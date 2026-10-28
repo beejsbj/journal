@@ -1031,7 +1031,7 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   when a pass ran, not which rows it read, and WP9's `_unpersisted_from` trusted it as proof: with the sessions
   database missing or misconfigured for more than 48 hours, another chat id, the writer enabled after a first pass,
   or a clock that ran ahead and was corrected, a pass was saved over rows it never saw, and the writer then wrote a
-  `/x` exchange from its cursor (seen by a read-only verifier after an earlier PR, 15). Rule: a view records where it began
+  `/x` exchange from its cursor (seen by a read-only verifier after earlier PR 15). Rule: a view records where it began
   recomputing (`View.start`), and **a reader that holds rows older than that asks `privacy.covering(cfg, oldest)`**,
   which re-takes the view from its oldest row (and 48 hours before it); saved results are a floor (more private),
   never the proof that a row is public. Readers that use it: the conversation writer (its oldest settled row), the
