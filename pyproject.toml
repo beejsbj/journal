@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "journal"
+version = "2.0.0"
+description = "Deterministic guided journaling over Telegram, with a Hermes Agent plugin"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+# Only needed to read Hermes settings from a profile's config.yaml outside Hermes' own Python.
+hermes = ["pyyaml>=6,<7"]
+# Only needed for `journal mcp` (the journal's tools for an MCP client); the core stays stdlib-only.
+mcp = ["mcp>=2,<3"]
+
+[project.scripts]
+journal = "journal.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/beejsbj/journal"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+journal = ["skills/*/*.md", "skills/*/references/*.md", "library/practices/*.md", "library/programs/*/program.md",
+           "library/programs/*/sessions/*.md", "library/situational/*.md", "serve/fallback/*", "serve/static/**/*"]

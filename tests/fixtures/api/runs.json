@@ -1,0 +1,113 @@
+[
+  {
+    "id": "2026-10-15-run1",
+    "program": "fix-life",
+    "title": "Fix your entire life in 1 day",
+    "emoji": "🧠",
+    "status": "active",
+    "started_at": "2026-10-15T03:42:00+00:00",
+    "completed_at": null,
+    "paused_since": null,
+    "last_activity_at": "2026-10-15T03:42:00+00:00",
+    "current": {
+      "session": 1,
+      "phase": 1
+    },
+    "where": "1:1:1",
+    "text": "Fix your entire life in 1 day — session 1/10 (The Anti-Vision Architect), phase 1/6 open since 09:12",
+    "sessions": [
+      {
+        "number": 1,
+        "title": "The Anti-Vision Architect",
+        "status": "in_progress",
+        "entry": "2026-10-15-fix-life-s01-2",
+        "phases_total": 6,
+        "started_at": "2026-10-15T03:42:00+00:00",
+        "completed_at": null
+      },
+      {
+        "number": 2,
+        "title": "The Hidden Goal Decoder",
+        "status": "not-started",
+        "entry": null,
+        "phases_total": 5,
+        "started_at": null,
+        "completed_at": null
+      },
+      {
+        "number": 3,
+        "title": "The Identity Construction Tracer",
+        "status": "not-started",
+        "entry": null,
+        "phases_total": 5,
+        "started_at": null,
+        "completed_at": null
+      },
+      {
+        "number": 4,
+        "title": "The Lifestyle-Outcome Alignment Auditor",
+        "status": "not-started",
+        "entry": null,
+        "phases_total": 5,
+        "started_at": null,
+        "completed_at": null
+      },
+      {
+        "number": 5,
+        "title": "The Dissonance Engine",
+        "status": "not-started",
+        "entry": null,
+        "phases_total": 5,
+        "started_at": null,
+        "completed_at": null
+      },
+      {
+        "number": 6,
+        "title": "The Cybernetic Debugger",
+        "status": "not-started",
+        "entry": null,
+        "phases_total": 5,
+        "started_at": null,
+        "completed_at": null
+      },
+      {
+        "number": 7,
+        "title": "The Ego Stage Navigator",
+        "status": "not-started",
+        "entry": null,
+        "phases_total": 5,
+        "started_at": null,
+        "completed_at": null
+      },
+      {
+        "number": 8,
+        "title": "The Game Architecture Engineer",
+        "status": "not-started",
+        "entry": null,
+        "phases_total": 5,
+        "started_at": null,
+        "completed_at": null
+      },
+      {
+        "number": 9,
+        "title": "The Conditioning Excavator",
+        "status": "not-started",
+        "entry": null,
+        "phases_total": 5,
+        "started_at": null,
+        "completed_at": null
+      },
+      {
+        "number": 10,
+        "title": "The One-Day Reset Architect",
+        "status": "not-started",
+        "entry": null,
+        "phases_total": 5,
+        "started_at": null,
+        "completed_at": null
+      }
+    ],
+    "insights_entry": null,
+    "scheduled": []
+  }
+]

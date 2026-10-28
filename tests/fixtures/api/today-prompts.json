@@ -1,0 +1,260 @@
+{
+  "date": "2026-10-15",
+  "weekday": "Thu",
+  "time": "21:40",
+  "timezone": "IST",
+  "location": "Kochi, Kerala, India",
+  "practices": {
+    "rows": [
+      {
+        "id": "morning",
+        "state": "missed",
+        "sent": "06:00",
+        "answered": null,
+        "stem": "2026-10-15-morning",
+        "prompt": {
+          "sent_at_local": "06:00 IST",
+          "opener": "Morning, Sam. Yesterday ended on the harbour and the gulls; you said the lighthouse kept coming back. Before the day takes over, how did you sleep, and what is sitting on your chest?",
+          "opener_source": "ada",
+          "asked": [
+            {
+              "id": "1",
+              "question": "How did you sleep?"
+            }
+          ],
+          "questions": [
+            {
+              "id": "1",
+              "text": "How did you sleep?",
+              "section": null
+            },
+            {
+              "id": "2",
+              "text": "How are you feeling — physically, mentally, emotionally?",
+              "section": null
+            },
+            {
+              "id": "3",
+              "text": "What's on your chest right now?",
+              "section": null
+            },
+            {
+              "id": "4",
+              "text": "Which of your values will you experiment with today?",
+              "section": null
+            },
+            {
+              "id": "5",
+              "text": "What's your centering mantra?",
+              "section": null
+            },
+            {
+              "id": "6",
+              "text": "Two things you're grateful for — why?",
+              "section": null
+            },
+            {
+              "id": "7",
+              "text": "Top priority today?",
+              "section": null
+            },
+            {
+              "id": "8",
+              "text": "2-3 supporting goals for a successful day?",
+              "section": null
+            },
+            {
+              "id": "9",
+              "text": "Any worries about the day ahead? What's the plan?",
+              "section": null
+            },
+            {
+              "id": "10",
+              "text": "Who needs your support today? How will you show up?",
+              "section": null
+            },
+            {
+              "id": "11",
+              "text": "What would make today deeply satisfying?",
+              "section": null
+            }
+          ],
+          "phases": []
+        }
+      },
+      {
+        "id": "gratitude",
+        "state": "answered",
+        "sent": "21:30",
+        "answered": "21:38",
+        "stem": "2026-10-15-gratitude",
+        "prompt": {
+          "sent_at_local": "21:30 IST",
+          "opener": "Three small things tonight, Sam. The walk to the harbour counts.",
+          "opener_source": "ada",
+          "asked": [],
+          "questions": [
+            {
+              "id": "1",
+              "text": "Three things today, and why each one mattered.",
+              "section": null
+            },
+            {
+              "id": "2",
+              "text": "Who made one of them possible?",
+              "section": null
+            }
+          ],
+          "phases": []
+        }
+      },
+      {
+        "id": "evening",
+        "state": "upcoming",
+        "at": "23:00"
+      },
+      {
+        "id": "weekly",
+        "state": "open",
+        "sent": "20:05",
+        "answered": null,
+        "stem": "2026-10-15-weekly",
+        "prompt": {
+          "sent_at_local": "20:05 IST",
+          "opener": null,
+          "opener_source": "plain",
+          "asked": [],
+          "questions": [
+            {
+              "id": "1.1",
+              "text": "Which days had energy, which didn't — and what was behind it?",
+              "section": "Energy & Themes"
+            },
+            {
+              "id": "1.2",
+              "text": "What kept coming up across the week?",
+              "section": "Energy & Themes"
+            },
+            {
+              "id": "2.1",
+              "text": "Which values showed up this week? Which were neglected?",
+              "section": "Values & Alignment"
+            },
+            {
+              "id": "3.1",
+              "text": "What intentions or promises slipped — to yourself or others?",
+              "section": "Dropped Threads"
+            },
+            {
+              "id": "4.1",
+              "text": "What's worth celebrating from the week, even small?",
+              "section": "Wins"
+            },
+            {
+              "id": "5.1",
+              "text": "Who showed up for you, and who did you show up for?",
+              "section": "Connections"
+            },
+            {
+              "id": "6.1",
+              "text": "What do you want to carry forward from this week?",
+              "section": "Forward"
+            },
+            {
+              "id": "6.2",
+              "text": "What thread do you want to pull next week?",
+              "section": "Forward"
+            },
+            {
+              "id": "6.3",
+              "text": "What would make next week feel aligned?",
+              "section": "Forward"
+            }
+          ],
+          "phases": []
+        }
+      }
+    ],
+    "open": [
+      "weekly"
+    ]
+  },
+  "program": null,
+  "entries": [
+    {
+      "stem": "2026-10-15-fix-life-s01",
+      "first_line": "The life I do not want."
+    },
+    {
+      "stem": "2026-10-15-gratitude",
+      "first_line": "The ferry was late and I did not mind. Bread from the corner bakery, still warm."
+    },
+    {
+      "stem": "2026-10-15-j",
+      "first_line": "call the harbour master"
+    }
+  ],
+  "reflection": {
+    "date": "2026-10-14",
+    "asked": "What does the sea ask?",
+    "stem": "2026-10-14-reflection"
+  },
+  "tasks": null,
+  "weather": "27°C, light rain; today 24–30°C, rain chance 60%",
+  "week": [
+    {
+      "date": "2026-10-09",
+      "weekday": "Fri",
+      "answered": 0,
+      "missed": 0,
+      "state": "none"
+    },
+    {
+      "date": "2026-10-10",
+      "weekday": "Sat",
+      "answered": 0,
+      "missed": 0,
+      "state": "none"
+    },
+    {
+      "date": "2026-10-11",
+      "weekday": "Sun",
+      "answered": 0,
+      "missed": 0,
+      "state": "none"
+    },
+    {
+      "date": "2026-10-12",
+      "weekday": "Mon",
+      "answered": 0,
+      "missed": 0,
+      "state": "none"
+    },
+    {
+      "date": "2026-10-13",
+      "weekday": "Tue",
+      "answered": 0,
+      "missed": 0,
+      "state": "none"
+    },
+    {
+      "date": "2026-10-14",
+      "weekday": "Wed",
+      "answered": 1,
+      "missed": 0,
+      "state": "answered"
+    },
+    {
+      "date": "2026-10-15",
+      "weekday": "Thu",
+      "answered": 1,
+      "missed": 1,
+      "state": "partial"
+    }
+  ],
+  "voices": {
+    "his": "Sam",
+    "hers": "Ada"
+  },
+  "location_source": null
+}

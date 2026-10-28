@@ -1,0 +1,13 @@
+__pycache__/
+uv.lock
+*.egg-info/
+.venv/
+.pytest_cache/
+web/node_modules/
+web/test-results/
+web/playwright-report/
+web/.vite/
+web/e2e/.paired.json
+web/screenshots/
+web/shots/out/
+web/shots/.paired.json

@@ -1,0 +1,68 @@
+---
+date: 2026-10-14
+kind: evening
+practice: evening
+type: journal
+source: journal
+---
+
+# Evening journal — Wed 14 Oct 2026
+
+## Prompt
+
+_Sent 23:00 IST · opener: ada_
+
+_Woven in: [1.1] What's spinning in your mind?_
+
+### A heading the model wrote
+Tea & <toast>? **Bold** and _soft_ — a line.
+
+> [!question]- Questions
+> **1. Brain Dump & Letting Go**
+> - What's spinning in your mind?
+> - What do you need to release before sleep?
+> **2. Day Review**
+> - What went well today?
+> - What challenged you?
+> - What did you learn?
+> **3. Story-Worthy Moments**
+> - What interesting moments happened, even if small?
+> - What made you smile or laugh?
+> - What surprised you?
+> **4. Wins & Celebrations**
+> - What wins, big or small, did you experience?
+> - What are you proud of?
+> **5. Insights & Revelations**
+> - What realizations or new understandings emerged?
+> - What did you learn about yourself or others?
+> **6. Values & Alignment**
+> - How did you honor your values today?
+> - Where did you feel most/least aligned?
+> **7. Energy Awareness**
+> - What energized you today?
+> - What drained your energy?
+> **8. Connection Reflection**
+> - What attention bids did you notice?
+> - Which connections did you lean into?
+> - Who showed up for you, and who did you show up for?
+> **9. Gratitude**
+> - What moments from today are you thankful for?
+> - What simple joys touched you today?
+> **10. Peace & Calming**
+> - What brought you peace today?
+> - What's one thing you can appreciate about yourself?
+> - What do you want to carry into your sleep?
+
+## Sam
+
+### 23:12 IST · text
+
+First words.
+
+### 23:40 IST · text
+
+A later reply.
+
+## Ada's annotations
+
+_Pending._

@@ -1,0 +1,83 @@
+{
+  "definition": {
+    "id": "midweek",
+    "kind": "practice",
+    "title": "Midweek check-in",
+    "emoji": "",
+    "source": "builtin",
+    "enabled": true,
+    "schedule": [
+      {
+        "time": "12:00",
+        "weekday": 2
+      }
+    ],
+    "closes": null,
+    "annotate": true,
+    "collapse_hours": 6.0,
+    "opener": {
+      "mode": "companion",
+      "shape": "a brief opener (max ~800 characters)",
+      "limit": 900,
+      "plain": "Midweek check-in. Quick pulse — a sentence or two is enough."
+    },
+    "companion": "a two-minute pulse — energy, drift, support; offer at most one nudge",
+    "group": "",
+    "path": "/package/library/practices/midweek.md",
+    "sections": [
+      {
+        "title": "Energy Check",
+        "questions": [
+          {
+            "id": "1.1",
+            "text": "How's your energy been this week?",
+            "pinned": false
+          },
+          {
+            "id": "1.2",
+            "text": "High/low/variable? Any idea why?",
+            "pinned": false
+          }
+        ]
+      },
+      {
+        "title": "Drift Check",
+        "questions": [
+          {
+            "id": "2.1",
+            "text": "Monday's intentions vs. where you are now — aligned or drifted?",
+            "pinned": false
+          },
+          {
+            "id": "2.2",
+            "text": "Anything taking you off course?",
+            "pinned": false
+          }
+        ]
+      },
+      {
+        "title": "Support Check",
+        "questions": [
+          {
+            "id": "3.1",
+            "text": "What do you need this week?",
+            "pinned": false
+          },
+          {
+            "id": "3.2",
+            "text": "Who can help? What would help?",
+            "pinned": false
+          }
+        ]
+      }
+    ]
+  },
+  "raw": "---\nkind: practice\nid: midweek\ntitle: Midweek check-in\nemoji:\nschedule.time: 12:00\nschedule.weekday: 2\ncollapse_hours: 6\nannotate: true\nopener.mode: companion\nopener.shape: a brief opener (max ~800 characters)\nopener.limit: 900\nopener.plain: Midweek check-in. Quick pulse — a sentence or two is enough.\ncompanion: a two-minute pulse — energy, drift, support; offer at most one nudge\n---\n## 1. Energy Check\n- How's your energy been this week?\n- High/low/variable? Any idea why?\n\n## 2. Drift Check\n- Monday's intentions vs. where you are now — aligned or drifted?\n- Anything taking you off course?\n\n## 3. Support Check\n- What do you need this week?\n- Who can help? What would help?\n",
+  "problems": [],
+  "mtime": null,
+  "override": null,
+  "diff": {
+    "since": "--- default when you edited/midweek.md\n+++ default now/midweek.md\n@@ -18,7 +18,7 @@\n - High/low/variable? Any idea why?\n \n ## 2. Drift Check\n-- Monday's intentions vs. where you are now — on track?\n+- Monday's intentions vs. where you are now — aligned or drifted?\n - Anything taking you off course?\n \n ## 3. Support Check\n",
+    "yours": "--- default/midweek.md\n+++ yours/midweek.md\n@@ -14,7 +14,7 @@\n companion: a two-minute pulse — energy, drift, support; offer at most one nudge\n ---\n ## 1. Energy Check\n-- How's your energy been this week?\n+- Where has your energy gone this week?\n - High/low/variable? Any idea why?\n \n ## 2. Drift Check\n"
+  }
+}

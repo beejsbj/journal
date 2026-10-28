@@ -1,0 +1,221 @@
+name: journal
+version: "2.0.0"
+manifest_version: 2
+api_version: 1
+kind: standalone
+description: >-
+  Deterministic guided journaling over Telegram: practices defined as files (the morning/evening/midweek/weekly
+  rituals and your own) sent in local time or with /start <id>, programs of ordered sessions (fix-life) and
+  situational sessions run phase by phase with /next /skip /back /break, verbatim capture of replies and /j notes
+  into one Markdown file per entry, annotations,
+  day reflections and week reviews by your companion persona, and a guard that keeps the agent out of
+  its own settings.
+author: journal contributors
+homepage: https://github.com/beejsbj/journal
+tags: [journal, telegram, gateway, cron]
+# The journal has no third-party dependencies (standard library only; PyYAML comes with Hermes).
+# `external` keeps the pyproject.toml (there for `uv tool install`) out of Hermes' shared dependency
+# environment, so enabling the plugin never rebuilds that environment.
+python_runtime: external
+provides_tools:
+  - journal_add_note
+  - journal_set_location
+  - journal_notebook
+  - journal_program
+provides_hooks:
+  - pre_gateway_dispatch
+  - pre_llm_call
+  - pre_tool_call
+config_schema:
+  config_file:
+    type: str
+    default: ""
+    label: Config file
+    description: Optional JSON config file loaded underneath these settings (same keys). Settings here win.
+  root:
+    type: str
+    default: ""
+    label: Journal directory
+    description: >-
+      Where entries are written, one Markdown file per entry (YYYY-MM-DD-<kind>.md). Required, here or
+      in the config file; `hermes journal doctor` fails until one of them sets it.
+  user:
+    type: dict
+    default: {name: "", pronouns: "they/them/their"}
+    description: "How entries and prompts refer to you: name (the heading over your words) and pronouns (subject/object/possessive)."
+  companion:
+    type: dict
+    default: {name: Companion, emoji: "📓"}
+    description: The persona's name (headings "<name>'s annotations" / "<name>'s notes") and the emoji on prompts.
+  timezone:
+    type: str
+    default: UTC
+    description: IANA timezone the schedule is read in. The journal_set_location tool updates it when you travel.
+  location:
+    type: str
+    default: ""
+    description: Where you are, in words (shown to the companion).
+  coordinates:
+    type: dict
+    description: "{lat, lon, place} for the weather source, plus source: openstreetmap when the web app's Use my location named the place (the app then credits OpenStreetMap wherever it shows it). Updated by journal_set_location."
+  lookup:
+    type: dict
+    description: "{reverse_url, timezone_url}: the keyless services the web app's Use my location asks (default OpenStreetMap Nominatim's /reverse and Open-Meteo's /v1/forecast). Point them at another instance if you run one."
+  windows:
+    type: dict
+    default: {collapse_hours: 6, grace_hours: 2, opener_budget_seconds: 240, annotate_after_minutes: 20}
+    description: How long a prompt stays open, how late it may be sent, the opener's model budget, and the wait before annotating.
+  channel:
+    type: dict
+    default: {platform: telegram, chat_id: "", user_ids: []}
+    description: >-
+      The chat the journal works in, on any Hermes gateway platform (telegram, discord, slack, signal, whatsapp,
+      matrix …): prompts go there and replies are captured there. chat_id is the chat as Hermes names it (empty on
+      telegram = telegram.chat_id); user_ids are your own ids there (empty = everything in the chat is yours, as in a
+      direct-message chat). Platforms other than Telegram are sent through Hermes and cannot fold, reply or show buttons.
+  telegram:
+    type: dict
+    default: {chat_id: "", token_env: JOURNAL_TELEGRAM_TOKEN, token_command: null, token_key: TELEGRAM_BOT_TOKEN, annotation_replies: true}
+    description: Chat to journal in, where the bot token comes from (an env var or a command that prints it), and whether annotations are sent back as replies.
+  agent:
+    type: dict
+    default: {enabled: true, command: null}
+    description: Model steps (openers, annotations). command = argv template replacing the Hermes one-shot chat.
+  hermes:
+    type: dict
+    default: {profile: null, command: null, state_db: null, cron_schedule: "*/5 * * * *", failure_deliver: null, mirror_to_chat: true}
+    description: >-
+      Profile for one-shot chats, hermes binary, sessions DB, tick schedule, where cron failure notices go
+      (default <channel platform>:<chat_id>), and whether what the journal sends is mirrored into the companion's chat
+      session (so she sees her prompts, annotations and reflections when he replies). legacy_plugins: other plugins
+      that capture the same chat (a predecessor); doctor fails while one of them is enabled.
+  sources:
+    type: dict
+    description: Context sources for openers (weather, telegram_history, tududi, scrobbler, listenbrainz, storyteller, audiobookshelf, grimmory), each {enabled, ...}. See the README.
+  guard:
+    type: dict
+    description: What the companion may not change (protected_paths, allowed_write_paths, protected_tokens, block_execute_code, restrict_hermes_cli, block_system_commands, escalate_to). See the README.
+  prompts:
+    type: dict
+    default: {reading_guidance: ""}
+    description: reading_guidance = where the companion should look before writing an opener or replying.
+  entries:
+    type: dict
+    default: {frontmatter_source: journal}
+    description: frontmatter_source = the `source:` value written into each entry's front matter.
+  audio:
+    type: dict
+    default: {transcribe: true, command: null, ffprobe: null}
+    description: >-
+      Audio files and recordings sent as documents (voice notes are transcribed by the gateway): transcribe
+      them in the tick (command = argv template with {file} printing the transcript; null = Hermes'
+      speech-to-text), and ffprobe for the recording time (null = found on PATH).
+  images:
+    type: dict
+    default: {max_mb: 20, describe: false}
+    description: >-
+      Photos and image files he sends are kept beside the entry like audio and embedded in his block (max_mb =
+      the largest picture kept; describe = the tick asks the companion for a one-line description, added as her
+      note, never as his words).
+  reflections:
+    type: dict
+    default:
+      day: {enabled: true, fallback_time: "04:00"}
+      week: {enabled: true, fallback_time: "04:00"}
+    description: >-
+      The companion's day reflection (after the evening entry is annotated, else fallback_time the next
+      morning) and week review (after the weekly entry is annotated, else fallback_time the day after),
+      written to the journal and sent to Telegram.
+  sweep:
+    type: dict
+    default: {enabled: true, lookback_hours: 48}
+    description: >-
+      Capture journal replies the gateway hook missed (sent while the companion was mid-reply) from the
+      Hermes sessions database, read-only, every tick.
+  recovery:
+    type: dict
+    default: {enabled: true, max_age_hours: 48}
+    description: >-
+      After a model outage left his chat messages answered only by Hermes' failure line, send one catch-up
+      reply once a model is reachable again (messages older than max_age_hours get a note in the chat
+      session instead of a reply).
+  capture:
+    type: dict
+    default: {mode: everything}
+    description: >-
+      What gets journaled. mode everything (the default): every chat thread is journal material, saved into the
+      entry it started from or a note entry of its own (see conversations). mode arm: the journal is one arm of a
+      general agent: replies to prompts, /j notes, program answers, voice notes answering a prompt and the
+      companion's journal_add_note are saved, with the conversation that follows them in the same thread;
+      ordinary chat that answers no prompt is not written into any entry. /x is off the record in both.
+  conversations:
+    type: dict
+    default: {enabled: true, quiet_minutes: 45, opt_out_prefix: /x, annotate_auto: false}
+    description: >-
+      Save the chat itself (his messages and the companion's replies) into the journal, grouped into threads
+      that end after quiet_minutes of silence or a journal prompt: into the entry a thread started from (a
+      journal reply or /j note), otherwise a new note entry. A message starting with opt_out_prefix is off the
+      record (alone: the rest of that thread). annotate_auto = annotate note entries started this way.
+  today:
+    type: dict
+    default:
+      enabled: true
+      max_chars: 1200
+      sources: [standing, practices, programs, entries, reflection, tasks, weather]
+      cache_minutes: 30
+    description: >-
+      The "today" block: once per conversation thread (his first message of the day, or after
+      conversations.quiet_minutes of quiet, or after a prompt was sent) the companion's turn gets up to
+      max_chars characters about the day (where things stand: when he was last heard from on the record, the
+      prompts unanswered since and any program in progress; how the practices went, today's entries, the last
+      reflection's question, tasks due and the weather), built from state and the tick's cache, never with a
+      context pack and never from the chat. cache_minutes: how often the tick refreshes tasks, weather and the
+      time of his last on-record chat message.
+  pack:
+    type: dict
+    default: {max_chars: 32000, entries: 6, lookback_days: 14, returning_days: 3, pointers: []}
+    description: >-
+      The context pack an opener is written from. max_chars = the whole pack (at least 8000); over it the oldest
+      material drops first. entries = his newest entries, by count whatever their age, each labelled with its
+      date and age. lookback_days = how far back the prompts unanswered since his last reply are counted, and his
+      chat is read for when he was last heard from. returning_days = from this gap since he was last heard from
+      on the record, the opener is asked to welcome him back without a recap. pointers = extra "where to look
+      further" lines (text), after the ones made from the connected sources.
+  serve:
+    type: dict
+    description: >-
+      `journal serve`, the private web app and its API (run from the CLI install, never by Hermes): bind
+      (127.0.0.1; anything wider is a deployment decision), port (8790), host (the site's name: Host check,
+      pairing links), public_port (the HTTPS port the site is published on when it is not 443; absent = 443),
+      token_env / token_command / token_key (resolved like the bot token; none configured = a
+      generated state_dir/serve-token), trusted_proxies (CIDRs whose X-Forwarded-* are believed), allow_write,
+      assets_dir, socket (an absolute Unix socket path served as well, 0600, for `tailscale serve`),
+      tailscale_users (Tailscale logins signed in by their identity header, on the socket only, from tailscaled). No default here on purpose: a settings form that saved one would override the config file's.
+  programs:
+    type: dict
+    default: {settle_minutes: 2, reflect: true, bridges: false, keyboard: true, synthesis: false}
+    description: >-
+      Programs (fix-life) and situational sessions, started with /start <id>: a phase answer moves the run on after
+      settle_minutes of quiet (/next at once); reflect = ask the model for a reflect phase's construction (its
+      authored text with a note when it can't); bridges = a short model lead-in before each question phase, quoting
+      only his last answer (off by default); keyboard = /next /skip /back /break as reply-keyboard buttons on each
+      phase (false: typed commands only); synthesis = add the companion's synthesis to a program's insights
+      document (every quote checked against the compiled text; a program file with `insights: compile+synthesis`
+      asks for it too).
+  state_dir:
+    type: str
+    default: ""
+    description: Engine state (ledger, notebook, packs, program runs). Default <HERMES_HOME>/plugin-data/journal.
+  practices_dir:
+    type: str
+    default: ""
+    description: >-
+      Your own practice files and forks of the built-in ones (`journal practices fork <id>`), one Markdown
+      file each. Default <state_dir>/practices. $JOURNAL_PRACTICES_DIR overrides.
+  adapter:
+    type: str
+    default: auto
+    description: >-
+      The agent the journal runs beside: auto (= hermes: the chat is read from Hermes' sessions database, model
+      steps run hermes chat unless agent.command is set) or none (no chat transcript; model steps only through
+      agent.command).

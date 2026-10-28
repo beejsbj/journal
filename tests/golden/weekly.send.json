@@ -1,0 +1,158 @@
+{
+ "log": [
+  "sent 2026-10-14-weekly (opener: plain:agent-failed, wove 0 questions)",
+  "sent 2026-10-14-weekly (opener: plain:agent-failed, wove 0 questions)"
+ ],
+ "mirror": [
+  {
+   "ref": [
+    "prompts",
+    "2026-10-14-weekly",
+    null
+   ],
+   "text": "🌿 Weekly pattern scan · Wed 14 Oct\n\nEnd of the week. Let's look back — take whichever thread matters.\n\n1. Energy & Themes\n   • Which days had energy, which didn't — and what was behind it?\n   • What kept coming up across the week?\n2. Values & Alignment\n   • Which values showed up this week? Which were neglected?\n3. Dropped Threads\n   • What intentions or promises slipped — to yourself or others?\n4. Wins\n   • What's worth celebrating from the week, even small?\n5. Connections\n   • Who showed up for you, and who did you show up for?\n6. Forward\n   • What do you want to carry forward from this week?\n   • What thread do you want to pull next week?\n   • What would make next week feel aligned?",
+   "what": "Ada sent the weekly prompt"
+  },
+  {
+   "ref": [
+    "prompts",
+    "2026-10-14-weekly",
+    null
+   ],
+   "text": "🌿 Weekly pattern scan · Wed 14 Oct\n\nEnd of the week. Let's look back — take whichever thread matters.\n\n1. Energy & Themes\n   • Which days had energy, which didn't — and what was behind it?\n   • What kept coming up across the week?\n2. Values & Alignment\n   • Which values showed up this week? Which were neglected?\n3. Dropped Threads\n   • What intentions or promises slipped — to yourself or others?\n4. Wins\n   • What's worth celebrating from the week, even small?\n5. Connections\n   • Who showed up for you, and who did you show up for?\n6. Forward\n   • What do you want to carry forward from this week?\n   • What thread do you want to pull next week?\n   • What would make next week feel aligned?",
+   "what": "Ada sent the weekly prompt again"
+  }
+ ],
+ "record": {
+  "asked": [],
+  "chat_id": "1001",
+  "citations": [],
+  "earlier_openers": [
+   "End of the week. Let's look back — take whichever thread matters."
+  ],
+  "html": "<b>🌿 Weekly pattern scan · Wed 14 Oct</b>\n\nEnd of the week. Let's look back — take whichever thread matters.\n\n<blockquote expandable><b>1. Energy &amp; Themes</b>\n- Which days had energy, which didn't — and what was behind it?\n- What kept coming up across the week?\n\n<b>2. Values &amp; Alignment</b>\n- Which values showed up this week? Which were neglected?\n\n<b>3. Dropped Threads</b>\n- What intentions or promises slipped — to yourself or others?\n\n<b>4. Wins</b>\n- What's worth celebrating from the week, even small?\n\n<b>5. Connections</b>\n- Who showed up for you, and who did you show up for?\n\n<b>6. Forward</b>\n- What do you want to carry forward from this week?\n- What thread do you want to pull next week?\n- What would make next week feel aligned?</blockquote>\n\n<i>Tap to open the questions · reply to this message anytime</i>",
+  "id": "2026-10-14-weekly",
+  "kind": "weekly",
+  "local_date": "2026-10-14",
+  "message_id": "702",
+  "needs_edit": false,
+  "opener": "End of the week. Let's look back — take whichever thread matters.",
+  "opener_source": "plain:agent-failed",
+  "plain_text": "🌿 Weekly pattern scan · Wed 14 Oct\n\nEnd of the week. Let's look back — take whichever thread matters.\n\n1. Energy & Themes\n   • Which days had energy, which didn't — and what was behind it?\n   • What kept coming up across the week?\n2. Values & Alignment\n   • Which values showed up this week? Which were neglected?\n3. Dropped Threads\n   • What intentions or promises slipped — to yourself or others?\n4. Wins\n   • What's worth celebrating from the week, even small?\n5. Connections\n   • Who showed up for you, and who did you show up for?\n6. Forward\n   • What do you want to carry forward from this week?\n   • What thread do you want to pull next week?\n   • What would make next week feel aligned?",
+  "previous_message_ids": [
+   "701"
+  ],
+  "questions": [
+   {
+    "id": "1.1",
+    "section": "Energy & Themes",
+    "text": "Which days had energy, which didn't — and what was behind it?"
+   },
+   {
+    "id": "1.2",
+    "section": "Energy & Themes",
+    "text": "What kept coming up across the week?"
+   },
+   {
+    "id": "2.1",
+    "section": "Values & Alignment",
+    "text": "Which values showed up this week? Which were neglected?"
+   },
+   {
+    "id": "3.1",
+    "section": "Dropped Threads",
+    "text": "What intentions or promises slipped — to yourself or others?"
+   },
+   {
+    "id": "4.1",
+    "section": "Wins",
+    "text": "What's worth celebrating from the week, even small?"
+   },
+   {
+    "id": "5.1",
+    "section": "Connections",
+    "text": "Who showed up for you, and who did you show up for?"
+   },
+   {
+    "id": "6.1",
+    "section": "Forward",
+    "text": "What do you want to carry forward from this week?"
+   },
+   {
+    "id": "6.2",
+    "section": "Forward",
+    "text": "What thread do you want to pull next week?"
+   },
+   {
+    "id": "6.3",
+    "section": "Forward",
+    "text": "What would make next week feel aligned?"
+   }
+  ],
+  "scheduled": "2026-10-14T23:09:00+05:30",
+  "stem": "2026-10-14-weekly"
+ },
+ "sent": [
+  {
+   "asked": [],
+   "chat_id": "1001",
+   "id": "2026-10-14-weekly",
+   "kind": "weekly",
+   "local_date": "2026-10-14",
+   "message_id": "701",
+   "opener": "End of the week. Let's look back — take whichever thread matters.",
+   "opener_source": "plain:agent-failed",
+   "scheduled": "2026-10-14T23:01:00+05:30"
+  },
+  {
+   "asked": [],
+   "chat_id": "1001",
+   "id": "2026-10-14-weekly",
+   "kind": "weekly",
+   "local_date": "2026-10-14",
+   "message_id": "702",
+   "opener": "End of the week. Let's look back — take whichever thread matters.",
+   "opener_source": "plain:agent-failed",
+   "previous_message_ids": [
+    "701"
+   ],
+   "scheduled": "2026-10-14T23:09:00+05:30"
+  }
+ ],
+ "telegram": [
+  [
+   "sendMessage",
+   {
+    "chat_id": "1001",
+    "link_preview_options": {
+     "is_disabled": true
+    },
+    "parse_mode": "HTML",
+    "text": "<b>🌿 Weekly pattern scan · Wed 14 Oct</b>\n\nEnd of the week. Let's look back — take whichever thread matters.\n\n<blockquote expandable><b>1. Energy &amp; Themes</b>\n- Which days had energy, which didn't — and what was behind it?\n- What kept coming up across the week?\n\n<b>2. Values &amp; Alignment</b>\n- Which values showed up this week? Which were neglected?\n\n<b>3. Dropped Threads</b>\n- What intentions or promises slipped — to yourself or others?\n\n<b>4. Wins</b>\n- What's worth celebrating from the week, even small?\n\n<b>5. Connections</b>\n- Who showed up for you, and who did you show up for?\n\n<b>6. Forward</b>\n- What do you want to carry forward from this week?\n- What thread do you want to pull next week?\n- What would make next week feel aligned?</blockquote>\n\n<i>Tap to open the questions · reply to this message anytime</i>"
+   }
+  ],
+  [
+   "sendMessage",
+   {
+    "chat_id": "1001",
+    "link_preview_options": {
+     "is_disabled": true
+    },
+    "parse_mode": "HTML",
+    "text": "<b>🌿 Weekly pattern scan · Wed 14 Oct</b>\n\nEnd of the week. Let's look back — take whichever thread matters.\n\n<blockquote expandable><b>1. Energy &amp; Themes</b>\n- Which days had energy, which didn't — and what was behind it?\n- What kept coming up across the week?\n\n<b>2. Values &amp; Alignment</b>\n- Which values showed up this week? Which were neglected?\n\n<b>3. Dropped Threads</b>\n- What intentions or promises slipped — to yourself or others?\n\n<b>4. Wins</b>\n- What's worth celebrating from the week, even small?\n\n<b>5. Connections</b>\n- Who showed up for you, and who did you show up for?\n\n<b>6. Forward</b>\n- What do you want to carry forward from this week?\n- What thread do you want to pull next week?\n- What would make next week feel aligned?</blockquote>\n\n<i>Tap to open the questions · reply to this message anytime</i>"
+   }
+  ],
+  [
+   "editMessageText",
+   {
+    "chat_id": "1001",
+    "link_preview_options": {
+     "is_disabled": true
+    },
+    "message_id": 701,
+    "parse_mode": "HTML",
+    "text": "<b>🌿 Weekly pattern scan · Wed 14 Oct</b>\n\nEnd of the week. Let's look back — take whichever thread matters.\n\n<i>sent again below</i>"
+   }
+  ]
+ ]
+}

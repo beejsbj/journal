@@ -1,0 +1,233 @@
+{
+ "log": [
+  "sent 2026-10-14-evening (opener: plain:agent-failed, wove 0 questions)",
+  "sent 2026-10-14-evening (opener: plain:agent-failed, wove 0 questions)"
+ ],
+ "mirror": [
+  {
+   "ref": [
+    "prompts",
+    "2026-10-14-evening",
+    null
+   ],
+   "text": "🌿 Evening journal · Wed 14 Oct\n\nEvening, Sam 🌿 Let the day land. Answer whatever pulls at you; you don't need to do them all.\n\n1. Brain Dump & Letting Go\n   • What's spinning in your mind?\n   • What do you need to release before sleep?\n2. Day Review\n   • What went well today?\n   • What challenged you?\n   • What did you learn?\n3. Story-Worthy Moments\n   • What interesting moments happened, even if small?\n   • What made you smile or laugh?\n   • What surprised you?\n4. Wins & Celebrations\n   • What wins, big or small, did you experience?\n   • What are you proud of?\n5. Insights & Revelations\n   • What realizations or new understandings emerged?\n   • What did you learn about yourself or others?\n6. Values & Alignment\n   • How did you honor your values today?\n   • Where did you feel most/least aligned?\n7. Energy Awareness\n   • What energized you today?\n   • What drained your energy?\n8. Connection Reflection\n   • What attention bids did you notice?\n   • Which connections did you lean into?\n   • Who showed up for you, and who did you show up for?\n9. Gratitude\n   • What moments from today are you thankful for?\n   • What simple joys touched you today?\n10. Peace & Calming\n   • What brought you peace today?\n   • What's one thing you can appreciate about yourself?\n   • What do you want to carry into your sleep?",
+   "what": "Ada sent the evening prompt"
+  },
+  {
+   "ref": [
+    "prompts",
+    "2026-10-14-evening",
+    null
+   ],
+   "text": "🌿 Evening journal · Wed 14 Oct\n\nEvening, Sam 🌿 Let the day land. Answer whatever pulls at you; you don't need to do them all.\n\n1. Brain Dump & Letting Go\n   • What's spinning in your mind?\n   • What do you need to release before sleep?\n2. Day Review\n   • What went well today?\n   • What challenged you?\n   • What did you learn?\n3. Story-Worthy Moments\n   • What interesting moments happened, even if small?\n   • What made you smile or laugh?\n   • What surprised you?\n4. Wins & Celebrations\n   • What wins, big or small, did you experience?\n   • What are you proud of?\n5. Insights & Revelations\n   • What realizations or new understandings emerged?\n   • What did you learn about yourself or others?\n6. Values & Alignment\n   • How did you honor your values today?\n   • Where did you feel most/least aligned?\n7. Energy Awareness\n   • What energized you today?\n   • What drained your energy?\n8. Connection Reflection\n   • What attention bids did you notice?\n   • Which connections did you lean into?\n   • Who showed up for you, and who did you show up for?\n9. Gratitude\n   • What moments from today are you thankful for?\n   • What simple joys touched you today?\n10. Peace & Calming\n   • What brought you peace today?\n   • What's one thing you can appreciate about yourself?\n   • What do you want to carry into your sleep?",
+   "what": "Ada sent the evening prompt again"
+  }
+ ],
+ "record": {
+  "asked": [],
+  "chat_id": "1001",
+  "citations": [],
+  "earlier_openers": [
+   "Evening, Sam 🌿 Let the day land. Answer whatever pulls at you; you don't need to do them all."
+  ],
+  "html": "<b>🌿 Evening journal · Wed 14 Oct</b>\n\nEvening, Sam 🌿 Let the day land. Answer whatever pulls at you; you don't need to do them all.\n\n<blockquote expandable><b>1. Brain Dump &amp; Letting Go</b>\n- What's spinning in your mind?\n- What do you need to release before sleep?\n\n<b>2. Day Review</b>\n- What went well today?\n- What challenged you?\n- What did you learn?\n\n<b>3. Story-Worthy Moments</b>\n- What interesting moments happened, even if small?\n- What made you smile or laugh?\n- What surprised you?\n\n<b>4. Wins &amp; Celebrations</b>\n- What wins, big or small, did you experience?\n- What are you proud of?\n\n<b>5. Insights &amp; Revelations</b>\n- What realizations or new understandings emerged?\n- What did you learn about yourself or others?\n\n<b>6. Values &amp; Alignment</b>\n- How did you honor your values today?\n- Where did you feel most/least aligned?\n\n<b>7. Energy Awareness</b>\n- What energized you today?\n- What drained your energy?\n\n<b>8. Connection Reflection</b>\n- What attention bids did you notice?\n- Which connections did you lean into?\n- Who showed up for you, and who did you show up for?\n\n<b>9. Gratitude</b>\n- What moments from today are you thankful for?\n- What simple joys touched you today?\n\n<b>10. Peace &amp; Calming</b>\n- What brought you peace today?\n- What's one thing you can appreciate about yourself?\n- What do you want to carry into your sleep?</blockquote>\n\n<i>Tap to open the questions · reply to this message anytime</i>",
+  "id": "2026-10-14-evening",
+  "kind": "evening",
+  "local_date": "2026-10-14",
+  "message_id": "702",
+  "needs_edit": false,
+  "opener": "Evening, Sam 🌿 Let the day land. Answer whatever pulls at you; you don't need to do them all.",
+  "opener_source": "plain:agent-failed",
+  "plain_text": "🌿 Evening journal · Wed 14 Oct\n\nEvening, Sam 🌿 Let the day land. Answer whatever pulls at you; you don't need to do them all.\n\n1. Brain Dump & Letting Go\n   • What's spinning in your mind?\n   • What do you need to release before sleep?\n2. Day Review\n   • What went well today?\n   • What challenged you?\n   • What did you learn?\n3. Story-Worthy Moments\n   • What interesting moments happened, even if small?\n   • What made you smile or laugh?\n   • What surprised you?\n4. Wins & Celebrations\n   • What wins, big or small, did you experience?\n   • What are you proud of?\n5. Insights & Revelations\n   • What realizations or new understandings emerged?\n   • What did you learn about yourself or others?\n6. Values & Alignment\n   • How did you honor your values today?\n   • Where did you feel most/least aligned?\n7. Energy Awareness\n   • What energized you today?\n   • What drained your energy?\n8. Connection Reflection\n   • What attention bids did you notice?\n   • Which connections did you lean into?\n   • Who showed up for you, and who did you show up for?\n9. Gratitude\n   • What moments from today are you thankful for?\n   • What simple joys touched you today?\n10. Peace & Calming\n   • What brought you peace today?\n   • What's one thing you can appreciate about yourself?\n   • What do you want to carry into your sleep?",
+  "previous_message_ids": [
+   "701"
+  ],
+  "questions": [
+   {
+    "id": "1.1",
+    "section": "Brain Dump & Letting Go",
+    "text": "What's spinning in your mind?"
+   },
+   {
+    "id": "1.2",
+    "section": "Brain Dump & Letting Go",
+    "text": "What do you need to release before sleep?"
+   },
+   {
+    "id": "2.1",
+    "section": "Day Review",
+    "text": "What went well today?"
+   },
+   {
+    "id": "2.2",
+    "section": "Day Review",
+    "text": "What challenged you?"
+   },
+   {
+    "id": "2.3",
+    "section": "Day Review",
+    "text": "What did you learn?"
+   },
+   {
+    "id": "3.1",
+    "section": "Story-Worthy Moments",
+    "text": "What interesting moments happened, even if small?"
+   },
+   {
+    "id": "3.2",
+    "section": "Story-Worthy Moments",
+    "text": "What made you smile or laugh?"
+   },
+   {
+    "id": "3.3",
+    "section": "Story-Worthy Moments",
+    "text": "What surprised you?"
+   },
+   {
+    "id": "4.1",
+    "section": "Wins & Celebrations",
+    "text": "What wins, big or small, did you experience?"
+   },
+   {
+    "id": "4.2",
+    "section": "Wins & Celebrations",
+    "text": "What are you proud of?"
+   },
+   {
+    "id": "5.1",
+    "section": "Insights & Revelations",
+    "text": "What realizations or new understandings emerged?"
+   },
+   {
+    "id": "5.2",
+    "section": "Insights & Revelations",
+    "text": "What did you learn about yourself or others?"
+   },
+   {
+    "id": "6.1",
+    "section": "Values & Alignment",
+    "text": "How did you honor your values today?"
+   },
+   {
+    "id": "6.2",
+    "section": "Values & Alignment",
+    "text": "Where did you feel most/least aligned?"
+   },
+   {
+    "id": "7.1",
+    "section": "Energy Awareness",
+    "text": "What energized you today?"
+   },
+   {
+    "id": "7.2",
+    "section": "Energy Awareness",
+    "text": "What drained your energy?"
+   },
+   {
+    "id": "8.1",
+    "section": "Connection Reflection",
+    "text": "What attention bids did you notice?"
+   },
+   {
+    "id": "8.2",
+    "section": "Connection Reflection",
+    "text": "Which connections did you lean into?"
+   },
+   {
+    "id": "8.3",
+    "section": "Connection Reflection",
+    "text": "Who showed up for you, and who did you show up for?"
+   },
+   {
+    "id": "9.1",
+    "section": "Gratitude",
+    "text": "What moments from today are you thankful for?"
+   },
+   {
+    "id": "9.2",
+    "section": "Gratitude",
+    "text": "What simple joys touched you today?"
+   },
+   {
+    "id": "10.1",
+    "section": "Peace & Calming",
+    "text": "What brought you peace today?"
+   },
+   {
+    "id": "10.2",
+    "section": "Peace & Calming",
+    "text": "What's one thing you can appreciate about yourself?"
+   },
+   {
+    "id": "10.3",
+    "section": "Peace & Calming",
+    "text": "What do you want to carry into your sleep?"
+   }
+  ],
+  "scheduled": "2026-10-14T23:09:00+05:30",
+  "stem": "2026-10-14-evening"
+ },
+ "sent": [
+  {
+   "asked": [],
+   "chat_id": "1001",
+   "id": "2026-10-14-evening",
+   "kind": "evening",
+   "local_date": "2026-10-14",
+   "message_id": "701",
+   "opener": "Evening, Sam 🌿 Let the day land. Answer whatever pulls at you; you don't need to do them all.",
+   "opener_source": "plain:agent-failed",
+   "scheduled": "2026-10-14T23:01:00+05:30"
+  },
+  {
+   "asked": [],
+   "chat_id": "1001",
+   "id": "2026-10-14-evening",
+   "kind": "evening",
+   "local_date": "2026-10-14",
+   "message_id": "702",
+   "opener": "Evening, Sam 🌿 Let the day land. Answer whatever pulls at you; you don't need to do them all.",
+   "opener_source": "plain:agent-failed",
+   "previous_message_ids": [
+    "701"
+   ],
+   "scheduled": "2026-10-14T23:09:00+05:30"
+  }
+ ],
+ "telegram": [
+  [
+   "sendMessage",
+   {
+    "chat_id": "1001",
+    "link_preview_options": {
+     "is_disabled": true
+    },
+    "parse_mode": "HTML",
+    "text": "<b>🌿 Evening journal · Wed 14 Oct</b>\n\nEvening, Sam 🌿 Let the day land. Answer whatever pulls at you; you don't need to do them all.\n\n<blockquote expandable><b>1. Brain Dump &amp; Letting Go</b>\n- What's spinning in your mind?\n- What do you need to release before sleep?\n\n<b>2. Day Review</b>\n- What went well today?\n- What challenged you?\n- What did you learn?\n\n<b>3. Story-Worthy Moments</b>\n- What interesting moments happened, even if small?\n- What made you smile or laugh?\n- What surprised you?\n\n<b>4. Wins &amp; Celebrations</b>\n- What wins, big or small, did you experience?\n- What are you proud of?\n\n<b>5. Insights &amp; Revelations</b>\n- What realizations or new understandings emerged?\n- What did you learn about yourself or others?\n\n<b>6. Values &amp; Alignment</b>\n- How did you honor your values today?\n- Where did you feel most/least aligned?\n\n<b>7. Energy Awareness</b>\n- What energized you today?\n- What drained your energy?\n\n<b>8. Connection Reflection</b>\n- What attention bids did you notice?\n- Which connections did you lean into?\n- Who showed up for you, and who did you show up for?\n\n<b>9. Gratitude</b>\n- What moments from today are you thankful for?\n- What simple joys touched you today?\n\n<b>10. Peace &amp; Calming</b>\n- What brought you peace today?\n- What's one thing you can appreciate about yourself?\n- What do you want to carry into your sleep?</blockquote>\n\n<i>Tap to open the questions · reply to this message anytime</i>"
+   }
+  ],
+  [
+   "sendMessage",
+   {
+    "chat_id": "1001",
+    "link_preview_options": {
+     "is_disabled": true
+    },
+    "parse_mode": "HTML",
+    "text": "<b>🌿 Evening journal · Wed 14 Oct</b>\n\nEvening, Sam 🌿 Let the day land. Answer whatever pulls at you; you don't need to do them all.\n\n<blockquote expandable><b>1. Brain Dump &amp; Letting Go</b>\n- What's spinning in your mind?\n- What do you need to release before sleep?\n\n<b>2. Day Review</b>\n- What went well today?\n- What challenged you?\n- What did you learn?\n\n<b>3. Story-Worthy Moments</b>\n- What interesting moments happened, even if small?\n- What made you smile or laugh?\n- What surprised you?\n\n<b>4. Wins &amp; Celebrations</b>\n- What wins, big or small, did you experience?\n- What are you proud of?\n\n<b>5. Insights &amp; Revelations</b>\n- What realizations or new understandings emerged?\n- What did you learn about yourself or others?\n\n<b>6. Values &amp; Alignment</b>\n- How did you honor your values today?\n- Where did you feel most/least aligned?\n\n<b>7. Energy Awareness</b>\n- What energized you today?\n- What drained your energy?\n\n<b>8. Connection Reflection</b>\n- What attention bids did you notice?\n- Which connections did you lean into?\n- Who showed up for you, and who did you show up for?\n\n<b>9. Gratitude</b>\n- What moments from today are you thankful for?\n- What simple joys touched you today?\n\n<b>10. Peace &amp; Calming</b>\n- What brought you peace today?\n- What's one thing you can appreciate about yourself?\n- What do you want to carry into your sleep?</blockquote>\n\n<i>Tap to open the questions · reply to this message anytime</i>"
+   }
+  ],
+  [
+   "editMessageText",
+   {
+    "chat_id": "1001",
+    "link_preview_options": {
+     "is_disabled": true
+    },
+    "message_id": 701,
+    "parse_mode": "HTML",
+    "text": "<b>🌿 Evening journal · Wed 14 Oct</b>\n\nEvening, Sam 🌿 Let the day land. Answer whatever pulls at you; you don't need to do them all.\n\n<i>sent again below</i>"
+   }
+  ]
+ ]
+}

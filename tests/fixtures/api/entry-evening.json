@@ -1,0 +1,220 @@
+{
+  "stem": "2026-10-14-evening",
+  "date": "2026-10-14",
+  "kind": "evening",
+  "practice": {
+    "id": "evening",
+    "title": "Evening journal",
+    "emoji": ""
+  },
+  "program": null,
+  "session": null,
+  "run": null,
+  "title": "Evening journal — Wed 14 Oct 2026",
+  "voices": {
+    "his": "Sam",
+    "hers": "Ada"
+  },
+  "prompt": {
+    "sent_at_local": "23:00 IST",
+    "opener": "Evening 🌿",
+    "opener_source": "ada",
+    "asked": [
+      {
+        "id": "1.1",
+        "question": "What's spinning in your mind?"
+      }
+    ],
+    "questions": [
+      {
+        "id": "1.1",
+        "text": "What's spinning in your mind?",
+        "section": "Brain Dump & Letting Go"
+      },
+      {
+        "id": "1.2",
+        "text": "What do you need to release before sleep?",
+        "section": "Brain Dump & Letting Go"
+      },
+      {
+        "id": "2.1",
+        "text": "What went well today?",
+        "section": "Day Review"
+      },
+      {
+        "id": "2.2",
+        "text": "What challenged you?",
+        "section": "Day Review"
+      },
+      {
+        "id": "2.3",
+        "text": "What did you learn?",
+        "section": "Day Review"
+      },
+      {
+        "id": "3.1",
+        "text": "What interesting moments happened, even if small?",
+        "section": "Story-Worthy Moments"
+      },
+      {
+        "id": "3.2",
+        "text": "What made you smile or laugh?",
+        "section": "Story-Worthy Moments"
+      },
+      {
+        "id": "3.3",
+        "text": "What surprised you?",
+        "section": "Story-Worthy Moments"
+      },
+      {
+        "id": "4.1",
+        "text": "What wins, big or small, did you experience?",
+        "section": "Wins & Celebrations"
+      },
+      {
+        "id": "4.2",
+        "text": "What are you proud of?",
+        "section": "Wins & Celebrations"
+      },
+      {
+        "id": "5.1",
+        "text": "What realizations or new understandings emerged?",
+        "section": "Insights & Revelations"
+      },
+      {
+        "id": "5.2",
+        "text": "What did you learn about yourself or others?",
+        "section": "Insights & Revelations"
+      },
+      {
+        "id": "6.1",
+        "text": "How did you honor your values today?",
+        "section": "Values & Alignment"
+      },
+      {
+        "id": "6.2",
+        "text": "Where did you feel most/least aligned?",
+        "section": "Values & Alignment"
+      },
+      {
+        "id": "7.1",
+        "text": "What energized you today?",
+        "section": "Energy Awareness"
+      },
+      {
+        "id": "7.2",
+        "text": "What drained your energy?",
+        "section": "Energy Awareness"
+      },
+      {
+        "id": "8.1",
+        "text": "What attention bids did you notice?",
+        "section": "Connection Reflection"
+      },
+      {
+        "id": "8.2",
+        "text": "Which connections did you lean into?",
+        "section": "Connection Reflection"
+      },
+      {
+        "id": "8.3",
+        "text": "Who showed up for you, and who did you show up for?",
+        "section": "Connection Reflection"
+      },
+      {
+        "id": "9.1",
+        "text": "What moments from today are you thankful for?",
+        "section": "Gratitude"
+      },
+      {
+        "id": "9.2",
+        "text": "What simple joys touched you today?",
+        "section": "Gratitude"
+      },
+      {
+        "id": "10.1",
+        "text": "What brought you peace today?",
+        "section": "Peace & Calming"
+      },
+      {
+        "id": "10.2",
+        "text": "What's one thing you can appreciate about yourself?",
+        "section": "Peace & Calming"
+      },
+      {
+        "id": "10.3",
+        "text": "What do you want to carry into your sleep?",
+        "section": "Peace & Calming"
+      }
+    ],
+    "phases": []
+  },
+  "blocks": [
+    {
+      "kind": "his",
+      "key": "words:0",
+      "at": "23:12 IST",
+      "source": "text",
+      "text": "First words, about the lighthouse.",
+      "audio": null,
+      "phase": null
+    },
+    {
+      "kind": "his",
+      "key": "words:1",
+      "at": "23:40 IST",
+      "source": "voice",
+      "text": "A spoken thought.",
+      "audio": "2026-10-14-evening.ogg",
+      "phase": null,
+      "meta": {
+        "duration": 151
+      }
+    },
+    {
+      "kind": "his",
+      "key": "his:813",
+      "at": "23:44",
+      "source": "text",
+      "text": "Later I thought of the harbour.",
+      "audio": null,
+      "reply_to": null
+    },
+    {
+      "kind": "hers",
+      "key": "her:4815",
+      "at": "23:45",
+      "text": "The harbour sounds like a SECRETHERS word.\nSecond line."
+    },
+    {
+      "kind": "his",
+      "key": "his:816",
+      "at": "23:50",
+      "source": "text",
+      "text": "yes, and the gulls.",
+      "audio": null,
+      "reply_to": "The harbour sounds like"
+    }
+  ],
+  "summary": null,
+  "analysis": {
+    "annotations": "- a theme.",
+    "notes": [
+      {
+        "at": "08:02 IST",
+        "text": "A note of hers."
+      }
+    ],
+    "reflection": "2026-10-14-reflection"
+  },
+  "flags": {
+    "annotated": true,
+    "has_conversation": true,
+    "transcript_pending": false,
+    "audio": true
+  },
+  "meta": {},
+  "path": "/journal/Journal/2026-10-14-evening.md",
+  "mtime": 1760000000.0,
+  "writable": true
+}

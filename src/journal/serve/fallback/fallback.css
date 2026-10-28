@@ -1,0 +1,4 @@
+body { font: 16px/1.5 system-ui, sans-serif; margin: 0; padding: 2rem 1.25rem; color: #222; background: #fbfaf7; }
+main { max-width: 36rem; margin: 0 auto; }
+code { font-size: 0.9em; }
+@media (prefers-color-scheme: dark) { body { color: #ddd; background: #161514; } }

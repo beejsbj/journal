@@ -1,0 +1,143 @@
+{
+ "log": [
+  "sent 2026-10-14-midweek (opener: plain:agent-failed, wove 0 questions)",
+  "sent 2026-10-14-midweek (opener: plain:agent-failed, wove 0 questions)"
+ ],
+ "mirror": [
+  {
+   "ref": [
+    "prompts",
+    "2026-10-14-midweek",
+    null
+   ],
+   "text": "🌿 Midweek check-in · Wed 14 Oct\n\nMidweek check-in. Quick pulse — a sentence or two is enough.\n\n1. Energy Check\n   • How's your energy been this week?\n   • High/low/variable? Any idea why?\n2. Drift Check\n   • Monday's intentions vs. where you are now — aligned or drifted?\n   • Anything taking you off course?\n3. Support Check\n   • What do you need this week?\n   • Who can help? What would help?",
+   "what": "Ada sent the midweek prompt"
+  },
+  {
+   "ref": [
+    "prompts",
+    "2026-10-14-midweek",
+    null
+   ],
+   "text": "🌿 Midweek check-in · Wed 14 Oct\n\nMidweek check-in. Quick pulse — a sentence or two is enough.\n\n1. Energy Check\n   • How's your energy been this week?\n   • High/low/variable? Any idea why?\n2. Drift Check\n   • Monday's intentions vs. where you are now — aligned or drifted?\n   • Anything taking you off course?\n3. Support Check\n   • What do you need this week?\n   • Who can help? What would help?",
+   "what": "Ada sent the midweek prompt again"
+  }
+ ],
+ "record": {
+  "asked": [],
+  "chat_id": "1001",
+  "citations": [],
+  "earlier_openers": [
+   "Midweek check-in. Quick pulse — a sentence or two is enough."
+  ],
+  "html": "<b>🌿 Midweek check-in · Wed 14 Oct</b>\n\nMidweek check-in. Quick pulse — a sentence or two is enough.\n\n<blockquote expandable><b>1. Energy Check</b>\n- How's your energy been this week?\n- High/low/variable? Any idea why?\n\n<b>2. Drift Check</b>\n- Monday's intentions vs. where you are now — aligned or drifted?\n- Anything taking you off course?\n\n<b>3. Support Check</b>\n- What do you need this week?\n- Who can help? What would help?</blockquote>\n\n<i>Tap to open the questions · reply to this message anytime</i>",
+  "id": "2026-10-14-midweek",
+  "kind": "midweek",
+  "local_date": "2026-10-14",
+  "message_id": "702",
+  "needs_edit": false,
+  "opener": "Midweek check-in. Quick pulse — a sentence or two is enough.",
+  "opener_source": "plain:agent-failed",
+  "plain_text": "🌿 Midweek check-in · Wed 14 Oct\n\nMidweek check-in. Quick pulse — a sentence or two is enough.\n\n1. Energy Check\n   • How's your energy been this week?\n   • High/low/variable? Any idea why?\n2. Drift Check\n   • Monday's intentions vs. where you are now — aligned or drifted?\n   • Anything taking you off course?\n3. Support Check\n   • What do you need this week?\n   • Who can help? What would help?",
+  "previous_message_ids": [
+   "701"
+  ],
+  "questions": [
+   {
+    "id": "1.1",
+    "section": "Energy Check",
+    "text": "How's your energy been this week?"
+   },
+   {
+    "id": "1.2",
+    "section": "Energy Check",
+    "text": "High/low/variable? Any idea why?"
+   },
+   {
+    "id": "2.1",
+    "section": "Drift Check",
+    "text": "Monday's intentions vs. where you are now — aligned or drifted?"
+   },
+   {
+    "id": "2.2",
+    "section": "Drift Check",
+    "text": "Anything taking you off course?"
+   },
+   {
+    "id": "3.1",
+    "section": "Support Check",
+    "text": "What do you need this week?"
+   },
+   {
+    "id": "3.2",
+    "section": "Support Check",
+    "text": "Who can help? What would help?"
+   }
+  ],
+  "scheduled": "2026-10-14T23:09:00+05:30",
+  "stem": "2026-10-14-midweek"
+ },
+ "sent": [
+  {
+   "asked": [],
+   "chat_id": "1001",
+   "id": "2026-10-14-midweek",
+   "kind": "midweek",
+   "local_date": "2026-10-14",
+   "message_id": "701",
+   "opener": "Midweek check-in. Quick pulse — a sentence or two is enough.",
+   "opener_source": "plain:agent-failed",
+   "scheduled": "2026-10-14T23:01:00+05:30"
+  },
+  {
+   "asked": [],
+   "chat_id": "1001",
+   "id": "2026-10-14-midweek",
+   "kind": "midweek",
+   "local_date": "2026-10-14",
+   "message_id": "702",
+   "opener": "Midweek check-in. Quick pulse — a sentence or two is enough.",
+   "opener_source": "plain:agent-failed",
+   "previous_message_ids": [
+    "701"
+   ],
+   "scheduled": "2026-10-14T23:09:00+05:30"
+  }
+ ],
+ "telegram": [
+  [
+   "sendMessage",
+   {
+    "chat_id": "1001",
+    "link_preview_options": {
+     "is_disabled": true
+    },
+    "parse_mode": "HTML",
+    "text": "<b>🌿 Midweek check-in · Wed 14 Oct</b>\n\nMidweek check-in. Quick pulse — a sentence or two is enough.\n\n<blockquote expandable><b>1. Energy Check</b>\n- How's your energy been this week?\n- High/low/variable? Any idea why?\n\n<b>2. Drift Check</b>\n- Monday's intentions vs. where you are now — aligned or drifted?\n- Anything taking you off course?\n\n<b>3. Support Check</b>\n- What do you need this week?\n- Who can help? What would help?</blockquote>\n\n<i>Tap to open the questions · reply to this message anytime</i>"
+   }
+  ],
+  [
+   "sendMessage",
+   {
+    "chat_id": "1001",
+    "link_preview_options": {
+     "is_disabled": true
+    },
+    "parse_mode": "HTML",
+    "text": "<b>🌿 Midweek check-in · Wed 14 Oct</b>\n\nMidweek check-in. Quick pulse — a sentence or two is enough.\n\n<blockquote expandable><b>1. Energy Check</b>\n- How's your energy been this week?\n- High/low/variable? Any idea why?\n\n<b>2. Drift Check</b>\n- Monday's intentions vs. where you are now — aligned or drifted?\n- Anything taking you off course?\n\n<b>3. Support Check</b>\n- What do you need this week?\n- Who can help? What would help?</blockquote>\n\n<i>Tap to open the questions · reply to this message anytime</i>"
+   }
+  ],
+  [
+   "editMessageText",
+   {
+    "chat_id": "1001",
+    "link_preview_options": {
+     "is_disabled": true
+    },
+    "message_id": 701,
+    "parse_mode": "HTML",
+    "text": "<b>🌿 Midweek check-in · Wed 14 Oct</b>\n\nMidweek check-in. Quick pulse — a sentence or two is enough.\n\n<i>sent again below</i>"
+   }
+  ]
+ ]
+}

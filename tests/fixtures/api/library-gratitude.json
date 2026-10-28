@@ -1,0 +1,49 @@
+{
+  "definition": {
+    "id": "gratitude",
+    "kind": "practice",
+    "title": "Daily gratitude",
+    "emoji": "",
+    "source": "user",
+    "enabled": true,
+    "schedule": [
+      {
+        "time": "21:30",
+        "weekday": null
+      }
+    ],
+    "closes": null,
+    "annotate": true,
+    "collapse_hours": 6.0,
+    "opener": {
+      "mode": "companion",
+      "shape": "a short opener (max ~900 characters)",
+      "limit": 1100,
+      "plain": "{title}. A sentence or two is enough."
+    },
+    "companion": "",
+    "group": "",
+    "path": "/journal/state/practices/gratitude.md",
+    "sections": [
+      {
+        "title": null,
+        "questions": [
+          {
+            "id": "1",
+            "text": "Three things today, and why each one mattered.",
+            "pinned": false
+          },
+          {
+            "id": "2",
+            "text": "Who made one of them possible?",
+            "pinned": false
+          }
+        ]
+      }
+    ]
+  },
+  "raw": "---\nkind: practice\nid: gratitude\ntitle: Daily gratitude\nschedule.time: 21:30\n---\n- Three things today, and why each one mattered.\n- Who made one of them possible?\n",
+  "problems": [],
+  "mtime": 1760000000.0,
+  "override": null
+}

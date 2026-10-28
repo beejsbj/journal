@@ -1,0 +1,160 @@
+{
+  "id": "2026-10-15-run1",
+  "program": "fix-life",
+  "title": "Fix your entire life in 1 day",
+  "emoji": "🧠",
+  "status": "active",
+  "started_at": "2026-10-15T03:42:00+00:00",
+  "completed_at": null,
+  "paused_since": null,
+  "last_activity_at": "2026-10-15T03:42:00+00:00",
+  "current": {
+    "session": 1,
+    "phase": 1
+  },
+  "where": "1:1:1",
+  "text": "Fix your entire life in 1 day — session 1/10 (The Anti-Vision Architect), phase 1/6 open since 09:12",
+  "sessions": [
+    {
+      "number": 1,
+      "title": "The Anti-Vision Architect",
+      "status": "in_progress",
+      "entry": "2026-10-15-fix-life-s01-2",
+      "phases_total": 6,
+      "started_at": "2026-10-15T03:42:00+00:00",
+      "completed_at": null
+    },
+    {
+      "number": 2,
+      "title": "The Hidden Goal Decoder",
+      "status": "not-started",
+      "entry": null,
+      "phases_total": 5,
+      "started_at": null,
+      "completed_at": null
+    },
+    {
+      "number": 3,
+      "title": "The Identity Construction Tracer",
+      "status": "not-started",
+      "entry": null,
+      "phases_total": 5,
+      "started_at": null,
+      "completed_at": null
+    },
+    {
+      "number": 4,
+      "title": "The Lifestyle-Outcome Alignment Auditor",
+      "status": "not-started",
+      "entry": null,
+      "phases_total": 5,
+      "started_at": null,
+      "completed_at": null
+    },
+    {
+      "number": 5,
+      "title": "The Dissonance Engine",
+      "status": "not-started",
+      "entry": null,
+      "phases_total": 5,
+      "started_at": null,
+      "completed_at": null
+    },
+    {
+      "number": 6,
+      "title": "The Cybernetic Debugger",
+      "status": "not-started",
+      "entry": null,
+      "phases_total": 5,
+      "started_at": null,
+      "completed_at": null
+    },
+    {
+      "number": 7,
+      "title": "The Ego Stage Navigator",
+      "status": "not-started",
+      "entry": null,
+      "phases_total": 5,
+      "started_at": null,
+      "completed_at": null
+    },
+    {
+      "number": 8,
+      "title": "The Game Architecture Engineer",
+      "status": "not-started",
+      "entry": null,
+      "phases_total": 5,
+      "started_at": null,
+      "completed_at": null
+    },
+    {
+      "number": 9,
+      "title": "The Conditioning Excavator",
+      "status": "not-started",
+      "entry": null,
+      "phases_total": 5,
+      "started_at": null,
+      "completed_at": null
+    },
+    {
+      "number": 10,
+      "title": "The One-Day Reset Architect",
+      "status": "not-started",
+      "entry": null,
+      "phases_total": 5,
+      "started_at": null,
+      "completed_at": null
+    }
+  ],
+  "insights_entry": null,
+  "scheduled": [],
+  "phase": {
+    "program": "fix-life",
+    "session": 1,
+    "phase": 1,
+    "type": "ask",
+    "title": "Current Reality Excavation",
+    "header": "🧠 Fix your entire life in 1 day · Session 1/10 · Phase 1/6",
+    "blocks": [
+      {
+        "heading": null,
+        "text": "> You are okay with your current standards because you are not fully aware of what they are or what they lead to. — Dan Koe"
+      },
+      {
+        "heading": null,
+        "text": "I'm going to help you see where your current life is actually heading. Not where you hope it goes. Where the math says it goes.\n\nMost people tolerate mediocrity because they've never stared at the compound effect of their daily choices. We're going to fix that."
+      },
+      {
+        "heading": null,
+        "text": "**1.1** What's the dull, persistent dissatisfaction you've learned to live with? Not deep suffering. What you've learned to tolerate.\n\n**1.2** What do you complain about repeatedly but never actually change?\n\n**1.3** Your age right now?"
+      }
+    ],
+    "questions": [
+      {
+        "id": "1.1",
+        "text": "What's the dull, persistent dissatisfaction you've learned to live with? Not deep suffering. What you've learned to tolerate."
+      },
+      {
+        "id": "1.2",
+        "text": "What do you complain about repeatedly but never actually change?"
+      },
+      {
+        "id": "1.3",
+        "text": "Your age right now?"
+      }
+    ],
+    "hint": "reply here · /next · /skip · /back · /break",
+    "sent_text": "> You are okay with your current standards because you are not fully aware of what they are or what they lead to. — Dan Koe\n\nI'm going to help you see where your current life is actually heading. Not where you hope it goes. Where the math says it goes.\n\nMost people tolerate mediocrity because they've never stared at the compound effect of their daily choices. We're going to fix that.\n\n**1.1** What's the dull, persistent dissatisfaction you've learned to live with? Not deep suffering. What you've learned to tolerate.\n\n**1.2** What do you complain about repeatedly but never actually change?\n\n**1.3** Your age right now?",
+    "delivered": true,
+    "open": true,
+    "answered": false,
+    "skipped": false,
+    "phases_total": 6
+  },
+  "keyboard": [
+    "next",
+    "skip",
+    "pause",
+    "abandon"
+  ]
+}

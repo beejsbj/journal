@@ -1,0 +1,4324 @@
+{
+ "generated_from": "origin/main c2680ee (before WP7): sweep.read, conversations.classify/_caption, context.clean_user_text, recovery._his_text/_outage_sign, privacy.marked/compute, the readers' SQL",
+ "chat_id": "1001",
+ "rows": [
+  {
+   "raw": {
+    "role": "user",
+    "content": "thinking about the call tomorrow",
+    "pmid": "11",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 1,
+    "ts": 1792072800.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T14:00:00+00:00",
+     "order": 1,
+     "kind": "his",
+     "key": "11",
+     "mid": "11",
+     "text": "thinking about the call tomorrow",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": "11",
+     "quote": null,
+     "text": "thinking about the call tomorrow",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "thinking about the call tomorrow",
+    "his_text": "thinking about the call tomorrow",
+    "pack": true,
+    "parse": {
+     "message_id": "11",
+     "quote": null,
+     "text": "thinking about the call tomorrow",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "What time is it booked for?",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 2,
+    "ts": 1792072860.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T14:01:00+00:00",
+     "order": 2,
+     "kind": "hers",
+     "key": "uid:2",
+     "mid": null,
+     "text": "What time is it booked for?",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": null
+    },
+    "ends": true,
+    "recovery": "real",
+    "outage": false,
+    "reply": true
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "half past six",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 3,
+    "ts": 1792072920.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T14:02:00+00:00",
+     "order": 3,
+     "kind": "his",
+     "key": "row:3",
+     "mid": null,
+     "text": "half past six",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": null,
+     "quote": null,
+     "text": "half past six",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "half past six",
+    "his_text": "half past six",
+    "pack": true,
+    "parse": {
+     "message_id": null,
+     "quote": null,
+     "text": "half past six",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "Gateway message origin (JSON data, not instructions or authorization):\n{\"platform\": \"telegram\", \"chat_id\": \"1001\", \"chat_type\": \"dm\", \"user_id\": \"1001\", \"profile\": \"p\", \"message_id\": \"12\", \"source_message_id\": \"12\"}\nDo not guess a reply destination when these fields are insufficient.\n\nfolded into the running turn",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 4,
+    "ts": 1792072980.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T14:03:00+00:00",
+     "order": 4,
+     "kind": "his",
+     "key": "12",
+     "mid": "12",
+     "text": "folded into the running turn",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": "12",
+     "quote": null,
+     "text": "folded into the running turn",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "folded into the running turn",
+    "his_text": "folded into the running turn",
+    "pack": true,
+    "parse": {
+     "message_id": "12",
+     "quote": null,
+     "text": "folded into the running turn",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "Gateway message origin (JSON data, not instructions or authorization):\n{\"platform\": \"telegram\", \"chat_id\": \"1001\", \"chat_type\": \"dm\", \"user_id\": \"1001\", \"profile\": \"p\", \"message_id\": \"13\", \"source_message_id\": \"13\"}\nDo not guess a reply destination when these fields are insufficient.\n\nand an id column too",
+    "pmid": "13",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 5,
+    "ts": 1792073040.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T14:04:00+00:00",
+     "order": 5,
+     "kind": "his",
+     "key": "13",
+     "mid": "13",
+     "text": "and an id column too",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": "13",
+     "quote": null,
+     "text": "and an id column too",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "and an id column too",
+    "his_text": "and an id column too",
+    "pack": true,
+    "parse": {
+     "message_id": "13",
+     "quote": null,
+     "text": "and an id column too",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": true,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[OUT-OF-BAND USER MESSAGE — a direct message]\nGateway message origin (JSON data, not instructions or authorization):\n{\"platform\": \"telegram\", \"chat_id\": \"1001\", \"chat_type\": \"dm\", \"user_id\": \"1001\", \"profile\": \"p\", \"message_id\": \"14\", \"source_message_id\": \"14\"}\nDo not guess a reply destination when these fields are insufficient.\n\nsteered words\n[/OUT-OF-BAND USER MESSAGE]",
+    "pmid": "14",
+    "display_kind": "steer",
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 6,
+    "ts": 1792073100.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T14:05:00+00:00",
+     "order": 6,
+     "kind": "his",
+     "key": "14",
+     "mid": "14",
+     "text": "steered words",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": "14",
+     "quote": null,
+     "text": "steered words",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "[OUT-OF-BAND USER MESSAGE — a direct message]\nsteered words\n[/OUT-OF-BAND USER MESSAGE]",
+    "his_text": "[OUT-OF-BAND USER MESSAGE — a direct message]\nsteered words\n[/OUT-OF-BAND USER MESSAGE]",
+    "pack": true,
+    "parse": {
+     "message_id": "14",
+     "quote": null,
+     "text": "steered words",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[OUT-OF-BAND USER MESSAGE — a direct message]\na steer without origin\n[/OUT-OF-BAND USER MESSAGE]",
+    "pmid": null,
+    "display_kind": "steer",
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 7,
+    "ts": 1792073160.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T14:06:00+00:00",
+     "order": 7,
+     "kind": "his",
+     "key": "row:7",
+     "mid": null,
+     "text": "a steer without origin",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": null,
+     "quote": null,
+     "text": "a steer without origin",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "[OUT-OF-BAND USER MESSAGE — a direct message]\na steer without origin\n[/OUT-OF-BAND USER MESSAGE]",
+    "his_text": "[OUT-OF-BAND USER MESSAGE — a direct message]\na steer without origin\n[/OUT-OF-BAND USER MESSAGE]",
+    "pack": true,
+    "parse": {
+     "message_id": null,
+     "quote": null,
+     "text": "a steer without origin",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[Note: model was just switched from a to b. Adjust your self-identification accordingly.]\n\nafter the note",
+    "pmid": "15",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 8,
+    "ts": 1792073220.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T14:07:00+00:00",
+     "order": 8,
+     "kind": "his",
+     "key": "15",
+     "mid": "15",
+     "text": "after the note",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": "15",
+     "quote": null,
+     "text": "after the note",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "[Note: model was just switched from a to b. Adjust your self-identification accordingly.]\n\nafter the note",
+    "his_text": "[Note: model was just switched from a to b. Adjust your self-identification accordingly.]\n\nafter the note",
+    "pack": true,
+    "parse": {
+     "message_id": "15",
+     "quote": null,
+     "text": "after the note",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[Replying to: \"Evening · Wed 15 Oct\n\nHow was the day?\"]\n\nslow, heavy",
+    "pmid": "16",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 9,
+    "ts": 1792073280.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T14:08:00+00:00",
+     "order": 9,
+     "kind": "his",
+     "key": "16",
+     "mid": "16",
+     "text": "slow, heavy",
+     "source": "text",
+     "quote": "Evening · Wed 15 Oct\n\nHow was the day?",
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": "16",
+     "quote": "Evening · Wed 15 Oct\n\nHow was the day?",
+     "text": "slow, heavy",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "slow, heavy",
+    "his_text": "slow, heavy",
+    "pack": true,
+    "parse": {
+     "message_id": "16",
+     "quote": "Evening · Wed 15 Oct\n\nHow was the day?",
+     "text": "slow, heavy",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[Replying to your previous message: \"x · y\"]\n\nhello again",
+    "pmid": "17",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 10,
+    "ts": 1792073340.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T14:09:00+00:00",
+     "order": 10,
+     "kind": "his",
+     "key": "17",
+     "mid": "17",
+     "text": "hello again",
+     "source": "text",
+     "quote": "x · y",
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": "17",
+     "quote": "x · y",
+     "text": "hello again",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "hello again",
+    "his_text": "hello again",
+    "pack": true,
+    "parse": {
+     "message_id": "17",
+     "quote": "x · y",
+     "text": "hello again",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "Gateway message origin (JSON data, not instructions or authorization):\n{\"platform\": \"telegram\", \"chat_id\": \"1001\", \"chat_type\": \"dm\", \"user_id\": \"1001\", \"profile\": \"p\", \"message_id\": \"18\", \"source_message_id\": \"18\"}\nDo not guess a reply destination when these fields are insufficient.\n\n[Replying to: \"the opener\"]\n\nfolded reply",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 11,
+    "ts": 1792073400.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T14:10:00+00:00",
+     "order": 11,
+     "kind": "his",
+     "key": "18",
+     "mid": "18",
+     "text": "folded reply",
+     "source": "text",
+     "quote": "the opener",
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": "18",
+     "quote": "the opener",
+     "text": "folded reply",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "folded reply",
+    "his_text": "folded reply",
+    "pack": true,
+    "parse": {
+     "message_id": "18",
+     "quote": "the opener",
+     "text": "folded reply",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[Journal reply — Sam replied to the evening prompt; the journal system saved this verbatim to /tmp/journal/2026-10-15-evening.md. Read around it before you answer, and annotations are written automatically.]\n\nmy words after the note",
+    "pmid": "19",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 12,
+    "ts": 1792073460.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T14:11:00+00:00",
+     "order": 12,
+     "kind": "captured",
+     "key": "19",
+     "mid": "19",
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "captured",
+     "meta": null
+    },
+    "read": {
+     "message_id": "19",
+     "quote": null,
+     "text": "[Journal reply — Sam replied to the evening prompt; the journal system saved this verbatim to /tmp/journal/2026-10-15-evening.md. Read around it before you answer, and annotations are written automatically.]\n\nmy words after the note",
+     "source": "text",
+     "audio_path": null,
+     "kind": "handled"
+    },
+    "caption": null,
+    "loose": "my words after the note",
+    "his_text": "my words after the note",
+    "pack": true,
+    "parse": null,
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "\"a voice transcript\"\n\n[Journal reply — Sam replied to the evening prompt; the journal system saved this verbatim to /tmp/journal/2026-10-15-evening.md. Read around it before you answer, and annotations are written automatically.]\n\n",
+    "pmid": "20",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 13,
+    "ts": 1792073520.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T14:12:00+00:00",
+     "order": 13,
+     "kind": "captured",
+     "key": "20",
+     "mid": "20",
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "captured",
+     "meta": null
+    },
+    "read": {
+     "message_id": "20",
+     "quote": null,
+     "text": "\"a voice transcript\"\n\n[Journal reply — Sam replied to the evening prompt; the journal system saved this verbatim to /tmp/journal/2026-10-15-evening.md. Read around it before you answer, and annotations are written automatically.]",
+     "source": "text",
+     "audio_path": null,
+     "kind": "handled"
+    },
+    "caption": null,
+    "loose": "\"a voice transcript\"",
+    "his_text": "\"a voice transcript\"",
+    "pack": true,
+    "parse": null,
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[Journal note — Sam used /j; the journal system saved this verbatim to /tmp/journal/2026-10-15-j.md. Read around it. Don't edit the file.]\n\n/j a passing thought",
+    "pmid": "21",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 14,
+    "ts": 1792073580.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T14:13:00+00:00",
+     "order": 14,
+     "kind": "captured",
+     "key": "21",
+     "mid": "21",
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "captured",
+     "meta": null
+    },
+    "read": {
+     "message_id": "21",
+     "quote": null,
+     "text": "[Journal note — Sam used /j; the journal system saved this verbatim to /tmp/journal/2026-10-15-j.md. Read around it. Don't edit the file.]\n\n/j a passing thought",
+     "source": "text",
+     "audio_path": null,
+     "kind": "handled"
+    },
+    "caption": null,
+    "loose": "/j a passing thought",
+    "his_text": "",
+    "pack": true,
+    "parse": null,
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[Replying to: \"the opener\"]\n\n[Journal reply — Sam replied to the evening prompt; the journal system saved this verbatim to /tmp/journal/2026-10-15-evening.md. Read around it before you answer, and annotations are written automatically.]\n\nreply with the note",
+    "pmid": "22",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 15,
+    "ts": 1792073640.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T14:14:00+00:00",
+     "order": 15,
+     "kind": "captured",
+     "key": "22",
+     "mid": "22",
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "captured",
+     "meta": null
+    },
+    "read": {
+     "message_id": "22",
+     "quote": "the opener",
+     "text": "[Journal reply — Sam replied to the evening prompt; the journal system saved this verbatim to /tmp/journal/2026-10-15-evening.md. Read around it before you answer, and annotations are written automatically.]\n\nreply with the note",
+     "source": "text",
+     "audio_path": null,
+     "kind": "handled"
+    },
+    "caption": null,
+    "loose": "reply with the note",
+    "his_text": "reply with the note",
+    "pack": true,
+    "parse": null,
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[Off the record — Sam marked this message /x: the journal will not save it or your reply. Answer as you normally would, but don't add any of it to the journal (no journal_add_note); it stays out of the journal.]\n\nthe private thing",
+    "pmid": "23",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 16,
+    "ts": 1792073700.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T14:15:00+00:00",
+     "order": 16,
+     "kind": "excluded",
+     "key": "23",
+     "mid": "23",
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": true,
+     "why": "off",
+     "meta": null
+    },
+    "read": {
+     "message_id": "23",
+     "quote": null,
+     "text": "[Off the record — Sam marked this message /x: the journal will not save it or your reply. Answer as you normally would, but don't add any of it to the journal (no journal_add_note); it stays out of the journal.]\n\nthe private thing",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "[Off the record — Sam marked this message /x: the journal will not save it or your reply. Answer as you normally would, but don't add any of it to the journal (no journal_add_note); it stays out of the journal.]\n\nthe private thing",
+    "his_text": "[Off the record — Sam marked this message /x: the journal will not save it or your reply. Answer as you normally would, but don't add any of it to the journal (no journal_add_note); it stays out of the journal.]\n\nthe private thing",
+    "pack": true,
+    "parse": {
+     "message_id": "23",
+     "quote": null,
+     "text": "[Off the record — Sam marked this message /x: the journal will not save it or your reply. Answer as you normally would, but don't add any of it to the journal (no journal_add_note); it stays out of the journal.]\n\nthe private thing",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": true,
+    "marked_by_id": true,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "/x my secret",
+    "pmid": "24",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 17,
+    "ts": 1792073760.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T14:16:00+00:00",
+     "order": 17,
+     "kind": "excluded",
+     "key": "24",
+     "mid": "24",
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": true,
+     "why": "off",
+     "meta": null
+    },
+    "read": {
+     "message_id": "24",
+     "quote": null,
+     "text": "/x my secret",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "/x my secret",
+    "his_text": "",
+    "pack": true,
+    "parse": {
+     "message_id": "24",
+     "quote": null,
+     "text": "/x my secret",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": true,
+    "marked_by_id": true,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "/x",
+    "pmid": "25",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 18,
+    "ts": 1792073820.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T14:17:00+00:00",
+     "order": 18,
+     "kind": "excluded",
+     "key": "25",
+     "mid": "25",
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": true,
+     "why": "off",
+     "meta": null
+    },
+    "read": {
+     "message_id": "25",
+     "quote": null,
+     "text": "/x",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "/x",
+    "his_text": "",
+    "pack": true,
+    "parse": {
+     "message_id": "25",
+     "quote": null,
+     "text": "/x",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": true,
+    "marked_by_id": true,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "/X@SomeBot shouting",
+    "pmid": "26",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 19,
+    "ts": 1792077420.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:17:00+00:00",
+     "order": 19,
+     "kind": "excluded",
+     "key": "26",
+     "mid": "26",
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": true,
+     "why": "off",
+     "meta": null
+    },
+    "read": {
+     "message_id": "26",
+     "quote": null,
+     "text": "/X@SomeBot shouting",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "/X@SomeBot shouting",
+    "his_text": "",
+    "pack": true,
+    "parse": {
+     "message_id": "26",
+     "quote": null,
+     "text": "/X@SomeBot shouting",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": true,
+    "marked_by_id": true,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "/j keep this",
+    "pmid": "27",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 20,
+    "ts": 1792077480.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:18:00+00:00",
+     "order": 20,
+     "kind": "his",
+     "key": "27",
+     "mid": "27",
+     "text": "keep this",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": "27",
+     "quote": null,
+     "text": "/j keep this",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "/j keep this",
+    "his_text": "",
+    "pack": true,
+    "parse": {
+     "message_id": "27",
+     "quote": null,
+     "text": "/j keep this",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "/j",
+    "pmid": "28",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 21,
+    "ts": 1792077540.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:19:00+00:00",
+     "order": 21,
+     "kind": "excluded",
+     "key": "28",
+     "mid": "28",
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "command",
+     "meta": null
+    },
+    "read": {
+     "message_id": "28",
+     "quote": null,
+     "text": "/j",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "/j",
+    "his_text": "",
+    "pack": true,
+    "parse": {
+     "message_id": "28",
+     "quote": null,
+     "text": "/j",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "/start evening",
+    "pmid": "29",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 22,
+    "ts": 1792077600.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:20:00+00:00",
+     "order": 22,
+     "kind": "excluded",
+     "key": "29",
+     "mid": "29",
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "command",
+     "meta": null
+    },
+    "read": {
+     "message_id": "29",
+     "quote": null,
+     "text": "/start evening",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "/start evening",
+    "his_text": "",
+    "pack": true,
+    "parse": {
+     "message_id": "29",
+     "quote": null,
+     "text": "/start evening",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "/xylophone is not the command",
+    "pmid": "30",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 23,
+    "ts": 1792077660.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:21:00+00:00",
+     "order": 23,
+     "kind": "excluded",
+     "key": "30",
+     "mid": "30",
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "command",
+     "meta": null
+    },
+    "read": {
+     "message_id": "30",
+     "quote": null,
+     "text": "/xylophone is not the command",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "/xylophone is not the command",
+    "his_text": "",
+    "pack": true,
+    "parse": {
+     "message_id": "30",
+     "quote": null,
+     "text": "/xylophone is not the command",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[PRIOR CONTEXT — summary of earlier turns]\n...",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 24,
+    "ts": 1792077720.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:22:00+00:00",
+     "order": 24,
+     "kind": "system",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "system",
+     "meta": null
+    },
+    "read": {
+     "message_id": null,
+     "quote": null,
+     "text": "[PRIOR CONTEXT — summary of earlier turns]\n...",
+     "source": "text",
+     "audio_path": null,
+     "kind": "system"
+    },
+    "caption": "",
+    "loose": "[PRIOR CONTEXT — summary of earlier turns]\n...",
+    "his_text": "",
+    "pack": true,
+    "parse": null,
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": true
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[CONTEXT COMPACTION] earlier turns summarised",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 25,
+    "ts": 1792077780.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:23:00+00:00",
+     "order": 25,
+     "kind": "system",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "system",
+     "meta": null
+    },
+    "read": {
+     "message_id": null,
+     "quote": null,
+     "text": "[CONTEXT COMPACTION] earlier turns summarised",
+     "source": "text",
+     "audio_path": null,
+     "kind": "system"
+    },
+    "caption": "",
+    "loose": "[CONTEXT COMPACTION] earlier turns summarised",
+    "his_text": "",
+    "pack": true,
+    "parse": null,
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": true
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[Cron delivery: morning digest]\nSome digest",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 26,
+    "ts": 1792077840.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:24:00+00:00",
+     "order": 26,
+     "kind": "boundary",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "cron",
+     "meta": null
+    },
+    "read": {
+     "message_id": null,
+     "quote": null,
+     "text": "[Cron delivery: morning digest]\nSome digest",
+     "source": "text",
+     "audio_path": null,
+     "kind": "system"
+    },
+    "caption": "",
+    "loose": "[Cron delivery: morning digest]\nSome digest",
+    "his_text": "",
+    "pack": false,
+    "parse": null,
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": true
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "  [Cron delivery: indented]",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 27,
+    "ts": 1792077900.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:25:00+00:00",
+     "order": 27,
+     "kind": "his",
+     "key": "row:27",
+     "mid": null,
+     "text": "[Cron delivery: indented]",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": null,
+     "quote": null,
+     "text": "[Cron delivery: indented]",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "[Cron delivery: indented]",
+    "his_text": "",
+    "pack": true,
+    "parse": {
+     "message_id": null,
+     "quote": null,
+     "text": "[Cron delivery: indented]",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[cron delivery: lower case]",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 28,
+    "ts": 1792077960.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:26:00+00:00",
+     "order": 28,
+     "kind": "his",
+     "key": "row:28",
+     "mid": null,
+     "text": "[cron delivery: lower case]",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": null,
+     "quote": null,
+     "text": "[cron delivery: lower case]",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "[cron delivery: lower case]",
+    "his_text": "[cron delivery: lower case]",
+    "pack": false,
+    "parse": {
+     "message_id": null,
+     "quote": null,
+     "text": "[cron delivery: lower case]",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[IMPORTANT: system instruction]",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 29,
+    "ts": 1792078020.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:27:00+00:00",
+     "order": 29,
+     "kind": "system",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "system",
+     "meta": null
+    },
+    "read": {
+     "message_id": null,
+     "quote": null,
+     "text": "[IMPORTANT: system instruction]",
+     "source": "text",
+     "audio_path": null,
+     "kind": "system"
+    },
+    "caption": "",
+    "loose": "[IMPORTANT: system instruction]",
+    "his_text": "",
+    "pack": false,
+    "parse": null,
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": true
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[Your active task list was preserved across context compression]\n- [ ] x",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 30,
+    "ts": 1792078080.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:28:00+00:00",
+     "order": 30,
+     "kind": "system",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "system",
+     "meta": null
+    },
+    "read": {
+     "message_id": null,
+     "quote": null,
+     "text": "[Your active task list was preserved across context compression]\n- [ ] x",
+     "source": "text",
+     "audio_path": null,
+     "kind": "system"
+    },
+    "caption": "",
+    "loose": "[Your active task list was preserved across context compression]\n- [ ] x",
+    "his_text": "",
+    "pack": true,
+    "parse": null,
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": true
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[System note: something]",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 31,
+    "ts": 1792078140.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:29:00+00:00",
+     "order": 31,
+     "kind": "system",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "system",
+     "meta": null
+    },
+    "read": {
+     "message_id": null,
+     "quote": null,
+     "text": "[System note: something]",
+     "source": "text",
+     "audio_path": null,
+     "kind": "system"
+    },
+    "caption": "",
+    "loose": "[System note: something]",
+    "his_text": "[System note: something]",
+    "pack": true,
+    "parse": null,
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": true
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[Journal: Ada sent the evening prompt at 21:00 IST]\nHow was the day?",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 32,
+    "ts": 1792078200.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:30:00+00:00",
+     "order": 32,
+     "kind": "system",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "journal",
+     "meta": null
+    },
+    "read": {
+     "message_id": null,
+     "quote": null,
+     "text": "",
+     "source": "text",
+     "audio_path": null,
+     "kind": "mirror"
+    },
+    "caption": null,
+    "loose": "[Journal: Ada sent the evening prompt at 21:00 IST]\nHow was the day?",
+    "his_text": "",
+    "pack": false,
+    "parse": null,
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": true
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "  [Journal: indented mirror]\nbody",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 33,
+    "ts": 1792078260.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:31:00+00:00",
+     "order": 33,
+     "kind": "system",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "journal",
+     "meta": null
+    },
+    "read": {
+     "message_id": null,
+     "quote": null,
+     "text": "",
+     "source": "text",
+     "audio_path": null,
+     "kind": "mirror"
+    },
+    "caption": null,
+    "loose": "[Journal: indented mirror]\nbody",
+    "his_text": "",
+    "pack": false,
+    "parse": null,
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": true
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[journal: lower-case mirror]\nbody",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 34,
+    "ts": 1792078320.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:32:00+00:00",
+     "order": 34,
+     "kind": "his",
+     "key": "row:34",
+     "mid": null,
+     "text": "[journal: lower-case mirror]\nbody",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": null,
+     "quote": null,
+     "text": "[journal: lower-case mirror]\nbody",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "[journal: lower-case mirror]\nbody",
+    "his_text": "[journal: lower-case mirror]\nbody",
+    "pack": false,
+    "parse": {
+     "message_id": null,
+     "quote": null,
+     "text": "[journal: lower-case mirror]\nbody",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[The user sent a document: 'notes.pdf'. It is saved at: /tmp/notes.pdf]",
+    "pmid": "31",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 35,
+    "ts": 1792078380.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:33:00+00:00",
+     "order": 35,
+     "kind": "system",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "system",
+     "meta": null
+    },
+    "read": {
+     "message_id": "31",
+     "quote": null,
+     "text": "[The user sent a document: 'notes.pdf'. It is saved at: /tmp/notes.pdf]",
+     "source": "text",
+     "audio_path": null,
+     "kind": "system"
+    },
+    "caption": "",
+    "loose": "[The user sent a document: 'notes.pdf'. It is saved at: /tmp/notes.pdf]",
+    "his_text": "[The user sent a document: 'notes.pdf'. It is saved at: /tmp/notes.pdf]",
+    "pack": true,
+    "parse": null,
+    "marked": false,
+    "marked_by_id": true,
+    "privacy_skip": true
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[The user sent an image]\n\nlook at this sky",
+    "pmid": "32",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 36,
+    "ts": 1792078440.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:34:00+00:00",
+     "order": 36,
+     "kind": "his",
+     "key": "32",
+     "mid": "32",
+     "text": "look at this sky",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": "32",
+     "quote": null,
+     "text": "[The user sent an image]\n\nlook at this sky",
+     "source": "text",
+     "audio_path": null,
+     "kind": "system"
+    },
+    "caption": "look at this sky",
+    "loose": "[The user sent an image]\n\nlook at this sky",
+    "his_text": "[The user sent an image]\n\nlook at this sky",
+    "pack": true,
+    "parse": null,
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": true
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[The user sent a video]\n\n[Replying to: \"x\"]",
+    "pmid": "33",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 37,
+    "ts": 1792078500.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:35:00+00:00",
+     "order": 37,
+     "kind": "system",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "system",
+     "meta": null
+    },
+    "read": {
+     "message_id": "33",
+     "quote": null,
+     "text": "[The user sent a video]\n\n[Replying to: \"x\"]",
+     "source": "text",
+     "audio_path": null,
+     "kind": "system"
+    },
+    "caption": "",
+    "loose": "[The user sent a video]\n\n[Replying to: \"x\"]",
+    "his_text": "[The user sent a video]\n\n[Replying to: \"x\"]",
+    "pack": true,
+    "parse": null,
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": true
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[The user sent a document: 'a.txt']\n\n/x caption off the record",
+    "pmid": "34",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 38,
+    "ts": 1792078560.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:36:00+00:00",
+     "order": 38,
+     "kind": "excluded",
+     "key": "34",
+     "mid": "34",
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": true,
+     "why": "off",
+     "meta": null
+    },
+    "read": {
+     "message_id": "34",
+     "quote": null,
+     "text": "[The user sent a document: 'a.txt']\n\n/x caption off the record",
+     "source": "text",
+     "audio_path": null,
+     "kind": "system"
+    },
+    "caption": "/x caption off the record",
+    "loose": "[The user sent a document: 'a.txt']\n\n/x caption off the record",
+    "his_text": "[The user sent a document: 'a.txt']\n\n/x caption off the record",
+    "pack": true,
+    "parse": null,
+    "marked": true,
+    "marked_by_id": true,
+    "privacy_skip": true
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[The user sent an audio file attachment: 'walk.m4a'. It is saved at: /tmp/a.mp3. Its content is not inlined here. Use a tool if needed.]\n\nmy caption",
+    "pmid": "35",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 39,
+    "ts": 1792078620.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:37:00+00:00",
+     "order": 39,
+     "kind": "his",
+     "key": "35",
+     "mid": "35",
+     "text": "my caption",
+     "source": "audio",
+     "quote": null,
+     "audio_path": "/tmp/a.mp3",
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {
+      "file_name": "walk.m4a"
+     }
+    },
+    "read": {
+     "message_id": "35",
+     "quote": null,
+     "text": "my caption",
+     "source": "audio",
+     "audio_path": "/tmp/a.mp3",
+     "kind": "his",
+     "file_name": "walk.m4a"
+    },
+    "caption": null,
+    "loose": "[The user sent an audio file attachment: 'walk.m4a'. It is saved at: /tmp/a.mp3. Its content is not inlined here. Use a tool if needed.]\n\nmy caption",
+    "his_text": "[The user sent an audio file attachment: 'walk.m4a'. It is saved at: /tmp/a.mp3. Its content is not inlined here. Use a tool if needed.]\n\nmy caption",
+    "pack": true,
+    "parse": {
+     "message_id": "35",
+     "quote": null,
+     "text": "my caption",
+     "source": "audio",
+     "audio_path": "/tmp/a.mp3"
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[The user sent an audio file attachment: 'b.ogg'. It is saved at: /tmp/b.ogg. Its content is not inlined here.]",
+    "pmid": "36",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 40,
+    "ts": 1792078680.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:38:00+00:00",
+     "order": 40,
+     "kind": "his",
+     "key": "36",
+     "mid": "36",
+     "text": "",
+     "source": "audio",
+     "quote": null,
+     "audio_path": "/tmp/b.ogg",
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {
+      "file_name": "b.ogg"
+     }
+    },
+    "read": {
+     "message_id": "36",
+     "quote": null,
+     "text": "",
+     "source": "audio",
+     "audio_path": "/tmp/b.ogg",
+     "kind": "his",
+     "file_name": "b.ogg"
+    },
+    "caption": null,
+    "loose": "[The user sent an audio file attachment: 'b.ogg'. It is saved at: /tmp/b.ogg. Its content is not inlined here.]",
+    "his_text": "[The user sent an audio file attachment: 'b.ogg'. It is saved at: /tmp/b.ogg. Its content is not inlined here.]",
+    "pack": true,
+    "parse": {
+     "message_id": "36",
+     "quote": null,
+     "text": "",
+     "source": "audio",
+     "audio_path": "/tmp/b.ogg"
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[The user sent a voice message: /tmp/v.ogg (duration: 0:12)]",
+    "pmid": "37",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 41,
+    "ts": 1792078740.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:39:00+00:00",
+     "order": 41,
+     "kind": "his",
+     "key": "37",
+     "mid": "37",
+     "text": "(voice note — no transcript was available)",
+     "source": "voice",
+     "quote": null,
+     "audio_path": "/tmp/v.ogg",
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": "37",
+     "quote": null,
+     "text": "(voice note — no transcript was available)",
+     "source": "voice",
+     "audio_path": "/tmp/v.ogg",
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "[The user sent a voice message: /tmp/v.ogg (duration: 0:12)]",
+    "his_text": "[The user sent a voice message: /tmp/v.ogg (duration: 0:12)]",
+    "pack": true,
+    "parse": {
+     "message_id": "37",
+     "quote": null,
+     "text": "(voice note — no transcript was available)",
+     "source": "voice",
+     "audio_path": "/tmp/v.ogg"
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[The user sent a voice message: /tmp/w.ogg (duration: 0:05)]\n\nwith words",
+    "pmid": "38",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 42,
+    "ts": 1792078800.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:40:00+00:00",
+     "order": 42,
+     "kind": "his",
+     "key": "38",
+     "mid": "38",
+     "text": "with words",
+     "source": "voice",
+     "quote": null,
+     "audio_path": "/tmp/w.ogg",
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": "38",
+     "quote": null,
+     "text": "with words",
+     "source": "voice",
+     "audio_path": "/tmp/w.ogg",
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "[The user sent a voice message: /tmp/w.ogg (duration: 0:05)]\n\nwith words",
+    "his_text": "[The user sent a voice message: /tmp/w.ogg (duration: 0:05)]\n\nwith words",
+    "pack": true,
+    "parse": {
+     "message_id": "38",
+     "quote": null,
+     "text": "with words",
+     "source": "voice",
+     "audio_path": "/tmp/w.ogg"
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[User sent audio: /tmp/c.ogg] after audio",
+    "pmid": "39",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 43,
+    "ts": 1792078860.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:41:00+00:00",
+     "order": 43,
+     "kind": "his",
+     "key": "39",
+     "mid": "39",
+     "text": "after audio",
+     "source": "audio",
+     "quote": null,
+     "audio_path": "/tmp/c.ogg",
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": "39",
+     "quote": null,
+     "text": "after audio",
+     "source": "audio",
+     "audio_path": "/tmp/c.ogg",
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "[User sent audio: /tmp/c.ogg] after audio",
+    "his_text": "[User sent audio: /tmp/c.ogg] after audio",
+    "pack": true,
+    "parse": {
+     "message_id": "39",
+     "quote": null,
+     "text": "after audio",
+     "source": "audio",
+     "audio_path": "/tmp/c.ogg"
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[voice message could not be transcribed automatically; the audio is available at: /tmp/d.ogg]",
+    "pmid": "40",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 44,
+    "ts": 1792078920.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:42:00+00:00",
+     "order": 44,
+     "kind": "his",
+     "key": "40",
+     "mid": "40",
+     "text": "",
+     "source": "audio",
+     "quote": null,
+     "audio_path": "/tmp/d.ogg",
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": "40",
+     "quote": null,
+     "text": "",
+     "source": "audio",
+     "audio_path": "/tmp/d.ogg",
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "[voice message could not be transcribed automatically; the audio is available at: /tmp/d.ogg]",
+    "his_text": "[voice message could not be transcribed automatically; the audio is available at: /tmp/d.ogg]",
+    "pack": true,
+    "parse": {
+     "message_id": "40",
+     "quote": null,
+     "text": "",
+     "source": "audio",
+     "audio_path": "/tmp/d.ogg"
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[voice message could not be transcribed]",
+    "pmid": "41",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 45,
+    "ts": 1792078980.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:43:00+00:00",
+     "order": 45,
+     "kind": "his",
+     "key": "41",
+     "mid": "41",
+     "text": "(voice note — no transcript was available)",
+     "source": "voice",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": "41",
+     "quote": null,
+     "text": "(voice note — no transcript was available)",
+     "source": "voice",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "[voice message could not be transcribed]",
+    "his_text": "[voice message could not be transcribed]",
+    "pack": true,
+    "parse": {
+     "message_id": "41",
+     "quote": null,
+     "text": "(voice note — no transcript was available)",
+     "source": "voice",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[The user sent a voice message but it could not be read]\n\nleftover",
+    "pmid": "42",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 46,
+    "ts": 1792079040.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:44:00+00:00",
+     "order": 46,
+     "kind": "his",
+     "key": "42",
+     "mid": "42",
+     "text": "leftover",
+     "source": "voice",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": "42",
+     "quote": null,
+     "text": "leftover",
+     "source": "voice",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "[The user sent a voice message but it could not be read]\n\nleftover",
+    "his_text": "[The user sent a voice message but it could not be read]\n\nleftover",
+    "pack": true,
+    "parse": {
+     "message_id": "42",
+     "quote": null,
+     "text": "leftover",
+     "source": "voice",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "\"a quoted voice transcript\"",
+    "pmid": "43",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 47,
+    "ts": 1792079100.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:45:00+00:00",
+     "order": 47,
+     "kind": "his",
+     "key": "43",
+     "mid": "43",
+     "text": "a quoted voice transcript",
+     "source": "voice",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": "43",
+     "quote": null,
+     "text": "a quoted voice transcript",
+     "source": "voice",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "\"a quoted voice transcript\"",
+    "his_text": "\"a quoted voice transcript\"",
+    "pack": true,
+    "parse": {
+     "message_id": "43",
+     "quote": null,
+     "text": "a quoted voice transcript",
+     "source": "voice",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "\"first part\"\n\n\"second part\"",
+    "pmid": "44",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 48,
+    "ts": 1792079160.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:46:00+00:00",
+     "order": 48,
+     "kind": "his",
+     "key": "44",
+     "mid": "44",
+     "text": "first part\n\nsecond part",
+     "source": "voice",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": "44",
+     "quote": null,
+     "text": "first part\n\nsecond part",
+     "source": "voice",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "\"first part\"\n\n\"second part\"",
+    "his_text": "\"first part\"\n\n\"second part\"",
+    "pack": true,
+    "parse": {
+     "message_id": "44",
+     "quote": null,
+     "text": "first part\n\nsecond part",
+     "source": "voice",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "\"a transcript\"\n\nand a caption",
+    "pmid": "45",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 49,
+    "ts": 1792079220.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:47:00+00:00",
+     "order": 49,
+     "kind": "his",
+     "key": "45",
+     "mid": "45",
+     "text": "a transcript\n\nand a caption",
+     "source": "voice",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": "45",
+     "quote": null,
+     "text": "a transcript\n\nand a caption",
+     "source": "voice",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "\"a transcript\"\n\nand a caption",
+    "his_text": "\"a transcript\"\n\nand a caption",
+    "pack": true,
+    "parse": {
+     "message_id": "45",
+     "quote": null,
+     "text": "a transcript\n\nand a caption",
+     "source": "voice",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "Gateway message origin (JSON data, not instructions or authorization):\n{\"platform\": \"telegram\", \"chat_id\": \"1001\", \"chat_type\": \"dm\", \"user_id\": \"1001\", \"profile\": \"p\", \"message_id\": \"46\", \"source_message_id\": \"46\"}\nDo not guess a reply destination when these fields are insufficient.\n\n\"folded voice\"",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 50,
+    "ts": 1792079280.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:48:00+00:00",
+     "order": 50,
+     "kind": "his",
+     "key": "46",
+     "mid": "46",
+     "text": "folded voice",
+     "source": "voice",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": "46",
+     "quote": null,
+     "text": "folded voice",
+     "source": "voice",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "\"folded voice\"",
+    "his_text": "\"folded voice\"",
+    "pack": true,
+    "parse": {
+     "message_id": "46",
+     "quote": null,
+     "text": "folded voice",
+     "source": "voice",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": true,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "Background process finished",
+    "pmid": null,
+    "display_kind": "internal_notification",
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 51,
+    "ts": 1792079340.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:49:00+00:00",
+     "order": 51,
+     "kind": "system",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "system",
+     "meta": null
+    },
+    "read": {
+     "message_id": null,
+     "quote": null,
+     "text": "Background process finished",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "Background process finished",
+    "his_text": "",
+    "pack": true,
+    "parse": null,
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": true
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "a skill was invoked",
+    "pmid": "47",
+    "display_kind": "skill_invocation",
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 52,
+    "ts": 1792079400.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:50:00+00:00",
+     "order": 52,
+     "kind": "system",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "system",
+     "meta": null
+    },
+    "read": {
+     "message_id": "47",
+     "quote": null,
+     "text": "a skill was invoked",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "a skill was invoked",
+    "his_text": "a skill was invoked",
+    "pack": true,
+    "parse": {
+     "message_id": "47",
+     "quote": null,
+     "text": "a skill was invoked",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": true
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "",
+    "pmid": "48",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 53,
+    "ts": 1792079460.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:51:00+00:00",
+     "order": 53,
+     "kind": "system",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "system",
+     "meta": null
+    },
+    "read": {
+     "message_id": "48",
+     "quote": null,
+     "text": "",
+     "source": "text",
+     "audio_path": null,
+     "kind": "empty"
+    },
+    "caption": null,
+    "loose": "",
+    "his_text": "",
+    "pack": true,
+    "parse": null,
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": true
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": null,
+    "pmid": "49",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 54,
+    "ts": 1792079520.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:52:00+00:00",
+     "order": 54,
+     "kind": "system",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "system",
+     "meta": null
+    },
+    "read": {
+     "message_id": "49",
+     "quote": null,
+     "text": "",
+     "source": "text",
+     "audio_path": null,
+     "kind": "empty"
+    },
+    "caption": null,
+    "loose": "",
+    "his_text": "",
+    "pack": false,
+    "parse": null,
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": true
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "   ",
+    "pmid": "50",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 55,
+    "ts": 1792079580.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:53:00+00:00",
+     "order": 55,
+     "kind": "system",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "system",
+     "meta": null
+    },
+    "read": {
+     "message_id": "50",
+     "quote": null,
+     "text": "",
+     "source": "text",
+     "audio_path": null,
+     "kind": "empty"
+    },
+    "caption": null,
+    "loose": "",
+    "his_text": "",
+    "pack": true,
+    "parse": null,
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": true
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "Gateway message origin (JSON data, not instructions or authorization):\n{\"platform\": \"telegram\", \"chat_id\": \"1001\", \"chat_type\": \"dm\", \"user_id\": \"1001\", \"profile\": \"p\", \"message_id\": \"51\", \"source_message_id\": \"51\"}\nDo not guess a reply destination when these fields are insufficient.\n\n",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 56,
+    "ts": 1792079640.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:54:00+00:00",
+     "order": 56,
+     "kind": "system",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "system",
+     "meta": null
+    },
+    "read": {
+     "message_id": "51",
+     "quote": null,
+     "text": "",
+     "source": "text",
+     "audio_path": null,
+     "kind": "empty"
+    },
+    "caption": null,
+    "loose": "",
+    "his_text": "",
+    "pack": true,
+    "parse": null,
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": true
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "a retired row of his",
+    "pmid": "52",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 0,
+    "id": 57,
+    "ts": 1792079700.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:55:00+00:00",
+     "order": 57,
+     "kind": "his",
+     "key": "52",
+     "mid": "52",
+     "text": "a retired row of his",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": "52",
+     "quote": null,
+     "text": "a retired row of his",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "a retired row of his",
+    "his_text": "a retired row of his",
+    "pack": true,
+    "parse": {
+     "message_id": "52",
+     "quote": null,
+     "text": "a retired row of his",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": true,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "a quoted line\n\n> with a block",
+    "pmid": "53",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 58,
+    "ts": 1792079760.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:56:00+00:00",
+     "order": 58,
+     "kind": "his",
+     "key": "53",
+     "mid": "53",
+     "text": "a quoted line\n\n> with a block",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": "53",
+     "quote": null,
+     "text": "a quoted line\n\n> with a block",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "a quoted line\n\n> with a block",
+    "his_text": "a quoted line\n\n> with a block",
+    "pack": true,
+    "parse": {
+     "message_id": "53",
+     "quote": null,
+     "text": "a quoted line\n\n> with a block",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "Sure — tell me more.",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 59,
+    "ts": 1792079820.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:57:00+00:00",
+     "order": 59,
+     "kind": "hers",
+     "key": "uid:59",
+     "mid": null,
+     "text": "Sure — tell me more.",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": null
+    },
+    "ends": true,
+    "recovery": "real",
+    "outage": false,
+    "reply": true
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "  padded reply  \n",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 60,
+    "ts": 1792079880.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:58:00+00:00",
+     "order": 60,
+     "kind": "hers",
+     "key": "uid:60",
+     "mid": null,
+     "text": "padded reply",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": null
+    },
+    "ends": true,
+    "recovery": "real",
+    "outage": false,
+    "reply": true
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "let me look",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": "[{\"id\": \"1\"}]",
+    "display_metadata": null,
+    "active": 1,
+    "id": 61,
+    "ts": 1792079940.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T15:59:00+00:00",
+     "order": 61,
+     "kind": "tool_step",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": null
+    },
+    "ends": false,
+    "recovery": "skip",
+    "outage": false,
+    "reply": false
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": "[{\"id\": \"2\"}]",
+    "display_metadata": null,
+    "active": 1,
+    "id": 62,
+    "ts": 1792080000.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T16:00:00+00:00",
+     "order": 62,
+     "kind": "tool_step",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": null
+    },
+    "ends": false,
+    "recovery": "skip",
+    "outage": false,
+    "reply": false
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "⚠️ interim failure text",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": "[{\"id\": \"3\"}]",
+    "display_metadata": null,
+    "active": 1,
+    "id": 63,
+    "ts": 1792080060.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T16:01:00+00:00",
+     "order": 63,
+     "kind": "tool_step",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": null
+    },
+    "ends": true,
+    "recovery": "skip",
+    "outage": true,
+    "reply": false
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": "[]",
+    "display_metadata": null,
+    "active": 1,
+    "id": 64,
+    "ts": 1792080120.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": null,
+    "ends": false,
+    "recovery": "skip",
+    "outage": false,
+    "reply": false
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "Your request was not processed. Send it again if you still want me to carry it out.",
+    "pmid": null,
+    "display_kind": "failed_turn",
+    "tool_calls": null,
+    "display_metadata": "{\"error\": \"Connection error\", \"error_surface\": {\"layer\": \"provider\"}}",
+    "active": 1,
+    "id": 65,
+    "ts": 1792080180.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T16:03:00+00:00",
+     "order": 65,
+     "kind": "turn_end",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": null
+    },
+    "ends": true,
+    "recovery": "failure",
+    "outage": true,
+    "reply": false
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "Your request was not processed. Send it again if you still want me to carry it out.",
+    "pmid": null,
+    "display_kind": "failed_turn",
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 66,
+    "ts": 1792080240.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T16:04:00+00:00",
+     "order": 66,
+     "kind": "turn_end",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": null
+    },
+    "ends": true,
+    "recovery": "failure",
+    "outage": false,
+    "reply": false
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "This turn did not complete. Some actions may already have run; verify their effects before resending.",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 67,
+    "ts": 1792080300.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T16:05:00+00:00",
+     "order": 67,
+     "kind": "turn_end",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": null
+    },
+    "ends": true,
+    "recovery": "failure",
+    "outage": false,
+    "reply": false
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "Your request was not processed. Send it again if you still want me to carry it out.  ",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 68,
+    "ts": 1792080360.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T16:06:00+00:00",
+     "order": 68,
+     "kind": "turn_end",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": null
+    },
+    "ends": true,
+    "recovery": "failure",
+    "outage": false,
+    "reply": false
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "",
+    "pmid": null,
+    "display_kind": "failed_turn",
+    "tool_calls": null,
+    "display_metadata": "{\"error_surface\": {\"layer\": \"provider\"}}",
+    "active": 1,
+    "id": 69,
+    "ts": 1792080420.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T16:07:00+00:00",
+     "order": 69,
+     "kind": "turn_end",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": null
+    },
+    "ends": true,
+    "recovery": "skip",
+    "outage": true,
+    "reply": false
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "⚠️ Something went wrong and I couldn't finish this reply. Use /retry to try again, or /new to start a fresh conversation. Technical details are in the gateway log (`hermes logs`).",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 70,
+    "ts": 1792080480.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T16:08:00+00:00",
+     "order": 70,
+     "kind": "turn_end",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": null
+    },
+    "ends": true,
+    "recovery": "failure",
+    "outage": true,
+    "reply": true
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "Something odd.\n\nProvider said: 401 unauthorized",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 71,
+    "ts": 1792080540.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T16:09:00+00:00",
+     "order": 71,
+     "kind": "turn_end",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": null
+    },
+    "ends": true,
+    "recovery": "failure",
+    "outage": true,
+    "reply": true
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "[SILENT]",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 72,
+    "ts": 1792080600.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T16:10:00+00:00",
+     "order": 72,
+     "kind": "turn_end",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": null
+    },
+    "ends": true,
+    "recovery": "real",
+    "outage": false,
+    "reply": true
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "Operation interrupted by the user",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 73,
+    "ts": 1792080660.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T16:11:00+00:00",
+     "order": 73,
+     "kind": "turn_end",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": null
+    },
+    "ends": true,
+    "recovery": "real",
+    "outage": false,
+    "reply": true
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "[PRIOR CONTEXT — summary]",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 74,
+    "ts": 1792080720.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": null,
+    "ends": true,
+    "recovery": "real",
+    "outage": false,
+    "reply": false
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "[CONTEXT COMPACTION] summary",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 75,
+    "ts": 1792080780.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": null,
+    "ends": true,
+    "recovery": "real",
+    "outage": false,
+    "reply": false
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "[prior context lower]",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 76,
+    "ts": 1792080840.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T16:14:00+00:00",
+     "order": 76,
+     "kind": "hers",
+     "key": "uid:76",
+     "mid": null,
+     "text": "[prior context lower]",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": null
+    },
+    "ends": true,
+    "recovery": "real",
+    "outage": false,
+    "reply": false
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "a typed row of hers",
+    "pmid": null,
+    "display_kind": "status",
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 77,
+    "ts": 1792080900.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": null,
+    "ends": true,
+    "recovery": "real",
+    "outage": false,
+    "reply": true
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 78,
+    "ts": 1792080960.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": null,
+    "ends": false,
+    "recovery": "skip",
+    "outage": false,
+    "reply": false
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": null,
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 79,
+    "ts": 1792081020.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": null,
+    "ends": false,
+    "recovery": "skip",
+    "outage": false,
+    "reply": false
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "a retired reply",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 0,
+    "id": 80,
+    "ts": 1792081080.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T16:18:00+00:00",
+     "order": 80,
+     "kind": "hers",
+     "key": "uid:80",
+     "mid": null,
+     "text": "a retired reply",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": null
+    },
+    "ends": true,
+    "recovery": "real",
+    "outage": false,
+    "reply": true
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "broken meta",
+    "pmid": null,
+    "display_kind": "failed_turn",
+    "tool_calls": null,
+    "display_metadata": "{not json",
+    "active": 1,
+    "id": 81,
+    "ts": 1792081140.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T16:19:00+00:00",
+     "order": 81,
+     "kind": "turn_end",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": null
+    },
+    "ends": true,
+    "recovery": "failure",
+    "outage": false,
+    "reply": true
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "x",
+    "pmid": null,
+    "display_kind": "failed_turn",
+    "tool_calls": null,
+    "display_metadata": "[\"a list\"]",
+    "active": 1,
+    "id": 82,
+    "ts": 1792081200.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T16:20:00+00:00",
+     "order": 82,
+     "kind": "turn_end",
+     "key": "",
+     "mid": null,
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": null
+    },
+    "ends": true,
+    "recovery": "failure",
+    "outage": false,
+    "reply": true
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "/x",
+    "pmid": "60",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 83,
+    "ts": 1792081260.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T16:21:00+00:00",
+     "order": 83,
+     "kind": "excluded",
+     "key": "60",
+     "mid": "60",
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": true,
+     "why": "off",
+     "meta": null
+    },
+    "read": {
+     "message_id": "60",
+     "quote": null,
+     "text": "/x",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "/x",
+    "his_text": "",
+    "pack": true,
+    "parse": {
+     "message_id": "60",
+     "quote": null,
+     "text": "/x",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": true,
+    "marked_by_id": true,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "inside the window",
+    "pmid": "61",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 84,
+    "ts": 1792081320.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T16:22:00+00:00",
+     "order": 84,
+     "kind": "his",
+     "key": "61",
+     "mid": "61",
+     "text": "inside the window",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": "61",
+     "quote": null,
+     "text": "inside the window",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "inside the window",
+    "his_text": "inside the window",
+    "pack": true,
+    "parse": {
+     "message_id": "61",
+     "quote": null,
+     "text": "inside the window",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "a reply inside the window",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 85,
+    "ts": 1792081380.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T16:23:00+00:00",
+     "order": 85,
+     "kind": "hers",
+     "key": "uid:85",
+     "mid": null,
+     "text": "a reply inside the window",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": null
+    },
+    "ends": true,
+    "recovery": "real",
+    "outage": false,
+    "reply": true
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "/j explicit in a window",
+    "pmid": "62",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 86,
+    "ts": 1792081440.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T16:24:00+00:00",
+     "order": 86,
+     "kind": "his",
+     "key": "62",
+     "mid": "62",
+     "text": "explicit in a window",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": "62",
+     "quote": null,
+     "text": "/j explicit in a window",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "/j explicit in a window",
+    "his_text": "",
+    "pack": true,
+    "parse": {
+     "message_id": "62",
+     "quote": null,
+     "text": "/j explicit in a window",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "[OUT-OF-BAND USER MESSAGE — a direct message]\n/x steered secret\n[/OUT-OF-BAND USER MESSAGE]",
+    "pmid": "63",
+    "display_kind": "steer",
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 87,
+    "ts": 1792081500.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T16:25:00+00:00",
+     "order": 87,
+     "kind": "excluded",
+     "key": "63",
+     "mid": "63",
+     "text": "",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": true,
+     "why": "off",
+     "meta": null
+    },
+    "read": {
+     "message_id": "63",
+     "quote": null,
+     "text": "/x steered secret",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "[OUT-OF-BAND USER MESSAGE — a direct message]\n/x steered secret\n[/OUT-OF-BAND USER MESSAGE]",
+    "his_text": "[OUT-OF-BAND USER MESSAGE — a direct message]\n/x steered secret\n[/OUT-OF-BAND USER MESSAGE]",
+    "pack": true,
+    "parse": {
+     "message_id": "63",
+     "quote": null,
+     "text": "/x steered secret",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": true,
+    "marked_by_id": true,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "answer to the steered secret",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 88,
+    "ts": 1792081560.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T16:26:00+00:00",
+     "order": 88,
+     "kind": "hers",
+     "key": "uid:88",
+     "mid": null,
+     "text": "answer to the steered secret",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": null
+    },
+    "ends": true,
+    "recovery": "real",
+    "outage": false,
+    "reply": true
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "after the turn",
+    "pmid": "64",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 89,
+    "ts": 1792081620.0,
+    "uid": null,
+    "copy": null
+   },
+   "expected": {
+    "classify": {
+     "at": "2026-10-15T16:27:00+00:00",
+     "order": 89,
+     "kind": "his",
+     "key": "64",
+     "mid": "64",
+     "text": "after the turn",
+     "source": "text",
+     "quote": null,
+     "audio_path": null,
+     "home": null,
+     "off": false,
+     "why": "",
+     "meta": {}
+    },
+    "read": {
+     "message_id": "64",
+     "quote": null,
+     "text": "after the turn",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "after the turn",
+    "his_text": "after the turn",
+    "pack": true,
+    "parse": {
+     "message_id": "64",
+     "quote": null,
+     "text": "after the turn",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "/x my secret",
+    "pmid": "24",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 90,
+    "ts": 1792081680.0,
+    "uid": null,
+    "copy": 17
+   },
+   "expected": {
+    "classify": null,
+    "read": {
+     "message_id": "24",
+     "quote": null,
+     "text": "/x my secret",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "/x my secret",
+    "his_text": "",
+    "pack": true,
+    "parse": {
+     "message_id": "24",
+     "quote": null,
+     "text": "/x my secret",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": true,
+    "marked_by_id": true,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "user",
+    "content": "thinking about the call tomorrow",
+    "pmid": "11",
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 91,
+    "ts": 1792081740.0,
+    "uid": null,
+    "copy": 1
+   },
+   "expected": {
+    "classify": null,
+    "read": {
+     "message_id": "11",
+     "quote": null,
+     "text": "thinking about the call tomorrow",
+     "source": "text",
+     "audio_path": null,
+     "kind": "his"
+    },
+    "caption": null,
+    "loose": "thinking about the call tomorrow",
+    "his_text": "thinking about the call tomorrow",
+    "pack": true,
+    "parse": {
+     "message_id": "11",
+     "quote": null,
+     "text": "thinking about the call tomorrow",
+     "source": "text",
+     "audio_path": null
+    },
+    "marked": false,
+    "marked_by_id": false,
+    "privacy_skip": false
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "answer to the steered secret",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 92,
+    "ts": 1792081800.0,
+    "uid": null,
+    "copy": 88
+   },
+   "expected": {
+    "classify": null,
+    "ends": true,
+    "recovery": "real",
+    "outage": false,
+    "reply": true
+   }
+  },
+  {
+   "raw": {
+    "role": "assistant",
+    "content": "Sure — tell me more.",
+    "pmid": null,
+    "display_kind": null,
+    "tool_calls": null,
+    "display_metadata": null,
+    "active": 1,
+    "id": 93,
+    "ts": 1792081860.0,
+    "uid": null,
+    "copy": 59
+   },
+   "expected": {
+    "classify": null,
+    "ends": true,
+    "recovery": "real",
+    "outage": false,
+    "reply": true
+   }
+  }
+ ],
+ "compute": {
+  "hook_starts": [
+   "2026-10-15T17:20:00+00:00"
+  ],
+  "sends": [
+   "2026-10-15T16:30:00+00:00"
+  ],
+  "off_ids": [
+   "13"
+  ],
+  "private": [
+   5,
+   16,
+   17,
+   18,
+   19,
+   38,
+   59,
+   60,
+   61,
+   62,
+   63,
+   64,
+   65,
+   66,
+   67,
+   68,
+   69,
+   70,
+   71,
+   72,
+   73,
+   74,
+   75,
+   76,
+   77,
+   78,
+   79,
+   80,
+   81,
+   82,
+   83,
+   84,
+   85,
+   87,
+   88,
+   89,
+   90,
+   92,
+   93
+  ],
+  "copies": {
+   "90": 17,
+   "91": 1,
+   "92": 88,
+   "93": 59
+  },
+  "windows": [
+   [
+    "2026-10-15T14:17:00+00:00",
+    "2026-10-15T15:02:00+00:00"
+   ],
+   [
+    "2026-10-15T16:21:00+00:00",
+    "2026-10-15T16:30:00+00:00"
+   ],
+   [
+    "2026-10-15T17:20:00+00:00",
+    null
+   ]
+  ],
+  "taint": true,
+  "answered": false,
+  "window": {
+   "since": "2026-10-15T17:20:00+00:00",
+   "last": "2026-10-15T17:20:00+00:00"
+  }
+ }
+}

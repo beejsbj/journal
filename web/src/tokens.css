@@ -1,0 +1,172 @@
+/* One token sheet, light and dark: the only place a colour, a face, a size or a duration is chosen. app.css consumes
+   these.
+
+   The identity is "Margin × Letters". The page is his: a book page, his words set in Newsreader roman at full ink, the
+   hours hung in the margin, rules and space instead of boxes. Her words are a letter: typed in Courier Prime, in her
+   ink, under a "From" line that runs out as a dashed fold. Her ink is the only hue on the page and it is hers alone;
+   his actions are in his ink. The figures are typed (times in Courier Prime) or set in Fraunces' soft numerals (the days
+   of the week, the counts).
+
+   Faces (SIL OFL 1.1, served from this origin and precached, so every device and every offline read shows the same
+   page; the licences are web/public/fonts/OFL-*.txt). Fontsource's latin subsets; Fraunces cut to its ten figures and
+   the Newsreader italic pinned at 400 by tools/web_fonts.py. */
+
+@font-face {
+  font-family: "Newsreader";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 800;
+  src: url("/fonts/newsreader-latin-opsz-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Newsreader";
+  font-style: italic;
+  font-display: swap;
+  font-weight: 400;
+  src: url("/fonts/newsreader-latin-italic-400.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Instrument Sans";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 700;
+  src: url("/fonts/instrument-sans-latin-wght-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Courier Prime";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url("/fonts/courier-prime-latin-400-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Courier Prime";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url("/fonts/courier-prime-latin-700-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* the figures only: any other character in a `--figure` run falls through to the reading face */
+@font-face {
+  font-family: "Fraunces Figures";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300 700;
+  src: url("/fonts/fraunces-digits-normal.woff2") format("woff2");
+  unicode-range: U+0030-0039;
+}
+
+:root {
+  color-scheme: light dark;
+
+  /* paper and his ink */
+  --bg: #f4efe4;
+  --surface: #faf6ee;
+  --sunk: #ebe4d5;
+  --ink: #1b1813;
+  --ink-2: #4f463b;
+  --ink-3: #6e6457;           /* 5.0:1 on the paper */
+  --rule: #d8cdb9;
+  --rule-2: #e5dccb;
+
+  /* her ink: her words and nothing else. Blue-black is the default; the reader may choose another below (Settings). */
+  --accent: #28367f;
+
+  /* his actions are in his own ink */
+  --act: var(--ink);
+  --act-ink: var(--bg);
+  --act-press: var(--ink-2);
+
+  /* status: only what must stand out does; an unanswered prompt is not a failure and has no colour */
+  --warn: #8a5410;
+  --bad: #8a3b2c;
+  --good: var(--ink);
+  --bad-wash: color-mix(in srgb, var(--bad) 7%, var(--bg));
+
+  /* type: his words in the book's roman; hers and every figure typed; the engine in a quiet grotesque */
+  --serif: "Newsreader", "Iowan Old Style", Charter, Georgia, serif;
+  --sans: "Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --type: "Courier Prime", "Courier New", ui-monospace, monospace;
+  --figure: "Fraunces Figures", "Newsreader", Georgia, serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --text-xs: 0.75rem;     /* 12: tags, typed labels */
+  --text-sm: 0.875rem;    /* 14: meta, hints, labels */
+  --text-md: 1rem;        /* 16: interface body, her words */
+  --text-lg: 1.25rem;     /* 20: his words */
+  --text-xl: 1.5rem;      /* 24: titles in the serif */
+  --text-2xl: 2.25rem;    /* 36: page titles on a phone */
+  --text-3xl: 3rem;       /* 48: page titles on a wide screen */
+  --leading-tight: 1.15;
+  --leading: 1.5;
+  --leading-read: 1.66;
+
+  /* space: a 4 px base */
+  --s1: 0.25rem;
+  --s2: 0.5rem;
+  --s3: 0.75rem;
+  --s4: 1rem;
+  --s5: 1.5rem;
+  --s6: 2rem;
+  --s7: 3rem;
+
+  --radius-s: 3px;
+  --radius: 4px;
+  --radius-l: 10px;
+
+  /* the page: his column, the margin his hours hang in, and on a wide screen the column her notes sit in */
+  --measure: 38rem;
+  --gutter: 6.5rem;
+  --note: 21rem;
+  --page: calc(var(--gutter) + var(--measure) + 4rem);
+  --spread: calc(var(--gutter) + var(--measure) + var(--note) + 8rem);
+  --nav-h: 4rem;
+  --tap: 2.75rem;
+
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --dur: 160ms;
+  --lift: 0 1px 2px rgb(40 30 10 / 0.05), 0 8px 28px rgb(40 30 10 / 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161513;
+    --surface: #1e1c19;
+    --sunk: #23201c;
+    --ink: #ece4d6;
+    --ink-2: #b8ad9b;
+    --ink-3: #958a79;
+    --rule: #38332b;
+    --rule-2: #2a2622;
+    --accent: #b6c0ff;
+    --warn: #e0a85a;
+    --bad: #e0a090;
+    --bad-wash: color-mix(in srgb, var(--bad) 9%, var(--bg));
+    --lift: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 32px rgb(0 0 0 / 0.45);
+  }
+}
+
+/* Her inks (Settings, "Ink"; web/src/ink.ts keeps the choice on this device). Each is set on <html data-ink> for the
+   page, and on any element that shows an ink of its own (the swatches). Every ink holds AA for body text on the paper
+   and the surface, light and dark (web/tests/ink.test.tsx), and so does --her-soft, the quieter grade of it. */
+[data-ink="blue-black"] { --accent: #28367f; }
+[data-ink="brown"] { --accent: #7a4519; }
+[data-ink="violet"] { --accent: #4b2a8a; }
+[data-ink="green"] { --accent: #1b5642; }
+@media (prefers-color-scheme: dark) {
+  [data-ink="blue-black"] { --accent: #b6c0ff; }
+  [data-ink="brown"] { --accent: #dcab78; }
+  [data-ink="violet"] { --accent: #d2b4ff; }
+  [data-ink="green"] { --accent: #8fd3b4; }
+}
+
+/* What is made from her ink, wherever an ink is set, so a swatch carries its own fold and grade */
+:root, [data-ink] {
+  --her-soft: color-mix(in srgb, var(--accent) 86%, var(--bg));
+  --edge: color-mix(in srgb, var(--accent) 42%, var(--bg));
+}

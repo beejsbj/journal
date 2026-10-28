@@ -1,0 +1,45 @@
+{
+  "settings": {
+    "location": "Hillside",
+    "windows": {
+      "collapse_hours": 6,
+      "grace_hours": 2
+    },
+    "reflections": {
+      "day": {
+        "enabled": true
+      },
+      "week": {
+        "enabled": true
+      }
+    },
+    "conversations": {
+      "quiet_minutes": 45
+    },
+    "programs": {
+      "settle_minutes": 2
+    },
+    "today": {
+      "enabled": true,
+      "max_chars": 1200,
+      "cache_minutes": 30
+    },
+    "serve": {
+      "port": 8790,
+      "token_command": "<set>"
+    },
+    "root": "/journal/Journal",
+    "state_dir": "/journal/state",
+    "practices_dir": "/journal/state/practices",
+    "timezone": "Asia/Kolkata"
+  },
+  "origins": {
+    "location": "file",
+    "windows": "file",
+    "reflections": "file",
+    "conversations": "hermes",
+    "programs": "default",
+    "today": "file",
+    "serve": "file"
+  }
+}

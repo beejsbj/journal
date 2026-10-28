@@ -1,0 +1,50 @@
+{
+  "date": "2026-10-15",
+  "weekday": "Thu",
+  "time": "09:12",
+  "timezone": "IST",
+  "location": "Hillside",
+  "practices": {
+    "rows": [
+      {
+        "id": "morning",
+        "state": "answered",
+        "sent": "06:00",
+        "answered": "06:41"
+      },
+      {
+        "id": "evening",
+        "state": "upcoming",
+        "at": "23:00"
+      }
+    ],
+    "open": []
+  },
+  "program": {
+    "text": "Fix your entire life in 1 day — session 3/10 (The Identity Construction Tracer), phase 2/5 open since Sun 21:14",
+    "program": "fix-life"
+  },
+  "entries": [
+    {
+      "stem": "2026-10-15-j",
+      "first_line": "call the dentist re Thursday"
+    },
+    {
+      "stem": "2026-10-15-morning",
+      "first_line": "slept badly, but the light was good"
+    }
+  ],
+  "reflection": {
+    "date": "2026-10-14",
+    "asked": "What would it take to let the Tuesday feeling in?"
+  },
+  "tasks": {
+    "count": 3,
+    "names": [
+      "Call the bank",
+      "Draft the quarterly report",
+      "Walk"
+    ]
+  },
+  "weather": "14°C, light rain"
+}

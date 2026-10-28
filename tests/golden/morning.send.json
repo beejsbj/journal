@@ -1,0 +1,168 @@
+{
+ "log": [
+  "sent 2026-10-14-morning (opener: plain:agent-failed, wove 0 questions)",
+  "sent 2026-10-14-morning (opener: plain:agent-failed, wove 0 questions)"
+ ],
+ "mirror": [
+  {
+   "ref": [
+    "prompts",
+    "2026-10-14-morning",
+    null
+   ],
+   "text": "🌿 Morning journal · Wed 14 Oct\n\nMorning, Sam 🌿 Start wherever something feels alive — one line or a voice note is plenty.\n\n1. How did you sleep?\n2. How are you feeling — physically, mentally, emotionally?\n3. What's on your chest right now?\n4. Which of your values will you experiment with today?\n5. What's your centering mantra?\n6. Two things you're grateful for — why?\n7. Top priority today?\n8. 2-3 supporting goals for a successful day?\n9. Any worries about the day ahead? What's the plan?\n10. Who needs your support today? How will you show up?\n11. What would make today deeply satisfying?",
+   "what": "Ada sent the morning prompt"
+  },
+  {
+   "ref": [
+    "prompts",
+    "2026-10-14-morning",
+    null
+   ],
+   "text": "🌿 Morning journal · Wed 14 Oct\n\nMorning, Sam 🌿 Start wherever something feels alive — one line or a voice note is plenty.\n\n1. How did you sleep?\n2. How are you feeling — physically, mentally, emotionally?\n3. What's on your chest right now?\n4. Which of your values will you experiment with today?\n5. What's your centering mantra?\n6. Two things you're grateful for — why?\n7. Top priority today?\n8. 2-3 supporting goals for a successful day?\n9. Any worries about the day ahead? What's the plan?\n10. Who needs your support today? How will you show up?\n11. What would make today deeply satisfying?",
+   "what": "Ada sent the morning prompt again"
+  }
+ ],
+ "record": {
+  "asked": [],
+  "chat_id": "1001",
+  "citations": [],
+  "earlier_openers": [
+   "Morning, Sam 🌿 Start wherever something feels alive — one line or a voice note is plenty."
+  ],
+  "html": "<b>🌿 Morning journal · Wed 14 Oct</b>\n\nMorning, Sam 🌿 Start wherever something feels alive — one line or a voice note is plenty.\n\n<blockquote expandable>1. How did you sleep?\n2. How are you feeling — physically, mentally, emotionally?\n3. What's on your chest right now?\n4. Which of your values will you experiment with today?\n5. What's your centering mantra?\n6. Two things you're grateful for — why?\n7. Top priority today?\n8. 2-3 supporting goals for a successful day?\n9. Any worries about the day ahead? What's the plan?\n10. Who needs your support today? How will you show up?\n11. What would make today deeply satisfying?</blockquote>\n\n<i>Tap to open the questions · reply to this message anytime</i>",
+  "id": "2026-10-14-morning",
+  "kind": "morning",
+  "local_date": "2026-10-14",
+  "message_id": "702",
+  "needs_edit": false,
+  "opener": "Morning, Sam 🌿 Start wherever something feels alive — one line or a voice note is plenty.",
+  "opener_source": "plain:agent-failed",
+  "plain_text": "🌿 Morning journal · Wed 14 Oct\n\nMorning, Sam 🌿 Start wherever something feels alive — one line or a voice note is plenty.\n\n1. How did you sleep?\n2. How are you feeling — physically, mentally, emotionally?\n3. What's on your chest right now?\n4. Which of your values will you experiment with today?\n5. What's your centering mantra?\n6. Two things you're grateful for — why?\n7. Top priority today?\n8. 2-3 supporting goals for a successful day?\n9. Any worries about the day ahead? What's the plan?\n10. Who needs your support today? How will you show up?\n11. What would make today deeply satisfying?",
+  "previous_message_ids": [
+   "701"
+  ],
+  "questions": [
+   {
+    "id": "1",
+    "section": null,
+    "text": "How did you sleep?"
+   },
+   {
+    "id": "2",
+    "section": null,
+    "text": "How are you feeling — physically, mentally, emotionally?"
+   },
+   {
+    "id": "3",
+    "section": null,
+    "text": "What's on your chest right now?"
+   },
+   {
+    "id": "4",
+    "section": null,
+    "text": "Which of your values will you experiment with today?"
+   },
+   {
+    "id": "5",
+    "section": null,
+    "text": "What's your centering mantra?"
+   },
+   {
+    "id": "6",
+    "section": null,
+    "text": "Two things you're grateful for — why?"
+   },
+   {
+    "id": "7",
+    "section": null,
+    "text": "Top priority today?"
+   },
+   {
+    "id": "8",
+    "section": null,
+    "text": "2-3 supporting goals for a successful day?"
+   },
+   {
+    "id": "9",
+    "section": null,
+    "text": "Any worries about the day ahead? What's the plan?"
+   },
+   {
+    "id": "10",
+    "section": null,
+    "text": "Who needs your support today? How will you show up?"
+   },
+   {
+    "id": "11",
+    "section": null,
+    "text": "What would make today deeply satisfying?"
+   }
+  ],
+  "scheduled": "2026-10-14T23:09:00+05:30",
+  "stem": "2026-10-14-morning"
+ },
+ "sent": [
+  {
+   "asked": [],
+   "chat_id": "1001",
+   "id": "2026-10-14-morning",
+   "kind": "morning",
+   "local_date": "2026-10-14",
+   "message_id": "701",
+   "opener": "Morning, Sam 🌿 Start wherever something feels alive — one line or a voice note is plenty.",
+   "opener_source": "plain:agent-failed",
+   "scheduled": "2026-10-14T23:01:00+05:30"
+  },
+  {
+   "asked": [],
+   "chat_id": "1001",
+   "id": "2026-10-14-morning",
+   "kind": "morning",
+   "local_date": "2026-10-14",
+   "message_id": "702",
+   "opener": "Morning, Sam 🌿 Start wherever something feels alive — one line or a voice note is plenty.",
+   "opener_source": "plain:agent-failed",
+   "previous_message_ids": [
+    "701"
+   ],
+   "scheduled": "2026-10-14T23:09:00+05:30"
+  }
+ ],
+ "telegram": [
+  [
+   "sendMessage",
+   {
+    "chat_id": "1001",
+    "link_preview_options": {
+     "is_disabled": true
+    },
+    "parse_mode": "HTML",
+    "text": "<b>🌿 Morning journal · Wed 14 Oct</b>\n\nMorning, Sam 🌿 Start wherever something feels alive — one line or a voice note is plenty.\n\n<blockquote expandable>1. How did you sleep?\n2. How are you feeling — physically, mentally, emotionally?\n3. What's on your chest right now?\n4. Which of your values will you experiment with today?\n5. What's your centering mantra?\n6. Two things you're grateful for — why?\n7. Top priority today?\n8. 2-3 supporting goals for a successful day?\n9. Any worries about the day ahead? What's the plan?\n10. Who needs your support today? How will you show up?\n11. What would make today deeply satisfying?</blockquote>\n\n<i>Tap to open the questions · reply to this message anytime</i>"
+   }
+  ],
+  [
+   "sendMessage",
+   {
+    "chat_id": "1001",
+    "link_preview_options": {
+     "is_disabled": true
+    },
+    "parse_mode": "HTML",
+    "text": "<b>🌿 Morning journal · Wed 14 Oct</b>\n\nMorning, Sam 🌿 Start wherever something feels alive — one line or a voice note is plenty.\n\n<blockquote expandable>1. How did you sleep?\n2. How are you feeling — physically, mentally, emotionally?\n3. What's on your chest right now?\n4. Which of your values will you experiment with today?\n5. What's your centering mantra?\n6. Two things you're grateful for — why?\n7. Top priority today?\n8. 2-3 supporting goals for a successful day?\n9. Any worries about the day ahead? What's the plan?\n10. Who needs your support today? How will you show up?\n11. What would make today deeply satisfying?</blockquote>\n\n<i>Tap to open the questions · reply to this message anytime</i>"
+   }
+  ],
+  [
+   "editMessageText",
+   {
+    "chat_id": "1001",
+    "link_preview_options": {
+     "is_disabled": true
+    },
+    "message_id": 701,
+    "parse_mode": "HTML",
+    "text": "<b>🌿 Morning journal · Wed 14 Oct</b>\n\nMorning, Sam 🌿 Start wherever something feels alive — one line or a voice note is plenty.\n\n<i>sent again below</i>"
+   }
+  ]
+ ]
+}

@@ -1,0 +1,42 @@
+{
+  "stem": "2026-10-15-j",
+  "date": "2026-10-15",
+  "kind": "j",
+  "practice": null,
+  "program": null,
+  "session": null,
+  "run": null,
+  "title": "Journal note — Thu 15 Oct 2026",
+  "voices": {
+    "his": "Sam",
+    "hers": "Ada"
+  },
+  "prompt": null,
+  "blocks": [
+    {
+      "kind": "his",
+      "key": "words:0",
+      "at": "08:30 IST",
+      "source": "text",
+      "text": "call the harbour master",
+      "audio": null,
+      "phase": null
+    }
+  ],
+  "summary": null,
+  "analysis": {
+    "annotations": null,
+    "notes": [],
+    "reflection": null
+  },
+  "flags": {
+    "annotated": false,
+    "has_conversation": false,
+    "transcript_pending": false,
+    "audio": false
+  },
+  "meta": {},
+  "path": "/journal/Journal/2026-10-15-j.md",
+  "mtime": 1760000000.0,
+  "writable": true
+}

@@ -1,0 +1,5 @@
+{
+  "valid": true,
+  "problems": [],
+  "raw": "---\nkind: practice\nid: gratitude\ntitle: Daily gratitude\nemoji:\nschedule.time: 21:30\ncollapse_hours: 6\nannotate: true\nopener.mode: companion\nopener.shape: a short opener (max ~900 characters)\nopener.limit: 1100\nopener.plain: {title}. A sentence or two is enough.\ncompanion:\n---\n- Three things today, and why each one mattered.\n- Who made one of them possible?\n"
+}

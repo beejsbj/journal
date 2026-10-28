@@ -1,0 +1,22 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv run -p ${{ matrix.python }} --with pytest --with pyyaml python -m pytest -q
+      - run: uv run -p ${{ matrix.python }} python tools/gen_builtins.py --check
+      # journal mcp's tools through the SDK itself (the optional extra journal[mcp]); without it they are skipped above
+      - run: uv run -p ${{ matrix.python }} --with pytest --with pyyaml --with 'mcp>=2,<3' python -m pytest -q tests/test_mcp.py tests/test_mcp_fence.py

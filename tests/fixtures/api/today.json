@@ -1,0 +1,96 @@
+{
+  "date": "2026-10-15",
+  "weekday": "Thu",
+  "time": "09:12",
+  "timezone": "IST",
+  "location": null,
+  "practices": {
+    "rows": [
+      {
+        "id": "gratitude",
+        "state": "upcoming",
+        "at": "21:30"
+      },
+      {
+        "id": "evening",
+        "state": "upcoming",
+        "at": "23:00"
+      }
+    ],
+    "open": []
+  },
+  "program": null,
+  "entries": [
+    {
+      "stem": "2026-10-15-fix-life-s01",
+      "first_line": "The life I do not want."
+    },
+    {
+      "stem": "2026-10-15-j",
+      "first_line": "call the harbour master"
+    }
+  ],
+  "reflection": {
+    "date": "2026-10-14",
+    "asked": "What does the sea ask?",
+    "stem": "2026-10-14-reflection"
+  },
+  "tasks": null,
+  "weather": null,
+  "week": [
+    {
+      "date": "2026-10-09",
+      "weekday": "Fri",
+      "answered": 0,
+      "missed": 0,
+      "state": "none"
+    },
+    {
+      "date": "2026-10-10",
+      "weekday": "Sat",
+      "answered": 0,
+      "missed": 0,
+      "state": "none"
+    },
+    {
+      "date": "2026-10-11",
+      "weekday": "Sun",
+      "answered": 0,
+      "missed": 0,
+      "state": "none"
+    },
+    {
+      "date": "2026-10-12",
+      "weekday": "Mon",
+      "answered": 0,
+      "missed": 0,
+      "state": "none"
+    },
+    {
+      "date": "2026-10-13",
+      "weekday": "Tue",
+      "answered": 0,
+      "missed": 0,
+      "state": "none"
+    },
+    {
+      "date": "2026-10-14",
+      "weekday": "Wed",
+      "answered": 1,
+      "missed": 0,
+      "state": "answered"
+    },
+    {
+      "date": "2026-10-15",
+      "weekday": "Thu",
+      "answered": 0,
+      "missed": 0,
+      "state": "none"
+    }
+  ],
+  "voices": {
+    "his": "Sam",
+    "hers": "Ada"
+  },
+  "location_source": null
+}

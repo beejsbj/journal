@@ -1,0 +1,54 @@
+{
+  "user": {"name": "Sam", "pronouns": "he/him/his"},
+  "companion": {"name": "Ada", "emoji": "🌿"},
+  "telegram": {
+    "token_env": "COMPANION_TELEGRAM_BOT_TOKEN",
+    "token_command": ["/home/user/.local/bin/secret-env", "companion"],
+    "token_key": "TELEGRAM_BOT_TOKEN",
+    "annotation_replies": true
+  },
+  "hermes": {
+    "command": "/home/user/.local/bin/hermes",
+    "failure_deliver": "bot-chat:ops",
+    "cron_schedule": "*/5 * * * *"
+  },
+  "sources": {
+    "weather": {"enabled": true},
+    "telegram_history": {"enabled": true, "days": 7, "limit": 25},
+    "tududi": {"enabled": true, "command": ["/usr/bin/python3", "/home/user/tududi/scripts/mcp-stdio.py"]},
+    "scrobbler": {"enabled": true, "command": "/home/user/.local/bin/chat-scrobbler"},
+    "listenbrainz": {"enabled": true, "user": "your-listenbrainz-name"},
+    "storyteller": {"enabled": true, "db": "/srv/library/storyteller/storyteller.db"},
+    "audiobookshelf": {"enabled": true, "db": "/srv/library/audiobookshelf/absdatabase.sqlite"},
+    "grimmory": {"enabled": true, "container": "grimmory-mariadb", "database": "booklore"},
+    "not_connected": "Calendar and watch history are not connected."
+  },
+  "guard": {
+    "enabled": true,
+    "protected_paths": [
+      "/home/user/.hermes",
+      "/home/user/.config/journal",
+      "/home/user/src/journal",
+      "/home/user/.config/systemd"
+    ],
+    "allowed_write_paths": ["/home/user/.hermes/profiles/companion/cache/scratch"],
+    "protected_tokens": [".hermes", "config/journal"],
+    "protect_journal_root": true,
+    "block_execute_code": true,
+    "restrict_hermes_cli": true,
+    "block_system_commands": true,
+    "escalate_to": "the operator"
+  },
+  "prompts": {
+    "reading_guidance": "Good places to look: older entries in the journal folder, his other notes, his tasks, his AI chats (`chat-scrobbler search \"<terms>\" --json`), what he's reading, what he's listening to."
+  },
+  "entries": {"frontmatter_source": "ada-journal"},
+  "audio": {"ffprobe": "/usr/bin/ffprobe"},
+  "serve": {
+    "port": 8790,
+    "host": "journal.example.com",
+    "token_command": ["/home/user/.local/bin/secret-env", "companion"],
+    "token_key": "JOURNAL_SERVE_TOKEN",
+    "trusted_proxies": ["10.0.0.0/24"]
+  }
+}

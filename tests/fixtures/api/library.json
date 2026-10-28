@@ -1,0 +1,565 @@
+[
+  {
+    "id": "morning",
+    "kind": "practice",
+    "title": "Morning journal",
+    "emoji": "",
+    "source": "builtin",
+    "enabled": true,
+    "schedule": [
+      {
+        "time": "06:00",
+        "weekday": null
+      }
+    ],
+    "closes": null,
+    "annotate": true,
+    "collapse_hours": 6.0,
+    "opener": {
+      "mode": "companion",
+      "shape": "a short opener (max ~1200 characters)",
+      "limit": 1400,
+      "plain": "{greet:Morning} Start wherever something feels alive — one line or a voice note is plenty."
+    },
+    "companion": "orientation — where they are, what matters today",
+    "group": "",
+    "path": "/package/library/practices/morning.md",
+    "sections": [
+      {
+        "title": null,
+        "questions": [
+          {
+            "id": "1",
+            "text": "How did you sleep?",
+            "pinned": false
+          },
+          {
+            "id": "2",
+            "text": "How are you feeling — physically, mentally, emotionally?",
+            "pinned": false
+          },
+          {
+            "id": "3",
+            "text": "What's on your chest right now?",
+            "pinned": false
+          },
+          {
+            "id": "4",
+            "text": "Which of your values will you experiment with today?",
+            "pinned": false
+          },
+          {
+            "id": "5",
+            "text": "What's your centering mantra?",
+            "pinned": false
+          },
+          {
+            "id": "6",
+            "text": "Two things you're grateful for — why?",
+            "pinned": false
+          },
+          {
+            "id": "7",
+            "text": "Top priority today?",
+            "pinned": false
+          },
+          {
+            "id": "8",
+            "text": "2-3 supporting goals for a successful day?",
+            "pinned": false
+          },
+          {
+            "id": "9",
+            "text": "Any worries about the day ahead? What's the plan?",
+            "pinned": false
+          },
+          {
+            "id": "10",
+            "text": "Who needs your support today? How will you show up?",
+            "pinned": false
+          },
+          {
+            "id": "11",
+            "text": "What would make today deeply satisfying?",
+            "pinned": false
+          }
+        ]
+      }
+    ],
+    "mtime": 1760000000.0,
+    "default_changed": null
+  },
+  {
+    "id": "gratitude",
+    "kind": "practice",
+    "title": "Daily gratitude",
+    "emoji": "",
+    "source": "user",
+    "enabled": true,
+    "schedule": [
+      {
+        "time": "21:30",
+        "weekday": null
+      }
+    ],
+    "closes": null,
+    "annotate": true,
+    "collapse_hours": 6.0,
+    "opener": {
+      "mode": "companion",
+      "shape": "a short opener (max ~900 characters)",
+      "limit": 1100,
+      "plain": "{title}. A sentence or two is enough."
+    },
+    "companion": "",
+    "group": "",
+    "path": "/journal/state/practices/gratitude.md",
+    "sections": [
+      {
+        "title": null,
+        "questions": [
+          {
+            "id": "1",
+            "text": "Three things today, and why each one mattered.",
+            "pinned": false
+          },
+          {
+            "id": "2",
+            "text": "Who made one of them possible?",
+            "pinned": false
+          }
+        ]
+      }
+    ],
+    "mtime": 1760000000.0,
+    "default_changed": null
+  },
+  {
+    "id": "evening",
+    "kind": "practice",
+    "title": "Evening journal",
+    "emoji": "",
+    "source": "builtin",
+    "enabled": true,
+    "schedule": [
+      {
+        "time": "23:00",
+        "weekday": null
+      }
+    ],
+    "closes": "day",
+    "annotate": true,
+    "collapse_hours": 6.0,
+    "opener": {
+      "mode": "companion",
+      "shape": "a short opener (max ~1200 characters)",
+      "limit": 1400,
+      "plain": "{greet:Evening} Let the day land. Answer whatever pulls at you; you don't need to do them all."
+    },
+    "companion": "closure — process the day, release, carry forward one thread",
+    "group": "",
+    "path": "/package/library/practices/evening.md",
+    "sections": [
+      {
+        "title": "Brain Dump & Letting Go",
+        "questions": [
+          {
+            "id": "1.1",
+            "text": "What's spinning in your mind?",
+            "pinned": false
+          },
+          {
+            "id": "1.2",
+            "text": "What do you need to release before sleep?",
+            "pinned": false
+          }
+        ]
+      },
+      {
+        "title": "Day Review",
+        "questions": [
+          {
+            "id": "2.1",
+            "text": "What went well today?",
+            "pinned": false
+          },
+          {
+            "id": "2.2",
+            "text": "What challenged you?",
+            "pinned": false
+          },
+          {
+            "id": "2.3",
+            "text": "What did you learn?",
+            "pinned": false
+          }
+        ]
+      },
+      {
+        "title": "Story-Worthy Moments",
+        "questions": [
+          {
+            "id": "3.1",
+            "text": "What interesting moments happened, even if small?",
+            "pinned": false
+          },
+          {
+            "id": "3.2",
+            "text": "What made you smile or laugh?",
+            "pinned": false
+          },
+          {
+            "id": "3.3",
+            "text": "What surprised you?",
+            "pinned": false
+          }
+        ]
+      },
+      {
+        "title": "Wins & Celebrations",
+        "questions": [
+          {
+            "id": "4.1",
+            "text": "What wins, big or small, did you experience?",
+            "pinned": false
+          },
+          {
+            "id": "4.2",
+            "text": "What are you proud of?",
+            "pinned": false
+          }
+        ]
+      },
+      {
+        "title": "Insights & Revelations",
+        "questions": [
+          {
+            "id": "5.1",
+            "text": "What realizations or new understandings emerged?",
+            "pinned": false
+          },
+          {
+            "id": "5.2",
+            "text": "What did you learn about yourself or others?",
+            "pinned": false
+          }
+        ]
+      },
+      {
+        "title": "Values & Alignment",
+        "questions": [
+          {
+            "id": "6.1",
+            "text": "How did you honor your values today?",
+            "pinned": false
+          },
+          {
+            "id": "6.2",
+            "text": "Where did you feel most/least aligned?",
+            "pinned": false
+          }
+        ]
+      },
+      {
+        "title": "Energy Awareness",
+        "questions": [
+          {
+            "id": "7.1",
+            "text": "What energized you today?",
+            "pinned": false
+          },
+          {
+            "id": "7.2",
+            "text": "What drained your energy?",
+            "pinned": false
+          }
+        ]
+      },
+      {
+        "title": "Connection Reflection",
+        "questions": [
+          {
+            "id": "8.1",
+            "text": "What attention bids did you notice?",
+            "pinned": false
+          },
+          {
+            "id": "8.2",
+            "text": "Which connections did you lean into?",
+            "pinned": false
+          },
+          {
+            "id": "8.3",
+            "text": "Who showed up for you, and who did you show up for?",
+            "pinned": false
+          }
+        ]
+      },
+      {
+        "title": "Gratitude",
+        "questions": [
+          {
+            "id": "9.1",
+            "text": "What moments from today are you thankful for?",
+            "pinned": false
+          },
+          {
+            "id": "9.2",
+            "text": "What simple joys touched you today?",
+            "pinned": false
+          }
+        ]
+      },
+      {
+        "title": "Peace & Calming",
+        "questions": [
+          {
+            "id": "10.1",
+            "text": "What brought you peace today?",
+            "pinned": false
+          },
+          {
+            "id": "10.2",
+            "text": "What's one thing you can appreciate about yourself?",
+            "pinned": false
+          },
+          {
+            "id": "10.3",
+            "text": "What do you want to carry into your sleep?",
+            "pinned": false
+          }
+        ]
+      }
+    ],
+    "mtime": 1760000000.0,
+    "default_changed": null
+  },
+  {
+    "id": "midweek",
+    "kind": "practice",
+    "title": "Midweek check-in",
+    "emoji": "",
+    "source": "builtin",
+    "enabled": true,
+    "schedule": [
+      {
+        "time": "12:00",
+        "weekday": 2
+      }
+    ],
+    "closes": null,
+    "annotate": true,
+    "collapse_hours": 6.0,
+    "opener": {
+      "mode": "companion",
+      "shape": "a brief opener (max ~800 characters)",
+      "limit": 900,
+      "plain": "Midweek check-in. Quick pulse — a sentence or two is enough."
+    },
+    "companion": "a two-minute pulse — energy, drift, support; offer at most one nudge",
+    "group": "",
+    "path": "/package/library/practices/midweek.md",
+    "sections": [
+      {
+        "title": "Energy Check",
+        "questions": [
+          {
+            "id": "1.1",
+            "text": "How's your energy been this week?",
+            "pinned": false
+          },
+          {
+            "id": "1.2",
+            "text": "High/low/variable? Any idea why?",
+            "pinned": false
+          }
+        ]
+      },
+      {
+        "title": "Drift Check",
+        "questions": [
+          {
+            "id": "2.1",
+            "text": "Monday's intentions vs. where you are now — aligned or drifted?",
+            "pinned": false
+          },
+          {
+            "id": "2.2",
+            "text": "Anything taking you off course?",
+            "pinned": false
+          }
+        ]
+      },
+      {
+        "title": "Support Check",
+        "questions": [
+          {
+            "id": "3.1",
+            "text": "What do you need this week?",
+            "pinned": false
+          },
+          {
+            "id": "3.2",
+            "text": "Who can help? What would help?",
+            "pinned": false
+          }
+        ]
+      }
+    ],
+    "mtime": 1760000000.0,
+    "default_changed": null
+  },
+  {
+    "id": "weekly",
+    "kind": "practice",
+    "title": "Weekly pattern scan",
+    "emoji": "",
+    "source": "builtin",
+    "enabled": true,
+    "schedule": [
+      {
+        "time": "20:00",
+        "weekday": 6
+      }
+    ],
+    "closes": "week",
+    "annotate": true,
+    "collapse_hours": 6.0,
+    "opener": {
+      "mode": "companion",
+      "shape": "the week's pattern scan as short bullets, then the questions (max ~2000 characters)",
+      "limit": 2200,
+      "plain": "End of the week. Let's look back — take whichever thread matters."
+    },
+    "companion": "patterns across the week — celebrate wins as well as gaps; one or two nudges at most",
+    "group": "",
+    "path": "/package/library/practices/weekly.md",
+    "sections": [
+      {
+        "title": "Energy & Themes",
+        "questions": [
+          {
+            "id": "1.1",
+            "text": "Which days had energy, which didn't — and what was behind it?",
+            "pinned": false
+          },
+          {
+            "id": "1.2",
+            "text": "What kept coming up across the week?",
+            "pinned": false
+          }
+        ]
+      },
+      {
+        "title": "Values & Alignment",
+        "questions": [
+          {
+            "id": "2.1",
+            "text": "Which values showed up this week? Which were neglected?",
+            "pinned": false
+          }
+        ]
+      },
+      {
+        "title": "Dropped Threads",
+        "questions": [
+          {
+            "id": "3.1",
+            "text": "What intentions or promises slipped — to yourself or others?",
+            "pinned": false
+          }
+        ]
+      },
+      {
+        "title": "Wins",
+        "questions": [
+          {
+            "id": "4.1",
+            "text": "What's worth celebrating from the week, even small?",
+            "pinned": false
+          }
+        ]
+      },
+      {
+        "title": "Connections",
+        "questions": [
+          {
+            "id": "5.1",
+            "text": "Who showed up for you, and who did you show up for?",
+            "pinned": false
+          }
+        ]
+      },
+      {
+        "title": "Forward",
+        "questions": [
+          {
+            "id": "6.1",
+            "text": "What do you want to carry forward from this week?",
+            "pinned": false
+          },
+          {
+            "id": "6.2",
+            "text": "What thread do you want to pull next week?",
+            "pinned": false
+          },
+          {
+            "id": "6.3",
+            "text": "What would make next week feel aligned?",
+            "pinned": false
+          }
+        ]
+      }
+    ],
+    "mtime": 1760000000.0,
+    "default_changed": null
+  },
+  {
+    "id": "fix-life",
+    "kind": "program",
+    "title": "Fix your entire life in 1 day",
+    "emoji": "🧠",
+    "group": "frameworks",
+    "source": "builtin",
+    "enabled": true,
+    "schedule": [],
+    "closes": null,
+    "sessions": 10,
+    "phases_total": 51,
+    "active_run": null,
+    "mtime": 1760000000.0,
+    "default_changed": null
+  },
+  {
+    "id": "conversation-prep",
+    "kind": "situational",
+    "title": "Conversation prep",
+    "emoji": "🗣️",
+    "group": "situational",
+    "source": "builtin",
+    "enabled": true,
+    "schedule": [],
+    "closes": null,
+    "sessions": 1,
+    "phases_total": 2,
+    "active_run": null,
+    "mtime": 1760000000.0,
+    "default_changed": null
+  },
+  {
+    "id": "post-session-debrief",
+    "kind": "situational",
+    "title": "Post-session debrief",
+    "emoji": "🪞",
+    "group": "situational",
+    "source": "builtin",
+    "enabled": true,
+    "schedule": [],
+    "closes": null,
+    "sessions": 1,
+    "phases_total": 2,
+    "active_run": null,
+    "mtime": 1760000000.0,
+    "default_changed": null
+  }
+]
