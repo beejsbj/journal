@@ -471,7 +471,7 @@ class PointersTest(Base):
 
 
 class VoicesTest(Base):
-    """M1 (review of #65): her words never verify as his. A journal: or telegram: quote is checked against his words
+    """M1 (review of CONTEXT-PACK): her words never verify as his. A journal: or telegram: quote is checked against his words
     in the source it cites, not against the pack's text (which holds her review, her notes and code's prose)."""
 
     def setUp(self):
@@ -566,7 +566,7 @@ class VoicesTest(Base):
         self.assertNotIn("skylight", " ".join(log))
 
     def test_a_name_two_nested_files_share_verifies_nothing(self):
-        """CodeRabbit on #65: with no file at the root, two nested files of one name must not vouch for each other."""
+        """CodeRabbit on CONTEXT-PACK: with no file at the root, two nested files of one name must not vouch for each other."""
         for sub, words in (("a", "words of the first file"), ("b", "words of the second file")):
             (self.cfg.root / sub).mkdir()
             (self.cfg.root / sub / "2026-10-11-thoughts.md").write_text(f"{words}\n", encoding="utf-8")
@@ -594,7 +594,7 @@ class VoicesTest(Base):
 
 
 class ReviewFindingsTest(Base):
-    """The rest of the review of #65, each from its probe."""
+    """The rest of the review of CONTEXT-PACK, each from its probe."""
 
     def test_a_phase_send_time_is_not_shown(self):
         """M2: a /start or /next typed in a bare /x window re-sends the phase and moves its sent_at."""
@@ -671,7 +671,7 @@ class ReviewFindingsTest(Base):
                 self.assertTrue(opener)
 
     def test_a_request_built_without_the_standing_data_says_so(self):
-        """CodeRabbit on #65: the fallback is quiet about ledger content but visible in the tick's log."""
+        """CodeRabbit on CONTEXT-PACK: the fallback is quiet about ledger content but visible in the tick's log."""
         real = prompts.opener_request
         calls = []
 

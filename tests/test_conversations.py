@@ -925,7 +925,7 @@ class ReviewRegressionTest(Base):
 
 
 class CodexReviewTest(Base):
-    """Cases from the PR #7 review, each reproduced first."""
+    """Cases from the first (earlier PR 7) review, each reproduced first."""
 
     def test_an_expired_off_window_stays_on_record_when_the_hook_clears_it(self):
         conversations.note_off(self.cfg, "x1", m(0), thread_start=True)
@@ -1038,7 +1038,7 @@ class CodexReviewTest(Base):
 
 
 class CodexReviewTwoTest(Base):
-    """Cases from the second PR #7 review, each reproduced first."""
+    """Cases from the second review (earlier PR 7), each reproduced first."""
 
     def test_an_open_off_window_follows_busy_path_activity(self):
         conversations.note_off(self.cfg, None, m(0), thread_start=True)
@@ -1090,7 +1090,7 @@ class CodexReviewTwoTest(Base):
 
 
 class CodexReviewThreeTest(Base):
-    """Cases from the third PR #7 review, each reproduced first."""
+    """Cases from the third review (earlier PR 7), each reproduced first."""
 
     def test_a_repeated_bare_x_keeps_the_open_window(self):
         conversations.note_off(self.cfg, None, m(0), thread_start=True)
@@ -1211,7 +1211,7 @@ class CodexReviewThreeTest(Base):
 
 
 class CodexReviewFourTest(Base):
-    """Cases from the fourth PR #7 review, each reproduced first, on the single privacy pass."""
+    """Cases from the fourth review (earlier PR 7), each reproduced first, on the single privacy pass."""
 
     def steer(self, text, at, mid):
         self.db.add("[OUT-OF-BAND USER MESSAGE — a direct message]\n" + text + "\n[/OUT-OF-BAND USER MESSAGE]", at, mid,
@@ -1356,7 +1356,7 @@ class BacklogTest(Base):
     """Backlog issues from the October 2026 review audit, each reproduced first."""
 
     def test_a_backfill_sees_a_prompt_sent_before_an_earlier_id_rows_later_time(self):
-        """#55: rows go by id, and a queued message of his is stored after a later one with its earlier send time.
+        """Queued rows: rows go by id, and a queued message of his is stored after a later one with its earlier send time.
         A prompt sent between the last row's time and the latest time handled is still a thread boundary."""
         (self.cfg.state_dir / "conversations.json").unlink()  # before any live tick
         self.his("message A", m(0), "700")
@@ -1369,7 +1369,7 @@ class BacklogTest(Base):
         self.assertIn("message B, after the prompt", self.note(2).read_text())
 
     def test_an_audio_file_in_a_relocated_entry_is_still_transcribed(self):
-        """#56: a ledger copied from another machine records the entry under the old root; the writer appends to the
+        """Other roots: a ledger copied from another machine records the entry under the old root; the writer appends to the
         same name in this journal, so the transcript must be queued (and filled) there too."""
         self.cfg.audio["command"] = ["/bin/sh", "-c", "echo 'transcribed words'"]
         self.cfg.audio["ffprobe"] = "/nonexistent"
@@ -1389,7 +1389,7 @@ class BacklogTest(Base):
         self.assertIn("transcribed words", conv((self.cfg.root / "2026-10-15-evening.md").read_text()))
 
     def test_an_old_backfilled_recording_is_kept_until_it_is_transcribed(self):
-        """#61: a backfill of a message older than the ledger keeps (120 days) files it on a prompt dated then; one
+        """Prune: a backfill of a message older than the ledger keeps (120 days) files it on a prompt dated then; one
         bad transcription must not let the same tick's prune drop the record and leave it pending for good."""
         (self.cfg.state_dir / "conversations.json").unlink()  # before any live tick
         old = T0 - timedelta(days=200)
@@ -1412,7 +1412,7 @@ class BacklogTest(Base):
         self.assertIsNone(ledger.find(ledger.snapshot(self.cfg.ledger_path), stem))
 
     def test_an_old_record_with_a_picture_to_describe_is_kept_while_pictures_are_described(self):
-        """#61, pictures: the images step only runs while descriptions are on, so only then is the record kept."""
+        """Prune, pictures: the images step only runs while descriptions are on, so only then is the record kept."""
         old = (T0 - timedelta(days=200)).isoformat()
         with ledger.locked(self.cfg.ledger_path) as data:
             data["prompts"].append({"id": "2026-03-29-j", "kind": "j", "local_date": "2026-03-29", "sent_at": old,
@@ -1426,7 +1426,7 @@ class BacklogTest(Base):
         self.assertIsNone(ledger.find(ledger.snapshot(self.cfg.ledger_path), "2026-03-29-j"))
 
     def test_his_own_annotations_heading_in_an_unannotated_note_stays_his_words(self):
-        """#54: an auto note has no annotations section (``annotate_auto`` off), so a heading of that shape in his
+        """End of words: an auto note has no annotations section (``annotate_auto`` off), so a heading of that shape in his
         words was read as the section boundary: his words were cut there, the conversation went in above the rest of
         them, and the rest read as her annotations."""
         words = "my plan for the week\n\n## Iris's annotations\n\nwhat I hope she says\n\n## Iris's notes\n\nand a list"
@@ -1445,7 +1445,7 @@ class BacklogTest(Base):
         self.assertNotIn("and a list", body[span[0]:span[1]])
 
     def test_a_steer_does_not_write_her_interim_text(self):
-        """#59: a message steered into her running turn is not the end of it: text she held before it is still not
+        """Steers: a message steered into her running turn is not the end of it: text she held before it is still not
         her reply if the turn goes on to another tool step, or ends with a later text."""
         steer = "[OUT-OF-BAND USER MESSAGE — a direct message]\n{}\n[/OUT-OF-BAND USER MESSAGE]"
         self.his("can you check the train times?", m(0), "750")
@@ -1466,7 +1466,7 @@ class BacklogTest(Base):
         self.assertIn("> The 10am is late.", section)
 
     def test_text_held_across_a_steer_is_written_when_her_turn_ends_there(self):
-        """#59: held is not dropped: when nothing more of her turn comes, the text she held is her reply."""
+        """Steers: held is not dropped: when nothing more of her turn comes, the text she held is her reply."""
         self.his("one question", m(0), "760")
         self.hers("The answer is yes.", m(1))
         self.steer_in("oh and thanks", m(1.5), "761")
@@ -1481,7 +1481,7 @@ class BacklogTest(Base):
 
 
 class BacklogReviewTest(Base):
-    """Findings of the independent review of PR #76, each reproduced first."""
+    """Findings of the independent review (earlier PR 76), each reproduced first."""
 
     def note_with_mark(self):
         self.his("first words", m(0), "800")

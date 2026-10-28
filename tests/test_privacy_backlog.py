@@ -1,4 +1,4 @@
-"""Old review findings on the privacy pass, its views and its windows (issues #52, #53, #57, #58, #60).
+"""Old review findings on the privacy pass, its views and its windows (BACKLOG-PRIVACY).
 
 Each case failed on main before its fix. Every one asserts the safe outcome: off-the-record words stay out of
 every reader, and public words still reach the readers that show them.
@@ -15,7 +15,7 @@ from journal.validate import norm
 
 
 class HistoryLimitTest(Base):
-    """#60: the pack's ``telegram_history.limit`` counts the messages it can show, not the rows it read: a burst of
+    """History limit: the pack's ``telegram_history.limit`` counts the messages it can show, not the rows it read: a burst of
     off-the-record messages must not use up the limit and push his public ones out of the pack."""
 
     def test_a_burst_of_off_record_messages_does_not_use_up_the_limit(self):
@@ -40,7 +40,7 @@ class HistoryLimitTest(Base):
 
 
 class PromptBoundaryCacheTest(Base):
-    """#58: a prompt sent by another process (the tick, ``journal send``) ends a bare-/x window, and the gateway's
+    """View cache: a prompt sent by another process (the tick, ``journal send``) ends a bare-/x window, and the gateway's
     briefly cached view must not hide that send: his reply right after it would be taken off the record."""
 
     def sent(self, how, at):
@@ -66,7 +66,7 @@ class PromptBoundaryCacheTest(Base):
 
 
 class ReplacedDatabaseTest(Base):
-    """#57: the saved pass names rows by id, and ids mean nothing in another sessions database. A replacement (a
+    """Saved ids: the saved pass names rows by id, and ids mean nothing in another sessions database. A replacement (a
     rebuilt or new Hermes database) that grows into the old ids must not inherit their private answers, which would
     drop his public messages; what the old database said privately stays out all the same."""
 
@@ -128,7 +128,7 @@ class ReplacedDatabaseTest(Base):
         self.assertEqual(privacy.view(self.cfg, m(30)).private, {})
 
     def test_a_deleted_row_on_the_same_database_keeps_the_saved_ids(self):
-        """Review of PR #77: Hermes deletes rows in normal use (a deleted session, a transcript rewritten after a
+        """Review (earlier PR 77): Hermes deletes rows in normal use (a deleted session, a transcript rewritten after a
         model switch). That must not drop the saved private ids: a compaction copy whose original is older than a
         reader's recompute is private only by its original's saved id."""
         self.tick(m(-30))
@@ -163,7 +163,7 @@ class ReplacedDatabaseTest(Base):
 
 
 class OutOfOrderWindowTest(Base):
-    """#53: a queued message is stored after rows with later times (it carries the time he sent it). The pass walks
+    """Queued rows: a queued message is stored after rows with later times (it carries the time he sent it). The pass walks
     rows in stored order, so the window could lapse before the queued row was reached, and the row, private by its
     own time, was then tested only against the open window: it was read as public. It is tested against the closed
     windows too, and its own time is activity of the window, as if it had been stored in order."""
@@ -236,7 +236,7 @@ class OutOfOrderWindowTest(Base):
 
 
 class RetentionTest(Base):
-    """#52: the hook's records of a bare /x it answered (``off_threads``) and of the messages it took off the record
+    """Off-the-record records: the hook's records of a bare /x it answered (``off_threads``) and of the messages it took off the record
     (``off``) are the only sign of privacy for rows that carry no mark of their own (messages steered in on the busy
     path inside a bare-/x window). They were pruned after 400 days, and the history they cover can be read for
     longer: a backfill with an older ``--since``, a quote verifier that reads the whole chat. They are the pass's

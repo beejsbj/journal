@@ -49,7 +49,7 @@ curl -sS http://127.0.0.1:8790/healthz
 The rendered unit is [deploy/journal-serve.service.example](../deploy/journal-serve.service.example) with your
 paths. It has no filesystem sandbox (DECISIONS.md, SERVE-UNSANDBOXED): under a user manager `PrivateTmp`,
 `ProtectSystem`, `ProtectHome` and `ReadWritePaths` put the service in a user namespace where tailscaled (root)
-reads as uid 65534, so Tailscale identity sign-in fails (#49). The server writes `root`, `state_dir`,
+reads as uid 65534, so Tailscale identity sign-in fails (SERVE-UNSANDBOXED). The server writes `root`, `state_dir`,
 `practices_dir` and the config file's directory as the service user, under ordinary file permissions; it never needs
 `state.db`. The mounts of those paths are gated (`RequiresMountsFor`, `mountpoint -q`). The unit leaves out
 `After=tailscaled.service` (a user unit cannot order itself after a system unit); `Restart=on-failure` plus the

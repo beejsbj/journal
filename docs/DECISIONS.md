@@ -420,7 +420,7 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   open: a system unit with `User=` the service user (the system manager can build the namespace), or accepting it
   explicitly. Not changed by TSAUTH. *Closed 2026-10-26 by SERVE-UNSANDBOXED* (below, "Taken by packages"): the sandbox
   is removed. The finding was half right: the mount namespace is not built (home writable, `/tmp` shared), but a user
-  namespace is, and that is what broke Tailscale identity (#49).
+  namespace is, and that is what broke Tailscale identity.
 
 - **TSAUTH — the example overlay shows the reverse-proxy route, not `tailscale serve`.** `deploy/example-overlay.json`
   has a published `host` (`journal.example.com`), a port and the reverse proxy's subnet; a deployment behind
@@ -436,7 +436,7 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   echo of the command or the notice. To close: trace what the one-shot call can read in the companion's profile (memory
   providers, toolsets enabled for it) and either show it cannot, or narrow the call.
 
-- **BACKLOG-BACKFILL — older unannotated files, and unannotated program sessions, keep the old boundary (#54).** A
+- **BACKLOG-BACKFILL — older unannotated files, and unannotated program sessions, keep the old boundary.** A
   file the engine starts without an annotations section now ends his words with a hidden `%% journal:end-of-words %%`
   line (Taken, below). Files written before it have no such line and are not migrated: in one that has no
   annotations heading, a line of his shaped like `## <Companion>'s annotations` (or `… notes`) is still read as the
@@ -1031,7 +1031,7 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   when a pass ran, not which rows it read, and WP9's `_unpersisted_from` trusted it as proof: with the sessions
   database missing or misconfigured for more than 48 hours, another chat id, the writer enabled after a first pass,
   or a clock that ran ahead and was corrected, a pass was saved over rows it never saw, and the writer then wrote a
-  `/x` exchange from its cursor (seen by a read-only verifier after PR #15). Rule: a view records where it began
+  `/x` exchange from its cursor (seen by a read-only verifier after earlier PR 15). Rule: a view records where it began
   recomputing (`View.start`), and **a reader that holds rows older than that asks `privacy.covering(cfg, oldest)`**,
   which re-takes the view from its oldest row (and 48 hours before it); saved results are a floor (more private),
   never the proof that a row is public. Readers that use it: the conversation writer (its oldest settled row), the
@@ -2132,7 +2132,7 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   session is due once it holds the tick's lock. Both gaps are real: `complete_session` reads the answers and only
   then marks the session completed, and `_refill_summary` renders from the answers and only then clears its flag, so
   an edit saved in between is seen by the request as an open or a waiting session while the summary written a moment
-  earlier lacks it (CodeRabbit and the independent review, PR #64; tested by injecting the edit inside
+  earlier lacks it (CodeRabbit and the independent review of SUMMARY-REFRESH; tested by injecting the edit inside
   `complete_session` and inside `_refill_summary`). Deleting an answer stays `409 program-answer`, as before.
   (4) **What it touches, and when it refuses (fail closed).** The `## Summary` section of the entry (the summary text
   and, when the session has one, its document), through `entries.write_summary`, the one writer of that section: the
@@ -2446,11 +2446,11 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   section) now opens with where things stand and the openers, so the notebook and the sources usually fall off the
   end of it. Accepted: the notebook is injected on every turn anyway, and she can read the sources herself.
   (10) **Found on the way:** the pack's chat reader (`context._his_messages`) read "the last 7 days" from the real
-  clock, not the pack's `now_local`; it made `ArmPackTest` a date time-bomb, which #50 pinned in the test, and would
+  clock, not the pack's `now_local`; it made `ArmPackTest` a date time-bomb, which WEB-DESIGN pinned in the test, and would
   have made this package's `/x` assertions pass vacuously after 1 Nov (CodeRabbit). The pack now passes its own
   `now_local` (`telegram_messages`, with no time, keeps the wall clock), and the test asserts the chat was read.
 - **SENT-AS-SENT (2026-10-26) — a prompt's questions are read from what was sent; a fold keeps the opener (closes
-  the WEB-DESIGN open point, Codex on PR #50, issue #63).** (1) `tick.send_due` stores the question set in the send record
+  the WEB-DESIGN open point, Codex on the WEB-DESIGN PR).** (1) `tick.send_due` stores the question set in the send record
   (`questions: [{id, text, section}]`, `library.question_snapshot`); `serve/document.prompt_of` reads it first
   (`library.snapshot_sections`, which ignores anything malformed) and falls back to the library for records from before
   and for a set over `SNAPSHOT_MAX_CHARS` (20,000). Size: about 2.2 KB for the evening bank (the largest built-in), less than the
@@ -2481,7 +2481,7 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   re-send edit reads the replaced record as it stood (`send_prompt` hands it to `refold`), and the record always
   writes `questions` (None over the cap), so a re-send over the cap clears the old set.
 
-- **SERVE-UNSANDBOXED (the owner, 2026-10-26) — `journal serve`'s unit has no filesystem sandbox (closes #49 and the
+- **SERVE-UNSANDBOXED (the owner, 2026-10-26) — `journal serve`'s unit has no filesystem sandbox (closes the Tailscale sign-in report and the
   TSAUTH open point on the sandbox).** The owner ruled the sandbox unneeded. His intent is that Tailscale
   identity is the sign-in and pairing the fallback when identity is not available. *Why.* Under a systemd user
   manager, `PrivateTmp`, `ProtectSystem`, `ProtectHome` and `ReadWritePaths` (and the other mount-namespace
@@ -2512,7 +2512,7 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   was "the config file's own") and the socket's directory outside the runtime directory (never gated before; review);
   the socket path is normalised in `config.serve_socket`, so the server, the unit and doctor agree on one path and
   a `..` can neither make a `RuntimeDirectory=` systemd refuses nor leave a stray directory.
-  *The socket's directory (review, PR #68).* The old `/tmp` refusal existed for `PrivateTmp`, but it also kept out a
+  *The socket's directory (review, earlier PR 68).* The old `/tmp` refusal existed for `PrivateTmp`, but it also kept out a
   second local user (a shared host has other uids besides the service user's): one who can write the socket's directory
   can unlink the server's socket and bind their own, and tailscaled (root) would then proxy his browser's requests,
   cookie included, to them. So `UnixServer.server_bind` refuses (`EPERM`, not retried; `journal serve` exits 1 saying
@@ -2565,7 +2565,7 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   runs already mid-session when this deploys both carry on (the rule refuses only new starts); `/next` acts on the
   one last active, as before. Open for him: whether "one program" should mean one *run* (between sessions included),
   which this reading deliberately does not do.
-  (6) **Review fixes (Opus review on PR #70).** *The run commands act on the run mid-session:* `current_run` with no
+  (6) **Review fixes (Opus review, earlier PR 70).** *The run commands act on the run mid-session:* `current_run` with no
   program named returns the run with a session in progress first (`session_in_progress`), and only when there is none
   the run touched last. Before, a reply to an older run's phase made that run current, so `/break` (which the refusal
   recommends) could pause the run it did not name. This changes `/next`, `/skip`, `/back`, `/break`, `journal program
@@ -2671,7 +2671,7 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   prefers a run with a session in progress (now possibly a situational session beside a program's), so `/next`
   reaches the session he is in. A completed run with session 10's interrupts still to come is finished: it holds
   nothing.
-  (6) **Review fixes (Opus review on PR #75).** *The cost of the situational exemption, named and softened:* a
+  (6) **Review fixes (Opus review, earlier PR 75).** *The cost of the situational exemption, named and softened:* a
   situational session started while a program is mid-session sends newer prompts, so the program's open phase no
   longer takes the next message (`capture.superseded`), and the situational summary's send removes its keyboard;
   under `capture.mode: arm` an untargeted message after that is not saved. This is what keeping situational sessions
@@ -2679,27 +2679,27 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   phase by itself (a send he did not ask for); instead the situational session's summary ends with "‹Title› is still
   open at session ‹s›, phase ‹p›: /start ‹word› sends it again." (`programs._still_open_line`), and `/start` makes
   that phase the newest again; `/abandon` of a situational run says the same. A situational run that expires says
-  nothing (no message goes out then). Open for him: whether the engine should re-send it on its own. *A refusal for a run
+  nothing (no message goes out then). *Closed 2026-10-29:* the re-send stays manual (PHASE-RESEND-MANUAL, at the end of this file). *A refusal for a run
   left past a trimmed definition* keeps the title and the `/start` offer (only "where" drops); it read "It's turned
   off" before. */abandon reaches session 10's interrupts:* `/abandon fix-life` on a finished run with interrupts
   still to come cancels them (as `journal program abandon` and the web's Abandon do); a run whose definition is gone
   is ended without offering a `/start` that cannot work; `/abandon` alone lists such a run too. With both a new run
   of a program and an older finished one still holding interrupts, `/abandon ‹word›` ends the run in progress (the
   one the word names now); a second `/abandon ‹word›` then reaches the interrupts.
-- **BACKLOG-BACKFILL — backfill and conversation fixes from the review audit (#55, #56, #61, #54, #59).**
-  - **#55:** a backfill bounds the prompt sends it merges in by the latest row time it handled, not the last row's
+- **BACKLOG-BACKFILL — backfill and conversation fixes from the review audit.**
+  - **Queued rows:** a backfill bounds the prompt sends it merges in by the latest row time it handled, not the last row's
     (rows go by id; a queued message carries an earlier time).
-  - **#56:** the conversation writer files a recording or picture on the entry's prompt by the path read through
+  - **Other roots:** the conversation writer files a recording or picture on the entry's prompt by the path read through
     `in_root`, as it appended there, and **rewrites that prompt's `entry_path` to the path in this journal**: the
     audio and images steps read `entry_path` as recorded and would otherwise look for the entry under the old root.
     Only the prompt filed on is changed, and only to the file that holds the block. A side effect: the tick's
     annotation step (and the annotation reply to Telegram) reads `entry_path` too, so a relocated entry it skipped
     as missing can now be annotated, once, like any other.
-  - **#61:** `tick.prune` keeps a prompt older than 120 days while it has work queued: a pending transcript (the
+  - **Prune:** `tick.prune` keeps a prompt older than 120 days while it has work queued: a pending transcript (the
     audio step always ends one), or a pending picture description while descriptions are on (the images step runs
     only then; with them off such a record would be kept for ever, so it goes with its date as before). The
     companion switched off (`agent.enabled: false`) does not drop it: that is taken as for a while.
-  - **#54:** a file the engine starts without an annotations section (`_new_file` with `annotate: false`: an auto
+  - **End of words:** a file the engine starts without an annotations section (`_new_file` with `annotate: false`: an auto
     note, a practice that is not annotated) carries a hidden `%% journal:end-of-words %%` line where that section
     would be. His words and the conversation end there, and the annotations and notes are looked for only after it.
     A hidden line rather than marks on every annotations and notes heading: the rituals' entries (and their goldens)
@@ -2711,7 +2711,7 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     gateway before its restart), or a `## Conversation` it opens there, leaves the file read by the rule without the
     line, as before this package. Open:
     older files and unannotated program sessions (Raised, above).
-  - **#59:** a row Hermes stores as a steer (`display_kind` `steer`: his message folded into her running turn) is
+  - **Steers:** a row Hermes stores as a steer (`display_kind` `steer`: his message folded into her running turn) is
     marked `steer` by the transcript adapter (`Row.meta`, documented in `ports.py`), and the conversation writer does
     not write her held text when one of his steered messages arrives (kept or off the record): her turn's later rows
     decide it, as for any held text. If nothing more of her turn comes, the held text is written at the tick's end
@@ -2729,7 +2729,7 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     way, as unsteered. A later text of hers that is not saved (after a steered command, say) means the text she held
     was not the reply either: it is dropped.
 
-- **BACKLOG-PRIVACY — the hook's off-the-record records are kept for good (#52).** `conversations._prune` no longer
+- **BACKLOG-PRIVACY — the hook's off-the-record records are kept for good.** `conversations._prune` no longer
   ages out `off` (ids the hook took off the record) or `off_threads` (bare `/x` commands the gateway answered, which
   store no row). For a message steered in on the busy path inside a bare-`/x` window they are the only sign it is
   private, and the chat they cover can be read for longer than 400 days: `backfill-conversations --since` takes any
@@ -2739,9 +2739,9 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   still ages out at 400 days: `covering` recomputes a reader's own rows from these inputs, except a compaction copy
   whose original is older than the recompute, which is private only by the original's saved id (a limit this
   package leaves as it was: such a copy of a row older than 400 days reads as public to the catch-up, the pack and
-  the verifier; the writer skips copies; tracked in #81). Cost: one small entry per off-the-record message in
+  the verifier; the writer skips copies; tracked in #4). Cost: one small entry per off-the-record message in
   `conversations.json`, for good.
-- **BACKLOG-PRIVACY — a queued row is private by its own time, and that time is activity of the window (#53).** The
+- **BACKLOG-PRIVACY — a queued row is private by its own time, and that time is activity of the window.** The
   pass walks rows in stored order; a message queued while she was busy is stored after rows with later times and
   carries the time he sent it. Before, a window that lapsed by the stored-order clock before the queued row was
   reached left the row tested against the open window only, and it was read as public. Now (1) every row's own time
@@ -2757,26 +2757,26 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   to every such photo, so after a window that ends on a photo with no reply of hers, her reply to his first public
   message is off the record too. A gateway row of the same kinds (a system note inside a window) taints as well; that
   errs toward privacy, as the window extension for those rows already did. Not changed: a bare `/x` that came in
-  on the busy path still opens its window at the stored-order clock, not its own time (#82, open: whether Hermes
+  on the busy path still opens its window at the stored-order clock, not its own time (#5, open: whether Hermes
   can store it after a message he sent later).
-- **BACKLOG-PRIVACY — a saved private id is checked against its own row (#57).** The saved pass names rows by id
+- **BACKLOG-PRIVACY — a saved private id is checked against its own row.** The saved pass names rows by id
   and keeps each one's time; `view` no longer merges a saved id for a row it reads under that id at another time
   (a replaced database: rebuilt, restored from an older backup, a new install), so his new public messages no longer
   inherit old private answers. An id the view does not read is kept as it is. The first version of this fix tied
   all the ids to one store-wide anchor (the newest row of the database) and dropped them all when it changed; the
-  independent review of PR #77 showed that Hermes deletes rows in normal use (a deleted session, a transcript
+  independent review of earlier PR 77 showed that Hermes deletes rows in normal use (a deleted session, a transcript
   rewritten after a model switch or `/restore`), and that the saved ids are not only a floor: a compaction copy whose
   original is older than a reader's recompute is private only by its original's saved id, so dropping them let the
   outage catch-up read a private turn's copies. Hence the check per row, which needs no new state. Limits, both
   toward privacy: a stale id the view never reads stays saved until it ages out (400 days), and a copy whose
   original's id is such a stale one (a replaced database, the original older than the recompute) reads as private.
-  The view cache also keys on the sessions database file's own stamp (CodeRabbit on PR #77): a database replaced at
+  The view cache also keys on the sessions database file's own stamp (CodeRabbit, earlier PR 77): a database replaced at
   the same path can keep the newest id.
-- **BACKLOG-PRIVACY — the view cache is keyed on every file the pass reads (#58).** The key adds a stamp (mtime in
+- **BACKLOG-PRIVACY — the view cache is keyed on every file the pass reads.** The key adds a stamp (mtime in
   ns, size, inode) of the ledger, `sent.jsonl` and `send-times.json` to `conversations.json`'s: a prompt sent by
   another process closes a bare-`/x` window, and the gateway's view cached before it (up to `CACHE_SECONDS`) took his
   reply right after the prompt off the record. Cost: the gateway's cache is taken again after any ledger write.
-- **BACKLOG-PRIVACY — the pack's history limit counts the messages it shows (#60).** `context._his_messages` takes
+- **BACKLOG-PRIVACY — the pack's history limit counts the messages it shows.** `context._his_messages` takes
   the newest `telegram_history.limit` messages after mirrors, off-the-record rows and rows with no words are left
   out, within `days` as before, so a burst of `/x` messages no longer pushes his public ones out of the pack.
 - **WEB-COMMAND (2026-10-27) — `/web` answers with the web app's address, and never with a secret.** There was no
@@ -2794,7 +2794,7 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   lets you straight in." when `serve.tailscale_users` and `serve.socket` are set, else "A browser that isn't paired
   yet is paired from the server, with `journal serve pair`." It reads no state and spawns nothing. A chat that gates
   commands needs `web` in `user_allowed_commands` (a deploy step).
-  (4) **Review fixes (PR #84).** *Not answered on arrival:* answering `/web` in the dispatch hook, as `/program` is,
+  (4) **Review fixes (earlier PR 84).** *Not answered on arrival:* answering `/web` in the dispatch hook, as `/program` is,
   would have it answered while she is mid-reply (Opus), but the hook runs before Hermes' command gating
   (`user_allowed_commands`), so anyone in the configured chat could have it (CodeRabbit). It stays on Hermes' own
   command path, gated, at the cost the rituals already carry: sent while she is mid-reply, it reaches her turn as
@@ -3016,3 +3016,9 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     geocoding example that matches it in tests, the web tests and `tools/serve_fixture.py`. Commit hashes cited in
     these docs are history: after a history rewrite they no longer resolve.
   - **Open:** the source adapters and `brain:` (top of this file).
+- **CHAT-EDITING (the owner, 2026-10-29) — no editing from chat surfaces (Telegram, Discord).** Forms stay on the web
+  app and the CLI; `/web` links there.
+- **PHASE-RESEND-MANUAL (the owner, 2026-10-29) — a program's interrupted phase is not resent on its own.** After a
+  situational session interrupts a program's open phase, the program does not resend that phase by itself;
+  `/start <word>` brings it back. Manual by design. Closes the open point in ONE-PROGRAM-RUN, review fixes (6) ("whether
+  the engine should re-send it on its own").

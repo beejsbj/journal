@@ -65,7 +65,7 @@ class WebCommandTest(CleanEnv):
 
     def test_it_is_not_answered_before_the_platforms_gating(self):
         """The dispatch hook runs before Hermes checks who may run a command (``user_allowed_commands``); /web takes
-        Hermes' own command path, so that gating applies to it (CodeRabbit on PR #84)."""
+        Hermes' own command path, so that gating applies to it (CodeRabbit, earlier PR 84)."""
         self.assertIsNone(commands.routed_program("/web"))
         self.assertIsNone(commands.run_program_command(self.cfg, "web", None))
 

@@ -4,7 +4,7 @@ A saved privacy pass (``conversations.json`` ``privacy.at``) says when a pass ra
 sessions database missing or pointed elsewhere, another chat id, or a clock that ran ahead, a pass is saved over rows
 it never saw. A reader holding rows older than what the view recomputed (``View.start``) asks for a view that covers
 them (``privacy.covering``). Each case below was seen leaking on the code before this rule (an adversarial probe
-after PR #15); each asserts the safe outcome: the off-the-record words stay out, the public words still go in.
+after earlier PR 15); each asserts the safe outcome: the off-the-record words stay out, the public words still go in.
 """
 import shutil
 import tempfile
