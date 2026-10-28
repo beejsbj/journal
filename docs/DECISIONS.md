@@ -2679,7 +2679,7 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   phase by itself (a send he did not ask for); instead the situational session's summary ends with "‹Title› is still
   open at session ‹s›, phase ‹p›: /start ‹word› sends it again." (`programs._still_open_line`), and `/start` makes
   that phase the newest again; `/abandon` of a situational run says the same. A situational run that expires says
-  nothing (no message goes out then). Open for him: whether the engine should re-send it on its own. *A refusal for a run
+  nothing (no message goes out then). *Closed 2026-10-29:* the re-send stays manual (PHASE-RESEND-MANUAL, at the end of this file). *A refusal for a run
   left past a trimmed definition* keeps the title and the `/start` offer (only "where" drops); it read "It's turned
   off" before. */abandon reaches session 10's interrupts:* `/abandon fix-life` on a finished run with interrupts
   still to come cancels them (as `journal program abandon` and the web's Abandon do); a run whose definition is gone
@@ -3018,3 +3018,7 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   - **Open:** the source adapters and `brain:` (top of this file).
 - **CHAT-EDITING (the owner, 2026-10-29) — no editing from chat surfaces (Telegram, Discord).** Forms stay on the web
   app and the CLI; `/web` links there.
+- **PHASE-RESEND-MANUAL (the owner, 2026-10-29) — a program's interrupted phase is not resent on its own.** After a
+  situational session interrupts a program's open phase, the program does not resend that phase by itself;
+  `/start <word>` brings it back. Manual by design. Closes the open point in ONE-PROGRAM-RUN, review fixes (6) ("whether
+  the engine should re-send it on its own").
