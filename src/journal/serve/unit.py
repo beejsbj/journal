@@ -9,7 +9,7 @@ No filesystem sandbox (2026-10-26; DECISIONS.md, SERVE-UNSANDBOXED). Under a use
 ``ProtectSystem``, ``ProtectHome``, ``ReadWritePaths`` and the other mount-namespace settings put the service in a
 user namespace of its own, where root reads as the overflow uid 65534. tailscaled, the peer on ``serve.socket``, is
 root, and Tailscale identity trusts only a root peer (``auth.tailscale_login``), so with them every browser fell back
-to pairing (#49). What stays needs no namespace: ``NoNewPrivileges`` (a process flag; checked to leave the namespace
+to pairing (DECISIONS.md, SERVE-UNSANDBOXED). What stays needs no namespace: ``NoNewPrivileges`` (a process flag; checked to leave the namespace
 and the peer's uid 0 as they are), ``UMask``, the cgroup limits, the mount gates and the restart settings. The server
 writes wherever the user it runs as can write; the Settings page's save needs only the config file's directory to be
 writable by that user.

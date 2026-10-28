@@ -161,7 +161,7 @@ class RefusalTest(OneAtATime):
                                      "back on to finish it. Then /start course."), got)
 
     def test_a_run_left_past_a_trimmed_definition_is_named_as_it_is(self):
-        """Review on PR #75: a run whose session the definition no longer has is still enabled; the refusal names it
+        """Review (earlier PR 75): a run whose session the definition no longer has is still enabled; the refusal names it
         by title and offers /start, and only "where" is left out."""
         course = self.start("course")
         self.finish_session(course["id"])
@@ -173,7 +173,7 @@ class RefusalTest(OneAtATime):
                                        "/start course and finish it, or end it with /abandon course"), got)
 
     def test_after_a_situational_session_its_summary_says_how_to_pick_the_program_up(self):
-        """Review on PR #75: prep's phases supersede fix-life's open phase, and prep's summary removes its keyboard;
+        """Review (earlier PR 75): prep's phases supersede fix-life's open phase, and prep's summary removes its keyboard;
         so the summary says /start fix-life sends the open phase again, which then takes the next message."""
         fix = self.start()
         self.now += timedelta(minutes=1)
@@ -307,7 +307,7 @@ class AbandonCommandTest(OneAtATime):
         return jcommands.abandon_reply(self.cfg, raw, lambda cfg, *a: self.spawned.append(a))
 
     def test_a_finished_run_with_interrupts_to_come_can_still_be_abandoned(self):
-        """Review on PR #75: session 10's interrupts outlive the run; /abandon fix-life cancels them, as the CLI and
+        """Review (earlier PR 75): session 10's interrupts outlive the run; /abandon fix-life cancels them, as the CLI and
         the web's Abandon do."""
         fix = self.start()
         run = programs.find_run(self.cfg, fix["id"])

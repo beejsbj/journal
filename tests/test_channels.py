@@ -871,7 +871,7 @@ class AnswerOffTheLoopTest(CleanEnv):
 
 class SplitPhaseAfterAMoveTest(unittest.TestCase):
     """The earlier parts of a split phase that a failed attempt already sent count only in the chat they went to: after
-    the channel moves, the retry sends the whole phase in the new chat (CodeRabbit, PR #78)."""
+    the channel moves, the retry sends the whole phase in the new chat (CodeRabbit, earlier PR 78)."""
 
     def setUp(self):
         import test_programs

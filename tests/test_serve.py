@@ -947,7 +947,7 @@ class UnitTest(CleanEnv):
 
     def test_no_setting_that_builds_a_namespace(self):
         """Under a user manager these put the service in a user namespace where tailscaled (root) reads as uid
-        65534, and Tailscale identity fails (#49; DECISIONS.md, SERVE-UNSANDBOXED)."""
+        65534, and Tailscale identity fails (DECISIONS.md, SERVE-UNSANDBOXED)."""
         cfg = self.overlay_cfg()
         cfg.serve["socket"] = "/run/user/1000/journal-serve/serve.sock"
         for text in (self.render(self.overlay_cfg()), self.render(cfg)):

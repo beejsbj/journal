@@ -524,7 +524,7 @@ class UnitTest(CleanEnv):
 
     def test_a_socket_anywhere_else_needs_nothing_in_the_unit(self):
         """The server makes a missing directory 0700 itself; with no private /tmp, a socket there is the path
-        tailscaled sees (#49)."""
+        tailscaled sees (DECISIONS.md, SERVE-UNSANDBOXED)."""
         plain = self.render(self.cfg())
         for sock in ("/run/user/1000/serve.sock", "/home/you/.hermes/profiles/companion/plugin-data/journal/serve.sock",
                      "/srv/sockets/journal.sock", "/tmp/journal-serve/serve.sock", "/var/tmp/serve.sock"):

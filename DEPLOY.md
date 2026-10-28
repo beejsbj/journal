@@ -173,7 +173,7 @@ the command) or go. Nothing to undo in the state.
 
 ## BACKLOG-PRIVACY — five privacy-pass fixes: queued rows, a replaced database, the view cache, kept /x records, the pack's limit (2026-10-27; tick and hook side; gateway restart; no state or config change)
 
-**What changes.** Issues #52, #53, #57, #58 and #60 (DECISIONS.md, BACKLOG-PRIVACY). In the privacy pass
+**What changes.** Five issues (DECISIONS.md, BACKLOG-PRIVACY). In the privacy pass
 (`privacy.py`): a message queued while she was busy is private by the time he sent it, in a window open or already
 closed, and that time keeps the window going; a captionless photo inside a window takes her turn off the record;
 a saved private id is not used for a row read under that id at another time (a replaced database); the view the
@@ -250,16 +250,16 @@ name with no command is inert) or go. Nothing to undo in the state: a refusal ch
 what the web's Abandon would have left (a run in progress is `abandoned`; a finished run with interrupts still to
 come stays `completed`, those interrupts cancelled). Neither is undone by the rollback.
 
-## BACKLOG-BACKFILL — backfill and conversation fixes #55, #56, #61, #54, #59 (2026-10-27; tick and hook side; gateway restart; no config change)
+## BACKLOG-BACKFILL — backfill and conversation fixes (2026-10-27; tick and hook side; gateway restart; no config change)
 
 **What changes.** Five fixes from the October review audit (DECISIONS.md, BACKLOG-BACKFILL):
-`journal backfill-conversations` honours a prompt sent between a queued row's time and the latest time it handled
-(#55); a recording or picture in the conversation of an entry whose ledger path names another root is queued for
-transcription or description, and that prompt's `entry_path` is rewritten to the file in this journal (#56); the
-120-day prune keeps a prompt while a transcript (or, with descriptions on, a picture description) is pending (#61);
+`journal backfill-conversations` honours a prompt sent between a queued row's time and the latest time it handled;
+a recording or picture in the conversation of an entry whose ledger path names another root is queued for
+transcription or description, and that prompt's `entry_path` is rewritten to the file in this journal; the
+120-day prune keeps a prompt while a transcript (or, with descriptions on, a picture description) is pending;
 an entry the engine starts without an annotations section (auto notes, practices with `annotate: false`) ends his
 words with a hidden `%% journal:end-of-words %%` line, so a line of his shaped like the annotations heading (`## <companion>'s annotations`) stays his
-words (#54); a message steered into her running turn no longer writes the text she held before it (#59). Existing
+words; a message steered into her running turn no longer writes the text she held before it. Existing
 entry files are not rewritten; new unannotated files gain the hidden line.
 
 **Side and restart.** `conversations.py`, `tick.py` and `hermes/transcript.py` run in the tick (a fresh process: the
@@ -267,7 +267,7 @@ next tick after the pin moves). `entries.py`, `conversations.py`, `ports.py` and
 the gateway at import, so **restart the gateway in the same step as moving the plugin pin**: until it restarts, the
 gateway's old `entries.py` does not know the hidden line, and a reply it appends to an auto note the new tick started
 lands after the line. The new code then reads that file by the rule without the line (the line counts only when
-nothing but her annotations or notes follows it), so the reply is his words as before this package; only that file loses the #54
+nothing but her annotations or notes follows it), so the reply is his words as before this package; only that file loses the end-of-words
 protection. Rides the next gateway window. Serve reads entries through `entries.py`: `uv tool install --force` at the same sha and
 `systemctl --user restart journal-serve`, so the web app reads the line too (until then it shows the same as now).
 
@@ -286,8 +286,8 @@ protection. Rides the next gateway window. Serve reads entries through `entries.
 
 ## BACKLOG-TESTS — tests and the README's Guarantees table only (2026-10-27; nothing deploys)
 
-**What changes.** `tests/` and `web/tests/` (new pins for the guarantees #71 listed, `GuardTest` rebuilt on a neutral
-layout for #72) and README *Guarantees*. No module under `src/` changes, the committed web build is untouched
+**What changes.** `tests/` and `web/tests/` (new pins for the guarantees the audit listed, `GuardTest` rebuilt on a neutral
+layout) and README *Guarantees*. No module under `src/` changes, the committed web build is untouched
 (`web/tests/` is not bundled), no config or state. **Side and restart:** none; not even a plugin pin move is needed.
 **First checks:** CI green (the `web` workflow's `npm test` runs the new vitest case). **Rollback:** revert the merge.
 
@@ -357,7 +357,7 @@ writes no new field, and a refused start changed nothing.
 
 ## SERVE-UNSANDBOXED — the serve unit drops its sandbox, so Tailscale identity signs him in (2026-10-26; serve side only; a unit change and a unit restart; no gateway restart; no config change)
 
-**What changes.** The owner's decision (DECISIONS.md, SERVE-UNSANDBOXED; closes #49): `journal serve --print-unit` no
+**What changes.** The owner's decision (DECISIONS.md, SERVE-UNSANDBOXED; closes the Tailscale sign-in report): `journal serve --print-unit` no
 longer renders `PrivateTmp=yes`, `ProtectSystem=strict`, `ProtectHome=read-only` or `ReadWritePaths=…`. Under the user
 manager those put the service in a user namespace where tailscaled (root) reads as uid 65534 on the socket, so no
 browser was signed in by Tailscale identity and every one fell back to pairing. Everything else in the unit stays,
@@ -391,7 +391,7 @@ which only serve and doctor read, and `settings.py` only the text of a refusal).
 **First checks.**
 1. `systemctl --user show journal-serve -p PrivateUsers -p ProtectHome -p PrivateTmp -p ProtectSystem -p
    NoNewPrivileges -p KillMode` shows `PrivateUsers=no`, `ProtectHome=no`, `PrivateTmp=no`, `ProtectSystem=no`,
-   `NoNewPrivileges=yes`, `KillMode=process`. `PrivateUsers=no` was reported before too (#49), so also check the
+   `NoNewPrivileges=yes`, `KillMode=process`. `PrivateUsers=no` was reported before too, so also check the
    process itself: `P=$(systemctl --user show -p MainPID --value journal-serve); readlink /proc/$P/ns/user
    /proc/self/ns/user; cat /proc/$P/uid_map` gives the same namespace twice and `0 0 4294967295` (before:
    a namespace of its own and `1000 1000 1`).
@@ -407,7 +407,7 @@ which only serve and doctor read, and `settings.py` only the text of a refusal).
 4. **On a phone** (another tailnet device, through `tailscale serve`): open
    `https://host.tailnet.ts.net:8790/` in a fresh private window. Today loads with no pairing screen; Settings
    says "Signed in via Tailscale as …" with no Unpair; `https://host.tailnet.ts.net:8790/api/v1/session` shows
-   `"via": "tailscale"`. The same in a desktop browser clears #49's first symptom; its other one (a desktop browser's "Can't
+   `"via": "tailscale"`. The same in a desktop browser clears the report's first symptom; its other one (a desktop browser's "Can't
    reach the journal server") is a separate check and may have another cause.
 5. `journal … config list` shows the file-layer keys writable (no "cannot write in"): the Settings page can still save.
    No vault write is made by any of these; if a test entry is saved from the phone, it is his entry: take the vault
@@ -445,7 +445,7 @@ imported by the gateway hook) and serve side (`serve/document.py`). Ride a gatew
 merge sha, `hermes gateway restart`, then `uv tool install --force` at the merge sha and
 `systemctl --user restart journal-serve`. Not before an hour from a ritual. Nothing is sent by the deploy itself.
 
-**Order.** This window also deploys #50 (WEB-DESIGN), #64 (SUMMARY-REFRESH) and #65 (CONTEXT-PACK); their sections'
+**Order.** This window also deploys WEB-DESIGN, SUMMARY-REFRESH and CONTEXT-PACK; their sections'
 steps and first checks run too. First, SUMMARY-REFRESH's step 1: `KillMode=process` on the live unit
 (`systemctl --user show journal-serve -p KillMode` says `process`) **before** any `systemctl --user restart
 journal-serve`, here or there.
@@ -1428,7 +1428,7 @@ What does not change: the four rituals, `schedule.due` for practices (the golden
 
 ## PRIV — privacy coverage: proven by rows read, not by a stamp (2026-10-19; tick side now; hook side rides window B)
 
-**A privacy fix, no new behaviour.** After PR #15 a read-only verifier saw four ways `/x` words could still reach an entry, the pack, the quote checker, annotation alignment or the outage catch-up: a saved pass stamped over rows it never read (the sessions database missing or pointed elsewhere for more than 48 hours, another chat id, the writer enabled after a first pass, a clock that ran ahead), a backfill with no lookback before `--since`, readers that look back further than 48 hours (pack 7 days, verifier all, catch-up 72 hours, alignment of an old prompt), and compaction copies of a private row, in the same session or (new time, rotation child session) elsewhere in the chat (`docs/DECISIONS.md`, "PRIV"). Now a reader holding rows older than what the view recomputed re-takes it from its oldest row (`privacy.covering`), `update` saves no pass while the sessions database is missing, a backfill recomputes from 48 hours before `--since`, and a copy is private when its original is. Annotation alignment for a prompt recorded in another chat returns no text.
+**A privacy fix, no new behaviour.** After an earlier PR (15) a read-only verifier saw four ways `/x` words could still reach an entry, the pack, the quote checker, annotation alignment or the outage catch-up: a saved pass stamped over rows it never read (the sessions database missing or pointed elsewhere for more than 48 hours, another chat id, the writer enabled after a first pass, a clock that ran ahead), a backfill with no lookback before `--since`, readers that look back further than 48 hours (pack 7 days, verifier all, catch-up 72 hours, alignment of an old prompt), and compaction copies of a private row, in the same session or (new time, rotation child session) elsewhere in the chat (`docs/DECISIONS.md`, "PRIV"). Now a reader holding rows older than what the view recomputed re-takes it from its oldest row (`privacy.covering`), `update` saves no pass while the sessions database is missing, a backfill recomputes from 48 hours before `--since`, and a copy is private when its original is. Annotation alignment for a prompt recorded in another chat returns no text.
 
 - **Tick side** (from the next tick after the pin moves): the writer, sweep, catch-up, pack, verifier and annotation alignment. In the ordinary case only the catch-up (72 hours) and a pack or verifier (7 days, all rows) read further than before: one recompute over those rows, from the read-only sessions database, per call. After an outage or a closed pass the writer recomputes once from its cursor. New tick-log line while the database is missing: `privacy pass not saved: no sessions database at …` (the sweep and writer already say `skipped`).
 - **Hook side**: the gateway calls `privacy.view` for its end-state checks (a bare-`/x` window still open, the tool guard's tainted turn), which look only at the last 48 hours and do not change in what they answer; it loads the new `privacy.py` (a copy-aware pass, a cache keyed by start) at the next gateway restart, so it rides **restart window B** (WP4–WP8). The pack it injects on a reply turn is the file the tick saved, so that part is fixed from the next tick. Nothing depends on the restart.
