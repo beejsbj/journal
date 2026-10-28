@@ -1,0 +1,1583 @@
+<!doctype html>
+<html lang="en" data-ink="blue-black">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>journal · Folio (direction A)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..500&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=Instrument+Sans:wght@400..600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   FOLIO — tokens
+   Three families, three jobs:
+     Newsreader      his words, titles, book heads (the reading face)
+     IBM Plex Mono   her words, and only her words (typed letters)
+     Instrument Sans the interface: labels, buttons, meta, figures in chrome
+   Her ink (--her) is the only hue. It is registered so a new ink flows in.
+   ============================================================ */
+@property --her { syntax: '<color>'; inherits: true; initial-value: #28367f; }
+
+:root {
+  --desk: #eee7d9;
+  --paper: #fbf8f1;
+  --paper-2: #f5f0e5;
+  --sunk: #ece5d6;
+  --ink: #1d1a15;
+  --ink-2: #4c443a;
+  --ink-3: #6d6356;
+  --rule: #dcd2bf;
+  --rule-2: #e9e2d3;
+  --letter: #fffcf6;
+  --her: #28367f;
+
+  --act: var(--ink);
+  --act-ink: var(--paper);
+
+  --f-read: "Newsreader", "Iowan Old Style", Charter, Georgia, serif;
+  --f-her: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --f-ui: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* type scale (px at 16 root) */
+  --t-micro: 0.75rem;   /* 12 margin source, counts */
+  --t-small: 0.8125rem; /* 13 meta, hints */
+  --t-ui: 0.9375rem;    /* 15 interface body, labels */
+  --t-her: 0.9063rem;   /* 14.5 her letters */
+  --t-her-lg: 1.0625rem;/* 17 her pull lines */
+  --t-read: 1.25rem;    /* 20 his words, reading */
+  --t-write: 1.375rem;  /* 22 his words, writing */
+  --t-h3: 1.25rem;      /* 20 book heads (italic) */
+  --t-h2: 1.75rem;      /* 28 */
+  --t-h1: 2.75rem;      /* 44 page titles */
+  --t-display: 4rem;    /* 64 insights headline */
+
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px; --s9: 96px;
+  --r-s: 6px; --r: 10px; --r-l: 14px; --r-pill: 999px;
+  --tap: 44px;
+  --rail: 236px;
+  --margin: 92px;
+  --measure: 35rem;
+
+  --sh-1: 0 1px 0 rgb(70 50 20 / .04), 0 1px 3px rgb(70 50 20 / .07);
+  --sh-sheet: 0 0 0 1px rgb(70 50 20 / .05), 0 1px 2px rgb(70 50 20 / .05), 0 16px 48px -16px rgb(70 50 20 / .20);
+  --sh-float: 0 0 0 1px rgb(70 50 20 / .06), 0 4px 10px rgb(40 30 10 / .07), 0 22px 54px -10px rgb(40 30 10 / .26);
+
+  --d-1: 120ms; --d-2: 200ms; --d-3: 340ms; --d-4: 480ms; --d-ink: 700ms;
+  --e-out: cubic-bezier(.22, .8, .24, 1);
+  --e-inout: cubic-bezier(.65, 0, .35, 1);
+  --e-paper: cubic-bezier(.3, .75, .12, 1);
+}
+[data-theme="dark"] {
+  --desk: #121110;
+  --paper: #1c1a17;
+  --paper-2: #221f1b;
+  --sunk: #282520;
+  --ink: #ede5d7;
+  --ink-2: #c0b5a3;
+  --ink-3: #998e7c;
+  --rule: #39342c;
+  --rule-2: #2b2823;
+  --letter: #24221e;
+  --her: #b6c0ff;
+  --sh-1: 0 1px 0 rgb(0 0 0 / .2), 0 1px 3px rgb(0 0 0 / .3);
+  --sh-sheet: 0 0 0 1px rgb(255 240 210 / .045), 0 18px 50px -14px rgb(0 0 0 / .6);
+  --sh-float: 0 0 0 1px rgb(255 240 210 / .07), 0 6px 14px rgb(0 0 0 / .3), 0 24px 60px -10px rgb(0 0 0 / .6);
+  color-scheme: dark;
+}
+/* her inks, light then dark: values carried from the tested Margin × Letters set (AA on paper and surface) */
+[data-ink="blue-black"] { --her: #28367f; }
+[data-ink="brown"] { --her: #7a4519; }
+[data-ink="violet"] { --her: #4b2a8a; }
+[data-ink="green"] { --her: #1b5642; }
+[data-theme="dark"][data-ink="blue-black"], [data-theme="dark"] [data-ink="blue-black"] { --her: #b6c0ff; }
+[data-theme="dark"][data-ink="brown"], [data-theme="dark"] [data-ink="brown"] { --her: #dcab78; }
+[data-theme="dark"][data-ink="violet"], [data-theme="dark"] [data-ink="violet"] { --her: #d2b4ff; }
+[data-theme="dark"][data-ink="green"], [data-theme="dark"] [data-ink="green"] { --her: #8fd3b4; }
+:root, [data-ink] {
+  --her-soft: color-mix(in oklab, var(--her) 82%, var(--paper));
+  --her-edge: color-mix(in oklab, var(--her) 34%, var(--paper));
+  --her-wash: color-mix(in srgb, var(--her) 2.5%, var(--letter));
+  --her-wash-2: color-mix(in srgb, var(--her) 7%, var(--letter));
+}
+html { transition: --her var(--d-ink) var(--e-inout); }
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --d-1: 1ms; --d-2: 1ms; --d-3: 1ms; --d-4: 1ms; --d-ink: 1ms; }
+  *, *::before, *::after { animation-duration: 1ms !important; animation-delay: 0ms !important; transition-delay: 0ms !important; }
+}
+.no-anim, .no-anim * { transition: none !important; animation: none !important; }
+
+/* ============================================================ base */
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--desk); color: var(--ink);
+  font: 400 var(--t-ui)/1.5 var(--f-ui);
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  overflow: hidden; transition: background var(--d-3);
+}
+::selection { background: color-mix(in oklab, var(--ink) 16%, transparent); }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 6px; }
+svg.ic { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; display: block; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.tab { font-variant-numeric: tabular-nums lining-nums; }
+
+/* type roles */
+.read { font-family: var(--f-read); font-size: var(--t-read); line-height: 1.62; color: var(--ink); font-optical-sizing: auto; }
+.her { font-family: var(--f-her); color: var(--her); font-size: var(--t-her); line-height: 1.72; letter-spacing: -0.005em; }
+.her em, .her i { font-style: italic; }
+.display { font-family: var(--f-read); font-weight: 340; font-size: var(--t-h1); line-height: 1.04; letter-spacing: -0.018em; margin: 0; font-optical-sizing: auto; }
+.kicker { font: 500 var(--t-small)/1.3 var(--f-ui); color: var(--ink-3); display: flex; align-items: center; gap: 8px; }
+.book-head { font: italic 400 var(--t-h3)/1.2 var(--f-read); color: var(--ink); margin: 0; display: flex; align-items: baseline; gap: 14px; }
+.book-head::after { content: ""; flex: 1; height: 1px; background: var(--rule); transform: translateY(-5px); }
+.book-head .count { order: 3; font: 400 var(--t-small) var(--f-ui); color: var(--ink-3); font-style: normal; }
+.hint { font-size: var(--t-small); color: var(--ink-3); }
+
+/* buttons: his actions are in his ink */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: var(--tap); padding: 0 18px;
+  border-radius: var(--r-pill); font: 550 var(--t-ui)/1 var(--f-ui); transition: background var(--d-1), transform var(--d-1), box-shadow var(--d-1), color var(--d-1); white-space: nowrap; }
+.btn:active { transform: scale(.97); }
+.btn-primary { background: var(--act); color: var(--act-ink); box-shadow: var(--sh-1); }
+.btn-primary:hover { background: color-mix(in oklab, var(--act) 88%, var(--paper)); }
+.btn-quiet { color: var(--ink); box-shadow: inset 0 0 0 1px var(--rule); }
+.btn-quiet:hover { background: var(--paper-2); }
+.btn-text { min-height: var(--tap); padding: 0 10px; border-radius: var(--r); font: 500 var(--t-ui) var(--f-ui); color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; }
+.btn-text:hover { color: var(--ink); background: var(--paper-2); }
+.icon-btn { width: var(--tap); height: var(--tap); border-radius: 12px; display: inline-grid; place-items: center; color: var(--ink-2); transition: background var(--d-1), color var(--d-1), transform var(--d-1); position: relative; }
+.icon-btn:hover { background: var(--paper-2); color: var(--ink); }
+.icon-btn:active { transform: scale(.94); }
+.icon-btn[aria-pressed="true"] { color: var(--ink); }
+.icon-btn[aria-pressed="true"] svg path { fill: currentColor; }
+#focusBtn[aria-pressed="true"] { background: var(--sunk); }
+#focusBtn[aria-pressed="true"] svg path { fill: none; }
+[data-tip]:hover::after { content: attr(data-tip); position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); white-space: nowrap;
+  background: var(--ink); color: var(--paper); font: 500 12px/1 var(--f-ui); padding: 7px 9px; border-radius: 7px; pointer-events: none; z-index: 30; animation: tip .18s var(--e-out) .35s both; }
+@keyframes tip { from { opacity: 0; transform: translate(-50%, -3px); } }
+
+/* ============================================================ app frame */
+.app { position: fixed; inset: 0; }
+.rail { position: absolute; left: 0; top: 0; bottom: 0; width: var(--rail); padding: 18px 14px 14px; display: flex; flex-direction: column; gap: 4px; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 4px 10px 18px; font: italic 400 23px/1 var(--f-read); letter-spacing: -0.01em; }
+.brand svg { width: 26px; height: 26px; }
+.write-cta { width: 100%; justify-content: flex-start; padding: 0 14px 0 14px; margin-bottom: 14px; border-radius: 12px; min-height: 46px; }
+.write-cta kbd { margin-left: auto; font: 500 11px/1 var(--f-ui); opacity: .55; border: 1px solid currentColor; border-radius: 4px; padding: 3px 5px; }
+.nav-item { display: flex; align-items: center; gap: 12px; min-height: var(--tap); padding: 0 12px; border-radius: 11px; color: var(--ink-2);
+  font: 500 var(--t-ui)/1 var(--f-ui); transition: background var(--d-2), color var(--d-2), box-shadow var(--d-2); position: relative; width: 100%; text-align: left; }
+.nav-item:hover { background: color-mix(in oklab, var(--paper) 55%, transparent); color: var(--ink); }
+.nav-item[aria-current="page"] { background: var(--paper); color: var(--ink); box-shadow: var(--sh-1); }
+.nav-item .badge { margin-left: auto; font: 500 12px/1 var(--f-ui); color: var(--ink-3); }
+.rail-spacer { flex: 1; }
+.rail-next { margin: 0 4px 12px; padding: 14px 12px; border-top: 1px solid var(--rule); font-size: var(--t-small); color: var(--ink-3); line-height: 1.45; }
+.rail-next b { display: block; color: var(--ink-2); font-weight: 500; }
+.rail-foot { display: flex; align-items: center; gap: 4px; }
+.rail-foot .nav-item { flex: 1; }
+
+.stage { position: absolute; left: var(--rail); top: 10px; right: 10px; bottom: 10px; background: var(--paper); border-radius: var(--r-l); box-shadow: var(--sh-sheet); overflow: hidden;
+  transition: transform var(--d-4) var(--e-paper), filter var(--d-4), border-radius var(--d-4), background var(--d-3); transform-origin: 50% 40%; }
+body.room-open .stage, body.room-open .rail { transform: scale(.985); filter: brightness(.96); }
+.rail { transition: transform var(--d-4) var(--e-paper), filter var(--d-4); transform-origin: 0 50%; }
+.tabbar { display: none; }
+
+/* screens and page transitions */
+.screen { position: absolute; inset: 0; overflow: hidden auto; opacity: 0; visibility: hidden; transform: translateY(10px);
+  transition: opacity 300ms var(--e-out), transform 420ms var(--e-out), visibility 0s 420ms; overscroll-behavior: contain; }
+.screen.active { opacity: 1; visibility: visible; transform: none; transition: opacity 300ms var(--e-out) 90ms, transform 460ms var(--e-out) 90ms, visibility 0s; }
+.screen.leaving { visibility: visible; opacity: 0; transform: translateY(-6px); transition: opacity 140ms ease, transform 200ms ease; }
+.page { max-width: 1000px; margin: 0 auto; padding: 56px 56px 120px; }
+
+/* ============================================================ her letter (shared) */
+.letter { position: relative; background: var(--her-wash); border-radius: 3px 14px 14px 14px; padding: 18px 22px 20px; isolation: isolate; box-shadow: 0 0 0 1px color-mix(in srgb, var(--her) 9%, transparent), 0 1px 2px rgb(70 50 20 / .05); }
+.letter::before { /* the fold: a dashed crease across the top, as a letter opened flat */
+  content: ""; position: absolute; left: 14px; right: 14px; top: 0; border-top: 1px dashed var(--her-edge); }
+.letter-from { font: 500 var(--t-small)/1.3 var(--f-ui); color: var(--her-soft); display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.letter-from .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--her); opacity: .7; }
+.letter p { margin: 0 0 .7em; }
+.letter p:last-child { margin-bottom: 0; }
+.asked { font-style: italic; font-size: var(--t-her-lg); line-height: 1.6; }
+.clip { position: absolute; top: -16px; right: 30px; width: 18px; height: 44px; color: var(--ink-3); z-index: 2; pointer-events: none; }
+.clip path { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
+
+/* paper fold (disclosure): height + slight translate; content settles after */
+.fold-head { display: flex; align-items: center; gap: 12px; width: 100%; min-height: var(--tap); text-align: left; border-radius: var(--r); }
+.chev { transition: transform var(--d-3) var(--e-paper); color: var(--ink-3); }
+.open > .fold-head .chev { transform: rotate(180deg); }
+.fold-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--d-3) var(--e-paper) 70ms; }
+.open > .fold-body { grid-template-rows: 1fr; transition: grid-template-rows calc(var(--d-3) + 80ms) var(--e-paper); }
+.fold-inner { min-height: 0; overflow: hidden; }
+.fold-content { opacity: 0; transform: translateY(-10px); transform-origin: 50% 0; transition: opacity 110ms ease, transform 220ms var(--e-out); }
+.open > .fold-body .fold-content { opacity: 1; transform: none; transition: opacity 300ms ease 150ms, transform 480ms var(--e-out) 90ms; }
+.settle > * { opacity: 0; transform: translateY(6px); transition: opacity 280ms ease, transform 420ms var(--e-out); }
+.open > .fold-body .settle > * { opacity: 1; transform: none; transition-delay: calc(170ms + var(--i, 0) * 38ms); }
+.flap { transform-origin: 50% 30%; transition: transform var(--d-3) var(--e-paper); }
+.open > .fold-head .flap { transform: scaleY(-1); }
+
+/* ============================================================ TODAY */
+.today-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 56px; }
+.today-head { margin-bottom: 30px; }
+.today-head .display { font-size: 3.4rem; }
+.dateline { margin: 10px 0 0; color: var(--ink-3); font-size: var(--t-small); }
+.weekstrip { list-style: none; margin: 0 0 40px; padding: 0; display: grid; grid-template-columns: repeat(7, 1fr); border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+.weekstrip li { text-align: center; padding: 12px 0 14px; }
+.weekstrip button { width: 100%; display: grid; justify-items: center; gap: 4px; border-radius: 10px; padding: 4px 0; min-height: var(--tap); }
+.weekstrip button:hover { background: var(--paper-2); }
+.ws-d { font: 500 11.5px/1 var(--f-ui); color: var(--ink-3); }
+.ws-n { font: 400 20px/1.1 var(--f-read); font-variant-numeric: lining-nums; }
+.ws-mark { width: 7px; height: 7px; border-radius: 50%; }
+.ws-mark.answered { background: var(--ink); }
+.ws-mark.missed { box-shadow: inset 0 0 0 1.3px var(--ink-3); }
+.ws-mark.none { width: 10px; height: 1.3px; border-radius: 1px; background: var(--rule); margin: 3px 0; }
+.weekstrip .is-today .ws-n { font-weight: 600; }
+.weekstrip .is-today button { background: var(--paper-2); box-shadow: inset 0 0 0 1px var(--rule); }
+.sec { margin-bottom: 40px; }
+.sec > .book-head { margin-bottom: 18px; }
+.letter.prompt-letter { padding: 24px 28px 22px; margin-top: 22px; }
+.letter-actions { display: flex; align-items: center; gap: 8px; margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--her-edge); }
+.letter-actions .hint { margin-left: auto; }
+.leaders { list-style: none; margin: 0; padding: 0; }
+.leaders li { display: flex; align-items: baseline; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--rule-2); }
+.leaders .t { font: 400 18px/1.3 var(--f-read); }
+.leaders .s { display: block; font-size: var(--t-small); color: var(--ink-3); }
+.leaders .dots { flex: 1; border-bottom: 1.5px dotted var(--rule); transform: translateY(-5px); min-width: 16px; }
+.leaders .v { font-size: var(--t-small); color: var(--ink-2); }
+.carry { padding: 22px 0 0; border-top: 1px solid var(--rule); }
+.carry .her { font-size: 1.25rem; line-height: 1.45; font-style: italic; margin: 10px 0 10px; }
+.ticks { display: inline-flex; gap: 3px; vertical-align: middle; }
+.ticks i { width: 10px; height: 4px; border-radius: 2px; background: var(--rule); }
+.ticks i.on { background: var(--ink); }
+.ticks i.now { background: var(--ink); opacity: .45; }
+.today-written a { display: block; text-decoration: none; padding: 12px 0; border-bottom: 1px solid var(--rule-2); }
+.today-written .read { font-size: 17px; color: var(--ink-2); line-height: 1.45; }
+.today-written .kicker { margin-bottom: 2px; }
+
+/* ============================================================ ENTRIES: list ↔ sidebar ↔ entry */
+.entries { position: absolute; inset: 0; display: flex; overflow: hidden; }
+.list-pane { flex: none; width: 100%; height: 100%; overflow: hidden auto; transition: width var(--d-4) var(--e-inout), background var(--d-4); position: relative; z-index: 1; overscroll-behavior: contain; }
+.detail-pane { flex: 1 1 0; min-width: 0; height: 100%; overflow: hidden auto; position: relative; opacity: 0; transform: translateX(28px);
+  transition: opacity 220ms ease, transform var(--d-4) var(--e-out); overscroll-behavior: contain; }
+.entries.open .list-pane { width: 300px; background: var(--paper-2); box-shadow: inset -1px 0 0 var(--rule-2); }
+.entries.open .detail-pane { opacity: 1; transform: none; transition: opacity 320ms ease 200ms, transform 560ms var(--e-out) 120ms; }
+.list-inner { max-width: 760px; margin: 0 auto; padding: 56px 48px 120px; transition: padding var(--d-4) var(--e-inout); }
+.entries.open .list-inner { padding: 18px 12px 80px; }
+/* the two heads trade places */
+.collapse { display: grid; grid-template-rows: 1fr; transition: grid-template-rows var(--d-4) var(--e-inout), opacity 200ms; }
+.collapse > div { min-height: 0; overflow: hidden; }
+.entries.open .collapse.full { grid-template-rows: 0fr; opacity: 0; }
+.collapse.compact { grid-template-rows: 0fr; opacity: 0; }
+.entries.open .collapse.compact { grid-template-rows: 1fr; opacity: 1; transition: grid-template-rows var(--d-4) var(--e-inout), opacity 300ms 200ms; }
+.compact-head { display: flex; align-items: center; gap: 4px; padding: 0 2px 10px 8px; }
+.compact-head h2 { font: italic 400 21px/1 var(--f-read); margin: 0; flex: 1; }
+.list-head { padding-bottom: 8px; }
+.list-head .display { margin-bottom: 18px; }
+
+/* filter as a sentence */
+.filter-sentence { font: 400 1.1875rem/1.6 var(--f-read); color: var(--ink-2); margin: 0 0 18px; }
+.choice { font: inherit; color: var(--ink); border-bottom: 1.5px dotted var(--ink-3); padding: 0 1px 0 0; display: inline-flex; align-items: baseline; gap: 2px; line-height: 1.25; transition: border-color var(--d-1), background var(--d-1); border-radius: 3px 3px 0 0; }
+.choice:hover { border-bottom-color: var(--ink); background: var(--paper-2); }
+.choice svg { width: 14px; height: 14px; transform: translateY(2px); color: var(--ink-3); }
+.searchline { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--rule); padding: 4px 2px; min-height: var(--tap); }
+.searchline:focus-within { border-bottom-color: var(--ink); }
+.searchline input { flex: 1; border: 0; background: none; font: italic 400 18px/1.3 var(--f-read); color: var(--ink); outline: none; min-width: 0; }
+.searchline input::placeholder { color: var(--ink-3); }
+.searchline svg { color: var(--ink-3); }
+.result-note { font-size: var(--t-small); color: var(--ink-3); margin-top: 10px; display: flex; align-items: center; }
+.result-note:empty { display: none; }
+
+.menu { position: fixed; z-index: 60; min-width: 230px; background: var(--paper); border-radius: 12px; box-shadow: var(--sh-float); padding: 6px; transform-origin: top left;
+  animation: pop 220ms var(--e-out) both; }
+.menu button { display: flex; width: 100%; align-items: center; gap: 10px; min-height: 40px; padding: 0 12px; border-radius: 8px; font: 400 var(--t-ui) var(--f-ui); text-align: left; }
+.menu button:hover { background: var(--paper-2); }
+.menu button .ic { width: 16px; height: 16px; margin-left: auto; opacity: 0; }
+.menu button[aria-checked="true"] .ic { opacity: 1; }
+.menu hr { border: 0; border-top: 1px solid var(--rule-2); margin: 6px 4px; }
+@keyframes pop { from { opacity: 0; transform: translateY(-4px) scale(.97); } }
+
+.week { margin-top: 26px; }
+.entries.open .week { margin-top: 10px; }
+.week > .book-head { margin-bottom: 6px; transition: font-size var(--d-4) var(--e-inout); }
+.entries.open .week > .book-head { font-size: 14px; padding: 8px 8px 2px; color: var(--ink-3); }
+.entries.open .week > .book-head .count { display: none; }
+.day { display: grid; grid-template-columns: 64px minmax(0, 1fr); border-top: 1px solid var(--rule-2); transition: grid-template-columns var(--d-4) var(--e-inout); }
+.week > .book-head + .day { border-top: 0; }
+.entries.open .day { grid-template-columns: 46px minmax(0, 1fr); border-top-color: transparent; }
+.day-tab { padding: 18px 0 0 2px; display: grid; align-content: start; gap: 2px; }
+.day-tab .n { font: 340 30px/1 var(--f-read); font-variant-numeric: lining-nums; letter-spacing: -0.02em; transition: font-size var(--d-4) var(--e-inout); }
+.day-tab .w { font: 500 12px/1 var(--f-ui); color: var(--ink-3); }
+.entries.open .day-tab { padding: 14px 0 0 8px; }
+.entries.open .day-tab .n { font-size: 19px; }
+.rows { display: grid; padding: 8px 0; }
+.row { display: block; width: 100%; text-align: left; padding: 10px 14px; margin: 0 -14px; border-radius: 12px; transition: background var(--d-1); position: relative; }
+.row:hover { background: var(--paper-2); }
+.entries.open .row { margin: 0; padding: 9px 10px; }
+.entries.open .row:hover { background: var(--sunk); }
+.row[aria-current="true"] { background: var(--paper); box-shadow: var(--sh-1); }
+.entries.open .row[aria-current="true"] { background: var(--paper); }
+.row-top { display: flex; align-items: baseline; gap: 10px; }
+.row-title { font: 550 var(--t-ui)/1.3 var(--f-ui); }
+.row-title .sub { font-weight: 400; color: var(--ink-3); }
+.row-time { font-size: var(--t-small); color: var(--ink-3); }
+.row-flags { margin-left: auto; display: flex; gap: 8px; align-items: center; color: var(--ink-3); }
+.row-flags svg { width: 15px; height: 15px; }
+.row-flags .her-mark { width: 7px; height: 7px; border-radius: 50%; background: var(--her); }
+.row-first { display: grid; grid-template-rows: 1fr; transition: grid-template-rows var(--d-4) var(--e-inout), opacity 220ms; }
+.row-first > p { min-height: 0; overflow: hidden; margin: 0; font: 400 18px/1.5 var(--f-read); color: var(--ink-2);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; padding-top: 3px; }
+.entries.open .row-first { grid-template-rows: 0fr; opacity: 0; }
+.entries.open .row-flags { display: none; }
+.list-empty { padding: 40px 0; font: italic 400 19px/1.5 var(--f-read); color: var(--ink-3); }
+.list-anim { animation: settle-in 360ms var(--e-out) both; }
+@keyframes settle-in { from { opacity: 0; transform: translateY(6px); } }
+
+/* entry toolbar */
+.leaf-bar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 2px; padding: 8px 14px; background: color-mix(in oklab, var(--paper) 86%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.leaf-bar .grow { flex: 1; }
+.leaf-bar .crumb { display: none; }
+.leaf-bar .mini-title { font: italic 400 16px/1 var(--f-read); color: var(--ink-2); opacity: 0; transform: translateY(4px); transition: opacity var(--d-2), transform var(--d-2); margin-left: 8px; }
+.leaf-bar.scrolled { box-shadow: 0 1px 0 var(--rule-2); }
+.leaf-bar.scrolled .mini-title { opacity: 1; transform: none; }
+
+/* the leaf: margin (hours) | his column */
+.leaf { --cols: var(--margin) minmax(0, var(--measure)); max-width: calc(var(--margin) + var(--measure) + 96px); min-width: 640px; margin: 0 auto; padding: 18px 48px 140px; }
+.leaf > * { display: grid; grid-template-columns: var(--cols); }
+.leaf > * > :not(.mg) { grid-column: 2; }
+.leaf-head { padding-bottom: 30px; }
+.leaf-head .kicker { margin-bottom: 10px; }
+.leaf-head .kicker::before { content: ""; width: 18px; height: 1px; background: var(--ink-3); }
+.leaf-meta { margin-top: 12px; color: var(--ink-3); font-size: var(--t-small); line-height: 1.7; }
+.leaf-meta span:not(:last-child)::after { content: "\00a0\00a0·\00a0\00a0  "; white-space: normal; opacity: .6; }
+.leaf-meta span { white-space: nowrap; }
+.mg { grid-column: 1; padding-right: 20px; text-align: right; }
+.mg time { display: block; font: italic 400 15px/1 var(--f-read); color: var(--ink-3); font-variant-numeric: tabular-nums lining-nums; padding-top: 7px; }
+.mg .src { display: block; margin-top: 6px; font: 500 11.5px/1.2 var(--f-ui); color: var(--ink-3); opacity: .85; }
+.mg.her-mg time { color: var(--her-soft); }
+.leaf-sec { margin-top: 6px; position: relative; }
+.ruled-margin { position: relative; }
+
+.letter-q { margin-top: 14px; }
+.q-toggle { color: var(--her); font: 500 var(--t-small)/1.2 var(--f-ui); min-height: 40px; gap: 8px; padding: 0; }
+.q-toggle .chev { color: var(--her-soft); width: 16px; height: 16px; }
+.q-toggle:hover .q-label { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.qlist { padding: 8px 0 4px; }
+.qsec { padding: 12px 0 8px; border-top: 1px dashed var(--her-edge); }
+.qsec h4 { margin: 0 0 6px; font: italic 400 16px/1.3 var(--f-read); color: var(--her-soft); }
+.qsec ol { list-style: none; margin: 0; padding: 0; }
+.qsec li { display: grid; grid-template-columns: 40px 1fr auto; gap: 6px; padding: 3px 0; align-items: baseline; }
+.qsec .qid { font: 500 11.5px/1 var(--f-ui); color: var(--her-soft); font-variant-numeric: tabular-nums; }
+.qsec .qt { font-size: 13.5px; line-height: 1.55; }
+.qsec li.asked-q .qt { font-weight: 500; }
+.qsec .tag-asked { font: 500 11px/1 var(--f-ui); color: var(--her); border-radius: 99px; padding: 3px 7px; background: var(--her-wash-2); }
+
+.blk { position: relative; margin-top: 30px; }
+.blk .bd p { margin: 0 0 .75em; }
+.blk .bd p:last-child { margin-bottom: 0; }
+.blk.his:hover .bd, .blk.his.acting .bd { }
+.blk-acts { position: absolute; right: -6px; top: -26px; display: flex; gap: 2px; padding: 3px; background: var(--paper); border-radius: 12px; box-shadow: var(--sh-float);
+  opacity: 0; transform: translateY(4px) scale(.98); pointer-events: none; transition: opacity 160ms ease, transform 220ms var(--e-out); z-index: 4; grid-column: 2; justify-self: end; }
+.blk.his:hover .blk-acts, .blk.his:focus-within .blk-acts, .blk.acting .blk-acts { opacity: 1; transform: none; pointer-events: auto; transition-delay: 80ms; }
+.blk-acts .icon-btn { width: 40px; height: 40px; border-radius: 9px; }
+.blk-acts .confirm { display: none; align-items: center; gap: 4px; padding: 0 4px 0 10px; font: 500 13px var(--f-ui); }
+.blk-acts.asking .icon-btn { display: none; }
+.blk-acts.asking .confirm { display: flex; }
+.blk-acts .confirm .btn { min-height: 34px; padding: 0 12px; font-size: 13px; }
+.blk.editing .bd { box-shadow: 0 0 0 1px var(--rule), 0 0 0 5px var(--paper-2); border-radius: 6px; outline: none; padding: 6px 10px; margin: -6px -10px; }
+.edit-bar { display: none; gap: 8px; margin-top: 14px; align-items: center; }
+.blk.editing .edit-bar { display: flex; }
+.blk.editing .blk-acts { display: none; }
+.blk.removing { animation: fold-away 420ms var(--e-inout) forwards; overflow: hidden; }
+@keyframes fold-away { to { opacity: 0; max-height: 0; margin-top: 0; transform: translateY(-6px); } }
+.replyto { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; color: var(--her-soft); font: italic 400 13px/1.4 var(--f-her); }
+.replyto svg { width: 15px; height: 15px; }
+
+/* the player */
+.player { display: flex; align-items: center; gap: 14px; background: var(--paper-2); border-radius: 16px; padding: 8px 14px 8px 8px; margin-bottom: 14px; box-shadow: inset 0 0 0 1px var(--rule-2); }
+.player .play { width: var(--tap); height: var(--tap); border-radius: 50%; background: var(--act); color: var(--act-ink); display: grid; place-items: center; flex: none; transition: transform var(--d-1); }
+.player .play:active { transform: scale(.92); }
+.player .play svg { width: 18px; height: 18px; }
+.wave { flex: 1; height: 36px; display: flex; align-items: center; gap: 2px; cursor: pointer; min-width: 0; }
+.wave i { flex: 1; min-width: 2px; border-radius: 2px; background: var(--rule); transition: background 120ms; }
+.wave i.on { background: var(--ink); }
+.ptime { font: 500 12.5px/1 var(--f-ui); color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.prate { font: 600 12px/1 var(--f-ui); color: var(--ink-2); min-width: 40px; height: 32px; border-radius: 8px; }
+.prate:hover { background: var(--sunk); }
+
+/* her slip in the document */
+.slip { background: var(--her-wash); border-radius: 3px 12px 12px 12px; padding: 14px 18px 16px; position: relative; margin-left: 28px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--her) 9%, transparent); }
+.slip::before { content: ""; position: absolute; left: -16px; top: 18px; width: 10px; height: 1px; background: var(--her-edge); }
+.slip .letter-from { margin-bottom: 4px; }
+.slip p { margin: 0; }
+
+.continue { margin-top: 40px; }
+.continue-btn { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 60px; padding: 0 18px; border-radius: 14px; box-shadow: inset 0 0 0 1px var(--rule); text-align: left;
+  font: italic 400 19px/1.2 var(--f-read); color: var(--ink-3); transition: box-shadow var(--d-2), background var(--d-2), color var(--d-2); }
+.continue-btn:hover { box-shadow: inset 0 0 0 1px var(--ink-3); color: var(--ink-2); background: var(--paper-2); }
+.continue-btn .k { margin-left: auto; font: 500 12px var(--f-ui); font-style: normal; color: var(--ink-3); }
+.continue-btn .mic { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; box-shadow: inset 0 0 0 1px var(--rule); color: var(--ink-2); font-style: normal; }
+
+/* readings: analysis + reflection, letters that fold */
+.readings { margin-top: 56px; }
+.readings > .book-head { margin-bottom: 8px; }
+.reading { border-top: 1px solid var(--rule); }
+.reading:last-child { border-bottom: 1px solid var(--rule); }
+.reading > .fold-head { padding: 14px 4px; min-height: 72px; }
+.reading > .fold-head:hover { background: color-mix(in oklab, var(--paper-2) 70%, transparent); }
+.env { width: 34px; height: 26px; color: var(--her); flex: none; }
+.env path, .env rect { fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linejoin: round; }
+.reading .rt { display: grid; gap: 2px; flex: 1; }
+.reading .rt b { font: 400 20px/1.2 var(--f-read); }
+.reading .rt span { font-size: var(--t-small); color: var(--ink-3); }
+.reading .fold-content { padding: 4px 4px 30px 50px; }
+.noticed { list-style: none; margin: 0; padding: 0; counter-reset: n; }
+.noticed li { padding: 14px 0; border-bottom: 1px dashed var(--her-edge); display: grid; grid-template-columns: 26px 1fr; gap: 4px 10px; }
+.noticed li::before { counter-increment: n; content: counter(n); font: 500 12px/1.9 var(--f-ui); color: var(--her-soft); grid-row: span 2; }
+.noticed q { font: italic 400 18px/1.45 var(--f-read); color: var(--ink); quotes: "“" "”"; }
+.noticed .her { margin: 0; }
+.rd-label { font: 500 var(--t-small)/1 var(--f-ui); color: var(--ink-3); margin: 22px 0 10px; }
+.threads a { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; text-decoration: none; }
+.threads a .her { flex: 1; }
+.threads a .hint { white-space: nowrap; }
+.refl-q { font: italic 400 1.5rem/1.35 var(--f-her); color: var(--her); margin: 10px 0 16px; letter-spacing: -0.02em; }
+.refl-carry { margin-top: 18px; padding: 12px 16px; background: var(--her-wash-2); border-radius: 10px; }
+.refl-carry .letter-from { margin-bottom: 2px; }
+
+/* ============================================================ LIBRARY */
+.lib-head { display: flex; align-items: flex-end; gap: 24px; margin-bottom: 12px; }
+.lib-head p { margin: 14px 0 0; color: var(--ink-2); font: 400 19px/1.5 var(--f-read); max-width: 34rem; }
+.lib-legend { margin: 0 0 40px; display: flex; align-items: center; gap: 10px; color: var(--ink-3); font-size: var(--t-small); }
+.lib-group { margin-bottom: 44px; }
+.lib-group > .book-head { margin-bottom: 4px; }
+.prac { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 0 14px; align-items: start; padding: 18px 0 18px; border-bottom: 1px solid var(--rule-2); position: relative; }
+.ribbon { width: 12px; height: 34px; margin-top: -18px; justify-self: center; color: var(--ink); }
+.ribbon path { fill: currentColor; }
+.ribbon.edited path { fill: none; stroke: currentColor; stroke-width: 1.5; }
+.prac-title { display: flex; align-items: baseline; gap: 12px; }
+.prac-title h3 { margin: 0; font: 400 22px/1.25 var(--f-read); letter-spacing: -0.005em; }
+.prac-title .dots { flex: 1; border-bottom: 1.5px dotted var(--rule); transform: translateY(-6px); min-width: 20px; }
+.prac-title .cad { font-size: var(--t-small); color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.prac-desc { margin: 4px 0 0; font: 400 16.5px/1.5 var(--f-read); color: var(--ink-2); max-width: 36rem; }
+.colophon { margin-top: 8px; font-size: var(--t-small); color: var(--ink-3); display: flex; gap: 0; flex-wrap: wrap; }
+.colophon span + span::before { content: "·"; margin: 0 8px; }
+.colophon .mine { color: var(--ink); font-weight: 550; }
+.prac-side { display: flex; align-items: center; gap: 8px; padding-top: 0; }
+.add-prac { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 0 0 0 44px; font: italic 400 19px var(--f-read); color: var(--ink-3); border-bottom: 1px solid var(--rule-2); text-align: left; }
+.add-prac:hover { color: var(--ink); }
+
+/* switch */
+.switch { width: 52px; height: var(--tap); display: inline-grid; place-items: center; flex: none; }
+.switch span { width: 40px; height: 24px; border-radius: 99px; background: var(--rule); position: relative; transition: background var(--d-2) var(--e-out); }
+.switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--paper); box-shadow: 0 1px 2px rgb(0 0 0 / .2); transition: transform var(--d-3) var(--e-paper); }
+.switch[aria-checked="true"] span { background: var(--ink); }
+.switch[aria-checked="true"] span::after { transform: translateX(16px); }
+.switch[disabled] { opacity: .45; cursor: not-allowed; }
+
+/* ============================================================ INSIGHTS */
+.ins { max-width: 1060px; }
+.ins-top { display: flex; align-items: center; gap: 6px; margin-bottom: 20px; }
+.ins-top .kicker { flex: 1; text-align: center; justify-content: center; }
+.ins-title { font: 300 var(--t-display)/0.98 var(--f-read); letter-spacing: -0.03em; margin: 0 0 48px; text-align: center; }
+.ins-title em { font-weight: 300; }
+.ins-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 64px; align-items: start; }
+.ins-swap { animation: settle-in 420ms var(--e-out) both; }
+.prose-figs { font: 400 1.7rem/1.42 var(--f-read); color: var(--ink-2); margin: 0 0 40px; letter-spacing: -0.01em; text-wrap: pretty; }
+.prose-figs b { font-weight: 500; color: var(--ink); font-variant-numeric: lining-nums; }
+.ledger { display: grid; grid-template-columns: repeat(7, 1fr); align-items: end; gap: 0; height: 220px; border-bottom: 1px solid var(--ink); position: relative; margin-bottom: 10px; }
+.ledger::before { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(to top, transparent 0 43px, var(--rule-2) 43px 44px); pointer-events: none; }
+.lcol { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; position: relative; gap: 6px; }
+.lcol .w { font: 500 12px/1 var(--f-ui); color: var(--ink-3); font-variant-numeric: tabular-nums; animation: settle-in 400ms var(--e-out) both; animation-delay: calc(300ms + var(--i) * 60ms); }
+.lcol .bar { flex: none; width: 10px; border-radius: 6px 6px 0 0; background: var(--ink); height: var(--h); transform-origin: bottom; animation: grow 700ms var(--e-paper) both; animation-delay: calc(80ms + var(--i) * 60ms); }
+.lcol.future .bar { background: none; border: 1.5px dashed var(--rule); border-bottom: 0; height: 26px; }
+.lcol.zero .bar { height: 2px; background: var(--ink-3); border-radius: 1px; width: 14px; }
+@keyframes grow { from { transform: scaleY(0); } }
+.ldays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; }
+.ldays div { display: grid; justify-items: center; gap: 3px; padding-top: 6px; }
+.ldays .d { font: 500 12px/1 var(--f-ui); color: var(--ink-3); }
+.ldays .n { font: 400 17px/1 var(--f-read); font-variant-numeric: lining-nums; }
+.ldays .rf { width: 6px; height: 6px; border-radius: 50%; background: var(--her); margin-top: 4px; }
+.ldays .rf.no { background: none; }
+.ledger-key { display: flex; gap: 22px; margin: 16px 0 40px; font-size: var(--t-small); color: var(--ink-3); }
+.ledger-key span { display: inline-flex; align-items: center; gap: 7px; }
+.ledger-key i { display: inline-block; }
+.ins-practices .leaders li { padding: 9px 0; }
+.ins-practices .v { font-variant-numeric: tabular-nums; }
+.review { position: relative; }
+.review .letter { padding: 26px 28px 8px; }
+.pull { font: italic 400 1.3rem/1.5 var(--f-her); color: var(--her); margin: 8px 0 12px; letter-spacing: -0.02em; text-wrap: pretty; }
+.pull::before { content: "“"; position: absolute; margin-left: -.62em; opacity: .5; }
+.review .fold-head { color: var(--her); font: 500 var(--t-small) var(--f-ui); border-top: 1px dashed var(--her-edge); border-radius: 0; min-height: 50px; }
+.review .fold-head .chev { color: var(--her-soft); margin-left: auto; }
+.review .fold-content { padding: 4px 0 22px; }
+.review-pending { font: italic 400 18px/1.5 var(--f-read); color: var(--ink-3); padding: 20px 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+.slips { margin-top: 36px; }
+.slips > .book-head { margin-bottom: 10px; font-size: 18px; }
+.rslip { border-bottom: 1px solid var(--rule-2); }
+.rslip > .fold-head { padding: 8px 0; min-height: 60px; gap: 14px; }
+.rslip .day-n { font: 340 26px/1 var(--f-read); width: 36px; font-variant-numeric: lining-nums; text-align: center; }
+.rslip .day-n small { display: block; font: 500 11px/1.4 var(--f-ui); color: var(--ink-3); }
+.rslip .her { flex: 1; font-style: italic; }
+.rslip .fold-content { padding: 0 0 18px 50px; }
+
+/* ============================================================ SETTINGS */
+.set-wrap { display: grid; grid-template-columns: 200px minmax(0, 620px); gap: 56px; max-width: 980px; margin: 0 auto; padding: 56px 56px 160px; }
+.set-nav { position: sticky; top: 56px; align-self: start; }
+.set-pills { display: grid; gap: 2px; }
+.set-nav .display { font-size: 2.25rem; margin-bottom: 18px; }
+.set-nav button { text-align: left; min-height: 38px; padding: 0 12px; border-radius: 9px; color: var(--ink-3); font: 500 14px var(--f-ui); position: relative; transition: color var(--d-2), background var(--d-2); }
+.set-nav button:hover { color: var(--ink); background: var(--paper-2); }
+.set-nav button[aria-current="true"] { color: var(--ink); }
+.set-nav button[aria-current="true"]::before { content: ""; position: absolute; left: 0; top: 11px; bottom: 11px; width: 2px; border-radius: 2px; background: var(--ink); }
+.set-sec { padding-top: 6px; margin-bottom: 52px; scroll-margin-top: 40px; }
+.set-sec > .book-head { margin-bottom: 6px; }
+.set-sec > .lede { margin: 0 0 16px; font: 400 17px/1.5 var(--f-read); color: var(--ink-2); }
+.group { background: var(--paper); border-radius: var(--r-l); box-shadow: inset 0 0 0 1px var(--rule); }
+.srow { display: flex; align-items: center; gap: 16px; padding: 14px 18px; min-height: 68px; }
+.srow + .srow { box-shadow: 0 -1px 0 var(--rule-2); }
+.srow .lab { flex: 1; min-width: 0; }
+.srow .lab b { display: block; font: 500 var(--t-ui)/1.35 var(--f-ui); }
+.srow .lab .hint { display: flex; gap: 8px; align-items: center; margin-top: 2px; flex-wrap: wrap; }
+.srow .reset { font: 500 12.5px var(--f-ui); color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--rule); padding: 2px 0; display: none; }
+.srow.changed .reset { display: inline; animation: settle-in 300ms var(--e-out) both; }
+.srow.changed .lab b::after { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--ink); margin-left: 8px; vertical-align: middle; }
+.srow.locked .lab b { color: var(--ink-2); }
+.lockline { display: inline-flex; align-items: center; gap: 5px; }
+.lockline svg { width: 13px; height: 13px; }
+.stepper { display: inline-flex; align-items: center; border-radius: 99px; box-shadow: inset 0 0 0 1px var(--rule); }
+.stepper button { width: var(--tap); height: 40px; display: grid; place-items: center; border-radius: 99px; color: var(--ink-2); }
+.stepper button:hover { background: var(--paper-2); color: var(--ink); }
+.stepper button svg { width: 16px; height: 16px; }
+.stepper output { min-width: 76px; text-align: center; font: 500 14.5px var(--f-ui); font-variant-numeric: tabular-nums; }
+.stepper output small { font-weight: 400; color: var(--ink-3); margin-left: 3px; font-size: 13px; }
+.stepper[aria-disabled="true"] { opacity: .55; pointer-events: none; }
+.seg { display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--sunk); border-radius: 11px; padding: 3px; position: relative; }
+.seg button { position: relative; z-index: 1; min-height: 36px; padding: 0 14px; border-radius: 8px; font: 500 13.5px var(--f-ui); color: var(--ink-2); transition: color var(--d-2); white-space: nowrap; }
+.seg button[aria-checked="true"] { color: var(--ink); }
+.seg .thumb { position: absolute; z-index: 0; top: 3px; bottom: 3px; border-radius: 8px; background: var(--paper); box-shadow: var(--sh-1); transition: left var(--d-3) var(--e-paper), width var(--d-3) var(--e-paper); }
+.chip { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--rule); font: 500 14px var(--f-ui); font-variant-numeric: tabular-nums; }
+.chip:hover { background: var(--paper-2); }
+.chip svg { width: 16px; height: 16px; color: var(--ink-3); }
+.val { font: 400 17px var(--f-read); color: var(--ink); }
+
+/* inks: a joy */
+.inks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+.inkopt { display: grid; justify-items: center; gap: 8px; padding: 18px 8px 14px; border-radius: 14px; text-align: center; transition: background var(--d-2), box-shadow var(--d-2); position: relative; }
+.inkopt:hover { background: var(--paper-2); }
+.inkopt[aria-checked="true"] { background: var(--paper); box-shadow: inset 0 0 0 1.5px var(--ink), var(--sh-1); }
+.blot { width: 54px; height: 48px; color: var(--her); transition: transform 500ms var(--e-paper); }
+.blot path { fill: currentColor; }
+.inkopt[aria-checked="true"] .blot { transform: scale(1.1) rotate(-4deg); }
+.inkopt b { font: 500 14px/1.2 var(--f-ui); }
+.inkopt small { font: italic 400 14px/1.3 var(--f-read); color: var(--ink-3); }
+.ink-proof { padding: 18px 22px; }
+.ink-proof .her { min-height: 1.7em; }
+.ink-proof .caret { display: inline-block; width: .55em; height: 1.1em; background: var(--her); vertical-align: -2px; margin-left: 1px; animation: blink 1s steps(1) infinite; opacity: .7; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* health */
+.health-sum { display: flex; align-items: center; gap: 16px; padding: 16px 18px; width: 100%; text-align: left; border-radius: var(--r-l); min-height: 76px; }
+.health-sum:hover { background: var(--paper-2); }
+.health-sum .marks { display: flex; gap: 3px; flex-wrap: wrap; width: 92px; }
+.hm { display: inline-block; flex: none; width: 8px; height: 8px; border-radius: 50%; box-shadow: inset 0 0 0 1.3px var(--ink-3); }
+.hm.ok { background: var(--ink-3); box-shadow: none; opacity: .5; }
+.hm.warn { background: linear-gradient(90deg, var(--ink) 50%, transparent 50%); box-shadow: inset 0 0 0 1.3px var(--ink); }
+.hm.fail { background: var(--ink); box-shadow: 0 0 0 2px var(--paper), 0 0 0 3px var(--ink); }
+.health-sum .lab { flex: 1; }
+.health-sum .lab b { display: block; font: 400 19px/1.3 var(--f-read); }
+.hlist { list-style: none; margin: 0; padding: 0 18px 10px; }
+.hlist li { display: grid; grid-template-columns: 18px 150px 1fr; gap: 12px; padding: 10px 0; border-top: 1px solid var(--rule-2); align-items: baseline; font-size: 14px; }
+.hlist li .hm { transform: translateY(1px); }
+.hlist li b { font-weight: 500; }
+.hlist li span { color: var(--ink-2); font-size: 13.5px; overflow-wrap: anywhere; }
+.hlist li.warn span, .hlist li.fail span { color: var(--ink); }
+.hlist .sep { display: block; padding: 14px 0 4px; border: 0; font: italic 400 15px var(--f-read); color: var(--ink-3); }
+
+.savebar { position: fixed; z-index: 40; left: calc(var(--rail) + (100% - var(--rail)) / 2); bottom: 26px; transform: translate(-50%, 140%); opacity: 0; display: flex; align-items: center; gap: 6px; padding: 6px 6px 6px 20px;
+  background: var(--paper); border-radius: 99px; box-shadow: var(--sh-float); transition: transform var(--d-4) var(--e-paper), opacity var(--d-2); font-weight: 500; }
+.savebar.show { transform: translate(-50%, 0); opacity: 1; }
+.savebar .n { margin-right: 10px; white-space: nowrap; }
+.toast { position: fixed; z-index: 70; left: calc(var(--rail) + (100% - var(--rail)) / 2); bottom: 26px; transform: translate(-50%, 20px); opacity: 0; display: flex; align-items: center; gap: 12px; padding: 6px 6px 6px 18px;
+  background: var(--ink); color: var(--paper); border-radius: 99px; transition: transform var(--d-3) var(--e-paper), opacity var(--d-2); pointer-events: none; font-weight: 500; }
+.toast.show { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
+.toast .btn-text { color: var(--paper); min-height: 38px; }
+.toast .btn-text:hover { background: color-mix(in oklab, var(--paper) 14%, transparent); color: var(--paper); }
+
+/* ============================================================ WRITE ROOM */
+.room { position: fixed; inset: 0; z-index: 50; background: var(--desk); display: flex; flex-direction: column; visibility: hidden;
+  clip-path: inset(var(--ct, 50%) var(--cr, 50%) var(--cb, 50%) var(--cl, 50%) round 14px); transition: clip-path 520ms var(--e-paper), visibility 0s 520ms; }
+.room.open { visibility: visible; clip-path: inset(0 0 0 0 round 0); transition: clip-path 560ms var(--e-paper), visibility 0s; }
+.room > * { opacity: 0; transition: opacity 160ms ease; }
+.room.open > * { opacity: 1; transition: opacity 300ms ease 180ms; }
+.room-bar { display: flex; align-items: center; gap: 8px; padding: 12px 16px; transition: opacity var(--d-3) !important; }
+.room-bar .where { flex: 1; min-width: 0; display: grid; gap: 1px; padding-left: 4px; }
+.room-bar .where b { font: italic 400 17px/1.2 var(--f-read); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.room-bar .where span { font-size: 12.5px; color: var(--ink-3); }
+.saved { display: inline-flex; align-items: center; gap: 8px; font-size: var(--t-small); color: var(--ink-3); margin-right: 6px; white-space: nowrap; }
+.saved i { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-3); transition: background var(--d-2), transform var(--d-2); }
+.saved.saving i { background: var(--ink); animation: breathe 900ms ease-in-out infinite; }
+@keyframes breathe { 50% { transform: scale(.6); opacity: .5; } }
+.room-scroll { flex: 1; overflow: auto; padding: 34px 20px 0; overscroll-behavior: contain; }
+.room-sheet { max-width: 800px; min-height: calc(100% - 0px); margin: 0 auto; background: var(--paper); border-radius: 16px 16px 0 0; box-shadow: var(--sh-sheet); padding: 0 0 160px; position: relative;
+  transform: translateY(24px); transition: transform 640ms var(--e-paper) 60ms; }
+.room.open .room-sheet { transform: none; }
+.room-letter-wrap { padding: 0 56px 0 calc(56px + var(--margin)); position: relative; top: -14px; }
+.room-letter { transform: translateY(-12px); opacity: 0; transition: transform 600ms var(--e-paper) 260ms, opacity 400ms ease 260ms; box-shadow: 0 1px 2px rgb(70 50 20 / .06), 0 10px 24px -14px rgb(70 50 20 / .3); }
+.room.open .room-letter { transform: none; opacity: 1; }
+.room-letter.none { background: none; box-shadow: none; padding: 30px 0 0; transform: none; }
+.room-letter.none::before { display: none; }
+.room-letter .fold-head { min-height: 36px; color: var(--her); font: 500 var(--t-small) var(--f-ui); gap: 6px; margin-top: 8px; }
+.room-letter .fold-head .chev { width: 16px; height: 16px; color: var(--her-soft); }
+.room-letter .qsec li { grid-template-columns: 34px 1fr; }
+.room-page { display: grid; grid-template-columns: var(--margin) minmax(0, 1fr); padding: 26px 56px 0; position: relative; }
+.room-page::before { /* the ruled margin: a double hairline */ content: ""; position: absolute; top: 0; bottom: -160px; left: calc(56px + var(--margin) - 14px); width: 3px; border-left: 1px solid var(--rule); border-right: 1px solid var(--rule); opacity: .9; }
+.room-mg { position: relative; }
+.room-mg time { position: absolute; right: 26px; font: italic 400 15px/1 var(--f-read); color: var(--ink-3); font-variant-numeric: tabular-nums lining-nums; transition: top 200ms var(--e-out), opacity 300ms; animation: settle-in 400ms var(--e-out) both; }
+.editor { font: 400 var(--t-write)/36px var(--f-read); color: var(--ink); outline: none; min-height: 40vh; padding: 4px 0 0; caret-color: var(--ink); font-optical-sizing: auto;
+  background-image: repeating-linear-gradient(to bottom, transparent 0 35px, color-mix(in oklab, var(--rule) 45%, transparent) 35px 36px); background-position: 0 -1px; }
+.editor:empty::before { content: attr(data-placeholder); color: var(--ink-3); font-style: italic; pointer-events: none; }
+.editor > div, .editor > p { margin: 0 0 36px; transition: opacity var(--d-3); }
+.editor .clip-voice { display: flex; align-items: center; gap: 12px; margin: 0 0 36px; height: 72px; padding: 0 14px 0 8px; background: var(--paper-2); border-radius: 14px; box-shadow: inset 0 0 0 1px var(--rule-2); font: 500 13px var(--f-ui); color: var(--ink-2); user-select: none; animation: settle-in 400ms var(--e-out) both; }
+.room.focus .editor > :not(.current) { opacity: .28; }
+.room.focus .room-bar, .room.focus .room-foot { opacity: .0; }
+.room.focus .room-bar:hover, .room.focus .room-foot:hover { opacity: 1; }
+.room.focus .room-letter-wrap { opacity: .3; transition: opacity var(--d-3); }
+.room-foot { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 14px 20px 22px; pointer-events: none; transition: opacity var(--d-3) !important; }
+.room-foot > * { pointer-events: auto; }
+.dock { display: flex; align-items: center; gap: 6px; padding: 6px; background: var(--paper); border-radius: 99px; box-shadow: var(--sh-float); }
+.rec { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: var(--paper-2); box-shadow: inset 0 0 0 1px var(--rule); color: var(--ink); position: relative; transition: background var(--d-2), color var(--d-2); }
+.rec:hover { background: var(--sunk); }
+.recording .rec { background: var(--ink); color: var(--paper); box-shadow: none; }
+.recording .rec::before { content: ""; position: absolute; inset: -5px; border-radius: 50%; border: 1.5px solid var(--ink); opacity: .35; animation: ring 1.6s var(--e-out) infinite; }
+@keyframes ring { from { transform: scale(.9); opacity: .5; } to { transform: scale(1.25); opacity: 0; } }
+.recwave { display: none; align-items: center; gap: 2px; height: 30px; width: 0; transition: width var(--d-3) var(--e-paper); overflow: hidden; }
+.recording .recwave { display: flex; width: 150px; }
+.recwave i { width: 3px; border-radius: 2px; background: var(--ink); height: 4px; transition: height 90ms linear; flex: none; }
+.rectime { font: 500 13px var(--f-ui); font-variant-numeric: tabular-nums; display: none; min-width: 36px; }
+.recording .rectime { display: block; }
+.count { font: 500 12.5px var(--f-ui); color: var(--ink-3); padding: 0 12px; font-variant-numeric: tabular-nums; min-width: 92px; text-align: center; white-space: nowrap; }
+.dock .sep { width: 1px; height: 24px; background: var(--rule); }
+
+/* action sheet (phone long-press) */
+.scrim { position: fixed; inset: 0; z-index: 80; background: rgb(20 15 8 / .28); opacity: 0; pointer-events: none; transition: opacity var(--d-3); }
+.scrim.show { opacity: 1; pointer-events: auto; }
+.asheet { position: fixed; z-index: 81; left: 8px; right: 8px; bottom: 8px; background: var(--paper); border-radius: 20px; padding: 8px; box-shadow: var(--sh-float); transform: translateY(120%); transition: transform var(--d-4) var(--e-paper); }
+.asheet.show { transform: none; }
+.asheet .quote { padding: 0; margin: 12px 14px 12px; font: italic 400 16px/1.45 var(--f-read); color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.asheet .quote + button { box-shadow: 0 -1px 0 var(--rule-2); border-radius: 0 0 12px 12px; }
+.asheet button { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 52px; padding: 0 14px; border-radius: 12px; font: 500 16px var(--f-ui); }
+.asheet button:hover { background: var(--paper-2); }
+
+.phone-only { display: none !important; }
+
+/* ============================================================ PHONE */
+@media (max-width: 899px) {
+  :root { --margin: 0px; --t-h1: 2.4rem; }
+  .phone-only { display: revert !important; }
+  .desk-only { display: none !important; }
+  body { background: var(--paper); }
+  .rail { display: none; }
+  .stage { left: 0; top: 0; right: 0; bottom: calc(64px + env(safe-area-inset-bottom)); border-radius: 0; box-shadow: none; }
+  body.room-open .stage { transform: scale(.97); border-radius: 18px; }
+  .tabbar { display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; left: 0; right: 0; bottom: 0; height: calc(64px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);
+    background: color-mix(in oklab, var(--paper) 92%, transparent); backdrop-filter: blur(12px); box-shadow: 0 -1px 0 var(--rule-2); z-index: 20; }
+  .tabbar button { display: grid; justify-items: center; align-content: center; gap: 3px; font: 500 11px/1 var(--f-ui); color: var(--ink-3); transition: color var(--d-2); }
+  .tabbar button[aria-current="page"] { color: var(--ink); }
+  .tabbar .tw { width: 48px; height: 40px; border-radius: 14px; background: var(--act); color: var(--act-ink); display: grid; place-items: center; box-shadow: var(--sh-1); }
+  .page { padding: 28px 20px 80px; }
+  .display { font-size: var(--t-h1); }
+  .today-grid { grid-template-columns: 1fr; gap: 8px; }
+  .today-head .display { font-size: 2.6rem; }
+  .today-head { position: relative; }
+  .today-head .head-tools { position: absolute; right: -8px; top: -6px; display: flex; }
+  .letter.prompt-letter { padding: 20px 18px 16px; }
+  .letter-actions { flex-wrap: wrap; }
+
+  /* entries: push */
+  .entries .list-pane, .entries .detail-pane { position: absolute; inset: 0; width: 100%; }
+  .entries .detail-pane { transform: translateX(100%); opacity: 1; background: var(--paper); transition: transform 420ms var(--e-paper), box-shadow 420ms; z-index: 2; }
+  .entries.open .detail-pane { transform: none; box-shadow: -1px 0 0 var(--rule-2), -20px 0 40px -20px rgb(0 0 0 / .2); transition: transform 460ms var(--e-paper), box-shadow 460ms; }
+  .entries .list-pane { transition: transform 460ms var(--e-paper), opacity 460ms; }
+  .entries.open .list-pane { width: 100%; transform: translateX(-28%); opacity: .4; background: var(--paper); box-shadow: none; }
+  .entries.open .list-inner { padding: 28px 20px 80px; }
+  .entries.open .collapse.full { grid-template-rows: 1fr; opacity: 1; }
+  .entries.open .collapse.compact { grid-template-rows: 0fr; opacity: 0; }
+  .entries.open .row-first { grid-template-rows: 1fr; opacity: 1; }
+  .entries.open .day { grid-template-columns: 52px minmax(0, 1fr); }
+  .entries.open .day-tab .n { font-size: 26px; }
+  .list-inner { padding: 28px 20px 80px; }
+  .day { grid-template-columns: 52px minmax(0, 1fr); }
+  .day-tab .n { font-size: 26px; }
+  .row { margin: 0 -10px; padding: 10px; }
+  .row-first > p { font-size: 17px; }
+  .filter-sentence { font-size: 1.125rem; }
+
+  .leaf-bar { padding: 6px 6px; }
+  .leaf-bar .crumb { display: inline-flex; }
+  .leaf { min-width: 0; padding: 8px 20px 100px; }
+  .leaf > * { grid-template-columns: minmax(0, 1fr); }
+  .leaf > * > :not(.mg) { grid-column: 1; }
+  .mg { grid-column: 1; text-align: left; padding: 0 0 6px; display: flex; align-items: center; gap: 10px; }
+  .mg time { padding: 0; font-size: 14.5px; }
+  .mg .src { margin: 0; }
+  .mg::after { content: ""; flex: 1; height: 1px; background: var(--rule-2); }
+  .blk { margin-top: 26px; }
+  .blk-acts { display: none; }
+  .slip { margin-left: 0; }
+  .leaf-sec > .mg { display: none; }
+  .slip::before { display: none; }
+  .leaf-head .display { font-size: 2.1rem; }
+  .reading .fold-content { padding-left: 4px; }
+  .qsec li { grid-template-columns: 34px 1fr; }
+  .qsec .tag-asked { grid-column: 2; justify-self: start; }
+  .player { gap: 10px; padding-right: 8px; }
+  .prate { display: none; }
+
+  .lib-head { display: block; }
+  .prac { grid-template-columns: 18px minmax(0, 1fr) auto; gap: 0 8px; padding: 16px 0; }
+  .ribbon { width: 10px; }
+  .prac-side { margin-top: -8px; }
+  .prac-side .btn-text { display: none; }
+  .prac-side .btn { padding: 0 14px; }
+  .prac-title { flex-wrap: wrap; row-gap: 2px; }
+  .prac-title .dots { display: none; }
+  .prac-title .cad { width: 100%; }
+  .prac-title h3 { font-size: 20px; }
+  .add-prac { padding-left: 18px; }
+
+  .ins-title { font-size: 2.6rem; text-align: left; margin-bottom: 28px; }
+  .ins-top .kicker { justify-content: flex-start; text-align: left; }
+  .ins-grid { display: flex; flex-direction: column; gap: 0; }
+  .ins-grid > div { display: contents; }
+  .ledger-key { margin-bottom: 36px; }
+  .review { margin-bottom: 8px; }
+  .ins-practices { margin-top: 36px; }
+  .prose-figs { font-size: 1.4rem; }
+  .ledger { height: 160px; }
+  .ledger::before { background: repeating-linear-gradient(to top, transparent 0 31px, var(--rule-2) 31px 32px); }
+
+  .set-wrap { grid-template-columns: minmax(0, 1fr); padding: 28px 16px 140px; gap: 0; }
+  .set-wrap > * { min-width: 0; }
+  #inkNote { display: none; }
+  .set-sec { scroll-margin-top: 80px; }
+  .stepper button { width: 40px; }
+  .stepper output { min-width: 62px; }
+  .srow.inline .lab .hint span:first-child { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .set-nav { position: sticky; top: -62px; z-index: 3; margin: -28px -16px 18px; padding: 28px 0 10px; background: color-mix(in oklab, var(--paper) 92%, transparent); backdrop-filter: blur(10px); }
+  .set-nav .display { margin: 0 16px 14px; }
+  .set-pills { display: flex; overflow-x: auto; gap: 6px; padding: 0 16px; scrollbar-width: none; }
+  .set-nav button { white-space: nowrap; flex: none; background: var(--paper-2); border-radius: 99px; padding: 0 14px; }
+  .set-nav button[aria-current="true"] { background: var(--ink); color: var(--paper); }
+  .set-nav button[aria-current="true"]::before { display: none; }
+  .srow { flex-wrap: wrap; padding: 14px 16px; }
+  .srow .lab { flex-basis: 100%; }
+  .srow.inline { flex-wrap: nowrap; }
+  .srow.inline .lab { flex-basis: auto; }
+  .inks { grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  .inkopt { padding: 12px 2px 10px; }
+  .inkopt small { display: none; }
+  .blot { width: 42px; height: 38px; }
+  .inkopt b { font-size: 13px; }
+  .hlist li { grid-template-columns: 18px 1fr; }
+  .hlist li span { grid-column: 2; }
+  .savebar { left: 50%; bottom: calc(76px + env(safe-area-inset-bottom)); }
+  .toast { left: 50%; bottom: calc(80px + env(safe-area-inset-bottom)); }
+
+  .room-bar { padding: 8px 8px; }
+  .room-bar .saved .lbl { display: none; }
+  .room-bar .where span { display: none; }
+  .room-bar .btn-primary { padding: 0 16px; }
+  .room-letter .her p:not(.asked) { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--her-soft); }
+  .room-letter .asked { font-size: 16px; }
+  .room-scroll { padding: 14px 0 0; }
+  .room-sheet { border-radius: 18px 18px 0 0; }
+  .room-letter-wrap { padding: 0 16px; top: -6px; }
+  .room-page { grid-template-columns: 0 1fr; padding: 18px 22px 0; }
+  .room-page::before { left: 10px; }
+  .room-mg time { display: none; }
+  .editor { font-size: 20px; line-height: 34px; background-image: repeating-linear-gradient(to bottom, transparent 0 33px, color-mix(in oklab, var(--rule) 45%, transparent) 33px 34px); background-position: 0 -1px; }
+  .editor > div, .editor > p { margin-bottom: 34px; }
+  .room-foot { padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
+  .count { min-width: 70px; padding: 0 6px; }
+}
+@media (min-width: 900px) and (max-width: 1140px) {
+  .today-grid { grid-template-columns: 1fr; gap: 0; }
+  .ins-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- ================= desktop rail ================= -->
+  <nav class="rail" aria-label="Main">
+    <div class="brand"><svg viewBox="0 0 28 28" aria-hidden="true"><rect x="5" y="3.5" width="17" height="21" rx="2" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.4"/><path d="M9.5 3.5v21" stroke="var(--ink)" stroke-width="1" opacity=".55"/><path d="M12 10h7M12 13.5h7M12 17h5" stroke="var(--ink)" stroke-width="1.1" opacity=".45" stroke-linecap="round"/><circle cx="9.5" cy="20" r="3.4" fill="none" stroke="var(--her)" stroke-width="1.3"/></svg>journal</div>
+    <button class="btn btn-primary write-cta" data-write="note"><i data-ic="pen"></i>Write<kbd>N</kbd></button>
+    <button class="nav-item" data-go="today"><i data-ic="today"></i>Today<span class="badge">1 waiting</span></button>
+    <button class="nav-item" data-go="entries"><i data-ic="entries"></i>Entries</button>
+    <button class="nav-item" data-go="library"><i data-ic="library"></i>Library</button>
+    <button class="nav-item" data-go="insights"><i data-ic="insights"></i>Insights</button>
+    <div class="rail-spacer"></div>
+    <div class="rail-next"><b>Next from Ada</b>Daily gratitude at 21:30, then the evening journal at 23:00.</div>
+    <div class="rail-foot">
+      <button class="nav-item" data-go="settings"><i data-ic="settings"></i>Settings</button>
+      <button class="icon-btn theme-toggle" data-tip="Light or dark" aria-label="Switch light or dark"><i data-ic="moon"></i></button>
+    </div>
+  </nav>
+
+  <main class="stage" id="stage">
+
+    <!-- ================= TODAY ================= -->
+    <section class="screen" data-screen="today" aria-label="Today">
+      <div class="page">
+        <div class="today-grid">
+          <div>
+            <header class="today-head">
+              <div class="kicker">Thursday</div>
+              <h1 class="display">15 October</h1>
+              <p class="dateline">09:12 · Hillside · India Standard Time</p>
+              <div class="head-tools phone-only"><button class="icon-btn theme-toggle" aria-label="Light or dark"><i data-ic="moon"></i></button><button class="icon-btn" data-go="settings" aria-label="Settings"><i data-ic="settings"></i></button></div>
+            </header>
+            <ol class="weekstrip" id="weekstrip"></ol>
+            <section class="sec">
+              <h2 class="book-head">Waiting for you<span class="count">since 06:00</span></h2>
+              <article class="letter prompt-letter">
+                <svg class="clip" viewBox="0 0 18 44" aria-hidden="true"><path d="M6 30V8a3.5 3.5 0 017 0v26a5 5 0 01-10 0V12"/></svg>
+                <div class="letter-from"><span class="dot"></span>From Ada · Morning journal · 06:00</div>
+                <div class="her">
+                  <p>Morning. The fog was still on the water when this went out. Start wherever something feels alive; one line is enough.</p>
+                  <p class="asked">What would make today a good one, even in a small way?</p>
+                </div>
+                <div class="letter-actions">
+                  <button class="btn btn-primary" data-write="morning"><i data-ic="pen"></i>Answer</button>
+                  <button class="btn-text" data-write="morning" data-voice="1"><i data-ic="mic"></i>Speak it</button>
+                  <span class="hint desk-only">Open until noon</span>
+                </div>
+              </article>
+            </section>
+            <section class="sec today-written">
+              <h2 class="book-head" >Written today</h2>
+              <a href="#entry" data-open-entry="2026-10-15-j"><div class="kicker">A note · 08:30</div><div class="read">call the harbour master</div></a>
+              <a href="#entry" data-open-entry="2026-10-15-fix-life-s01"><div class="kicker">Fix your life, session 1 · 06:14</div><div class="read">The life I do not want.</div></a>
+            </section>
+          </div>
+          <aside>
+            <section class="sec">
+              <h2 class="book-head">Later today</h2>
+              <ul class="leaders">
+                <li><span><span class="t">Daily gratitude</span><span class="s">Yours · three questions</span></span><span class="dots"></span><span class="v tab">21:30</span></li>
+                <li><span><span class="t">Evening journal</span><span class="s">Built in · twenty-four questions</span></span><span class="dots"></span><span class="v tab">23:00</span></li>
+                <li><span><span class="t">Fix your life</span><span class="s">Session 3 of 10, open since Sunday</span><span class="ticks" style="margin-top:8px"><i class="on"></i><i class="on"></i><i class="now"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></span><span class="dots"></span><button class="btn-text" data-go="library">Continue</button></li>
+              </ul>
+            </section>
+            <section class="sec carry">
+              <div class="kicker">Carry forward</div>
+              <p class="her">“Make the call before the ferry.”</p>
+              <button class="btn-text" style="padding-left:0" data-open-entry="2026-10-14-evening" data-fold-target="reflection">From Wednesday’s reflection <i data-ic="right"></i></button>
+            </section>
+
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= ENTRIES ================= -->
+    <section class="screen" data-screen="entries" aria-label="Entries">
+      <div class="entries" id="entries">
+        <div class="list-pane" id="listPane">
+          <div class="list-inner">
+            <div class="collapse full"><div>
+              <div class="list-head">
+                <h1 class="display">Entries</h1>
+                <p class="filter-sentence">Showing <button class="choice" data-menu="kind"><span>every entry</span><i data-ic="chev"></i></button> from <button class="choice" data-menu="practice"><span>any practice</span><i data-ic="chev"></i></button>, newest first.</p>
+                <label class="searchline"><i data-ic="search"></i><span class="sr">Search your words</span><input id="q" type="search" placeholder="Search your words" autocomplete="off"></label>
+                <div class="result-note" id="resultNote"></div>
+              </div>
+            </div></div>
+            <div class="collapse compact"><div>
+              <div class="compact-head">
+                <h2>Entries</h2>
+                <button class="icon-btn" data-close-entry data-tip="Back to the list" aria-label="Back to the list"><i data-ic="expand"></i></button>
+              </div>
+            </div></div>
+            <div id="list"></div>
+          </div>
+        </div>
+        <div class="detail-pane" id="detailPane" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <!-- ================= LIBRARY ================= -->
+    <section class="screen" data-screen="library" aria-label="Library">
+      <div class="page" style="max-width:860px">
+        <header class="lib-head">
+          <div style="flex:1">
+            <h1 class="display">Library</h1>
+            <p>The practices Ada sends on a schedule, and the ones you start when you need them.</p>
+          </div>
+          <button class="btn btn-quiet desk-only"><i data-ic="plus"></i>New practice</button>
+        </header>
+        <p class="lib-legend"><svg class="ribbon" viewBox="0 0 12 34" style="margin:0;height:20px;width:9px"><path d="M0 0h12v34l-6-6-6 6z"/></svg>A ribbon marks a page you wrote, or rewrote.</p>
+        <div id="library"></div>
+      </div>
+    </section>
+
+    <!-- ================= INSIGHTS ================= -->
+    <section class="screen" data-screen="insights" aria-label="Insights">
+      <div class="page ins">
+        <div class="ins-top">
+          <button class="icon-btn" id="wkPrev" aria-label="Earlier week"><i data-ic="left"></i></button>
+          <div class="kicker" id="wkLabel">Last week</div>
+          <button class="icon-btn" id="wkNext" aria-label="Later week"><i data-ic="right"></i></button>
+        </div>
+        <div id="insBody"></div>
+      </div>
+    </section>
+
+    <!-- ================= SETTINGS ================= -->
+    <section class="screen" data-screen="settings" aria-label="Settings" id="settingsScreen">
+      <div class="set-wrap">
+        <nav class="set-nav" id="setNav" aria-label="Settings sections">
+          <h1 class="display">Settings</h1>
+          <div class="set-pills">
+          <button data-sec="s-ink" aria-current="true">Ink & page</button>
+          <button data-sec="s-place">Place & time</button>
+          <button data-sec="s-prompts">Prompts</button>
+          <button data-sec="s-refl">Reflections</button>
+          <button data-sec="s-chat">In the chat</button>
+          <button data-sec="s-device">This device</button>
+          <button data-sec="s-health">Health</button>
+          </div>
+        </nav>
+        <div id="settingsBody">
+
+          <section class="set-sec" id="s-ink">
+            <h2 class="book-head">Her ink</h2>
+            <p class="lede">The colour Ada’s words are typed in. It changes everywhere at once, on this device only.</p>
+            <div class="inks" id="inks" role="radiogroup" aria-label="Her ink"></div>
+            <div class="letter ink-proof"><div class="letter-from"><span class="dot"></span>From Ada<span id="inkNote" style="margin-left:auto;font-weight:400"></span></div><p class="her" id="inkProof"></p></div>
+            <div class="group" style="margin-top:16px">
+              <div class="srow"><div class="lab"><b>Page</b><div class="hint">Light, dark, or as this device is set</div></div>
+                <div class="seg" role="radiogroup" id="themeSeg"><span class="thumb"></span><button role="radio" data-v="system">System</button><button role="radio" data-v="light">Light</button><button role="radio" data-v="dark">Dark</button></div></div>
+            </div>
+          </section>
+
+          <section class="set-sec" id="s-place">
+            <h2 class="book-head">Place & time</h2>
+            <p class="lede">Prompts are sent by the local time where you are.</p>
+            <div class="group">
+              <div class="srow"><div class="lab"><b>Place</b><div class="hint">Its coordinates and time zone are looked up for you</div></div><span class="val">Hillside</span><button class="btn btn-quiet" style="min-height:40px"><i data-ic="pin"></i>Use my location</button></div>
+              <div class="srow"><div class="lab"><b>Time zone</b><div class="hint">Overrides the place’s, if set</div></div><button class="chip">Asia/Kolkata · UTC+5:30<i data-ic="chev"></i></button></div>
+            </div>
+          </section>
+
+          <section class="set-sec" id="s-prompts">
+            <h2 class="book-head">Prompts</h2>
+            <p class="lede">How long a prompt stays open, and when Ada reads what you wrote.</p>
+            <div class="group" id="g-prompts"></div>
+          </section>
+
+          <section class="set-sec" id="s-refl">
+            <h2 class="book-head">Reflections</h2>
+            <p class="lede">The day’s reflection and the week’s review, in her hand.</p>
+            <div class="group" id="g-refl"></div>
+          </section>
+
+          <section class="set-sec" id="s-chat">
+            <h2 class="book-head">In the chat</h2>
+            <p class="lede">The short note about today Ada gets when a conversation starts.</p>
+            <div class="group" id="g-chat"></div>
+          </section>
+
+          <section class="set-sec" id="s-device">
+            <h2 class="book-head">This device</h2>
+            <div class="group">
+              <div class="srow"><div class="lab"><b>Paired with this browser</b><div class="hint">Since 12 October · until you unpair or the token is rotated</div></div><button class="btn btn-quiet" style="min-height:40px">Unpair</button></div>
+              <div class="srow"><div class="lab"><b>Version 2.0.0</b><div class="hint">The server and the last tick agree</div></div><span class="hint tab">d62c151</span></div>
+            </div>
+          </section>
+
+          <section class="set-sec" id="s-health">
+            <h2 class="book-head">Health</h2>
+            <div class="group fold" id="healthFold" data-fold-id="health">
+              <button class="health-sum fold-head" aria-expanded="false">
+                <span class="marks" id="hmarks"></span>
+                <span class="lab"><b>Nearly everything is well.</b><span class="hint">16 checks fine, two to look at, one not working</span></span>
+                <i data-ic="chev" class="chev"></i>
+              </button>
+              <div class="fold-body"><div class="fold-inner"><div class="fold-content"><ul class="hlist settle" id="hlist"></ul></div></div></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ================= phone tab bar ================= -->
+  <nav class="tabbar" aria-label="Main">
+    <button data-go="today"><i data-ic="today"></i>Today</button>
+    <button data-go="entries"><i data-ic="entries"></i>Entries</button>
+    <button data-write="note" aria-label="Write"><span class="tw"><i data-ic="pen"></i></span></button>
+    <button data-go="library"><i data-ic="library"></i>Library</button>
+    <button data-go="insights"><i data-ic="insights"></i>Insights</button>
+  </nav>
+</div>
+
+<!-- ================= WRITE ROOM ================= -->
+<div class="room" id="room" role="dialog" aria-modal="true" aria-label="Write">
+  <header class="room-bar">
+    <button class="icon-btn" id="roomClose" data-tip="Close (Esc)" aria-label="Close"><i data-ic="close"></i></button>
+    <div class="where"><b id="roomWhere">A note</b><span id="roomWhen">Thursday 15 October</span></div>
+    <span class="saved" id="saved"><i></i><span class="lbl">Nothing written yet</span></span>
+    <button class="icon-btn" id="focusBtn" aria-pressed="false" data-tip="Focus (⌘ .)" aria-label="Focus"><i data-ic="focus"></i></button>
+    <button class="btn btn-primary" id="roomSend">Add to journal</button>
+  </header>
+  <div class="room-scroll" id="roomScroll">
+    <div class="room-sheet">
+      <div class="room-letter-wrap" id="roomLetterWrap"></div>
+      <div class="room-page">
+        <div class="room-mg" id="roomMg"></div>
+        <div class="editor" id="editor" contenteditable="true" spellcheck="true" data-placeholder="Begin anywhere. It’s yours." aria-label="Your words"></div>
+      </div>
+    </div>
+  </div>
+  <div class="room-foot">
+    <div class="dock" id="dock">
+      <button class="rec" id="recBtn" aria-label="Record your voice"><i data-ic="mic"></i></button>
+      <div class="recwave" id="recwave"></div>
+      <span class="rectime" id="rectime">0:00</span>
+      <span class="sep"></span>
+      <span class="count" id="count">0 words</span>
+    </div>
+  </div>
+</div>
+
+<div class="menu" id="menu" hidden role="menu"></div>
+<div class="savebar" id="savebar"><span class="n" id="saveN">1 change</span><button class="btn-text" id="discard">Discard</button><button class="btn btn-primary" id="saveBtn" style="min-height:40px">Save</button></div>
+<div class="toast" id="toast"><span id="toastMsg"></span><button class="btn-text" id="toastUndo">Undo</button></div>
+<div class="scrim" id="scrim"></div>
+<div class="asheet" id="asheet" role="dialog" aria-label="Passage actions">
+  <div class="quote" id="asQuote"></div>
+  <button data-act="edit"><i data-ic="pen"></i>Edit these words</button>
+  <button data-act="copy"><i data-ic="copy"></i>Copy</button>
+  <button data-act="delete"><i data-ic="trash"></i>Delete…</button>
+</div>
+
+<script>
+/* ============================================================ icons */
+const IC = {
+  today:'<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 9.5h16M8.5 3v4M15.5 3v4"/><circle cx="12" cy="14.5" r="1.3" fill="currentColor" stroke="none"/>',
+  entries:'<path d="M7 3.5h8l4 4V20.5H7z"/><path d="M15 3.5v4h4M10 12h6M10 15.5h6"/><path d="M4.5 7v15.5H15" opacity=".55"/>',
+  library:'<path d="M5 4.5h3.5v15H5zM10.5 4.5H14v15h-3.5zM15.6 5.3l3.3-.9 3.6 14.4-3.3.9z"/>',
+  insights:'<path d="M12 6.5C10 5 7 4.5 3.5 5v13c3.5-.5 6.5 0 8.5 1.5 2-1.5 5-2 8.5-1.5V5C17 4.5 14 5 12 6.5zM12 6.5v13"/>',
+  pen:'<path d="M4.5 19.5l1.2-4.6L15.6 5a2.2 2.2 0 013.1 3.1L8.8 18z"/><path d="M13.8 6.8l3.1 3.1"/>',
+  settings:'<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.2"/><circle cx="9" cy="17" r="2.2"/>',
+  search:'<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/>',
+  chev:'<path d="M6.5 9.5l5.5 5.5 5.5-5.5"/>',
+  left:'<path d="M14.5 5.5L8 12l6.5 6.5"/>', right:'<path d="M9.5 5.5L16 12l-6.5 6.5"/>',
+  up:'<path d="M6.5 14.5L12 9l5.5 5.5"/>', down:'<path d="M6.5 9.5l5.5 5.5 5.5-5.5"/>',
+  close:'<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
+  play:'<path d="M8.5 5.8v12.4L18.5 12z" fill="currentColor" stroke="none"/>',
+  pause:'<path d="M8 5.5h2.8v13H8zM13.2 5.5H16v13h-2.8z" fill="currentColor" stroke="none"/>',
+  mic:'<rect x="9" y="3.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0013 0M12 18v3"/>',
+  stop:'<rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" stroke="none"/>',
+  trash:'<path d="M5 7h14M10 7V4.5h4V7M7 7l1 13h8l1-13"/>',
+  star:'<path d="M12 4.2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 16.6l-4.8 2.5.9-5.4-3.9-3.8 5.4-.8z"/>',
+  more:'<circle cx="6" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.3" fill="currentColor" stroke="none"/>',
+  focus:'<path d="M4.5 9V5.5a1 1 0 011-1H9M15 4.5h3.5a1 1 0 011 1V9M19.5 15v3.5a1 1 0 01-1 1H15M9 19.5H5.5a1 1 0 01-1-1V15"/><circle cx="12" cy="12" r="2.4"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
+  moon:'<path d="M19 14.5A7.5 7.5 0 019.5 5a7.5 7.5 0 109.5 9.5z"/>',
+  copy:'<rect x="8.5" y="8.5" width="11" height="12" rx="2"/><path d="M5 15.5V6a1.5 1.5 0 011.5-1.5H15"/>',
+  person:'<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c1-3.5 4-5 7-5s6 1.5 7 5"/>',
+  wave:'<path d="M4 12h1M8 8.5v7M12 5.5v13M16 9v6M20 12h-1"/>',
+  lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>',
+  pin:'<path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0113 0c0 5-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>',
+  plus:'<path d="M12 5.5v13M5.5 12h13"/>', minus:'<path d="M5.5 12h13"/>',
+  check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  reply:'<path d="M9 7.5L4.5 12 9 16.5M4.5 12h9a6 6 0 016 6"/>',
+  clock:'<circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/>',
+  expand:'<path d="M4 6.5h16M4 12h16M4 17.5h10"/>',
+};
+const ic = (n, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true">${IC[n] || ''}</svg>`;
+const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+function hydrateIcons(root = document) { $$('i[data-ic]', root).forEach(i => { const cls = i.className; i.outerHTML = ic(i.dataset.ic, cls); }); }
+const ENV = '<svg class="env" viewBox="0 0 34 26" aria-hidden="true"><rect x="2" y="5" width="30" height="19" rx="2"/><path class="flap" d="M2.5 6L17 15.5 31.5 6"/></svg>';
+const CLIP = '<svg class="clip" viewBox="0 0 18 44" aria-hidden="true"><path d="M6 30V8a3.5 3.5 0 017 0v26a5 5 0 01-10 0V12"/></svg>';
+const RIBBON = (edited) => `<svg class="ribbon ${edited ? 'edited' : ''}" viewBox="0 0 12 34" aria-hidden="true"><path d="M.75 0h10.5v32.5L6 27.3.75 32.5z"/></svg>`;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* ============================================================ fixture content (neutral) */
+const QUESTIONS = [["1.1","What's spinning in your mind?","Brain Dump & Letting Go"],["1.2","What do you need to release before sleep?","Brain Dump & Letting Go"],["2.1","What went well today?","Day Review"],["2.2","What challenged you?","Day Review"],["2.3","What did you learn?","Day Review"],["3.1","What interesting moments happened, even if small?","Story-Worthy Moments"],["3.2","What made you smile or laugh?","Story-Worthy Moments"],["3.3","What surprised you?","Story-Worthy Moments"],["4.1","What wins, big or small, did you experience?","Wins & Celebrations"],["4.2","What are you proud of?","Wins & Celebrations"],["5.1","What realizations or new understandings emerged?","Insights & Revelations"],["5.2","What did you learn about yourself or others?","Insights & Revelations"],["6.1","How did you honor your values today?","Values & Alignment"],["6.2","Where did you feel most/least aligned?","Values & Alignment"],["7.1","What energized you today?","Energy Awareness"],["7.2","What drained your energy?","Energy Awareness"],["8.1","What attention bids did you notice?","Connection Reflection"],["8.2","Which connections did you lean into?","Connection Reflection"],["8.3","Who showed up for you, and who did you show up for?","Connection Reflection"],["9.1","What moments from today are you thankful for?","Gratitude"],["9.2","What simple joys touched you today?","Gratitude"],["10.1","What brought you peace today?","Peace & Calming"],["10.2","What's one thing you can appreciate about yourself?","Peace & Calming"],["10.3","What do you want to carry into your sleep?","Peace & Calming"]];
+const MORNING_Q = [["1.1","What would make today a good one, even in a small way?","Intention"],["1.2","What's the one thing that matters most today?","Intention"],["2.1","How did you sleep?","Body"],["2.2","Where in your body is the day already sitting?","Body"],["3.1","What are you looking forward to?","Outlook"]];
+
+const ENTRIES = [
+  { stem:'2026-10-15-j', date:'2026-10-15', time:'08:30', title:'A note', practice:'note', first:'call the harbour master', f:{} },
+  { stem:'2026-10-15-fix-life-s01', date:'2026-10-15', time:'06:14', title:'Fix your life', sub:'session 1', practice:'fix-life', first:'The life I do not want. Mornings that start in the inbox, evenings that end on a screen.', f:{} },
+  { stem:'2026-10-14-evening', date:'2026-10-14', time:'23:12', title:'Evening journal', practice:'evening', first:'First words, about the lighthouse. It came on at dusk the way it always does, without asking anyone, and I stood at the end of the pier longer than I meant to.', f:{audio:1, her:1} },
+  { stem:'2026-10-14-gratitude', date:'2026-10-14', time:'21:34', title:'Daily gratitude', practice:'gratitude', first:'The gulls at the breakwater, loud and certain of themselves. Bread still warm from the corner bakery.', f:{} },
+  { stem:'2026-10-14-morning', date:'2026-10-14', time:'06:41', title:'Morning journal', practice:'morning', first:'Slept badly, woke to rain on the skylight. Want to walk before the ferry.', f:{her:1} },
+  { stem:'2026-10-13-evening', date:'2026-10-13', time:'23:05', title:'Evening journal', practice:'evening', first:'Quiet day. Mended the gate; the hinge sang the whole time and I let it.', f:{her:1} },
+  { stem:'2026-10-12-morning', date:'2026-10-12', time:'06:20', title:'Morning journal', practice:'morning', first:'Fog over the harbour, the far shore gone entirely. Only the bell buoy to say it was still there.', f:{audio:1} },
+  { stem:'2026-10-11-weekly', date:'2026-10-11', time:'18:02', title:'Weekly pattern scan', practice:'weekly', first:'Three evenings this week I meant to call and didn’t. The water helps; the screen doesn’t.', f:{her:1} },
+  { stem:'2026-10-09-evening', date:'2026-10-09', time:'23:20', title:'Evening journal', practice:'evening', first:'Walked the long way round the point. The keeper was painting the rail and waved with the brush.', f:{audio:1, her:1} },
+  { stem:'2026-10-08-midweek', date:'2026-10-08', time:'12:04', title:'Midweek check-in', practice:'midweek', first:'Half the week gone and the boat still out of the water. That’s fine, actually.', f:{} },
+  { stem:'2026-10-08-prep', date:'2026-10-08', time:'17:15', title:'Conversation prep', practice:'conversation-prep', first:'What I want to say to my brother, plainly, before the weekend.', f:{} },
+  { stem:'2026-10-06-evening', date:'2026-10-06', time:'22:48', title:'Evening journal', practice:'evening', first:'Rope burn on my palm from the dinghy. A good tired.', f:{her:1} },
+];
+const PRACTICES = [['any','any practice'],['morning','Morning journal'],['evening','Evening journal'],['gratitude','Daily gratitude'],['midweek','Midweek check-in'],['weekly','Weekly pattern scan'],['conversation-prep','Conversation prep'],['fix-life','Fix your life'],['note','notes of your own']];
+const KINDS = [['all','every entry'],['audio','entries with your voice'],['her','entries Ada wrote back to'],['starred','starred entries']];
+
+const DOC = {
+  '2026-10-14-evening': {
+    kicker:'Evening journal', title:'Wednesday, 14 October', span:'23:00 – 23:50',
+    letter:{ at:'23:00', label:'Evening journal', opener:'Evening. The lamp’s on and the harbour’s gone dark. Let the day land; answer whatever pulls at you and leave the rest.', asked:['1.1'], qs:QUESTIONS },
+    blocks:[
+      { k:'his', key:'words:0', at:'23:12', src:'typed', p:['First words, about the lighthouse. It came on at dusk the way it always does, without asking anyone, and I stood at the end of the pier longer than I meant to.','I think I wanted something to be that certain today. The light doesn’t decide each evening whether it’s worth it.'] },
+      { k:'his', key:'words:1', at:'23:40', src:'voice · 2:31', audio:151, p:['A spoken thought. I keep meaning to call the harbour master about the mooring and keep not doing it, and the not-doing is louder than the call would be.'] },
+      { k:'his', key:'his:813', at:'23:44', src:'typed', p:['Later I thought of the harbour. How it holds still while everything in it moves.'] },
+      { k:'hers', at:'23:45', text:'The harbour sounds like a word you come back to. What is it holding for you tonight?' },
+      { k:'his', key:'his:816', at:'23:50', src:'in the chat', reply:'The harbour sounds like a word you come back to', p:['yes, and the gulls. They argue all evening and then, all at once, stop. I want to learn that.'] },
+    ],
+    analysis:{ at:'08:02 the next morning', noticed:[
+      ['without asking anyone','Things that arrive unbidden, the light and the gulls’ sudden quiet, are where tonight’s words settle.'],
+      ['the not-doing is louder than the call would be','You name the cost of waiting plainly. It may be smaller to do than to carry.'],
+      ['all at once, stop','An ending you admire. Perhaps a way you’d like your evenings to close.'] ],
+      threads:[['The mooring call','third evening running','Mon, Tue, Wed'],['The water as a place to think','since 6 October','5 entries']],
+      notes:[['08:02','You wrote most when you stopped trying to finish the thought.']] },
+    reflection:{ q:'What does the sea ask?', body:['Wednesday went from rain on the skylight to the gulls going quiet. In between, the same unmade call sat under everything.','The lighthouse kept coming back as the thing that doesn’t deliberate. You might borrow a little of that tomorrow.'], carry:'Make the call before the ferry.' }
+  }
+};
+function genericDoc(e) {
+  const d = new Date(e.date + 'T12:00'); const title = d.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' });
+  return { kicker: e.title + (e.sub ? ', ' + e.sub : ''), title, span: e.time, letter: e.practice === 'note' ? null : { at: e.time.slice(0,2) + ':00', label: e.title, opener: 'A few lines is plenty. Start wherever something feels alive.', asked: ['1.1'], qs: MORNING_Q },
+    blocks: [{ k:'his', key:'words:0', at:e.time, src:e.f.audio ? 'voice · 1:12' : 'typed', audio: e.f.audio ? 72 : 0, p:[e.first] }], analysis: e.f.her ? DOC['2026-10-14-evening'].analysis : null, reflection: null };
+}
+
+/* ============================================================ theme + ink */
+const root = document.documentElement;
+const mq = matchMedia('(prefers-color-scheme: dark)');
+let themePref = 'system';
+function applyTheme(pref) { themePref = pref; root.dataset.theme = pref === 'system' ? (mq.matches ? 'dark' : 'light') : pref; $$('.theme-toggle').forEach(b => b.innerHTML = ic(root.dataset.theme === 'dark' ? 'sun' : 'moon')); syncSeg($('#themeSeg'), pref); }
+mq.addEventListener('change', () => themePref === 'system' && applyTheme('system'));
+$$('.theme-toggle').forEach(b => b.addEventListener('click', () => applyTheme(root.dataset.theme === 'dark' ? 'light' : 'dark')));
+const INKS = [['blue-black','Blue-black','a typewriter ribbon'],['brown','Brown','iron-gall, as a reader annotates'],['violet','Violet','a carbon copy'],['green','Green','post-office ink']];
+const BLOT = '<svg class="blot" viewBox="0 0 60 52" aria-hidden="true"><path d="M31 3c8 .5 15 4 19.5 9.5 4.6 5.6 7.2 13 4.6 19.8-2.3 6-8.3 9.4-13.8 12.6-5.4 3.1-11.7 5.4-17.6 3.6C17.3 46.6 11 43 7 37.6 3 32.2 1.8 24.6 4.6 18.4 7.2 12.6 13 8.6 18.6 5.8 22.5 3.8 26.7 2.8 31 3zm19 39.5c1.6 0 2.8 1.3 2.8 2.8S51.6 48 50 48s-2.8-1.2-2.8-2.7 1.2-2.8 2.8-2.8zM9.5 6.5c1.2 0 2.2 1 2.2 2.2s-1 2.1-2.2 2.1-2.1-1-2.1-2.1 1-2.2 2.1-2.2z"/></svg>';
+function renderInks() {
+  $('#inks').innerHTML = INKS.map(([id, name, note]) => `<button class="inkopt" role="radio" data-ink="${id}" aria-checked="${root.dataset.ink === id}">${BLOT}<b>${name}</b><small>${note}</small></button>`).join('');
+}
+let typeTimer;
+function typeProof() {
+  const nt = INKS.find(i => i[0] === root.dataset.ink); if (nt && $('#inkNote')) $('#inkNote').textContent = nt[1] + ', ' + nt[2];
+  const text = 'How did today go? A line or two is plenty; I’ll read it in the morning.';
+  const el = $('#inkProof'); clearInterval(typeTimer); let i = 0; el.innerHTML = '<span class="caret"></span>';
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { el.textContent = text; return; }
+  typeTimer = setInterval(() => { i += 1; el.innerHTML = esc(text.slice(0, i)) + '<span class="caret"></span>'; if (i >= text.length) clearInterval(typeTimer); }, 26);
+}
+function setInk(id) { root.dataset.ink = id; $$('#inks .inkopt').forEach(b => b.setAttribute('aria-checked', b.dataset.ink === id)); typeProof(); }
+document.addEventListener('click', e => { const b = e.target.closest('#inks .inkopt'); if (b) setInk(b.dataset.ink); });
+
+/* ============================================================ router + page transitions */
+let current = null;
+function go(name, opts = {}) {
+  if (name === current && !opts.force) return;
+  const next = $(`.screen[data-screen="${name}"]`); if (!next) return;
+  const prev = current && $(`.screen[data-screen="${current}"]`);
+  if (prev && prev !== next) { prev.classList.remove('active'); prev.classList.add('leaving'); setTimeout(() => prev.classList.remove('leaving'), 220); }
+  if (prev !== next) next.scrollTop = 0; next.classList.add('active'); current = name;
+  $$('[data-go]').forEach(b => b.dataset.go === name ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
+  if (name !== 'entries' && !opts.keep) closeEntry(true);
+  if (name === 'settings') typeProof();
+  if (!opts.silent) setHash(name === 'entries' && openStem ? 'entry' : name);
+}
+function setHash(path) { const qs = location.hash.split('?')[1]; history.replaceState(null, '', '#' + path + (qs ? '?' + qs : '')); }
+document.addEventListener('click', e => { const g = e.target.closest('[data-go]'); if (g) { e.preventDefault(); go(g.dataset.go); } });
+
+/* ============================================================ entries list */
+const filt = { kind:'all', practice:'any', q:'' };
+function weekStart(ds) { const d = new Date(ds + 'T12:00'); const k = (d.getDay() + 6) % 7; d.setDate(d.getDate() - k); return d; }
+function renderList(anim) {
+  const q = filt.q.trim().toLowerCase();
+  const rows = ENTRIES.filter(e => (filt.practice === 'any' || e.practice === filt.practice)
+    && (filt.kind === 'all' || (filt.kind === 'audio' && e.f.audio) || (filt.kind === 'her' && e.f.her) || (filt.kind === 'starred' && e.stem === '2026-10-14-evening'))
+    && (!q || e.first.toLowerCase().includes(q)));
+  const weeks = new Map();
+  rows.forEach(e => { const w = weekStart(e.date).toISOString().slice(0, 10); if (!weeks.has(w)) weeks.set(w, new Map()); const days = weeks.get(w); if (!days.has(e.date)) days.set(e.date, []); days.get(e.date).push(e); });
+  let html = '';
+  for (const [w, days] of weeks) {
+    const wd = new Date(w + 'T12:00'); const n = [...days.values()].flat().length;
+    html += `<section class="week"><h2 class="book-head">Week of ${wd.getDate()} ${wd.toLocaleDateString('en-GB', { month:'long' })}<span class="count">${n} ${n === 1 ? 'entry' : 'entries'}</span></h2>`;
+    for (const [ds, es] of days) {
+      const d = new Date(ds + 'T12:00');
+      html += `<div class="day"><div class="day-tab"><span class="n">${d.getDate()}</span><span class="w">${d.toLocaleDateString('en-GB', { weekday:'short' })}</span></div><div class="rows">`;
+      for (const e of es) {
+        const first = q ? esc(e.first).replace(new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'ig'), '<mark style="background:var(--sunk);color:inherit;border-radius:3px">$1</mark>') : esc(e.first);
+        html += `<button class="row" data-stem="${e.stem}" aria-current="${e.stem === openStem}"><div class="row-top"><span class="row-title">${esc(e.title)}${e.sub ? ` <span class="sub">${e.sub}</span>` : ''}</span><span class="row-time tab">${e.time}</span><span class="row-flags">${e.f.audio ? `<span title="Has your voice">${ic('wave')}</span>` : ''}${e.f.her ? '<span class="her-mark" title="Ada wrote back"></span>' : ''}</span></div><div class="row-first"><p>${first}</p></div></button>`;
+      }
+      html += '</div></div>';
+    }
+    html += '</section>';
+  }
+  if (!rows.length) html = `<p class="list-empty">Nothing here with those words. Try fewer, or another practice.</p>`;
+  const list = $('#list'); list.innerHTML = html; if (anim) { list.classList.remove('list-anim'); void list.offsetWidth; list.classList.add('list-anim'); }
+  const filtered = filt.kind !== 'all' || filt.practice !== 'any' || q;
+  $('#resultNote').innerHTML = filtered ? `${rows.length} of ${ENTRIES.length} entries <button class="btn-text" id="clearF" style="min-height:28px;padding:0 6px;margin-left:4px">Show all</button>` : '';
+}
+$('#q').addEventListener('input', e => { filt.q = e.target.value; renderList(false); });
+document.addEventListener('click', e => { if (e.target.id === 'clearF') { filt.kind = 'all'; filt.practice = 'any'; filt.q = ''; $('#q').value = ''; syncChoices(); renderList(true); } });
+function syncChoices() { $('[data-menu="kind"] span').textContent = KINDS.find(k => k[0] === filt.kind)[1]; $('[data-menu="practice"] span').textContent = PRACTICES.find(k => k[0] === filt.practice)[1]; }
+const menu = $('#menu');
+document.addEventListener('click', e => {
+  const c = e.target.closest('[data-menu]');
+  if (c) { e.stopPropagation(); const which = c.dataset.menu; const opts = which === 'kind' ? KINDS : PRACTICES; const r = c.getBoundingClientRect();
+    menu.innerHTML = opts.map(([v, l], i) => (which === 'practice' && i === 1 ? '<hr>' : '') + `<button role="menuitemradio" data-v="${v}" aria-checked="${filt[which] === v}">${l[0].toUpperCase() + l.slice(1)}${ic('check')}</button>`).join('');
+    menu.hidden = false; menu.style.left = Math.min(r.left - 8, innerWidth - 250) + 'px'; menu.style.top = (r.bottom + 6) + 'px'; menu.dataset.which = which; menu.style.animation = 'none'; void menu.offsetWidth; menu.style.animation = ''; return; }
+  const m = e.target.closest('#menu button');
+  if (m) { filt[menu.dataset.which] = m.dataset.v; syncChoices(); renderList(true); }
+  menu.hidden = true;
+});
+
+/* ============================================================ entry: open / close */
+let openStem = null;
+const entriesEl = $('#entries'), detail = $('#detailPane');
+function renderDoc(stem) {
+  const e = ENTRIES.find(x => x.stem === stem); const doc = DOC[stem] || genericDoc(e);
+  const L = doc.letter; const sections = []; let sec = null;
+  if (L) L.qs.forEach(([id, t, s]) => { if (!sec || sec.s !== s) { sec = { s, qs:[] }; sections.push(sec); } sec.qs.push([id, t]); });
+  const askedTxt = L ? L.qs.filter(q => L.asked.includes(q[0])).map(q => q[1]) : [];
+  const words = doc.blocks.filter(b => b.k === 'his').reduce((n, b) => n + b.p.join(' ').split(/\s+/).length, 0);
+  let h = `<div class="leaf-bar" id="leafBar">
+    <button class="btn-text crumb" data-close-entry>${ic('left')}Entries</button>
+    <button class="icon-btn desk-only" data-close-entry data-tip="All entries (Esc)" aria-label="Back to all entries">${ic('expand')}</button>
+    <button class="icon-btn desk-only" data-step="-1" data-tip="Newer" aria-label="Newer entry">${ic('up')}</button>
+    <button class="icon-btn desk-only" data-step="1" data-tip="Older" aria-label="Older entry">${ic('down')}</button>
+    <span class="mini-title">${esc(doc.title)}</span><span class="grow"></span>
+    <button class="icon-btn" data-tip="Star" aria-label="Star" aria-pressed="${stem === '2026-10-14-evening'}">${ic('star')}</button>
+    <button class="icon-btn" data-tip="Mood and people" aria-label="Mood and people">${ic('person')}</button>
+    <button class="icon-btn" data-tip="More" aria-label="More">${ic('more')}</button></div>
+  <article class="leaf">
+    <header class="leaf-head"><div><div class="kicker">${esc(doc.kicker)}</div><h1 class="display">${esc(doc.title)}</h1>
+      <div class="leaf-meta"><span class="tab">${doc.span}</span><span>${doc.blocks.filter(b => b.k === 'his').length} passages</span><span>${words} words</span>${doc.blocks.some(b => b.audio) ? '<span>your voice, 2:31</span>' : ''}</div></div></header>`;
+  if (L) h += `<div class="leaf-sec"><div class="mg her-mg"><time>${L.at}</time></div>
+    <div class="letter">${CLIP}<div class="letter-from"><span class="dot"></span>From Ada · sent ${L.at}</div>
+      <div class="her"><p>${esc(L.opener)}</p>${askedTxt.map(t => `<p class="asked">${esc(t)}</p>`).join('')}</div>
+      <div class="letter-q fold" data-fold-id="questions"><button class="fold-head q-toggle" aria-expanded="false">${ic('chev', 'chev')}<span class="q-label">All ${L.qs.length} questions, in ${sections.length} parts</span></button>
+        <div class="fold-body"><div class="fold-inner"><div class="fold-content qlist settle">${sections.map((s, i) => `<div class="qsec" style="--i:${i}"><h4>${esc(s.s)}</h4><ol>${s.qs.map(([id, t]) => `<li class="${L.asked.includes(id) ? 'asked-q' : ''}"><span class="qid">${id}</span><span class="qt her">${esc(t)}</span>${L.asked.includes(id) ? '<span class="tag-asked">asked tonight</span>' : '<span></span>'}</li>`).join('')}</ol></div>`).join('')}</div></div></div></div>
+    </div></div>`;
+  doc.blocks.forEach((b, i) => {
+    if (b.k === 'hers') { h += `<div class="blk hers"><div class="mg her-mg"><time>${b.at}</time></div><div class="slip"><div class="letter-from">Ada replied</div><p class="her">${esc(b.text)}</p></div></div>`; return; }
+    h += `<div class="blk his" data-key="${b.key}" tabindex="-1"><div class="mg"><time>${b.at}</time><span class="src">${b.src}</span></div>
+      <div class="bdw">${b.reply ? `<div class="replyto">${ic('reply')}<span>“${esc(b.reply)}…”</span></div>` : ''}${b.audio ? player(b.audio, i) : ''}<div class="bd read">${b.p.map(p => `<p>${esc(p)}</p>`).join('')}</div>
+      <div class="edit-bar"><button class="btn btn-primary" data-edit="save" style="min-height:38px">Save</button><button class="btn-text" data-edit="cancel">Cancel</button><span class="hint">Your words, as you change them</span></div></div>
+      <div class="blk-acts" role="toolbar" aria-label="Passage actions"><button class="icon-btn" data-act="edit" data-tip="Edit" aria-label="Edit">${ic('pen')}</button><button class="icon-btn" data-act="copy" data-tip="Copy" aria-label="Copy">${ic('copy')}</button><button class="icon-btn" data-act="delete" data-tip="Delete" aria-label="Delete">${ic('trash')}</button>
+        <span class="confirm">Delete this passage?<button class="btn btn-primary" data-act="really">Delete</button><button class="btn-text" data-act="keep" style="min-height:34px">Keep</button></span></div></div>`;
+  });
+  h += `<div class="continue"><button class="continue-btn" data-write="${stem}"><span class="mic">${ic('pen')}</span>Continue in your own words<span class="k desk-only">N</span></button></div>`;
+  if (doc.analysis || doc.reflection) {
+    h += `<section class="readings"><h2 class="book-head">Her readings</h2>`;
+    if (doc.analysis) { const A = doc.analysis; h += `<div class="reading fold" data-fold-id="analysis"><button class="fold-head" aria-expanded="false">${ENV}<span class="rt"><b>What she noticed</b><span>Analysis · Ada, ${A.at}</span></span>${ic('chev', 'chev')}</button>
+      <div class="fold-body"><div class="fold-inner"><div class="fold-content settle">
+        <ol class="noticed" style="--i:0">${A.noticed.map(([q, n]) => `<li><q>${esc(q)}</q><p class="her">${esc(n)}</p></li>`).join('')}</ol>
+        <div style="--i:1"><div class="rd-label">Threads across days</div><div class="threads">${A.threads.map(([t, s, d]) => `<a href="#entries"><span class="her">${esc(t)}, <em>${esc(s)}</em></span><span class="hint">${esc(d)}</span></a>`).join('')}</div></div>
+        <div style="--i:2"><div class="rd-label">Her note</div>${A.notes.map(([t, n]) => `<p class="her" style="margin:0"><span class="hint tab" style="margin-right:10px">${t}</span>${esc(n)}</p>`).join('')}</div>
+      </div></div></div></div>`; }
+    if (doc.reflection) { const R = doc.reflection; h += `<div class="reading fold" data-fold-id="reflection"><button class="fold-head" aria-expanded="false">${ENV}<span class="rt"><b>Wednesday’s reflection</b><span>Ada, 04:00 · the day as a whole</span></span>${ic('chev', 'chev')}</button>
+      <div class="fold-body"><div class="fold-inner"><div class="fold-content settle"><p class="refl-q" style="--i:0">${esc(R.q)}</p>${R.body.map((p, i) => `<p class="her" style="--i:${i + 1};margin:0 0 12px">${esc(p)}</p>`).join('')}
+        <div class="refl-carry" style="--i:4"><div class="letter-from">Carry forward</div><p class="her" style="margin:0;font-style:italic">${esc(R.carry)}</p></div></div></div></div></div>`; }
+    h += '</section>';
+  }
+  h += '</article>';
+  detail.innerHTML = h; detail.scrollTop = 0;
+}
+function player(sec, i) {
+  let bars = ''; let s = 7 + i; for (let k = 0; k < 64; k++) { s = (s * 9301 + 49297) % 233280; const r = s / 233280; const env = Math.sin(Math.PI * (k + 2) / 68); bars += `<i style="height:${Math.round(18 + 78 * env * (0.35 + 0.65 * r))}%"></i>`; }
+  const fmt = t => Math.floor(t / 60) + ':' + String(Math.floor(t % 60)).padStart(2, '0');
+  return `<div class="player" data-dur="${sec}"><button class="play" aria-label="Play your voice">${ic('play')}</button><div class="wave" role="slider" aria-label="Position" aria-valuemin="0" aria-valuemax="${sec}" aria-valuenow="0">${bars}</div><span class="ptime"><span class="cur">0:00</span> / ${fmt(sec)}</span><button class="prate">1×</button></div>`;
+}
+function openEntry(stem, opts = {}) {
+  if (current !== 'entries') go('entries', { keep: true, silent: true });
+  openStem = stem; renderDoc(stem);
+  $$('#list .row').forEach(r => r.setAttribute('aria-current', r.dataset.stem === stem));
+  entriesEl.classList.add('open'); setHash('entry');
+  if (opts.fold) { const f = $(`[data-fold-id="${opts.fold}"]`, detail); if (f) setTimeout(() => { setFold(f, true); setTimeout(() => f.scrollIntoView({ behavior: 'smooth', block: 'center' }), 200); }, opts.instant ? 0 : 700); }
+}
+function closeEntry(silent) {
+  if (!openStem) return; openStem = null; entriesEl.classList.remove('open');
+  $$('#list .row').forEach(r => r.setAttribute('aria-current', 'false'));
+  if (!silent) setHash('entries');
+}
+document.addEventListener('click', e => {
+  const r = e.target.closest('.row[data-stem]'); if (r) { openEntry(r.dataset.stem); return; }
+  const o = e.target.closest('[data-open-entry]'); if (o) { e.preventDefault(); openEntry(o.dataset.openEntry, { fold: o.dataset.foldTarget }); return; }
+  if (e.target.closest('[data-close-entry]')) closeEntry();
+  const st = e.target.closest('[data-step]'); if (st && openStem) { const vis = $$('#list .row').map(r => r.dataset.stem); const i = vis.indexOf(openStem) + Number(st.dataset.step); if (vis[i]) { detail.style.opacity = 0; setTimeout(() => { openEntry(vis[i]); detail.style.opacity = ''; }, 120); } }
+});
+detail.addEventListener('scroll', () => { const b = $('#leafBar'); if (b) b.classList.toggle('scrolled', detail.scrollTop > 90); });
+
+/* folds */
+function setFold(f, open) { f.classList.toggle('open', open); const h = $(':scope > .fold-head', f); if (h) h.setAttribute('aria-expanded', open); }
+document.addEventListener('click', e => { const h = e.target.closest('.fold-head'); if (!h) return; const f = h.parentElement; setFold(f, !f.classList.contains('open')); });
+
+/* player */
+let playing = null;
+document.addEventListener('click', e => {
+  const p = e.target.closest('.player'); if (!p) return;
+  if (e.target.closest('.prate')) { const b = e.target.closest('.prate'); const r = { '1×':'1.5×', '1.5×':'2×', '2×':'1×' }[b.textContent]; b.textContent = r; p.dataset.rate = parseFloat(r); return; }
+  if (e.target.closest('.wave')) { const w = e.target.closest('.wave').getBoundingClientRect(); setPos(p, (e.clientX - w.left) / w.width * Number(p.dataset.dur)); return; }
+  if (e.target.closest('.play')) { if (playing && playing.el === p) { stopPlay(); return; } stopPlay(); start(p); }
+});
+function setPos(p, t) { p.dataset.t = t; const bars = $$('.wave i', p); const n = Math.round(t / p.dataset.dur * bars.length); bars.forEach((b, i) => b.classList.toggle('on', i < n)); $('.cur', p).textContent = Math.floor(t / 60) + ':' + String(Math.floor(t % 60)).padStart(2, '0'); }
+function start(p) { $('.play', p).innerHTML = ic('pause'); let last = performance.now(); const tick = now => { const t = Number(p.dataset.t || 0) + (now - last) / 1000 * Number(p.dataset.rate || 1); last = now; if (t >= p.dataset.dur) { setPos(p, 0); stopPlay(); return; } setPos(p, t); playing.raf = requestAnimationFrame(tick); }; playing = { el: p, raf: requestAnimationFrame(tick) }; }
+function stopPlay() { if (!playing) return; cancelAnimationFrame(playing.raf); $('.play', playing.el).innerHTML = ic('play'); playing = null; }
+
+/* block actions: hover toolbar (desktop), long-press sheet (touch) */
+let undoBlk = null, asTarget = null;
+function blockAct(blk, act) {
+  if (act === 'edit') { blk.classList.add('editing'); const bd = $('.bd', blk); bd.dataset.orig = bd.innerHTML; bd.contentEditable = 'true'; bd.focus(); }
+  if (act === 'copy') toast('Copied your words');
+  if (act === 'delete') $('.blk-acts', blk).classList.add('asking');
+  if (act === 'keep') $('.blk-acts', blk).classList.remove('asking');
+  if (act === 'really') { blk.style.maxHeight = blk.offsetHeight + 'px'; blk.classList.add('removing'); undoBlk = blk; toast('Passage deleted', true); setTimeout(() => { if (undoBlk === blk) blk.hidden = true; }, 430); }
+}
+document.addEventListener('click', e => {
+  const a = e.target.closest('.blk-acts [data-act]'); if (a) { blockAct(a.closest('.blk'), a.dataset.act); return; }
+  const ed = e.target.closest('[data-edit]'); if (ed) { const blk = ed.closest('.blk'); const bd = $('.bd', blk); if (ed.dataset.edit === 'cancel') bd.innerHTML = bd.dataset.orig; bd.contentEditable = 'false'; blk.classList.remove('editing'); if (ed.dataset.edit === 'save') toast('Saved to the entry'); }
+  const s = e.target.closest('#asheet [data-act]'); if (s && asTarget) { const act = s.dataset.act === 'delete' ? 'really' : s.dataset.act; closeSheet(); setTimeout(() => blockAct(asTarget, act), 200); }
+});
+let lp; detail.addEventListener('touchstart', e => { const blk = e.target.closest('.blk.his'); if (!blk || blk.classList.contains('editing')) return; lp = setTimeout(() => { asTarget = blk; $('#asQuote').textContent = $('.bd', blk).textContent; $('#scrim').classList.add('show'); $('#asheet').classList.add('show'); navigator.vibrate && navigator.vibrate(8); }, 480); }, { passive: true });
+['touchend', 'touchmove'].forEach(t => detail.addEventListener(t, () => clearTimeout(lp), { passive: true }));
+detail.addEventListener('contextmenu', e => { if (e.target.closest('.blk.his') && matchMedia('(pointer:coarse)').matches) e.preventDefault(); });
+function closeSheet() { $('#scrim').classList.remove('show'); $('#asheet').classList.remove('show'); }
+$('#scrim').addEventListener('click', closeSheet);
+let toastT;
+function toast(msg, undo) { const t = $('#toast'); $('#toastMsg').textContent = msg; $('#toastUndo').hidden = !undo; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), undo ? 5000 : 2200); }
+$('#toastUndo').addEventListener('click', () => { if (undoBlk) { undoBlk.hidden = false; undoBlk.classList.remove('removing'); undoBlk.style.maxHeight = ''; $('.blk-acts', undoBlk).classList.remove('asking'); undoBlk = null; } $('#toast').classList.remove('show'); });
+
+/* ============================================================ today week strip */
+(function () {
+  const days = [['Fri', 9, 'answered'], ['Sat', 10, 'none'], ['Sun', 11, 'answered'], ['Mon', 12, 'answered'], ['Tue', 13, 'missed'], ['Wed', 14, 'answered'], ['Thu', 15, 'none']];
+  $('#weekstrip').innerHTML = days.map(([w, n, s], i) => `<li class="${i === 6 ? 'is-today' : ''}"><button data-go="entries" aria-label="${w} ${n}: ${s}"><span class="ws-d">${w}</span><span class="ws-n">${n}</span><span class="ws-mark ${s}"></span></button></li>`).join('');
+})();
+
+/* ============================================================ library */
+(function () {
+  const G = [
+    ['Daily', [
+      { t:'Morning journal', cad:'Every day · 06:00', d:'Start wherever something feels alive. One line is enough.', col:['Built in', 'Five questions'], on:true },
+      { t:'Daily gratitude', cad:'Every day · 21:30', d:'A sentence or two, before the evening comes.', col:['Yours', 'Three questions', 'Written 3 October'], mine:true, on:true },
+      { t:'Evening journal', cad:'Every day · 23:00', d:'Let the day land. Answer whatever pulls at you and leave the rest.', col:['Built in', 'Twenty-four questions in ten parts'], on:true },
+      { t:'Midweek check-in', cad:'Wednesdays · 12:00', d:'A quick pulse halfway through the week.', col:['Built in, rewritten by you', 'The default has changed since'], edited:true, on:true },
+      { t:'Weekly pattern scan', cad:'Sundays · 20:00', d:'The week’s patterns as short lines, then the questions.', col:['Built in', 'Closes with the week'], on:false },
+    ]],
+    ['When you need one', [
+      { t:'Conversation prep', cad:'Two parts', d:'Before a talk that matters: what you want to say, and what you want to hear.', col:['Built in'], start:true },
+      { t:'Post-session debrief', cad:'Two parts', d:'After a session, while it is still warm.', col:['Built in'], start:true },
+    ]],
+    ['Programs', [
+      { t:'Fix your entire life in 1 day', cad:'10 sessions · 51 phases', d:'A long look at the life you don’t want, the one you do, and the next small step between them.', col:['Built in'], prog:3 },
+    ]],
+  ];
+  $('#library').innerHTML = G.map(([g, ps]) => `<section class="lib-group"><h2 class="book-head">${g}<span class="count">${ps.length}</span></h2>${ps.map(p => `
+    <div class="prac">${p.mine || p.edited ? RIBBON(p.edited) : '<span></span>'}
+      <div><div class="prac-title"><h3>${p.t}</h3><span class="dots"></span><span class="cad">${p.cad}</span></div>
+        <p class="prac-desc">${p.d}</p>
+        <div class="colophon">${p.col.map((c, i) => `<span class="${i === 0 && (p.mine || p.edited) ? 'mine' : ''}">${c}</span>`).join('')}${p.prog ? `<span>Session ${p.prog} of 10 <span class="ticks" style="margin-left:6px">${Array.from({ length: 10 }, (_, i) => `<i class="${i < p.prog - 1 ? 'on' : i === p.prog - 1 ? 'now' : ''}"></i>`).join('')}</span></span>` : ''}</div></div>
+      <div class="prac-side">${p.start ? '<button class="btn btn-quiet" style="min-height:40px">Start</button>' : p.prog ? '<button class="btn btn-primary" style="min-height:40px">Continue</button>' : `<button class="btn-text" style="font-size:13.5px;color:var(--ink-3)" data-write="morning">Send now</button><button class="switch" role="switch" aria-checked="${p.on}" aria-label="${p.t} on schedule"><span></span></button>`}</div>
+    </div>`).join('')}${g === 'Daily' ? `<button class="add-prac">${ic('plus')}Write a practice of your own</button>` : ''}</section>`).join('');
+})();
+document.addEventListener('click', e => { const s = e.target.closest('.switch'); if (s && !s.closest('.srow')) s.setAttribute('aria-checked', s.getAttribute('aria-checked') !== 'true'); });
+
+/* ============================================================ insights */
+const WEEKS = [
+  { label:'Last week', title:'5 – 11 <em>October</em>', days:[['Mon',5,180,1],['Tue',6,402,1],['Wed',7,0,0],['Thu',8,260,1],['Fri',9,515,1],['Sat',10,120,0],['Sun',11,640,1]],
+    prose:'You wrote on <b>six</b> of seven days: <b>2,117</b> words in <b>10</b> entries. Of the <b>12</b> prompts Ada sent, you answered <b>10</b>; Wednesday’s two went by, and that was all right.',
+    prac:[['Morning journal','5 of 7'],['Evening journal','5 of 7'],['Midweek check-in','answered'],['Weekly pattern scan','answered'],['Conversation prep','once, Thursday']],
+    review:{ pull:'You wrote most on the days you went down to the water, and least on the day you meant to call and didn’t.', body:['The week opened tired and closed easy. Friday was the longest entry you’ve written this month, and almost all of it was the walk round the point.','The mooring call came up three times. Each time the words got shorter, which may be its own answer.','Next week, perhaps notice what the water gives you before you sit down to write.'] },
+    refl:[['Sun',11,'What did the week keep returning to?','The water, and the call. Both kept, neither finished.'],['Fri',9,'Where did you feel most like yourself?','On the path, before the keeper waved.'],['Thu',8,'What will you say plainly?','That you’d like to see him, and that you’re sorry about the summer.'],['Tue',6,'What wore you out?','The rope, the cold, the good kind.']] },
+  { label:'This week', title:'12 – 18 <em>October</em>', days:[['Mon',12,212,0],['Tue',13,340,1],['Wed',14,486,1],['Thu',15,96,0],['Fri',16,-1,0],['Sat',17,-1,0],['Sun',18,-1,0]],
+    prose:'Four days in, you have written on <b>every one</b>: <b>1,134</b> words in <b>8</b> entries. Of the <b>7</b> prompts so far you answered <b>6</b>; Tuesday’s gratitude went by.',
+    prac:[['Morning journal','3 of 4'],['Evening journal','2 of 3'],['Daily gratitude','2 of 3'],['Fix your life','session 1 of 10']],
+    review:null,
+    refl:[['Wed',14,'What does the sea ask?','Make the call before the ferry.'],['Tue',13,'Where did the day go quiet?','At the gate, with the hinge singing.']] },
+];
+let wk = 0;
+function renderWeek(anim) {
+  const W = WEEKS[wk]; $('#wkLabel').textContent = W.label; $('#wkPrev').disabled = wk === 0; $('#wkNext').disabled = wk === WEEKS.length - 1;
+  $('#wkPrev').style.opacity = wk === 0 ? .3 : 1; $('#wkNext').style.opacity = wk === WEEKS.length - 1 ? .3 : 1;
+  const max = Math.max(...W.days.map(d => d[2]));
+  $('#insBody').innerHTML = `<div class="${anim ? 'ins-swap' : ''}"><h1 class="ins-title">${W.title}</h1>
+  <div class="ins-grid"><div>
+    <p class="prose-figs" style="order:1">${W.prose}</p>
+    <div class="ledger" style="order:2">${W.days.map(([w, n, words], i) => `<div class="lcol ${words < 0 ? 'future' : words === 0 ? 'zero' : ''}" style="--i:${i}"><span class="w">${words > 0 ? words.toLocaleString() : words === 0 ? '—' : ''}</span><span class="bar" style="--h:${words > 0 ? Math.max(8, words / max * 82) : 0}%"></span></div>`).join('')}</div>
+    <div class="ldays" style="order:3">${W.days.map(([w, n, words, r]) => `<div><span class="d">${w}</span><span class="n">${n}</span><span class="rf ${r ? '' : 'no'}"></span></div>`).join('')}</div>
+    <div class="ledger-key" style="order:4"><span><i style="width:8px;height:14px;border-radius:4px 4px 0 0;background:var(--ink)"></i>your words that day</span><span><i style="width:6px;height:6px;border-radius:50%;background:var(--her)"></i>Ada wrote a reflection</span></div>
+    <section class="ins-practices" style="order:7"><h2 class="book-head" style="margin-bottom:6px;font-size:18px">By practice</h2><ul class="leaders">${W.prac.map(([t, v]) => `<li><span class="t" style="font-size:17px">${t}</span><span class="dots"></span><span class="v">${v}</span></li>`).join('')}</ul></section>
+  </div><div>
+    <div class="kicker" style="margin-bottom:14px;order:5">Her review of the week</div>
+    ${W.review ? `<div class="review" style="order:6"><div class="letter">${CLIP}<div class="letter-from"><span class="dot"></span>From Ada · Sunday night</div><p class="pull">${esc(W.review.pull)}</p>
+      <div class="fold" data-fold-id="review"><button class="fold-head" aria-expanded="false">Read the whole review${ic('chev', 'chev')}</button><div class="fold-body"><div class="fold-inner"><div class="fold-content settle">${W.review.body.map((p, i) => `<p class="her" style="--i:${i};margin:0 0 12px">${esc(p)}</p>`).join('')}</div></div></div></div></div></div>`
+      : `<p class="review-pending" style="order:6">Her review comes on Sunday night, after the weekly scan. Until then, the days speak for themselves.</p>`}
+    <section class="slips" style="order:8"><h2 class="book-head">Day by day, from Ada</h2>${W.refl.map(([w, n, q, c], i) => `<div class="rslip fold" data-fold-id="refl-${i}"><button class="fold-head" aria-expanded="false"><span class="day-n">${n}<small>${w}</small></span><span class="her">${esc(q)}</span>${ic('chev', 'chev')}</button><div class="fold-body"><div class="fold-inner"><div class="fold-content settle"><p class="her" style="margin:0 0 8px;--i:0">${esc(c)}</p><button class="btn-text" data-open-entry="2026-10-14-evening" data-fold-target="reflection" style="padding-left:0;--i:1">Read it with the day ${ic('right')}</button></div></div></div></div>`).join('')}</section>
+  </div></div></div>`;
+}
+$('#wkPrev').addEventListener('click', () => { if (wk > 0) { wk--; renderWeek(true); } });
+$('#wkNext').addEventListener('click', () => { if (wk < WEEKS.length - 1) { wk++; renderWeek(true); } });
+
+/* ============================================================ settings */
+const ROWS = {
+  'g-prompts': [
+    { id:'collapse', type:'step', lab:'A prompt stays open for', v:6, def:6, min:1, max:24, step:1, unit:'hours', hint:'After that it folds away in the chat' },
+    { id:'grace', type:'step', lab:'Grace for a late send', v:2, def:2, min:0, max:6, step:1, unit:'hours', hint:'If the server was asleep at the hour' },
+    { id:'annotate', type:'step', lab:'Ada reads what you wrote after', v:30, def:30, min:5, max:120, step:5, unit:'min', hint:'Of quiet, once you stop writing' },
+    { id:'opener', type:'seg', lab:'Her opening line', v:'ada', def:'ada', opts:[['ada','In her words'],['plain','Plain']], hint:'Plain works with no model at all' },
+  ],
+  'g-refl': [
+    { id:'day', type:'toggle', lab:'A reflection on each day', v:true, def:true, hint:'Written after the evening entry is read' },
+    { id:'dayby', type:'time', lab:'At the latest by', v:'04:00', def:'04:00', hint:'The next morning' },
+    { id:'week', type:'seg', lab:'A review of the week', v:'after', def:'after', opts:[['off','Off'],['after','After the scan'],['fixed','Sunday night']], hint:'Default: after the weekly scan' },
+  ],
+  'g-chat': [
+    { id:'quiet', type:'step', lab:'Quiet before the today note', v:45, def:30, min:5, max:120, step:5, unit:'min', locked:'Set in Hermes, change it there' },
+    { id:'todayon', type:'toggle', lab:'Send the today note', v:true, def:true, hint:'Ada starts each conversation knowing the day' },
+    { id:'chars', type:'step', lab:'Its length, at most', v:1200, def:1200, min:400, max:3000, step:100, unit:'chars' },
+    { id:'cache', type:'step', lab:'Kept for', v:30, def:30, min:5, max:120, step:5, unit:'min', hint:'Before it is rebuilt' },
+  ],
+};
+const fmtDef = r => r.type === 'step' ? `${r.def.toLocaleString()} ${r.unit}` : r.type === 'toggle' ? (r.def ? 'on' : 'off') : r.type === 'seg' ? r.opts.find(o => o[0] === r.def)[1].toLowerCase() : r.def;
+function renderSettings() {
+  for (const [g, rows] of Object.entries(ROWS)) $('#' + g).innerHTML = rows.map(r => {
+    const ctl = r.type === 'step' ? `<div class="stepper" ${r.locked ? 'aria-disabled="true"' : ''}><button data-dec aria-label="Less">${ic('minus')}</button><output>${r.v.toLocaleString()}<small>${r.unit}</small></output><button data-inc aria-label="More">${ic('plus')}</button></div>`
+      : r.type === 'toggle' ? `<button class="switch" role="switch" aria-checked="${r.v}" aria-label="${r.lab}"><span></span></button>`
+      : r.type === 'seg' ? `<div class="seg" role="radiogroup"><span class="thumb"></span>${r.opts.map(([v, l]) => `<button role="radio" data-v="${v}" aria-checked="${r.v === v}">${l}</button>`).join('')}</div>`
+      : `<button class="chip tab">${ic('clock')}${r.v}</button>`;
+    const hint = r.locked ? `<span class="lockline">${ic('lock')}${r.locked}</span>` : `<span>${r.hint ? r.hint + ' · ' : ''}default ${fmtDef(r)}</span><button class="reset">Reset</button>`;
+    return `<div class="srow ${r.locked ? 'locked' : ''} ${r.type !== 'seg' ? 'inline' : ''}" data-row="${r.id}"><div class="lab"><b>${r.lab}</b><div class="hint">${hint}</div></div>${ctl}</div>`;
+  }).join('');
+  $$('.seg').forEach(s => syncSeg(s));
+}
+function syncSeg(seg, v) { if (!seg) return; if (v !== undefined) $$('button', seg).forEach(b => b.setAttribute('aria-checked', b.dataset.v === v)); const on = $('button[aria-checked="true"]', seg); const th = $('.thumb', seg); if (on && th) { th.style.left = on.offsetLeft + 'px'; th.style.width = on.offsetWidth + 'px'; } }
+const allRows = () => Object.values(ROWS).flat();
+const initial = Object.fromEntries(allRows().map(r => [r.id, r.v]));
+function markDirty() {
+  let n = 0; allRows().forEach(r => { const el = $(`[data-row="${r.id}"]`); const changed = r.v !== initial[r.id]; if (changed) n++; el.classList.toggle('changed', r.v !== r.def && !r.locked); });
+  $('#saveN').textContent = `${n} ${n === 1 ? 'change' : 'changes'}`; $('#savebar').classList.toggle('show', n > 0 && current === 'settings');
+}
+document.addEventListener('click', e => {
+  const row = e.target.closest('.srow[data-row]'); if (!row) return; const r = allRows().find(x => x.id === row.dataset.row);
+  if (e.target.closest('[data-inc],[data-dec]')) { r.v = Math.min(r.max, Math.max(r.min, r.v + (e.target.closest('[data-inc]') ? r.step : -r.step))); $('output', row).innerHTML = `${r.v.toLocaleString()}<small>${r.unit}</small>`; $('output', row).animate([{ transform: 'translateY(-3px)', opacity: .4 }, { transform: 'none', opacity: 1 }], { duration: 220, easing: 'ease-out' }); }
+  else if (e.target.closest('.switch')) { r.v = !r.v; $('.switch', row).setAttribute('aria-checked', r.v); }
+  else if (e.target.closest('.seg button')) { r.v = e.target.closest('.seg button').dataset.v; syncSeg($('.seg', row), r.v); }
+  else if (e.target.closest('.reset')) { r.v = r.def; renderSettings(); }
+  else return;
+  markDirty();
+});
+$('#themeSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) applyTheme(b.dataset.v); });
+$('#discard').addEventListener('click', () => { allRows().forEach(r => r.v = initial[r.id]); renderSettings(); markDirty(); });
+$('#saveBtn').addEventListener('click', () => { allRows().forEach(r => initial[r.id] = r.v); markDirty(); toast('Settings saved'); });
+$('#setNav').addEventListener('click', e => { const b = e.target.closest('[data-sec]'); if (b) $('#' + b.dataset.sec).scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+$('#settingsScreen').addEventListener('scroll', () => { let cur = 's-ink'; $$('.set-sec').forEach(s => { if (s.getBoundingClientRect().top < 200) cur = s.id; }); $$('#setNav [data-sec]').forEach(b => b.setAttribute('aria-current', b.dataset.sec === cur)); });
+const HEALTH = [['ok','config','loaded from the config file'],['ok','journal root','/journal/Journal'],['ok','state dir','/journal/state'],['ok','practices dir','1 practice of yours'],['ok','library','5 practices (4 built in, 1 yours)'],['ok','programs','fix-life (10 sessions), 2 situational'],['ok','channel','Telegram, through the Bot API'],['fail','companion','not found: openers fall back to plain, nothing else changes'],['ok','day reflection','after the evening entry, by 04:00'],['ok','week review','after the weekly scan'],['ok','sweep','reads the chat read-only'],['ok','conversations','by thread, after 45 minutes of quiet'],['ok','capture','every chat thread; /x keeps a message out'],['warn','audio transcription','no backend outside Hermes: voice is kept, words come later'],['warn','ffprobe','not found: voice headings carry no length'],['ok','serve bind','127.0.0.1:8790'],['ok','serve assets','built from web/ 86531e2'],['ok','version','same as the last tick'],['ok','last tick','09:10, two minutes ago']];
+function renderHealth() {
+  const order = { fail:0, warn:1, ok:2 }; const sorted = [...HEALTH].sort((a, b) => order[a[0]] - order[b[0]]);
+  $('#hmarks').innerHTML = sorted.map(h => `<i class="hm ${h[0]}"></i>`).join('');
+  $('#hlist').innerHTML = sorted.map((h, i) => (i > 0 && sorted[i - 1][0] !== 'ok' && h[0] === 'ok' ? `<li class="sep" style="--i:${i}">Working as it should</li>` : '') + `<li class="${h[0]}" style="--i:${Math.min(i, 12)}"><i class="hm ${h[0]}" aria-label="${h[0]}"></i><b>${h[1]}</b><span>${h[2]}</span></li>`).join('');
+  $('.health-sum .hint').textContent = `${sorted.filter(h => h[0] === 'ok').length} checks fine, ${sorted.filter(h => h[0] === 'warn').length} to look at, ${sorted.filter(h => h[0] === 'fail').length} not working`;
+}
+
+/* ============================================================ the write room */
+const room = $('#room'), editor = $('#editor');
+let roomFrom = null, roomTrigger = null;
+const LETTERS = {
+  morning: { where:'Morning journal', when:'Thursday 15 October · open since 06:00', from:'From Ada · 06:00', opener:'Morning. The fog was still on the water when this went out. Start wherever something feels alive; one line is enough.', asked:'What would make today a good one, even in a small way?', qs:MORNING_Q },
+  '2026-10-14-evening': { where:'Evening journal, continued', when:'Adding to Wednesday 14 October', from:'From Ada · 23:00', opener:'Evening. The lamp’s on and the harbour’s gone dark. Let the day land; answer whatever pulls at you and leave the rest.', asked:'What’s spinning in your mind?', qs:QUESTIONS },
+};
+function openRoom(from, trigger, opts = {}) {
+  roomFrom = from; roomTrigger = trigger || null;
+  const L = LETTERS[from];
+  $('#roomWhere').textContent = L ? L.where : 'A note'; $('#roomWhen').textContent = L ? L.when : 'Thursday 15 October · just for you';
+  const narrow = innerWidth < 900; $('#roomSend').textContent = L ? (from === 'morning' ? (narrow ? 'Send' : 'Send your answer') : (narrow ? 'Add' : 'Add to the entry')) : (narrow ? 'Keep' : 'Keep this note');
+  const secs = []; if (L) L.qs.forEach(([id, t, s]) => { let x = secs.find(y => y.s === s); if (!x) secs.push(x = { s, qs:[] }); x.qs.push([id, t]); });
+  $('#roomLetterWrap').innerHTML = L ? `<div class="letter room-letter">${CLIP}<div class="letter-from"><span class="dot"></span>${L.from}</div><div class="her"><p>${esc(L.opener)}</p><p class="asked">${esc(L.asked)}</p></div>
+    <div class="fold" data-fold-id="room-q"><button class="fold-head" aria-expanded="false">${ic('chev', 'chev')}${L.qs.length - 1} more questions, if you want them</button><div class="fold-body"><div class="fold-inner"><div class="fold-content qlist settle">${secs.map((s, i) => `<div class="qsec" style="--i:${i}"><h4>${esc(s.s)}</h4><ol>${s.qs.map(([id, t]) => `<li><span class="qid">${id}</span><span class="qt her">${esc(t)}</span></li>`).join('')}</ol></div>`).join('')}</div></div></div></div></div>`
+    : `<div class="room-letter none"><button class="btn-text" style="padding-left:0;color:var(--ink-3)">${ic('chev')}Answer one of Ada’s prompts instead</button></div>`;
+  editor.dataset.sample = opts.sample ? '1' : ''; editor.innerHTML = opts.sample ? SAMPLE : ''; updateCount(); paintMargin(); setSaved(opts.sample ? 'saved' : 'empty');
+  // open out of the thing that was pressed
+  const r = trigger ? trigger.getBoundingClientRect() : { top: innerHeight / 2 - 20, left: innerWidth / 2 - 60, right: innerWidth / 2 + 60, bottom: innerHeight / 2 + 20 };
+  room.style.setProperty('--ct', r.top + 'px'); room.style.setProperty('--cl', r.left + 'px'); room.style.setProperty('--cr', (innerWidth - r.right) + 'px'); room.style.setProperty('--cb', (innerHeight - r.bottom) + 'px');
+  if (opts.instant) root.classList.add('no-anim');
+  void room.offsetWidth; room.classList.add('open'); document.body.classList.add('room-open');
+  if (opts.instant) requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('no-anim')));
+  setTimeout(() => { if (!opts.noFocus) { editor.focus(); placeCaretEnd(); } }, opts.instant ? 0 : 420);
+  if (opts.voice) setTimeout(startRec, 600);
+  setHash('write');
+}
+function closeRoom() {
+  if (!room.classList.contains('open')) return; stopRec(true); setFocus(false);
+  if (roomTrigger && document.contains(roomTrigger) && roomTrigger.offsetParent) { const r = roomTrigger.getBoundingClientRect(); room.style.setProperty('--ct', r.top + 'px'); room.style.setProperty('--cl', r.left + 'px'); room.style.setProperty('--cr', (innerWidth - r.right) + 'px'); room.style.setProperty('--cb', (innerHeight - r.bottom) + 'px'); }
+  room.classList.remove('open'); document.body.classList.remove('room-open'); setHash(current === 'entries' && openStem ? 'entry' : current);
+}
+const SAMPLE = '<div>The ferry horn went twice this morning, which it never does. I took it as a sign to stop putting things off.</div><div>Called the harbour master at last. Four minutes. The mooring is fine; it was always going to be fine.</div><div>What would make today good: finishing the gate, and not checking the phone before noon.</div>';
+function placeCaretEnd() { const s = getSelection(); const rg = document.createRange(); rg.selectNodeContents(editor); rg.collapse(false); s.removeAllRanges(); s.addRange(rg); }
+document.addEventListener('click', e => { const w = e.target.closest('[data-write]'); if (w) { e.preventDefault(); openRoom(w.dataset.write === 'note' ? null : w.dataset.write, w, { voice: !!w.dataset.voice }); } });
+$('#roomClose').addEventListener('click', closeRoom);
+$('#roomSend').addEventListener('click', () => { const has = editor.textContent.trim(); closeRoom(); if (has) setTimeout(() => toast(roomFrom ? 'Added to the entry' : 'Kept as a note'), 400); });
+let saveT;
+function setSaved(s) { const el = $('#saved'); el.classList.toggle('saving', s === 'saving'); const now = new Date(); const t = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  $('.lbl', el).textContent = s === 'saving' ? 'Keeping…' : s === 'empty' ? 'Nothing written yet' : `Draft kept · ${editor.dataset.sample ? '23:58' : t}`; }
+function updateCount() { const n = ((editor.children.length ? [...editor.children].map(c => c.classList.contains('clip-voice') ? '' : c.textContent).join(' ') : editor.textContent).trim().match(/\S+/g) || []).length; $('#count').textContent = n ? `${n} ${n === 1 ? 'word' : 'words'} · ${Math.max(1, Math.round(n / 200))} min` : 'No words yet'; }
+const STAMPS = new WeakMap(); let stampBase = 23 * 60 + 52;
+function paintMargin() {
+  if (!editor.children.length && editor.textContent.trim()) { const d = document.createElement('div'); d.textContent = editor.textContent; editor.textContent = ''; editor.appendChild(d); placeCaretEnd(); }
+  const mg = $('#roomMg'); const kids = [...editor.children]; let html = ''; let lastT = '';
+  kids.forEach((k, i) => { if (!STAMPS.has(k)) { const now = new Date(); STAMPS.set(k, editor.dataset.sample ? fmtMin(stampBase + i * 3) : String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0')); }
+    const t = STAMPS.get(k); if (t !== lastT && k.textContent.trim()) html += `<time style="top:${k.offsetTop - editor.offsetTop + 13}px">${t}</time>`; lastT = t; });
+  mg.innerHTML = html;
+}
+const fmtMin = m => String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+editor.addEventListener('input', () => { updateCount(); paintMargin(); setSaved('saving'); clearTimeout(saveT); saveT = setTimeout(() => setSaved('saved'), 800); markCurrent(); });
+function markCurrent() { const s = getSelection(); if (!s.rangeCount) return; let n = s.anchorNode; while (n && n.parentNode !== editor) n = n.parentNode; [...editor.children].forEach(c => c.classList.toggle('current', c === n)); }
+document.addEventListener('selectionchange', () => room.classList.contains('focus') && markCurrent());
+function setFocus(on) { room.classList.toggle('focus', on); $('#focusBtn').setAttribute('aria-pressed', on); if (on) { setFold($('[data-fold-id="room-q"]') || document.createElement('i'), false); markCurrent(); } }
+$('#focusBtn').addEventListener('click', () => setFocus(!room.classList.contains('focus')));
+
+/* recording (simulated) */
+let recT, recRaf, recStart;
+$('#recwave').innerHTML = '<i></i>'.repeat(36);
+function startRec() { const d = $('#dock'); d.classList.add('recording'); $('#recBtn').innerHTML = ic('stop'); $('#recBtn').setAttribute('aria-label', 'Stop recording'); recStart = Date.now();
+  const bars = $$('#recwave i'); let k = 0; const loop = () => { k++; if (k % 3 === 0) { bars.forEach((b, i) => { if (i < bars.length - 1) b.style.height = bars[i + 1].style.height || '4px'; }); bars[bars.length - 1].style.height = (4 + Math.random() * 22) + 'px'; } const s = Math.floor((Date.now() - recStart) / 1000); $('#rectime').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); recRaf = requestAnimationFrame(loop); }; loop(); }
+function stopRec(discard) { const d = $('#dock'); if (!d.classList.contains('recording')) return; cancelAnimationFrame(recRaf); d.classList.remove('recording'); $('#recBtn').innerHTML = ic('mic');
+  if (!discard) { const s = Math.max(1, Math.floor((Date.now() - recStart) / 1000)); const c = document.createElement('div'); c.className = 'clip-voice'; c.contentEditable = 'false';
+    c.innerHTML = `<span class="play" style="width:40px;height:40px;border-radius:50%;background:var(--act);color:var(--act-ink);display:grid;place-items:center">${ic('play')}</span><span>Your voice · 0:${String(s).padStart(2, '0')}<br><span class="hint">The words arrive once it’s sent</span></span>`; editor.appendChild(c); const p = document.createElement('div'); p.innerHTML = '<br>'; editor.appendChild(p); paintMargin(); setSaved('saved'); } }
+$('#recBtn').addEventListener('click', () => $('#dock').classList.contains('recording') ? stopRec() : startRec());
+
+/* keys */
+document.addEventListener('keydown', e => {
+  const typing = e.target.closest && e.target.closest('input, [contenteditable="true"]');
+  if (e.key === 'Escape') { if (room.classList.contains('focus')) setFocus(false); else if (room.classList.contains('open')) closeRoom(); else if ($('#asheet').classList.contains('show')) closeSheet(); else if (openStem) closeEntry(); }
+  if ((e.metaKey || e.ctrlKey) && e.key === '.') { e.preventDefault(); if (room.classList.contains('open')) setFocus(!room.classList.contains('focus')); }
+  if (!typing && !room.classList.contains('open') && (e.key === 'n' || e.key === 'N')) { e.preventDefault(); openRoom(openStem && current === 'entries' ? (LETTERS[openStem] ? openStem : null) : null, null); }
+});
+addEventListener('resize', () => { $$('.seg').forEach(s => syncSeg(s)); paintMargin(); });
+
+/* ============================================================ boot: #screen?theme=dark&ink=brown&open=analysis */
+function route(first) {
+  const [path, qs] = location.hash.slice(1).split('?'); const p = new URLSearchParams(qs || '');
+  applyTheme(p.get('theme') || 'system'); if (p.get('ink')) setInkQuiet(p.get('ink'));
+  wk = p.get('week') === 'current' ? 1 : 0; renderWeek();
+  if (room.classList.contains('open')) { root.classList.add('no-anim'); closeRoom(); }
+  const screen = path || 'today';
+  if (screen === 'entry') { go('entries', { silent: true, keep: true }); openEntry(p.get('stem') || '2026-10-14-evening'); }
+  else if (screen === 'write') { go(p.get('over') || 'today', { silent: true }); openRoom(p.get('from') === 'note' ? null : (p.get('from') || 'morning'), null, { instant: true, sample: p.get('sample') !== '0', noFocus: true }); if (p.get('focus')) setFocus(true); if (p.get('rec')) startRec(); }
+  else { go(['today', 'entries', 'library', 'insights', 'settings'].includes(screen) ? screen : 'today', { silent: true }); closeEntry(true); }
+  (p.get('open') || '').split(',').filter(Boolean).forEach(id => { const f = $(`[data-fold-id="${id}"]`); if (f) setFold(f, true); });
+  if (p.get('dirty')) { ROWS['g-prompts'][0].v = 8; renderSettings(); }
+  if (p.get('scroll')) { const sc = $('.screen.active'); const el = $(p.get('scroll')); if (el) setTimeout(() => el.scrollIntoView({ block: 'start' }), 50); }
+  markDirty(); typeProof();
+  requestAnimationFrame(() => requestAnimationFrame(() => { root.classList.remove('no-anim'); $$('.seg').forEach(s => syncSeg(s)); paintMargin(); }));
+}
+function setInkQuiet(id) { root.dataset.ink = id; $$('#inks .inkopt').forEach(b => b.setAttribute('aria-checked', b.dataset.ink === id)); }
+(function boot() {
+  root.classList.add('no-anim');
+  hydrateIcons(); renderInks(); renderList(); renderSettings(); renderHealth();
+  route(true);
+})();
+addEventListener('hashchange', () => { root.classList.add('no-anim'); route(); });
+const _go = go; go = function (n, o) { _go(n, o); markDirty(); };
+</script>
+</body>
+</html>
