@@ -3022,3 +3022,8 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   situational session interrupts a program's open phase, the program does not resend that phase by itself;
   `/start <word>` brings it back. Manual by design. Closes the open point in ONE-PROGRAM-RUN, review fixes (6) ("whether
   the engine should re-send it on its own").
+- **FAVICON (2026-11-04) — the tab has its own mark.** The page mark (`mark.svg`) shrunk to 16 px loses its rule, lines
+  and ring, so the favicon is drawn for that size (`public/icons/favicon.svg`, with `favicon-32.png` for a browser without
+  SVG favicons): a `j` in his ink whose dot is the postmark ring in her default ink, on the paper. Its colours are fixed,
+  on an opaque tile, so it reads on light and dark tabs with no style in the SVG. The installed app's icons and `Mark` in
+  `icons.tsx` stay the page; **open:** whether they follow it belongs to the WEB-UX identity pass.

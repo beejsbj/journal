@@ -203,7 +203,7 @@ web/
     editorModel.ts settingsModel.ts drafts.ts   the editor's form and moves, the settings the server allows, unsent drafts
     sw.ts swCore.ts      the service worker (Workbox precache + the runtime rules) and its testable rules
     offline.ts pwa.ts    what the page knows about cached answers and being offline; registration and the update prompt
-  public/icons/          mark.svg and the PNGs made from it (scripts/make-icons.mjs)
+  public/icons/          mark.svg, favicon.svg and the PNGs made from them (scripts/make-icons.mjs)
   scripts/               source-hash.ts, manifest.ts (the manifest, colours read from tokens.css), make-icons.mjs
     tokens.css, app.css
   tests/                 vitest on fixture JSON from tests/fixtures/ (shared with the Python suite)

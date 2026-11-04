@@ -16,6 +16,14 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## FAVICON — the tab's own mark (2026-11-04; serve side only; no gateway restart; no config or state change)
+
+**What changes.** The web app's favicon is `icons/favicon.svg` (and `icons/favicon-32.png`), through the committed web
+build. **Side and restart.** Serve side: `uv tool install --force` at the merge sha, then
+`systemctl --user restart journal-serve`. **First checks.** `/icons/favicon.svg` answers 200 and a fresh tab shows the
+`j`; browsers cache favicons hard, so an old tab can keep the page mark for a while. **Rollback.** The CLI at the
+previous sha and the same restart.
+
 ## SCRUB-PERSONAL — the repo holds nothing specific to a deployment (2026-10-28; docs, tests and comments, one doctor row; no gateway restart needed; no config or state change)
 
 **What changes.** Docs, tests and fixtures are generic; the deployment overlay left the repo

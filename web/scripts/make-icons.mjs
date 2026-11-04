@@ -8,6 +8,7 @@
  * - `icon-maskable-512.png`: the mark scaled into the middle 72% (Android masks to a circle at worst; the safe
  *   zone is the middle 80%), on the same paper.
  * - `apple-touch-icon.png` (180): iOS wants an opaque square and rounds it itself.
+ * - `favicon-32.png`: the tab's mark (`favicon.svg`, drawn for 16 px, not the page shrunk) for a browser without SVG favicons.
  */
 import { Resvg } from "@resvg/resvg-js";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -27,4 +28,5 @@ writeFileSync(`${dir}icon-192.png`, png(mark, 192));
 writeFileSync(`${dir}icon-512.png`, png(mark, 512));
 writeFileSync(`${dir}icon-maskable-512.png`, png(maskable, 512));
 writeFileSync(`${dir}apple-touch-icon.png`, png(mark, 180));
+writeFileSync(`${dir}favicon-32.png`, png(readFileSync(`${dir}favicon.svg`, "utf-8"), 32));
 console.log("icons written to", dir);
