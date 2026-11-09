@@ -261,11 +261,12 @@ def _step1(cfg, p, at, now, data, today: date, delivery: bool) -> Slot | None:
 
 def _of_journal_day(cfg, p, now, data, jday: date) -> list[Slot]:
     """The practice's slots that belong to journal day ``jday``: its date's slots from ``day_ends_at`` on, and the next
-    date's before it (a 00:30 slot is the night of the day before). A slot with no time stays with its date."""
+    date's before it (a 00:30 slot is the night of the day before). A slot belongs by its scheduled time, so a late
+    delivery does not move it; an extra by when it happened; one with no time stays with its date."""
     out = []
     for d in (jday, jday + timedelta(days=1)):
         for s in day(cfg, d.isoformat(), now, data=data, practice=p):
-            when = s.time
+            when = s.at if s.at is not None else s.time
             if (journal_day(cfg, when) if when is not None else d) == jday:
                 out.append(s)
     return out

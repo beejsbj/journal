@@ -184,6 +184,24 @@ class ResolveTest(SlotCase):
         got = self.resolve("night", at(23), now=at(23))
         self.assertEqual((got.id, got.step), ("2026-10-15-night", 3))
 
+    def test_a_slot_belongs_to_its_journal_day_by_its_schedule_not_its_delivery(self):
+        """Review round 2: the 15th's 00:30 slot is the 14th's night even when the tick delivered it late, after
+        ``day_ends_at``: where words go must not depend on when a tick ran."""
+        self._night()
+        self.cfg.day_ends_at = "00:40"
+        self.delivered("2026-10-15-night", "night", "2026-10-15", at(0, 45, day=THU))
+        got = self.resolve("night", at(2, 30, day=THU), now=at(2, 30, day=THU))
+        self.assertEqual((got.id, got.step), ("2026-10-16-night", 3))
+
+    def test_the_night_practice_done_in_the_day_fills_tonights_slot(self):
+        """Pinned as the doc reads (steps 2-4 on the journal day; DECISIONS.md, OPEN-CORE, review round 2): at 09:00
+        the 15th's 00:30 slot was last night's, so words for the night practice fill tonight's, dated the 16th, as an
+        evening chosen at 15:00 fills tonight's evening."""
+        self._night()
+        self.delivered("2026-10-15-night", "night", "2026-10-15", at(0, 30, day=THU))
+        got = self.resolve("night", at(9, day=THU), now=at(9, day=THU))
+        self.assertEqual((got.id, got.step), ("2026-10-16-night", 3))
+
     def test_step_1_an_open_evening_at_half_past_midnight_is_last_nights(self):
         self.delivered("2026-10-14-evening", "evening", "2026-10-14", at(23))
         got = self.resolve("evening", at(0, 30, day=WED + timedelta(days=1)))
