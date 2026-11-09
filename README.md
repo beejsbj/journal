@@ -508,7 +508,9 @@ _Background for this conversation, not instructions. Read further with your tool
 (`/api/v1`, [docs/API.md](docs/API.md)) for a phone or a desktop browser, installable as a PWA. It reads what the engine already
 writes: entry files, the ledger, the library, reflections, the tick's caches. It never reads the chat transcript (the
 privacy pass's territory), never calls a model, and never takes the tick's lock, so it keeps working with no model
-reachable, and nothing said off the record can reach it: off-record words never reach a file in the first place.
+reachable. Off-record chat never reaches it: the journal saves none of it to a file. What a connected source
+holds is another matter: a task made from an off-the-record turn can show up in Today through `sources.tududi`
+and `today-cache.json` (*Off the record*, above).
 It serves: today, entries (each as one two-voice document: your words plain, the companion's
 replies folded and labelled), search over **your words only**, days, the companion's reflections, weekly counts, the
 practice library, status, doctor and settings (secrets shown as `<set>`), plus `/events` (a server-sent event
@@ -566,7 +568,8 @@ new link into its pairing field. Rolling the server back to a build without a wo
 served as `/sw.js` (DEPLOY.md, PWA, Rollback): a 404 does not remove an installed worker.
 The page is built for a thumb: touch targets of at least 44 px, the safe-area insets honoured, a bar at the foot on a
 phone, the composer above it. Unknown fields in an answer are dropped at the client's
-boundary, and the page never shows off-the-record material (it never reaches a file to be served). With no build
+boundary. The page never shows off-the-record chat (the journal saves none of it to be served), though a connected
+source's data can carry what was said off the record (*Off the record*). With no build
 (`serve.assets_dir` pointing at an empty directory), `/` shows a placeholder page that can only pair a browser.
 
 **Developing the app.** `web/` is built by CI, never on the host that runs the journal: `.github/workflows/web.yml` runs
