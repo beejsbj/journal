@@ -18,14 +18,14 @@ nothing to an engine one-shot: ``agent.MODEL_STEP_ENV``). Its one tool is ``jour
 over his words in every entry; no chat transcript or context pack is given to it. ``FOLLOW-UP:`` lines go to the
 notebook, as with annotations.
 
-Quotation fails closed (``validate.unfound``): only well-formed double quotation and blockquote lines count, and
-each must be his words, found in one paragraph of one file (or one reply of his) with its parts around "…" in order
-and close together: the period's entries, his replies, or his words anywhere in the journal; her own words, old or
-new, never count. Any other quote-like mark, any HTML, and a "you wrote" with no quotation in its sentence are
-irregular. A bad answer (such a quote or mark, or no reflection at all: empty, too long, not prose) writes nothing
-and is retried on later ticks, ``ATTEMPTS`` times, then alerted
-once; on the last attempt a reflection whose only fault is its quotes is written with the sentences that hold them
-dropped (``validate.strike``), and that is logged, so a stubborn misquote costs a sentence, not the reflection. A
+Quotation fails closed (``validate.unfound``): only well-formed double quotation and blockquotes count, and each
+must be his words, found in one paragraph of one file (or one reply of his) with its parts around "…" in order and
+close together: the period's entries, his replies, or his words anywhere in the journal; her own words, old or new,
+never count. Any other quote-like mark, any HTML, and a "you wrote" with no quotation in its sentence are irregular.
+A bad answer (such a quote or mark, or no reflection at all: empty, too long, not prose) writes nothing and is
+retried on later ticks, ``ATTEMPTS`` times, then alerted once; on the last attempt a reflection whose only fault is
+its quotes is written with the sentences that hold them dropped (``validate.strike``), and that is logged, so a
+stubborn misquote costs a sentence, not the reflection. A
 model that cannot be reached at all is different: that is an outage, which defers the reflection without using an
 attempt (``outage``: retried at most every 30 minutes for up to 7 days, one alert once it has lasted 6 hours). A run
 that times out while the model has answered another step in this tick is a long run, not an outage: it uses an

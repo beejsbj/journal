@@ -21,9 +21,10 @@ The gateway restarts in **windows**, at least an hour from a ritual (the built-i
 **What changes.** The day reflection and week review read the opening and the question of her last few analyses,
 what he wrote back to each, and the notebook threads the engine filed from the journal; their one-shot runs with
 `-t journal_read`, the new read-only `journal_search` tool (his words in the journal's files), with a 480 s budget.
-Quotation fails closed: only double quotes paired on one line and blockquote lines count, each must be his words,
-and any other quote-like mark is irregular; either is a bad answer and retried, and on the last attempt the sentence
-holding it is dropped instead of losing the reflection. The catch-up and program checks reject an irregular mark too. One voice description goes into the opener, annotation, reflection and week
+Quotation fails closed: only double quotes paired on one line and blockquotes count, each must be his words, and any
+other quote-like character, any HTML and a "you wrote" with no quotation are irregular; each is a bad answer and
+retried, and on the last attempt the sentence holding it is dropped instead of losing the reflection. The catch-up
+and program checks run the same check against their one source (the catch-up's: his lines only). One voice description goes into the opener, annotation, reflection and week
 requests. The engine's own one-shots carry `JOURNAL_MODEL_STEP=1`, and the journal's `pre_llm_call` hook adds
 nothing to them (it used to append the whole notebook). New state: `origin` on annotation and reflection follow-ups
 in `notebook.json`; `answers` on the capture of a note that replies to a reflection; `struck` on a reflection's
@@ -53,7 +54,8 @@ the new plugin is safe, so pin first; if the order cannot be kept, pause the tic
    take it from the reflection too.
 3. After the next reflection: the file reads **What I notice** / **What moved** / **To carry forward**; the tick log
    says `wrote <date>-reflection.md (…)`. A quote that is not his shows as `reflection attempt N/3 failed (quote not in
-   his words: …)`, a stray or odd mark as `… failed (irregular quote mark …)`, and on the last attempt the log adds
+   his words: …)`, a stray or odd mark as `… failed (irregular quote mark …)` or `(irregular HTML …)`, an unquoted
+   "you wrote" as `… failed (attribution without a quotation: …)`, and on the last attempt the log adds
    `(last attempt: N quotes not his or irregular, sentences dropped)` with the passages under `struck` in the
    ledger's reflection record. A run that searches is longer (budget 480 s; the tick waits for it); a timeout after
    another model step answered in the tick uses an attempt instead of counting as an outage, and the try after a
