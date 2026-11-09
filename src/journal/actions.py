@@ -29,7 +29,7 @@ from typing import Callable
 from . import audio, capture, channel, compose, entries, ledger, library, slots
 from .config import Config
 
-FACES = ("web", "cli", "mcp")
+FACES = tuple(entries.FACES)  # web, cli, mcp
 
 
 class Refused(ValueError):

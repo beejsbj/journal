@@ -350,6 +350,33 @@ class PrivacyTest(Base):
         self.assertNotIn("UNRELATED", seen[0])
 
 
+class ChatCapturesUnchangedTest(Base):
+    """Review round 1: rules 9 and 10 set apart words saved on a face (a capture whose ``via`` is a face), not every
+    capture without a platform message id: a chat capture without one, or one the sweep made, reads as before."""
+
+    WORDS = "the long walk by the river made the whole afternoon feel lighter than it had any right to be"
+
+    def _chat_capture(self, via=None):
+        self.send(at(9, 1))
+        with ledger.locked(self.cfg.ledger_path) as data:
+            p = ledger.find(data, "2026-10-14-water")
+            capture.record(self.cfg, p, "next-message", self.WORDS, at(9, 5).astimezone(timezone.utc), "text", None,
+                           via=via, data=data)
+
+    def test_a_chat_capture_with_no_message_id_is_still_aligned_with_her_reply(self):
+        self._chat_capture()
+        reads = []
+        self.ask = lambda cfg, query, *a, **k: "Lighter (inference)."
+        with mock.patch.object(context, "companion_reply_after", lambda *a, **k: reads.append(a) or "her reply"):
+            tick.annotate(self.cfg, at(9, 40).astimezone(timezone.utc), [])
+        self.assertEqual(len(reads), 1)
+
+    def test_the_sweeps_capture_with_no_message_id_is_still_a_legacy_chat_capture(self):
+        self._chat_capture(via="sweep")
+        saved = conversations._Saved(self.cfg, ledger.snapshot(self.cfg.ledger_path))
+        self.assertIsNotNone(saved.find(self.WORDS, at(10)))
+
+
 class NoChannelTest(Base):
     def setUp(self):
         super().setUp()

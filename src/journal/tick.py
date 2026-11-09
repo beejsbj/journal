@@ -610,10 +610,10 @@ def annotate(cfg: Config, now: datetime, log: list[str]) -> None:
         body = path.read_text(encoding="utf-8")
         if not entries.annotations_pending(body):
             continue
-        # her next chat reply aligns the annotations with a chat answer; words saved on a face (no platform message
-        # on the first capture) have none, and the chat after them is unrelated (OPEN-PROMPTS rule 9)
+        # her next chat reply aligns the annotations with a chat answer; words saved on a face have none, and the
+        # chat after them is unrelated (OPEN-PROMPTS rule 9)
         reply = context.companion_reply_after(cfg, first, chat_id=p.get("chat_id"), platform=channel.platform_of(p)) \
-            if p["captures"][0].get("platform_message_id") else None
+            if not capture.by_face(p["captures"][0]) else None
         asked.add(path)
         try:
             text = agent.ask(cfg, prompts.annotation_request(cfg, entries.without_companion_replies(body), reply), 180,

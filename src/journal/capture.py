@@ -224,6 +224,13 @@ def capture_to(cfg: Config, pid: str, rule: str, text: str, now: datetime,
 # ── the web app's writes (``journal serve``): the same entries, the same ledger lock ─────────────────────────────
 
 WEB_RULE = "web"   # the capture rule of a reply written from the web app to a practice's open prompt
+def by_face(c: dict | None) -> bool:
+    """A capture of words saved on a face (the web app, the CLI, MCP: its ``via``), not of a chat message. Rules 9 and
+    10 of OPEN-PROMPTS set these apart; a chat capture without a platform message id, or one the sweep or the
+    conversation writer made, is not one."""
+    return isinstance(c, dict) and c.get("via") in entries.FACES
+
+
 WEB_VIA = "web"    # ``captures[].via``: where the web app's captures came from, whatever their source
 MCP_VIA = "mcp"    # the same for ``journal mcp`` (an MCP client): rule, source and via all say ``mcp``
 

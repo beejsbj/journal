@@ -779,8 +779,8 @@ _ENGINE_NAME = re.compile(r"^\d{4}-\d{2}-\d{2}-([a-z][a-z0-9-]*?)(?:-s(\d{2}))?(
 _ENTRY_STEM = re.compile(r"^\d{4}-\d{2}-\d{2}-([a-z][a-z0-9-]*)\.md$")
 _REPEAT = re.compile(r"^(.+)-(\d+)$")
 _SESSION = re.compile(r"^(.+)-s(\d{2})$")
-FREEFORM_IDS = ("j", "note")
-FACES = {"web": "the web app", "cli": "the CLI", "mcp": "MCP"}  # a record's ``opened_via`` → where he wrote, said aloud  # a /j note; an entry the companion started with a note
+FREEFORM_IDS = ("j", "note")  # a /j note; an entry the companion started with a note
+FACES = {"web": "the web app", "cli": "the CLI", "mcp": "MCP"}  # a record's ``opened_via`` → where he wrote, said aloud
 ENGINE_TYPE = "journal"  # the ``type:`` value every engine-written entry carries
 
 

@@ -3086,8 +3086,11 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     channel row is ok. `Config.channel()` with `none` is `NoChannel` (a send that slipped through fails loudly).
     **Left open:** an annotation or reflection written while there was no chat stays unsent; if a chat is configured
     later, the tick sends the backlog (annotation replies and reflections have no age limit).
-  - **Rule 9 and 10** as the doc says: no alignment text when the first capture has no `platform_message_id`; a
-    capture with `via` is not a legacy chat capture for `conversations._Saved`.
+  - **Rules 9 and 10 key on a face's `via`** (`capture.by_face`: `web`, `cli`, `mcp`), not on a missing
+    `platform_message_id` (rule 9's parenthesis) or on any `via` (rule 10's "Fix"): chat captures without a message
+    id exist (a gateway event with none, the conversation writer's notes) and so do the sweep's and the writer's own
+    `via`s, and those keep reading as before (review round 1). Face captures get no alignment text and are not legacy
+    chat captures, which is what the doc's two rules are for.
   - **Engine alone:** `agent.is_failure_text` holds Hermes' failure copy itself (the adapter re-exports it), and
     `status.serve_rows` answers one row when `serve/` is not installed; a test runs `today`, `status`, `doctor` and
     `tick` from a copy of the package without `hermes/`, `serve/` and `mcp/`.
