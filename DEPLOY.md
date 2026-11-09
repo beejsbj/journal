@@ -16,6 +16,77 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## OPEN-PUSH — Web Push from `journal serve` to the installed PWA (2026-11-09; serve side only; **no gateway restart**; a new optional extra `journal[push]`; a new setting `push.*`; no state migration)
+
+**What changes.** `journal serve` can nudge the installed web app when a practice is due (README *Web app*,
+Notifications; docs/OPEN-PROMPTS.md *Push notifications*, rule 12):
+
+- With the extra `journal[push]` (`cryptography`), serve makes a VAPID key pair at its first start
+  (`state_dir/serve-push.json`, 0600) and runs a thread that makes a pass a minute: each scheduled slot whose time has
+  come, still within `windows.grace_hours`, unanswered and not pushed before is pushed once to every subscribed device
+  (`push-sent.json` remembers it, three days). A push says the practice's title and "due now", nothing else. It
+  writes no prompt record and nothing in `sent.jsonl`, `send-times.json` or `hook-state.json`.
+- New routes: `GET /api/v1/push`, `POST` and `DELETE /api/v1/push/subscriptions` (signed in; not write routes, so
+  `serve.allow_write: false` keeps them).
+- New setting `push.when`: `no-chat` (default) pushes only on a journal with `channel.platform: none`, so **a chat
+  install pushes nothing until `push.when: always` is set** in the config file; `push.subject` (the VAPID contact;
+  default the project's URL). `plugin.yaml` documents the key with no default, as it does `serve`.
+- The PWA: Settings → *Notifications* (turn on from a tap, turn off); the service worker shows a push and opens
+  `/today?write=<id>` on a tap. The committed build is CI's.
+- `journal doctor` and `journal serve check`: a `serve push` row.
+
+**Where it runs.** `serve/**` and the web build are serve side. Outside them: `cli.py` (`journal serve` starts the
+thread), `status.py` (the doctor row; imports `serve/` lazily, inside the row), `config.py` (the `push` default and its
+check) and `plugin.yaml` (the key's description). The gateway imports `config.py` but nothing on a gateway path reads
+`push` (only `serve/push.py` and the doctor row do), and it imports neither `status.py` nor `serve/` (checked with
+the import list in the table above); so the gateway keeps its old copy correctly and takes the new one at any later
+restart, and the settings form shows `push` after that restart. The tick runs no new code path.
+
+**Steps.** Move the plugin pin to the merge sha with the CLI (the same-sha rule), then:
+
+```sh
+uv tool install --force 'journal[hermes,push] @ git+https://github.com/beejsbj/journal@<sha>'   # keep the extras the install has (mcp too, if used)
+systemctl --user restart journal-serve
+```
+
+On a journal with a chat, decide whether it should push at all; if yes, set `"push": {"when": "always"}` in the
+config file (serve rereads it at the next request; the push thread at its next pass).
+
+**First checks** (read-only for the journal):
+
+1. `journal serve check`: the `serve push` row says the keys exist ("… devices subscribed; push.when …"); without the
+   extra it says how to install it. `stat -c %a <state dir>/serve-push.json` is `600`.
+2. Open the installed app, tap **Update available**, Settings → *Notifications*: "Off for this device" and **Turn on
+   notifications** (on an iPhone: only in the Home Screen app). Turn it on, allow; the row now counts one device.
+   On a chat install under `no-chat` the section says nothing is pushed.
+3. A test push to the subscribed devices, writing nothing to the journal (it reads `serve-push.json` and posts a
+   notification that opens Today on a tap):
+
+   ```sh
+   "$(uv tool dir)/journal/bin/python" - <<'PY'
+   import json, os
+   from pathlib import Path
+   from journal.serve import webpush
+   state = json.loads((Path(os.environ["STATE_DIR"]) / "serve-push.json").read_text())
+   body = json.dumps({"title": "Test", "body": "due now"}).encode()
+   for sub in state["subscriptions"]:
+       print(webpush.send(sub, body, vapid_private=state["vapid"]["private"], subject="https://github.com/beejsbj/journal"))
+   PY
+   ```
+
+   with `STATE_DIR` exported as the `state dir` doctor prints. Each device answers `Result(status='sent', …)`; a
+   `gone` one has unsubscribed (the next real pass removes it).
+4. Receipts across the first real slot after the restart: the vault checksum, and `sha256sum` of `ledger.json`,
+   `sent.jsonl`, `send-times.json` and `hook-state.json` taken before the slot's time and again a minute after the push
+   arrives, differ only by what the tick itself did for that slot (on a no-chat install: nothing). `journal serve`'s
+   log shows no `push pass failed` line.
+
+**Rollback.** The CLI and the serve unit back to the previous sha (`uv tool install --force … @<previous sha>`, unit
+restart). The old server ignores `serve-push.json` and `push-sent.json` (leave them, or remove them: removing the keys
+means every device turns notifications on again later). The new PWA keeps its subscription, finds no `/push` route
+("This server does not offer notifications yet") and gets no pushes; turn notifications off on each device first to
+end the subscriptions cleanly. The plugin pin needs no rollback of its own.
+
 ## OPEN-FACES — do and answer a practice from the web app, the CLI and MCP (2026-11-09; serve side, the CLI and MCP; **no gateway restart of its own**: it rides OPEN-CORE's window; no config change; no state migration)
 
 **What changes.** Every face writes his words through `journal/actions.py` and opens a practice as a view:

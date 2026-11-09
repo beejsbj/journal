@@ -30,7 +30,7 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   none` means no delivery by intent, and Web Push from `journal serve` nudges the PWA. Nothing a face writes, and no
   push, is a chat boundary, so neither can end a `/x` window. The owner took choices A–E on 2026-11-09 (recorded
   there). To close: packages OPEN-CORE, OPEN-FACES, OPEN-PUSH and OPEN-PROGRAMS land. *OPEN-CORE built*: see
-  "OPEN-CORE" under *Taken*, which records where it read the doc. *OPEN-FACES built*: see "OPEN-FACES" under *Taken*.
+  "OPEN-CORE" under *Taken*, which records where it read the doc. *OPEN-FACES built*: see "OPEN-FACES" under *Taken*. *OPEN-PUSH built*: see "OPEN-PUSH" under *Taken*.
 
 - **SCRUB-PERSONAL — the source adapters and `brain:` (open, the owner's).** The built-in context sources (tududi,
   chat-scrobbler, listenbrainz, storyteller, audiobookshelf, grimmory) are optional features, but together they
@@ -3248,3 +3248,51 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     view refuses still showed a composer; DEPLOY's temporary-journal write check ran with `HERMES_HOME` set, whose
     plugin settings would have pointed it at the vault and the live ledger (now `env -u HERMES_HOME` and a doctor
     check first); stale docs. The editor now runs through the shell, as git runs it (`code --wait`, `~`, quoting).
+- **OPEN-PUSH (2026-11-09) — Web Push from `journal serve` to the installed PWA** (docs/OPEN-PROMPTS.md *Push
+  notifications* and rule 12; issue #19; stacked on OPEN-FACES; the RFC 8291/8292 module `serve/webpush.py` came from
+  the first slice on branch `open-push`). What the package built, and what it decided where the doc or the issue left
+  room:
+  - **Where the issue and the doc differ, the doc.** The issue's thread reads "slot states once a minute, each slot
+    turning due pushed once"; the doc says eligibility comes "from the schedule and that marker, never from catching
+    the slot in the *due* state, which a tick delivering it a moment earlier would hide". Built as the doc says
+    (`push.due`): a scheduled slot of today or yesterday (a late evening's grace runs past midnight) whose time has
+    come, still within `windows.grace_hours`, with no captures, and not in `push-sent.json`. A practice turned off has
+    no slot (`slots.day`), so it is not pushed.
+  - **The payload carries the practice's id** beside its title and "due now" (`{"title", "body", "practice"}`): the
+    tap opens `/today?write=<id>`, which needs it. Nothing else, and the service worker builds the address from the id
+    alone, never from a URL in the payload.
+  - **`GET /api/v1/push`** (not in the issue) gives Settings what it needs: whether the server can push (and why not),
+    the public key to subscribe with, `push.when`, whether this journal pushes, and the device count. It makes the
+    keys if the first start could not, so a browser is never left without one.
+  - **Subscriptions are signed-in routes, not `api.WRITE`.** They change no entry, ledger or definition, so a
+    read-only server (`serve.allow_write: false`) still nudges, as logout is a signed-in POST today. They still need
+    the site's `Origin`.
+  - **Serve posts only to the browsers' push services.** The doc's "its outbound calls go to the push services only"
+    is held at the door: a subscription's endpoint must be `https` on `fcm.googleapis.com`, `android.googleapis.com`,
+    `updates.push.services.mozilla.com`, `*.push.apple.com` or `*.notify.windows.com` (no user info, port 443), else
+    `422 bad-subscription`; otherwise a signed-in request could make serve POST to any address. A browser using
+    another service would need the list widened. At most ten devices; a new one past that replaces the oldest.
+  - **Once means at least one device took it.** A slot is marked pushed when one device's push service accepted it;
+    when every device failed (the network down), the next pass tries again, within the slot's grace. A device that
+    failed while another succeeded misses that slot. The push service keeps a push until the slot's grace ends
+    (`TTL`, at least a minute), so a phone that comes back online late is not nudged for a slot already over.
+  - **`push-sent.json` is pruned by age** (three days), in the pass itself, rather than "with the ledger": a pass
+    looks at today and yesterday only, and serve does not run the ledger's prune.
+  - **`push.subject`**, a setting the doc does not name: the VAPID `sub` claim is sent to the push service with every
+    push. Defaulting it to the site (`https://<serve.host>`) would hand Apple, Google or Mozilla his private site's
+    name; the default is the project's URL, which names the software. An operator can set a `mailto:` of their own.
+  - **`push.when`** takes `no-chat` and `always`; anything else (or a `push` that is not an object) is a config
+    warning and means `no-chat`. It is not on the web's settings allow-list (`WEB_WRITABLE`): it is set in the config
+    file or Hermes settings, like `serve.*`. `plugin.yaml` documents it with no default, as it does `serve`.
+  - **The thread** is started by `journal serve` (`cli.serve`, after `prime`), not by `app.run`, so the tests that run
+    a server start none. It makes the keys, then a pass at once and one a minute until the server stops; a pass that
+    fails is logged and the next one runs. It never takes `tick.lock`.
+  - **The PWA.** Settings gains *Notifications*, in the current design's style (a section with a panel, as pairing
+    has): permission is asked from the tap only; on an iPhone or iPad outside the Home Screen app it says to add it
+    there first; a subscription made with another key (the server's keys were lost) reads as off, and one the device
+    has is posted again on opening Settings (idempotent), so a server that dropped it gets it back. A push shows one
+    notification per practice (`tag`).
+  - **Program phases are not pushed:** OPEN-PROGRAMS (PR #29) has not merged into this base. Recorded as its
+    follow-up: once a phase can be current with no delivery, the pass should push it as it does a slot.
+  - **Tests changed.** None of the existing tests; `tests/test_serve_privacy.py` gains the push routes' samples and a
+    pass, under the same refusal of `sqlite3.connect` and the privacy pass.

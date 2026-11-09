@@ -14,7 +14,7 @@ One engine in `src/journal`, four faces over the same config, state and entry fi
 | --- | --- | --- |
 | `journal` CLI | `cli.py` (console script `journal`) | `journal tick`, run every five minutes, does all scheduled work; the other subcommands inspect and maintain (`journal --help`). |
 | Hermes plugin | repo root: `plugin.yaml`, `__init__.py` → `hermes/` | The companion's integration: hooks (`pre_gateway_dispatch` capture, `pre_llm_call` context, `pre_tool_call` guard), the companion's tools, slash commands, the `skills/journal-system` skill, `hermes journal …`. The journal works in one chat on any gateway platform (the `channel` setting; default Telegram and `telegram.chat_id`): `channel.py` decides which messages and turns are the journal's (platform, chat, owners), and every send goes through the `Channel` port (`telegram.TelegramChannel`, else `hermes/channel.py` through `hermes journal deliver`). With `channel.platform: none` there is no chat at all: prompts, annotation replies, reflections, program summaries and notes are not sent, attempted, counted or alerted, and practices are done on the other faces (program phases still need a chat until OPEN-PROGRAMS). |
-| `journal serve` + PWA | `serve/` (stdlib HTTP server and API); `web/` (Preact source) built into `serve/static/` | A private web app over the same files. Reads entries and state JSON, never the chat transcript; calls no model; sends by spawning `journal send`. |
+| `journal serve` + PWA | `serve/` (stdlib HTTP server and API); `web/` (Preact source) built into `serve/static/` | A private web app over the same files. Reads entries and state JSON, never the chat transcript; calls no model; sends by spawning `journal send`. With the extra `journal[push]` it nudges the installed PWA by Web Push when a slot comes (`serve/push.py` over `serve/webpush.py`; `push.when`): a push is no delivery, writes no prompt record and is never a chat boundary (OPEN-PROMPTS rule 12). |
 | `journal mcp` | `mcp/` (optional extra `journal[mcp]`) | The engine's calls as MCP tools over stdio, under serve's rules. |
 
 Adapters stay thin: the seam is `inbound`, `turncontext`, `tools`, `commands` and the two ports in `ports.py`
@@ -62,6 +62,7 @@ the transcript placeholder live there, `actions.refuse`), which takes its slot f
   `sent.jsonl`, `send-times.json`, `conversations.json` (cursor and the saved privacy pass), `sweep.json` (the sweep's
   row-id watermark), `hook-state.json`, `mirror-queue.json`, `notebook.json`, `notebook-archive.jsonl`,
   `today-cache.json`, `packs/`, `runs/`, `practices/`, `audio-stash/`, `serve-auth.json`, `serve-pairings.json`,
+  `serve-push.json` (VAPID keys and subscriptions, 0600), `push-sent.json` (slots pushed),
   `last-tick.json`, `errors.jsonl`. Each name is a constant or literal in the module that owns it
   (`grep -rnE '"[a-z-]+\.jsonl?"' src/journal` finds them). Shared JSON state is read, changed and written under `ledger.locked` /
   `ledger.locked_state`, with a `<name>.lock` beside the file; `tick.lock` serialises ticks; `sent.jsonl`,
@@ -104,7 +105,8 @@ Read `docs/DECISIONS.md` before changing anything, and your package's section of
   sample there.
 - **The engine owns sending and capture.** Serve, MCP and the companion spawn `journal send` / `journal program`; an
   HTTP worker never holds `tick.lock`.
-- **The core is stdlib.** `dependencies = []`; PyYAML (`journal[hermes]`) and the MCP SDK (`journal[mcp]`) stay optional.
+- **The core is stdlib.** `dependencies = []`; PyYAML (`journal[hermes]`), the MCP SDK (`journal[mcp]`) and
+  `cryptography` (`journal[push]`, imported lazily by `serve/webpush.py` alone) stay optional.
 - **Code is generic, and the repo is public.** Names, paths and timezones come from config; a deployment's personal
   overlay lives outside the repo (`deploy/example-overlay.json` shows the shape with placeholders). Nothing personal is
   committed: no names, hosts, paths, places, ids or words of a real deployment, in code, tests, fixtures or docs.

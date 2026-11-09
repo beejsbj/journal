@@ -74,7 +74,7 @@ the `Channel` port (CHANNELS).
 
 ```
 plugin.yaml, __init__.py             repo root = Hermes plugin (wrapper → journal.hermes.register)
-pyproject.toml                       console script `journal`; extras: hermes = [pyyaml]; no extra for serve
+pyproject.toml                       console script `journal`; extras: hermes = [pyyaml], mcp, push = [cryptography] (Web Push only)
 web/                                 PWA source (Preact + TypeScript + Vite); not a Python package
 deploy/example-overlay.json          an overlay's shape (names, paths, serve.*); real overlays live outside the repo
 deploy/journal-serve.service.example rendered by `journal serve --print-unit` from config
@@ -111,7 +111,9 @@ src/journal/
     programs/fix-life/program.md  programs/fix-life/sessions/01-anti-vision.md … 10-one-day-reset.md
     situational/conversation-prep.md  situational/post-session-debrief.md
   serve/              `journal serve`: app.py (ThreadingHTTPServer + router), api.py (one function per route),
-                      auth.py (token, pairing, cookie, Origin), static.py, sse.py, unit.py (--print-unit)
+                      auth.py (token, pairing, cookie, Origin), static.py, sse.py, unit.py (--print-unit),
+                      push.py (Web Push: keys, subscriptions, the pass-a-minute thread, its routes) over
+                      webpush.py (RFC 8291 aes128gcm, RFC 8292 VAPID; `cryptography` from the extra journal[push])
     static/           committed PWA build (index.html, assets/, sw.js, manifest.webmanifest)
   hermes/             the Hermes adapter (thin): __init__ (register), hooks, tools (registration only), commands,
                       cron, runtime, transcript.py (HermesTranscript: state.db → Row), companion.py (HermesCompanion),
@@ -296,6 +298,7 @@ New keys (all names generic; a deployment's overlay supplies its values):
 | `serve.trusted_proxies` | `[]` | CIDRs whose `X-Forwarded-*` are believed (e.g. the reverse proxy's subnet, `10.0.0.0/24`). |
 | `serve.public_port` | none (443) | The HTTPS port the site is published on when not 443 (SERVEPORT). |
 | `serve.socket` | none | A Unix socket served as well as TCP (0600), for `tailscale serve … unix:<path>` (TSAUTH). |
+| `push.when`, `push.subject` | `no-chat`, none (the project's URL) | Web Push from serve (OPEN-PUSH): `no-chat` pushes only with `channel.platform: none`, `always` on a chat install too; the VAPID contact the push services see. |
 | `serve.tailscale_users` | `[]` | Logins signed in by `Tailscale-User-Login` on the socket only, from tailscaled (root peer) only, for a client that is not this host and not marked cross-site (TSAUTH). |
 | `adapter` | `auto` | `hermes` / `none` / `plainchat`; auto = hermes when `hermes_home` is set. |
 | `channel.platform`, `channel.chat_id`, `channel.user_ids` | `telegram`, `telegram.chat_id`, `[]` | The journal's chat (CHANNELS): any Hermes gateway platform, the chat as Hermes names it, and his ids there (empty: the chat is his, as a DM is). `channel.platform: none` is a journal with no chat (OPEN-PROMPTS rule 6, `Config.has_channel`): prompts, annotation replies, reflections, program summaries and notes are not sent, attempted, counted or alerted; slots go upcoming → due → missed by derivation. Program phases and interrupts still go to the channel (refused, counted, alerted) until OPEN-PROGRAMS. An empty chat id on any other platform still fails and alerts. |
@@ -322,7 +325,7 @@ Four processes may touch the journal; locks and order are fixed:
 | Gateway (Hermes) with the plugin loaded | hooks, tools, slash commands | `ledger.locked`, `ledger.locked_state(hook-state.json / conversations.json)`; never `tick.lock` |
 | Tick (`journal tick`, every 5 min, fresh process) | send → privacy → sweep → conversations → programs → fold → audio → annotate → reply → reflect → recover → mirror → cache → prune → notebook | `tick.lock` (non-blocking: skips the round if held), then `ledger.locked` per write |
 | Spawned one-shots (`journal send <id>`, `journal program <action> <run>`) | one send or one program transition | `tick.lock` blocking, then `ledger.locked` |
-| `journal serve` (long-running, user unit) | reads; small locked writes; spawns for anything that sends | `ledger.locked` / `locked_state` for writes; **never** `tick.lock` |
+| `journal serve` (long-running, user unit) | reads; small locked writes; spawns for anything that sends; a Web Push thread (a pass a minute) | `ledger.locked` / `locked_state` for writes (the push thread: `locked_state` on `serve-push.json` and `push-sent.json` only); **never** `tick.lock` |
 
 His words from a face (`actions.answer`, `actions.note`, `actions.add`: serve's `POST /entries`, `journal write`, MCP's
 `journal_save`) are one `ledger.locked` call each: the slot is resolved, its record made or filled in, and the capture
