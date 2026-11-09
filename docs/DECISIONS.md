@@ -455,19 +455,18 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   heading and would take the line for summary text. To close: decide whether either is worth the work (a summary that
   stops at the line, then the line in session files too).
 
-- **OWN-WORDS — four things around a queued picture and her context, left open.** (1) *The privacy pass reads a captionless
+- **OWN-WORDS — three things around a queued picture and her context, left open.** (1) *The privacy pass reads a captionless
   picture at its stored time.* Hermes stores the event's time with a message that has text, but a picture sent with
   no caption at the time its turn ran; queued behind a stuck turn, that can be long after he sent it. A picture sent
   inside a bare-`/x` window and run after the window closed is public to the pass, and so is her reply to it. The
   sweep no longer captures such a picture (it checks the arrival time against the windows, Taken below), but the pass
   and the conversation writer still read the stored time. To close: give the row its arrival time in the adapter
   (`Row.at` from the cached file, as the sweep's `arrival` does), and re-check the saved pass's rule for a row whose
-  time changes when Hermes clears its cache. (2) *The conversation writer keeps no picture of a queued message in
+  time changes when Hermes clears its cache. (An outage catch-up may read such a reply too: CodeRabbit raised it on the
+  PR; deferred here, not dismissed.) (2) *The conversation writer keeps no picture of a queued message in
   ordinary chat*: the hook never saw it, so nothing was stashed; its caption is written, the picture is not. To close:
   carry `Row.meta["images"]` on the writer's event and let `_keep_images` copy from Hermes' cache when there is no
-  stash. (3) *A native picture's row can open with Hermes' own "[System note: A new message has arrived …]"* (a turn
-  that resumed after pending tool output): the row then reads as a system row, so its caption is lost (not leaked).
-  To close: peel that note like `[Note: …]`, if it is ever seen live. (4) *Her notebook is stored in the
+  stash. (3) *Her notebook is stored in the
   companion's other sessions.* `turncontext.build` gives the notebook to every turn of hers, not only turns in the
   journal's chat, and Hermes stores it with the user's message in some of them: a read-only count of one live
   database found it in the `content` of over two hundred user rows of `tool`-source sessions (her one-shot runs) and
@@ -3065,9 +3064,10 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   - **The adapter reads his part of a row only where the turn put it** (`hermes/transcript.py` `read`). A list of
     parts Hermes stored as JSON (`\x00json:` and the list: an in-place compaction, a compaction's copies) is read as
     Hermes' own text of it first (`decode`; one it cannot read is withheld). Then the envelopes in front come off: the
-    origin note, a `[Note: …]`, a skills reload note and the group context around a message addressed to her (both
-    stored in a picture's row, since Hermes' clean transcript replaces text only), the reply quote (hers: kept as the
-    quote, never checked as his). In a native picture's row nothing after the placeholders is his (`native`: the last
+    origin note, a `[Note: …]`, a skills reload note, Hermes' note in front of a resumed turn ("A new message has
+    arrived …", "The previous turn was interrupted by …", when a message follows it; the note alone stays a system
+    row) and the group context around a message addressed to her (all stored in a picture's row, since Hermes' clean
+    transcript replaces text only), the reply quote (hers: kept as the quote, never checked as his). In a native picture's row nothing after the placeholders is his (`native`: the last
     run of picture lines and placeholders, when they agree in number; a run leaves its last line break, so a caption
     shaped like one does not hide the real one); Hermes' stand-in is no caption, and the files go in
     `Row.meta["images"]`. An injected block that **ends** the text comes off (`trailing`): the engine's closed fence,

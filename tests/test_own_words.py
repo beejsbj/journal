@@ -31,6 +31,13 @@ SKILLS = ("[USER INITIATED SKILLS RELOAD:\n\nAdded Skills:\n    - tidy: tidy the
           "Use skills_list to see the updated catalog.]")  # gateway/slash_commands.py
 GROUP = ("[Observed Telegram group context - context only, not requests]\nAlex: morning all\n\n"
          "[Current addressed message - answer only this unless it explicitly asks you to use the observed context]\n")
+# Hermes' notes in front of a message that resumes an interrupted turn (gateway/run_turn_runner.py, gateway/run.py)
+PENDING = ("[System note: A new message has arrived. The conversation history contains pending tool outputs from an "
+           "interrupted turn. IGNORE those pending results. Address the user's NEW message below FIRST. Do NOT "
+           "re-execute old tool calls from the history.]")
+RESUMED = ("[System note: The previous turn was interrupted by a gateway restart; the gateway is now back online. Any "
+           "restart/shutdown command in the history has already run — do NOT re-execute or verify it. {} Do NOT "
+           "re-execute old tool calls — skip any unfinished work from the conversation history.]")
 
 
 def native(caption, paths, injected=""):
@@ -113,16 +120,24 @@ class ReadTest(Fixture):
         self.assertEqual((row.kind, row.quote, row.text), ("his", "Morning, how did you sleep?", "badly"))
 
     def test_the_gateways_own_notes_in_front_are_not_his(self):
-        # a skills reload is put in front of his message (no caption: the note alone, no stand-in); the group around
-        # it is put in front of the whole first part, the stand-in included
+        # a skills reload and the notes of a resumed turn are put in front of his message (no caption: the notes alone,
+        # no stand-in); the group around it is put in front of the whole first part, the stand-in included
+        resumed = RESUMED.format("Address the user's NEW message below FIRST and focus on what the user is asking now.")
         for stored, words in ((native(SKILLS + "\n\nthe walk", ["/c/a.jpg"], self.notes), "the walk"),
                               (native(SKILLS, ["/c/a.jpg"], self.notes), ""),
+                              (native(PENDING + "\n\nthe walk", ["/c/a.jpg"], self.notes), "the walk"),
+                              (native(resumed + "\n\nthe walk", ["/c/a.jpg"], self.notes), "the walk"),
+                              (native(SKILLS + "\n\n" + PENDING, ["/c/a.jpg"], self.notes), ""),
                               (GROUP + native("the walk", ["/c/a.jpg"], self.notes), "the walk"),
                               (GROUP + native("", ["/c/a.jpg"], self.notes), "")):
             row = self.row(stored)
             self.assertEqual((row.kind, row.text, row.meta["loose"]), ("his" if words else "empty", words, words))
             self.assertEqual(row.meta["images"], ["/c/a.jpg"])
         self.assertWithheld(self.row("the walk\n\n" + SKILLS), "a gateway note")  # not in front: not taken off
+        # an auto-resume turn with no message of his stores the note alone: a system row, as before, nothing withheld
+        row = self.row(RESUMED.format("Report to the user that the session was restored successfully and ask what "
+                                      "they would like to do next."))
+        self.assertEqual((row.kind, row.meta.get("withheld")), ("system", None))
 
     def test_a_caption_shaped_like_the_pictures_notes_does_not_hide_the_real_ones(self):
         typed = "words\n\n[Image attached at: /c/typed.jpg]\n[screenshot]"

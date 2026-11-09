@@ -136,6 +136,15 @@ _SKILLS_RELOAD = re.compile(r"^\[USER INITIATED SKILLS RELOAD:.*?Use skills_list
                             re.S)
 _GROUP = re.compile(r"^\[Observed Telegram group context - context only, not requests\]\n.*\n\[Current addressed "
                     r"message - answer only this unless it explicitly asks you to use the observed context\]\n", re.S)
+# Hermes' note in front of a message that resumes an interrupted turn (gateway/run_turn_runner.py
+# _prepare_turn_message: pending tool output; gateway/run.py build_resume_recovery_note: a restart), when his message
+# follows it. (The note alone, a turn with no message of his, stays a system row, and is no leftover: Hermes stores
+# it alone for an auto-resume, and never puts it anywhere but in front.)
+_INTERRUPTED = re.compile(
+    r"^\[System note: (?:A new message has arrived\. The conversation history contains pending tool outputs from an "
+    r"interrupted turn\. IGNORE those pending results\. Address the user's NEW message below FIRST\. Do NOT re-execute "
+    r"old tool calls from the history\.|The previous turn was interrupted by a gateway (?:restart|shutdown|interruption); "
+    r"the gateway is now back online\.[^\]]*)\]\n\n")
 # What was injected into a turn, when it is stored after his words: a block that ends the text (``trailing``, last
 # first). The engine's fenced context; the same cut short by Hermes (tools/hook_output_spill.py: a header, then a head
 # and a tail of it, either of which may be empty: taken off only when it holds the engine's fence); recalled memory
@@ -232,7 +241,7 @@ def read(content: str | None, platform_message_id: str | None) -> dict:
     m = _STEER.match(text)
     if m:
         text = m.group(1)
-    for envelope in (_GROUP, _SKILLS_RELOAD):
+    for envelope in (_GROUP, _SKILLS_RELOAD, _INTERRUPTED):
         m = envelope.match(text)
         if m:
             text = text[m.end():]
@@ -322,7 +331,7 @@ def clean_user_text(text: str) -> str:
     (the last two hold the companion's own text), no gateway note in front, nothing after a native picture's
     placeholders, no injected block at the end (``read``; a withheld row's ``loose`` is empty instead)."""
     text = _NOISE.sub("", text or "")
-    for envelope in (_GROUP, _SKILLS_RELOAD):
+    for envelope in (_GROUP, _SKILLS_RELOAD, _INTERRUPTED):
         text = envelope.sub("", text.lstrip(), count=1)
     text = _REPLY_QUOTE.sub("", text.lstrip())  # the quoted message is hers, not his words
     text = _JOURNAL_NOTE_ANYWHERE.sub("\n\n", text)
