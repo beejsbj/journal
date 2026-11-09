@@ -3134,7 +3134,9 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     a deliberate send answered *in the chat* during its opener re-sent onto that prompt (now it resolves again, as for
     a face); `her_messages` after a lost race named the face's plain opener instead of the one the chat message has;
     `capture.by_face` raised on a damaged `via`; a slot was put on a journal day by its delivery time, so a late tick
-    could move it (now by its scheduled time). **Left open for the owner:** a practice scheduled between midnight and
+    could move it (now by its scheduled time); the today block called a slot the chat never got "missed" with no
+    word that it was never sent (now `<id> at HH:MM, not sent to the chat (missed)`); DEPLOY's first check named a
+    log line an answered slot does not write. **Left open for the owner:** a practice scheduled between midnight and
     `day_ends_at` (say *night* at 00:30) done in the daytime fills *tonight's* slot, whose id and entry are dated
     tomorrow (`2026-10-16-night` on the 15th), and the tick then skips that send; on `main` a `/start night` at 09:00
     re-sent the 15th's. This is the doc's journal day applied as written (an evening chosen at 15:00 fills tonight's
