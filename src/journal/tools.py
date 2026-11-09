@@ -1,11 +1,11 @@
 """The companion's tools, independent of any agent: the specs an adapter registers and ``call``, which runs one.
 
 ``call(cfg, name, params, turn)`` is the only way a tool reaches the journal. It refuses the writes (the companion's
-own notes, the notebook's add and resolve, a move by ``journal_set_location``) in an off-the-record turn before the handler runs, and reads (the
-notebook's list, ``journal_program``) are allowed there. The refusal fails closed: when it cannot tell whether the
-turn is off the record, nothing is written. An adapter that also has a hook ahead of the call (Hermes'
-``pre_tool_call``) uses ``refusal`` there to turn a tool away early; ``call`` checks again, so a hook that fails
-open does not let a write through.
+own notes, the notebook's add and resolve, a move by ``journal_set_location``) in an off-the-record turn before the
+handler runs, and reads (the notebook's list, ``journal_program``, ``journal_search``) are allowed there. The refusal
+fails closed: when it cannot tell whether the turn is off the record, nothing is written. An adapter that also has a
+hook ahead of the call (Hermes' ``pre_tool_call``) uses ``refusal`` there to turn a tool away early; ``call`` checks
+again, so a hook that fails open does not let a write through.
 
 Handlers return JSON strings and never raise (Hermes' tool contract, kept as the neutral one).
 """
@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable
 
-from . import capture, hookstate, location, notebook, privacy, programview
+from . import capture, hookstate, location, notebook, privacy, programview, search
 from .config import Config, Names
 
 log = logging.getLogger("journal.tools")
@@ -25,6 +25,10 @@ WRITES: dict[str, tuple[str, ...] | None] = {"journal_add_note": None, "journal_
                                              "journal_set_location": None}
 # (tool → the actions that write; None: every call writes. journal_program has no write action: status and propose
 # are reads, allowed in an off-record turn. Off the record means nothing in the journal changes, a move included)
+READ_TOOLSET = "journal_read"
+READ_ONLY = ("journal_search",)
+# (the tools that only read the journal's files, registered apart under READ_TOOLSET, so a model step that must not
+# write, the day reflection and week review, can be given them and nothing else: ``toolsets=READ_TOOLSET``)
 
 
 @dataclass(frozen=True)
@@ -133,6 +137,35 @@ def program_schema(n: Names) -> dict:
     }
 
 
+def search_schema(n: Names) -> dict:
+    who = n.user or "the user"
+    return {
+        "name": "journal_search",
+        "description": (
+            f"Search {n.user_possessive} journal: {n.possessive} own words in every entry, back to the first one. Use "
+            f"it to look up what {n.subject} wrote before about something (a person, a place, a worry, a phrase) "
+            "instead of guessing or relying on what you remember, and to see how today compares with weeks ago. "
+            "Words find entries with any of them (as a word or its start: walk finds walked; most matches first, then "
+            "newest); "
+            "\"a phrase in double quotes\" must appear as written. Returns each entry's name and date with short "
+            f"excerpts of {n.possessive} words. Read-only: it never reads the chat, your annotations, your notes or "
+            f"your reflections, and it changes nothing, so it is fine in any turn. Cite what you use as "
+            f"journal:<entry>; quote {who} only as the excerpt has it."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Words, or \"a phrase\" in double quotes."},
+                "date_from": {"type": "string", "description": "Optional: only entries on or after YYYY-MM-DD."},
+                "date_to": {"type": "string", "description": "Optional: only entries on or before YYYY-MM-DD."},
+                "limit": {"type": "integer", "description": f"How many entries (default {search.LIMIT}, at most "
+                                                            f"{search.MAX_LIMIT})."},
+            },
+            "required": ["query"],
+        },
+    }
+
+
 def specs(names: Names) -> tuple[ToolSpec, ...]:
     """The tools to register, in registration order, worded with this journal's names."""
     return (
@@ -143,6 +176,8 @@ def specs(names: Names) -> tuple[ToolSpec, ...]:
                  names.emoji or "📝"),
         ToolSpec("journal_program", program_schema(names),
                  "Read the journal's programs: what is available and running; propose a /start line.", "📚"),
+        ToolSpec("journal_search", search_schema(names), "Search the user's own words in the journal (read-only).",
+                 "🔎"),
     )
 
 
@@ -223,8 +258,20 @@ def _program(cfg: Config, params: dict, **_) -> str:
     return json.dumps({"success": False, "error": f"unknown action {action!r}: use status or propose"})
 
 
+def _search(cfg: Config, params: dict, **_) -> str:
+    """A read of his words in the journal's files (``search``): allowed in an off-record turn, as the notebook's list
+    is."""
+    try:
+        found = search.search(cfg, params.get("query") or "", params.get("date_from"), params.get("date_to"),
+                              params.get("limit"))
+    except search.SearchError as e:
+        return json.dumps({"success": False, "error": str(e)})
+    return json.dumps({"success": True, **found}, ensure_ascii=False)
+
+
 HANDLERS: dict[str, Callable[..., str]] = {"journal_add_note": _add_note, "journal_set_location": _set_location,
-                                           "journal_notebook": _notebook, "journal_program": _program}
+                                           "journal_notebook": _notebook, "journal_program": _program,
+                                           "journal_search": _search}
 
 
 def call(cfg: Config, name: str, params: dict | None, turn: ToolTurn | None = None, **env: Any) -> str:

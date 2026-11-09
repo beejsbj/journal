@@ -415,7 +415,7 @@ class ToolCallTest(ReceiveBase):
         from journal.config import Names
         specs = tools.specs(Names(user="Sam", companion="Ada"))
         self.assertEqual([s.name for s in specs], ["journal_notebook", "journal_set_location", "journal_add_note",
-                                                   "journal_program"])
+                                                   "journal_program", "journal_search"])
         self.assertEqual({s.name for s in specs}, set(tools.HANDLERS))
         self.assertTrue(all(s.schema["name"] == s.name for s in specs))
 
