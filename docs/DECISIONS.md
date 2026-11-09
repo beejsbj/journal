@@ -3036,9 +3036,9 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   him at length and said little of their own. The writer saw one period's files plus a single earlier analysis, had
   no tools, and lost the whole reflection on one misquote, so the safe answer was to stitch his quotes together and
   hedge. The owner asked for this work on 2026-11-09 and had already turned per-entry annotation replies off in his
-  deployment, so the reflection is now the one analytical message of the day. Independent reviews of the first and
-  second versions found the bugs fixed in the second and third rounds (below: replies, quotes, copies, the run
-  budget).
+  deployment, so the reflection is now the one analytical message of the day. Five review rounds shaped it (below:
+  replies, quotes, copies, the run budget); the quote machinery that tried to keep a reflection with a bad quote was
+  split out to #26.
   - **Inputs (`reflect.continuity`).** Her last three day reflections within seven days plus the latest week review
     of the six days before (a week review: the last two reviews within three weeks), oldest first. Three days show a
     run (a habit forming, a thread dropped) without outweighing the day's own entries; two weeks show a trend without
@@ -3087,54 +3087,40 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     included. Files are still recognised by name and front matter together, so a hand-written file with an
     analysis's front matter stays his, and so does one merely named like a copy (`2026-10-14-evening 3.md` with no
     entry layout, `notes (1).md`, `2026-10-14 (draft).md`).
-  - **Only his words in quotation marks, and quotation fails closed.** A day reflection's or week review's quotes
-    are checked against his words only: the period's entries (`entries.his_text`), his replies above, and his words
-    in every file of the journal (what search can reach, read only when needed); her earlier analyses, notes,
-    annotations and notebook never count, even when she was given them. Only **well-formed double quotation** counts
-    as quotation (`validate._scan`): a straight `"…"` or curly `“…”` pair on one line, closed by the next quote mark
-    on that line, its inside neither empty nor starting or ending with a space, and a **blockquote** as Obsidian
-    renders one (`_BLOCKQUOTE`: up to three spaces, perhaps a list item's marker, then `>`, with the non-blank lines
-    straight after it as lazy continuation), checked as one passage. **Every other quote-like character is
-    irregular**, and the rule is a class, not a list (`validate.quote_like`): Unicode's initial and final punctuation
-    (categories Pi and Pf), every character named a quotation mark, a prime or a corner bracket, the apostrophe, the
-    backtick and the fullwidth apostrophe. The one exception is a `’` or `'` between two letters or digits, an
-    apostrophe inside a word. **Any HTML tag or entity** is irregular too (`&quot;…&quot;`, `<q>`, `<blockquote>`):
-    a reflection needs neither. And a sentence that says **"you wrote", "you said", "as you put it", "in your
-    words", "your words were", "you called it", "you told me" or "you described it as" with no quotation in it** is
-    a problem (`_ATTRIBUTION`, like `CLAIM_MARKERS` for openers): words reported as his without quotation marks
-    cannot be checked. That is the parent's call (option (b)) pending the owner's veto; its cost is that an honest
-    paraphrase saying "you wrote" is retried, and the prompt asks for a quotation or for paraphrase without those
-    words. The rounds that led here: the second dropped stray marks and kept the words (`You wrote "I adore naps”`
-    reached him as `You wrote I adore naps`), the third listed the irregular marks, which left 18 other shapes
-    (`″…″`, `「…」`, `&ldquo;…&rdquo;`, `- > …`, `You wrote: …`) writing an invented line on the first attempt.
-    **Harmless styles that fail closed, on purpose:** scare quotes in single quotes, `'cause`, `the '90s`, a plural
-    possessive (`the kids’ room`), a one-word quote (`"No"`: nothing in it to check), a Markdown autolink (`<https:…>`)
-    and an `&` entity: each makes the answer a bad one and is retried, and the prompt asks for straight double quotes
-    only. A quote with "…" must have its parts in one paragraph of one file, in order, each within 300 characters of
-    the one before. A quote that is not his, an irregular mark or an unquoted attribution makes the answer a bad one:
-    nothing is written and it is retried, as before. Only on the **last** attempt, when a retry would lose the
-    reflection, is it written with each sentence that holds such a problem dropped, its lead-in with it
-    (`validate.strike`), a blockquote whole, and the passages logged under `struck`. A sentence starts at its block
-    (paragraph, list item or lead-in), so a hard-wrapped one goes whole; common abbreviations (e.g., i.e., Dr.) do
-    not end one; a line left with only a bold lead-in or a list marker goes too, so an emptied **To carry forward**
-    leaves no line for the today block or the web app to misread; only the seams are tidied. An attribution in the
-    sentence before a quote goes with it when it uses one of the words above (it is a problem of its own);
-    **accepted:** one in other words (`On Monday you said this. "…"` uses "you said" and goes; `On Monday, this.
-    "…"` stays) would need a reading of the prose, not its marks. The first version took the quotation marks away
-    and kept the words, which left invented words in his mouth as reported speech; the parent chose dropping the
-    sentence on the last attempt only (option (a)) pending the owner's veto. The trade: a stubborn problem costs a
-    sentence on the last attempt where it used to cost the reflection. README's Guarantees gains the row (it was
-    implicit). **The program checks and the catch-up** (`_misquote`) now run the same check against their one
-    source, without the attribution rule: every quote is checked whatever its length, "…" parts must sit together,
-    and any irregular mark fails the text. The catch-up's source was his messages *and* the conversation before the
-    outage in both voices, so a line of hers passed as his; it is now his lines only. **Open:** the attribution rule
-    for the catch-up and a program's construction and bridge, which are written to answer what he said and would
-    lose many honest paraphrases ("You said you'd call…") to it; and a synthesis's source, the compiled insights
-    document, holds each session's summary (the engine's prose) beside his answers. Tests changed on purpose:
-    `test_reflect.py`'s invented-quote test (a bad answer is now one that is not prose), `test_outage.py`'s bad
-    answer, two `test_conversations.py` tests that now read the corpus as `entries.his_text`, and the round-3
-    tests in `test_continuity.py` where round 4's rules reach further (lazy continuation, a plural possessive, the
-    attribution before a quote).
+  - **Only his words in quotation marks; a bad quote is a bad answer, as on main.** A day reflection's or week
+    review's quotes are checked against his words only: the period's entries (`entries.his_text`), his replies above,
+    and his words in every file of the journal (what search can reach, read only when needed); her earlier analyses,
+    notes, annotations and notebook never count, even when she was given them. Quotation is a straight `"…"` or curly
+    `“…”` pair on one line, closed by the next double quote mark on that line, its inside neither empty nor starting
+    or ending with a space, and a blockquote as Obsidian renders one (`_BLOCKQUOTE`: up to three spaces, perhaps a
+    list item's marker, then `>`, with the non-blank lines straight after it as lazy continuation), checked as one
+    passage. A quote with "…" must have its parts in one paragraph of one file, in order, each within 300 characters
+    of the one before; a part under three characters must be a whole word of his ("No" is not the end of "know").
+    **Every double quote mark outside such a pair is irregular**, as a class (`validate.quote_like`): `"` and `＂`,
+    anything Unicode names a double quotation mark (`“ ” „ ‟ « » ❝ ❞ 〝 〞 〟`), the double, triple and quadruple
+    primes (`″ ‴ ⁗ ‶ ‷ ʺ`), the double apostrophe `ˮ`, and the corner brackets CJK quotes with (`「 」 『 』`). A
+    quote that is not his, or an irregular mark, makes the answer a bad one: nothing is written and it is retried,
+    `ATTEMPTS` times, then alerted; **a reflection that never passes is not written**, exactly as on main. The prompt
+    asks for straight double quotes only, few short quotes, and no "you wrote" without a quote. The program checks
+    and the catch-up (`_misquote`) run the same check against their one source: every quote whatever its length,
+    "…" parts together, and any irregular double mark fails the text. The catch-up's source was his messages *and*
+    the conversation before the outage in both voices, so a line of hers passed as his; it is now his lines only.
+    **Split out (2026-11-09).** Four reviews in a row broke a "keep the reflection" design: unquoting (invented words
+    stayed as reported speech), dropping stray marks (`You wrote "X”` reached him as `You wrote X`), a denylist of
+    odd marks (18 shapes outside it), then a class rule with sentence striking and attribution markers (a striking
+    span that kept a middle sentence, markers satisfied by any quote in the sentence, homoglyphs such as `ˮ` and
+    `ʼ`, missed phrasings, and false positives on possessives, `'90s`, backticks and autolinks). The writer is a
+    cooperative model and the realistic risk, attribution in paraphrase, is semantic, so this package keeps main's
+    behaviour for a bad quote with the checks above, and drops striking, unquoting and the attribution rule.
+    **Open (#26):** paraphrase is not policed (a sentence that says he wrote something, without quotation marks);
+    single quotes, backticks and HTML used as quotation are not judged; and a reflection with a bad quote is still
+    lost once its attempts run out. #26 records what the four reviews found and proposes a semantic check (a small
+    model asked whether a sentence attributes words or claims to him that his words do not hold) instead of more
+    patterns. **Not flagged here, on purpose:** single quotes, apostrophes and possessives (`the kids’ room`,
+    `'90s`, `'cause`), backticks, autolinks and HTML, since a false positive now costs the whole reflection. Tests
+    changed on purpose: `test_reflect.py`'s invented-quote test (a bad answer is now one that is not prose; the
+    invented quote is `test_continuity.py`'s), `test_outage.py`'s bad answer, and two `test_conversations.py` tests
+    that now read the corpus as `entries.his_text`.
   - **A long run is not an outage.** The reflection's budget is 480 s (annotations 180, openers 240), since it may
     search first; the tick waits for it. A run that still times out after another model step answered in the same
     tick uses an attempt, instead of being deferred as "model unreachable" and stopping the tick's other analyses;
@@ -3156,5 +3142,5 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     always in a reflection, she reads past it.
   - **Open:** whether to add a deterministic "echoes" step (older entries sharing the day's rarer words) if she
     seldom searches; `journal_search` in MCP; whether 480 s is the right budget once real runs are seen; the
-    reflection-only hang above; an attribution in other words before a struck quote; the attribution rule for the
-    catch-up and the program checks; the summaries in a synthesis's source.
+    reflection-only hang above; paraphrase, single quotes and HTML as quotation, and keeping a reflection with a bad
+    quote (#26); the summaries in a synthesis's source.

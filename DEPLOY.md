@@ -16,19 +16,18 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
-## CONTINUITY — reflections read what came before, `journal_search`, only his words in quotes, one voice (2026-11-09; tick and hook side; **gateway restart needed**; **plugin pin before the CLI**; no config change; three new optional state fields)
+## CONTINUITY — reflections read what came before, `journal_search`, only his words in quotes, one voice (2026-11-09; tick and hook side; **gateway restart needed**; **plugin pin before the CLI**; no config change; two new optional state fields)
 
 **What changes.** The day reflection and week review read the opening and the question of her last few analyses,
 what he wrote back to each, and the notebook threads the engine filed from the journal; their one-shot runs with
 `-t journal_read`, the new read-only `journal_search` tool (his words in the journal's files), with a 480 s budget.
-Quotation fails closed: only double quotes paired on one line and blockquotes count, each must be his words, and any
-other quote-like character, any HTML and a "you wrote" with no quotation are irregular; each is a bad answer and
-retried, and on the last attempt the sentence holding it is dropped instead of losing the reflection. The catch-up
-and program checks run the same check against their one source (the catch-up's: his lines only). One voice description goes into the opener, annotation, reflection and week
+Quotes are checked against his words only (the period's entries, his replies, his words in any file); a quote
+that is not his, or a stray double quote mark of any kind, is a bad answer and retried, and a reflection that never
+passes is not written, as before. The catch-up and program checks run the same check against their one source (the
+catch-up's: his lines only). One voice description goes into the opener, annotation, reflection and week
 requests. The engine's own one-shots carry `JOURNAL_MODEL_STEP=1`, and the journal's `pre_llm_call` hook adds
 nothing to them (it used to append the whole notebook). New state: `origin` on annotation and reflection follow-ups
-in `notebook.json`; `answers` on the capture of a note that replies to a reflection; `struck` on a reflection's
-ledger record. Older code ignores all three.
+in `notebook.json`; `answers` on the capture of a note that replies to a reflection. Older code ignores both.
 
 **Side and restart.** The tick is a fresh process (reflections, prompts, the follow-ups' `origin`): new code from the
 next tick. Each one-shot `hermes chat` is a fresh process that loads the plugin, so it registers `journal_read` and
@@ -54,12 +53,10 @@ the new plugin is safe, so pin first; if the order cannot be kept, pause the tic
    take it from the reflection too.
 3. After the next reflection: the file reads **What I notice** / **What moved** / **To carry forward**; the tick log
    says `wrote <date>-reflection.md (…)`. A quote that is not his shows as `reflection attempt N/3 failed (quote not in
-   his words: …)`, a stray or odd mark as `… failed (irregular quote mark …)` or `(irregular HTML …)`, an unquoted
-   "you wrote" as `… failed (attribution without a quotation: …)`, and on the last attempt the log adds
-   `(last attempt: N quotes not his or irregular, sentences dropped)` with the passages under `struck` in the
-   ledger's reflection record. A run that searches is longer (budget 480 s; the tick waits for it); a timeout after
-   another model step answered in the tick uses an attempt instead of counting as an outage, and the try after a
-   timeout that was deferred goes without the search on 300 s.
+   his words: …)`, a stray or odd double quote mark as `… failed (irregular quote mark …)`; after three, the usual
+   alert, and no file. A run that searches is longer (budget 480 s; the tick waits for it); a timeout after another
+   model step answered in the tick uses an attempt instead of counting as an outage, and the try after a timeout
+   that was deferred goes without the search on 300 s.
 4. Rollback: the CLI and the plugin pin at the previous sha, and a gateway restart. The new state fields are
    ignored by the old code; nothing needs undoing.
 
