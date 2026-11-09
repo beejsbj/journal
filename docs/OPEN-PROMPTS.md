@@ -66,14 +66,18 @@ A practice can be done at any time (the owner, 2026-11-09: "I can select a speci
 anytime"). Doing it fills the slot it belongs to when one fits, and otherwise makes an extra entry of that practice.
 It never falls back to a loose `/j` note.
 
+Steps 2–4 work on the **journal day** of `at`: its local date, except that words written before `day_ends_at`
+(a new setting, default `04:00`) belong to the day before. So a 21:00 evening with a two-hour window, missed by
+00:30, takes that answer from step 2, and tonight's evening is left alone.
+
 1. A slot of that practice that is **due or open** now, today's or yesterday's, newest first, whose time is at or
    before `at`. An evening answer at 00:30 takes last night's slot.
-2. Else today's newest slot that is **missed and unanswered**, whose time is at or before `at`. The chat's fold
+2. Else the journal day's newest slot that is **missed and unanswered**, whose time is at or before `at`. The chat's fold
    already says "missed — reply anytime".
-3. Else the **next slot later the same local day** that has no record: doing it early fills that slot, and its
+3. Else the **next slot later the same journal day** that has no record: doing it early fills that slot, and its
    scheduled send is skipped. A slot that has already been delivered is not taken here, since WP10 refuses a prompt
    sent after `at`.
-4. Else **an extra entry of that practice** for `at`'s day: slot 1's id when the practice has no schedule and that
+4. Else **an extra entry of that practice** for the journal day: slot 1's id when the practice has no schedule and that
    id is free, otherwise the next free number after the scheduled slots (`<date>-<id>-<n>`, the numbering
    `capture.entry_stem` already uses for a second entry).
 
@@ -81,7 +85,7 @@ Adding more words to an entry already written goes through that entry (the web a
 …/blocks`; `journal write --entry <stem>` on the CLI), not through the practice. Choosing a practice therefore always
 starts something: a slot or a fresh entry.
 
-Words dated before yesterday go straight to step 4. `serve/writes._at` accepts `at` up to 31 days back, and filling
+Words dated before the previous journal day go straight to step 4. `serve/writes._at` accepts `at` up to 31 days back, and filling
 an old slot would turn an old miss into an answer in the week strip and in the opener's missed count. When `answer`
 writes into the record a failed send left, it fills in what that record lacks: the plain opener, the question
 snapshot and the stem.
@@ -96,22 +100,23 @@ snapshot and the stem.
    reads the record again only after the send). It applies to scheduled sends only: a deliberate `/start` or *Send
    to chat* of an answered record is what rule 3 is for. The pack is saved after this check, so a skipped send
    leaves no pack behind.
-3. **Delivering onto a face-made record attaches, never overwrites.** When a delivery meets a record that has no
-   `message_id`, it writes the delivery fields only: `message_id`, `sent_at` (the delivery time, so a thread
-   boundary is never dated in the past), `sent_at_local`, `chat_id` and `platform`. It keeps the questions, stem
-   and captures. Today's `q.update(record)` would overwrite all of them. There are two cases:
-   - **A deliberate delivery** (`/start`, *Send to chat*) sends the record's own opener, so the chat and the entry
-     show the same words. A failure is logged and not counted toward an alert: the slot is answered, so the tick
-     never retries it (rule 1).
-   - **A send that lost the race in rule 2** has already gone out with the tick's opener. The record keeps what was
-     actually sent (`html`, `plain_text`, and that opener in `earlier_openers`), so the sweep's quote matching
-     (`sweep.prompt_texts`) and the fold (`capture.stored_opener`) never rewrite the chat message to words he did
-     not see. It also sets `needs_edit`, so the next tick folds the message to "answered" rather than leaving it
-     looking unanswered for `collapse_hours`. (`capture._web_record` leaves `needs_edit` off on a record with no
-     `message_id`.)
-4. **Chat replies match delivered prompts only.** `direct-reply` and `next-message` keep reading `open_prompts`,
-   which requires `message_id`, with the window measured from the delivery. Words saved on a face never make a
-   prompt that catches his next chat message.
+3. **A delivery never overwrites a face-made record.** A deliberate delivery (`/start`, *Send to chat*, `journal
+   send`) takes its slot from `slots.resolve`, which never returns an answered record: step 4 makes an extra entry.
+   So a face-made record only meets a delivery in the race of rule 2, when the scheduled send has already gone out
+   with the tick's opener after he answered on a face. Then the record keeps its own fields (opener, questions, stem,
+   captures) and gains the delivery's: `message_id`, `sent_at` (the delivery time, so a thread boundary is never
+   dated in the past), `sent_at_local`, `chat_id`, `platform`, and **`sent_opener`**, `sent_html` and
+   `sent_plain_text`, which hold what the chat message actually says. Readers of the chat message use those:
+   `tick._fold_edit` (through a `capture.sent_opener(record)` that falls back to `opener`) and the sweep's quote
+   matching (`sweep.prompt_texts`). The entry keeps `opener`. So the fold never rewrites the message to words he did
+   not see there. The race also sets `needs_edit`, so the next tick folds the message to "answered" rather than
+   leaving its questions showing for `collapse_hours`. (`capture._web_record` leaves `needs_edit` off on a record
+   with no `message_id`.) Today's `q.update(record)` would overwrite the record's fields, so this replaces it for
+   such records.
+4. **Chat replies match delivered prompts only, as today.** A `direct-reply` is matched by the message he replied to
+   (`ledger.by_message_id`), whatever state the prompt is in, so a late reply to an answered or expired prompt is
+   still kept. A `next-message` capture reads `open_prompts`, which requires `message_id`, with the window measured
+   from the delivery. A face-made record has no message, so neither rule can catch his chat words for it.
 5. **The opener off the chat is the plain one.** It needs no model and no spawn, and serve still calls no model
    (Decision 6) *(choice A)*.
 6. **No channel, no attempts.** With `channel.platform: none` the schedule writes nothing and sends nothing; slots
@@ -193,10 +198,12 @@ on iOS that means added to the home screen, iOS 16.4 or later, with permission a
   (0600, beside `serve-auth.json`). Subscriptions come from the PWA: `POST /api/v1/push/subscriptions` with the
   browser's endpoint and keys, and `DELETE` to stop. They are stored in the same file, one per device. A push
   service answering 404 or 410 removes that subscription.
-- **When.** A background thread in serve looks at the slot states once a minute. Each slot that turns *due* is
-  pushed once (`push-sent.json` keeps the slot ids, pruned with the ledger). The setting `push.when` decides when:
-  `no-chat` (the default) pushes only when `channel.platform` is `none`, and `always` pushes alongside the chat too.
-  Program phases and interrupts are pushed once OPEN-PROGRAMS lands.
+- **When.** A background thread in serve runs once a minute. A slot is pushed once (`push-sent.json` keeps the
+  slot ids, pruned with the ledger) when its scheduled time has come, it is still within `grace_hours`, and it is
+  not answered. Eligibility comes from the schedule and that marker, never from catching the slot in the *due*
+  state, which a tick delivering it a moment earlier would hide. The setting `push.when` decides which slots: with
+  `no-chat` (the default) only when `channel.platform` is `none`; with `always`, delivered ones too. Program phases
+  and interrupts are pushed once OPEN-PROGRAMS lands.
 - **What a push says.** The practice's title and "due now", and nothing else: never his words, never an opener,
   never anything read from an entry. The payload is encrypted end to end, but the browser vendor's push service
   (Apple, Google or Mozilla) still sees the endpoint, the time and the size. Tapping the notification opens Today
@@ -210,7 +217,7 @@ on iOS that means added to the home screen, iOS 16.4 or later, with permission a
 Each step is one package and one PR. OPEN-CORE, OPEN-FACES and OPEN-PROGRAMS touch gateway-loaded modules, so each
 goes out in a restart window ([DEPLOY.md](../DEPLOY.md)). OPEN-PUSH is serve side only.
 
-1. **OPEN-CORE.** Add the slot-state read module and `slots.resolve`. Add the new done rule, the pre-send check and
+1. **OPEN-CORE.** Add the slot-state read module and `slots.resolve`, with the journal day (`day_ends_at`). Add the new done rule, the pre-send check and
    the attach-only delivery (rules 1–3), and `channel.platform: none` with its quiet paths (rule 6). Add
    `actions.answer` and `note` with the refusals (rule 7). Move the readers in the map below to the slot states:
    Today's rows, `status`, `standing`, the today block's lines (rule 8), the week strip and insights in `serve/api`,
@@ -276,11 +283,17 @@ Not affected: entry files and their format, the ledger's locking, `/j` notes, bl
   *undelivered* list). Backdated words before a delivered prompt never answer it.
 - **Any time:** choosing an answered practice again makes an extra entry (`-<n>`), never a `/j` note; words dated
   before yesterday make an extra entry on that day and fill no old slot.
-- **Push:** RFC 8291/8292 test vectors; a slot is pushed once; a 410 drops the subscription; `push.when: no-chat`
+- **Push:** RFC 8291/8292 test vectors; a slot is pushed once, also when the tick delivered it before the thread's
+  first look (`push.when: always`); a 410 drops the subscription; `push.when: no-chat`
   pushes nothing while a chat is configured; a push writes nothing to the ledger, `sent.jsonl`, `send-times.json` or
   the thread stamps (rule 12); the payload carries the title only.
-- **The lost race:** a scheduled send that goes out after a face answered keeps the sent opener on the record;
-  the next tick folds it to "answered"; the sweep still matches a quote of the sent text.
+- **The lost race:** a scheduled send that goes out after a face answered keeps `opener` and gains `sent_opener`,
+  `sent_html` and `sent_plain_text`; the next tick folds the message to "answered" with the sent opener; the sweep
+  matches a quote of the sent text. A deliberate `/start` after a face answer makes an extra entry, never touching
+  the answered record.
+- **Overnight:** at 00:30 a missed 21:00 evening (two-hour window) takes the answer, and tonight's slot is untouched;
+  at 15:00 the evening fills tonight's slot early. `day_ends_at` moves the boundary.
+- **Late direct replies:** a reply to an answered or expired delivered prompt is still captured by message id.
 - **The conversation writer** does not file a chat message into an entry because it repeats words written on a
   face (rule 10).
 - **Privacy** (beside `test_privacy_seams.py`): a face answer writes nothing to `sent.jsonl`, `send-times.json` or
