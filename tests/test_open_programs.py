@@ -524,3 +524,45 @@ class ChatScheduleNoteTest(ti.Base):
         self.assertEqual(len(self.items()), 8)  # the interrupts are timed …
         self.assertEqual(len(self.bot.sends()), before)  # … and neither the note nor phase 4 went to the chat
         self.assertTrue(any("note held back" in line for line in self.log))
+
+
+# ── review round 1 ───────────────────────────────────────────────────────────
+
+class ReviewInterruptTest(ti.Base):
+    def held(self):
+        rid = self.reach_schedule_phase()
+        self.confirm("2026-11-02 07:00")
+        with mock.patch.object(programs, "_off_the_record", return_value=True):
+            self.tick_at(self.local("2026-11-02T09:01"))
+        return rid
+
+    def web(self, rid, n=1, text="answered in the web app"):
+        stem = programs.entry_stem(self.cfg, self.the_run(), 10)
+        capture.add_web_block(self.cfg, stem, text, self.now + timedelta(minutes=1),
+                              interrupt_prompt=f"{rid}-s10-i{n}")
+
+    def test_a_web_answer_to_an_interrupt_missed_in_the_chat_is_in_the_insights(self):
+        rid = self.held()
+        with mock.patch.object(programs, "_off_the_record", return_value=True):
+            self.tick_at(self.local("2026-11-02T13:30"))  # its grace window passed while the chat was off the record
+        self.assertEqual(self.items()[0]["status"], "missed")
+        self.web(rid, text="MY LATE WEB ANSWER")
+        text = programs.insights(self.cfg, rid, self.now, self.log).read_text(encoding="utf-8")
+        self.assertIn("MY LATE WEB ANSWER", text)
+
+    def test_an_interrupt_answered_on_the_web_is_not_cancelled_by_an_abandon(self):
+        rid = self.held()
+        self.web(rid)
+        programs.abandon(self.cfg, rid, self.now, self.log)
+        self.assertEqual(self.items()[0]["status"], "answered")
+
+    def test_a_second_confirmation_does_not_reuse_an_opened_interrupt_id(self):
+        rid = self.held()
+        self.assertEqual(self.items()[0]["status"], "pending")  # opened, its delivery held
+        self.assertEqual(self.where(), (10, 4))
+        programs.back(self.cfg, rid, self.now, self.log)  # back to the schedule phase, and a new day
+        self.assertEqual(self.where(), (10, 3))
+        self.confirm("2026-11-03 07:00")
+        new = [i for i in self.items() if i["local"].startswith("2026-11-03")]
+        self.assertEqual(len(new), 8)
+        self.assertNotIn("s10-i1", {i["id"] for i in new})

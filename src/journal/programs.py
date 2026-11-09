@@ -1066,6 +1066,8 @@ def _reconcile_sent(cfg: Config, run: dict) -> None:
         rec = snap.get(pid) or {}
         if rec.get("message_id"):
             item.update(status="sent", prompt_id=pid)
+        elif rec.get("captures"):  # opened and answered on a face before the chat had it
+            item.update(status="answered", prompt_id=pid)
         elif rec.get("send_attempts", 0) >= SEND_ATTEMPTS:
             item.update(status="failed", prompt_id=None)
 
@@ -1213,7 +1215,7 @@ def _batch(run: dict, s: int) -> int:
     """Which confirmation of session ``s`` this is: the first is 1; a later one (the session run again, or a phase
     reopened after interrupts went out) is the next, so its prompt ids are its own."""
     return 1 + max((i.get("batch", 1) for i in run.get("scheduled") or [] if i.get("session") == s
-                    and i.get("status", "pending") != "pending"), default=0)
+                    and (i.get("status", "pending") != "pending" or i.get("opened_at"))), default=0)
 
 
 def plan_interrupts(cfg: Config, prog: Program, run: dict, s: int, p: int, day: date, hour: int,
@@ -1871,7 +1873,7 @@ def _sections(cfg: Config, prog: Program, run: dict) -> list[str]:
             for i in items:
                 at = datetime.fromisoformat(i["local"]).strftime("%a %-d %b %H:%M")
                 state = i.get("status", "pending")
-                words = said.get(i["n"]) if state in ("sent", "open", "answered") else None
+                words = said.get(i["n"])  # (on a face too, whatever became of it in the chat)
                 out.append(f"**Interrupt {i['n']}/{i['of']} ({i['offset']}) · {at}** — {i['text']}\n\n"
                            + (entries.demote_headings(words) if words else
                               "_(no answer)_" if state in ("sent", "open", "answered") else
