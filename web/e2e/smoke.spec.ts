@@ -93,12 +93,17 @@ test("library, insights and settings read", async ({ page }, info) => {
   await shot(page, info, "settings");
 });
 
-test("the navigation is a bar at the foot on a phone and in the header on a desktop", async ({ page }, info) => {
+// WEB-UX: on a desktop the navigation is the rail down the left (it was a header bar), under the mark and Write.
+test("the navigation is a bar at the foot on a phone and the rail on the left on a desktop", async ({ page }, info) => {
   await page.goto("/");
   const box = await page.locator("nav.nav").boundingBox();
-  const height = page.viewportSize()?.height ?? 0;
-  if (info.project.name === "phone") expect(box?.y ?? 0).toBeGreaterThan(height / 2);
-  else expect(box?.y ?? 999).toBeLessThan(120);
+  const view = page.viewportSize() ?? { width: 0, height: 0 };
+  if (info.project.name === "phone") expect(box?.y ?? 0).toBeGreaterThan(view.height / 2);
+  else {
+    expect(box?.x ?? 999).toBeLessThan(80);
+    expect((box?.x ?? 999) + (box?.width ?? 999)).toBeLessThan(240);
+    expect(box?.y ?? 999).toBeLessThan(view.height / 3);
+  }
 });
 
 test.describe("unpaired", () => {
