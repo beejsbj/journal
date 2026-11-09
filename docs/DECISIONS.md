@@ -3193,7 +3193,8 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     else is, so a line of his starting with `#` (a Markdown heading) is kept, which git's comment stripping would
     lose. Empty words or an editor that fails save nothing (exit 1); refusals exit 1; an argument the journal cannot
     use (an unknown practice, a bad `--at`, an id with `--entry`, an unknown entry) exits 2. `--at` takes an ISO time
-    and, unlike the web's API, also one without an offset or a bare `HH:MM` today, both read in the journal's time
+    and, unlike the web's API, also one without an offset or a bare `HH:MM` (the latest such time not more than five
+    minutes ahead: at 00:30, `23:30` is last night's), both read in the journal's time
     zone (a person typing at a terminal); there is no 31-day limit here (serve keeps its own): words before the
     previous journal day make an extra entry and fill no old slot (OPEN-CORE). `hermes journal` does not gain `open`
     and `write` (it mirrors the chat-side subset); `journal` has them.
@@ -3233,3 +3234,17 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     OPEN-CORE's mapping for old clients would need the server to tell builds apart, for a window of minutes);
     `--at` has no lower bound beyond what the calendar can place (a typo years back makes an extra entry on that
     day, which is visible and his to move; serve's 31-day limit is the web's).
+  - **Review round 2** (a second independent Opus pass, over the whole branch and the round-1 fixes): one major, a
+    privacy one in a round-1 fix: the editor's file was removed only on `journal write`'s normal returns, so an
+    interrupt while the editor ran (Emacs's C-g, a Ctrl-C at `code --wait`), an unreadable file or an exception at the
+    save left it on disk, `/x` words included. Fixed: the file lives in a 0700 directory of its own (the editor's
+    swap and auto-save files go with it), this process ignores SIGINT and SIGQUIT while the editor runs (as git
+    does), and every way out settles it: removed when nothing of his is in it or any line of it is off the record,
+    else kept and named (`_Draft`). Also fixed: words written below the scissors, or saved before the editor failed,
+    were deleted (now kept and named); an `OSError` at the save was a traceback; `HH:MM` a few minutes ahead was
+    yesterday's (now within the five-minute slack it is today's, as the ISO time is); the template ignored `--at`
+    (`actions.view` takes `at`); `fills` called a 00:30 slot "tomorrow's" (journal days now); `?write` opened an
+    earlier missed card while the words filled a due one (`writeTarget` follows `resolve`'s order); a practice the
+    view refuses still showed a composer; DEPLOY's temporary-journal write check ran with `HERMES_HOME` set, whose
+    plugin settings would have pointed it at the vault and the live ledger (now `env -u HERMES_HOME` and a doctor
+    check first); stale docs. The editor now runs through the shell, as git runs it (`code --wait`, `~`, quoting).

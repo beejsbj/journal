@@ -257,8 +257,11 @@ journal [--config FILE] [--hermes-home DIR] <command>
                                 missed slot, the next one later today, else an extra entry; never a /j note); with no id,
                                 a /j note; --entry adds to an entry already written. From $EDITOR as git commit does (the
                                 template below the scissors line is left out), or stdin when piped or with `-`. --at: an
-                                ISO time, or HH:MM today. /x, the engine's marker lines and the transcript placeholder
-                                are refused (exit 1, nothing saved)
+                                ISO time, or HH:MM (the latest such time not ahead of now). /x, the engine's marker
+                                lines and the transcript placeholder are refused (exit 1, nothing saved). Words from the
+                                editor that are not saved (refused, written below the scissors, a failure, Ctrl-C) are
+                                kept in its file, which the message names, unless any of it is off the record: then the
+                                file is removed
   sweep                         capture replies the gateway hook missed, from the sessions DB (the tick does this too)
   backfill-conversations --since YYYY-MM-DD [--dry-run | --write]
                                 save past chat into the journal by the conversation rules (a dry run unless --write)

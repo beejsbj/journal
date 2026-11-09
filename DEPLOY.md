@@ -63,9 +63,13 @@ starts `journal mcp` (restart the client, or reconnect the server, to see `journ
    answers `409 no-chat`. Do not press **Save** as a check: it writes into tonight's slot and the tick then
    skips that send (use it when he wants to write).
 3. `journal open evening` prints the practice and the slot line and changes nothing (vault checksum before and
-   after). `journal write` is a real write: try it against a temporary journal (`JOURNAL_CONFIG` pointing at a config
-   whose `root` and `state_dir` are under a temporary directory), e.g. `echo test | journal write evening` there, and
-   check `<tmp root>/<date>-evening.md` and that `sent.jsonl` was not written.
+   after). `journal write` is a real write: try it only against a temporary journal, and **without `HERMES_HOME`**:
+   with it set, the profile's plugin settings (`root`, `state_dir` among them) win over the config file, and the
+   "temporary" write lands in the vault and the live ledger (where the tick would then skip tonight's send). So, with
+   a config whose `root` and `state_dir` are under a temporary directory: `env -u HERMES_HOME JOURNAL_CONFIG=<tmp
+   config> journal doctor` first, and go on only if its root and state dir are the temporary ones; then `echo test |
+   env -u HERMES_HOME JOURNAL_CONFIG=<tmp config> journal write evening`, and check `<tmp root>/<date>-evening.md`
+   and that `sent.jsonl` was not written there. Vault checksum before and after: unchanged.
 4. MCP (if a client is configured): `journal_start` with a practice id returns its opener, questions and `fills`, and
    `manual-trigger.log` gains no line.
 

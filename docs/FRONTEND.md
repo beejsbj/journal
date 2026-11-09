@@ -64,7 +64,10 @@ programs with no active run).
   `slots.resolve` gives or makes an extra entry, never a `/j` note; nothing is fetched or written before he opens it),
   *Send to chat* (POST `/library/{id}/send`, shows "on its way", resolves on `ledger-changed`). A *due* card ("due
   since 09:00") is a slot whose time has come with no chat message for it. `/today?write=<id>` (Today's second path)
-  opens *Write now* on that practice's first row still to answer, or the practice alone when it has no row today.
+  opens *Write now* on the row the words will fill (the newest due or open one, else the newest missed, else the next
+  to come), or the practice alone when it has no row today; it is used once (it leaves the address, and a save stops
+  it opening again). A practice the view refuses (turned off, unknown) shows why and no composer. *Send to chat* is
+  left out when `/today` says `chat: false` (a journal with no chat).
 - Program card for each active run: "Session 3/10 · The Identity Construction Tracer · Phase 2/5 open since
   Sunday", buttons *Continue* (opens the Run screen), *Pause*.
 - Scheduled one-offs today (session-10 interrupts) as a quiet list with times.

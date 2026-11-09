@@ -71,7 +71,7 @@ def build_parser() -> argparse.ArgumentParser:
     wr.add_argument("dash", metavar="-", nargs="?", choices=["-"], help="read the words from stdin")
     wr.add_argument("--entry", metavar="STEM", help="add to an entry already written (2026-10-14-evening)")
     wr.add_argument("--at", metavar="TIME", help="when you wrote them: an ISO time (with or without its offset) or "
-                                                 "HH:MM today, in the journal's time zone")
+                                                 "HH:MM (the latest such time not ahead of now), in the journal's time zone")
     st = subs.add_parser("status", help="Show what the journal is doing")
     st.add_argument("--json", action="store_true")
     td = subs.add_parser("today", help="Print the today block the companion gets at the start of a thread")

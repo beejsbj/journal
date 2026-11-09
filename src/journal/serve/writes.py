@@ -3,8 +3,9 @@ sends and program steps that are spawned rather than run here.
 
 What keeps these safe is what they call, not what they check:
 
-* **The engine only appends his words; he can change them.** A reply or a block goes through
-  ``capture.capture_web`` / ``capture.add_web_block`` (``entries.record_reply``, under the ledger lock like the hook's
+* **The engine only appends his words; he can change them.** Words for a practice, or a note, go through
+  ``actions.answer`` / ``actions.note``, and a block through ``capture.add_web_block`` (``entries.record_reply``,
+  under the ledger lock like the hook's
   and the tick's writes). The routes that change a file he already has are his own acts, each carrying the state he was
   looking at and refused on drift (409, never an overwrite): ``PATCH …/meta`` replaces the front matter alone
   (``entries.set_meta``), ``PATCH``/``DELETE …/blocks/<key>`` replace or remove one block of his and nothing else
