@@ -3161,8 +3161,8 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   - **The `/x` hold covers the delivery only**, as the doc asks; two readings of it. *The settle*: a settle on an
     answer made on a face (`capture.by_face` of the newest capture) no longer asks `_off_the_record`; a settle on an
     answer in the chat still waits for the window (`test_programs_review`'s `test_a_settle_waits…` pins that, and
-    moving on there would make his next private message the next phase's answer). The next phase is opened at once
-    and its delivery is held. *The engine's notes from a settle* (a schedule phase's "interrupts timed" and "send a
+    keeps the chat as it was: the phase he is answering there stays the open one in the chat until the window closes).
+    On a face's answer the next phase is opened at once and its delivery is held. *The engine's notes from a settle* (a schedule phase's "interrupts timed" and "send a
     day and time") are held back too (`_say(auto=True)`); one held back is not said later (the schedule is in the run,
     `journal program status` and the web app). A phase opened inside a window still has its reflect construction built
     (the old code skipped that model call while held); a delivery that waited builds the phase again, as the old
@@ -3205,10 +3205,10 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     or `answered` as not pending and never sends it.
   - **Review round 1** (an independent Opus pass, read-only, with probes in temporary copies): no blocker, no leak of
     words said off the record; opening a phase or an interrupt is never a chat boundary. Fixed, each test-first:
-    (major) Next or Skip in the web app on a phase whose chat send was held sent it and ended his `/x` window: a
-    `journal program …` without `--notify` (the web app's spawn, a shell) now runs `programs.on_a_face()`, so the chat
-    send it causes is held as an automatic one is, and Next or Skip there moves on from a phase still owed to the chat
-    (in the chat, `--notify`, `/next` still delivers what was owed: `--notify` is given only by the chat's commands);
+    (major) Next or Skip in the web app on a phase whose chat send was held sent it and ended his `/x` window: the web
+    app's `journal program …` now runs `programs.on_a_face()` (inferred from a missing `--notify` in round 1, made an
+    explicit `--face` in round 2), so the chat send it causes is held as an automatic one is, and Next or Skip there
+    moves on from a phase still owed to the chat (in the chat, `/next` still delivers what was owed);
     a session finished on a face or by a settle inside a window held its summary in no way (now held, uncounted, and
     sent by the step once the window closes); a phase whose message the chat already had (`/back`, `/start`) took his
     next chat message again before it was re-sent (now `face_open`: current on the faces only until the re-send, as
@@ -3221,3 +3221,18 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     wording, `describe`'s line. **Kept:** `_answered_this_visit` counts any capture since the phase was opened, a
     direct reply to an older message of it included (the reviewer suggested faces only): a reply in the chat is an
     answer to the phase, and re-sending a phase he has just answered is what the rule avoids.
+  - **Review round 2** (a second independent Opus pass): no blocker, no leak; the round-1 fixes hold for their cases.
+    Fixed, test-first: (major) inferring a face from a missing `--notify` made a shell's `journal program next` move
+    past a phase he never saw, and the settle the chat's hook spawns ran as a face: serve now passes `--face` on
+    `start`, `next`, `skip`, `back` and `resume`, and only that flag makes a face (the serve spawn-argument tests in
+    `test_serve_programs.py` and `test_one_program.py` gain it); a phase left behind kept its failed attempts, so it
+    stayed in `status`'s undelivered rows and a later visit read as given up (`_left` drops them when the run moves
+    off a phase the chat never got); a reopened phase showed the old text on the web while the chat got the new
+    (`phase_text` and the intro are kept per visit); summaries of sessions done with no chat went out in a burst when
+    a chat was set (`summary_unsent: no chat`); an answer showed under an earlier confirmation's interrupt of the same
+    number; a second confirmation dropped an interrupt answered on a face (it reconciles first); a first phase whose
+    send waited lost the program's intro. **Left open, for the owner:** when a chat is set on an install that ran a
+    program with none, the phase that is current is not sent by itself (nothing was owed when it opened): `/start
+    <program>` sends it, and until then the chat takes nothing for it (README *No chat* says so). A summary held by a
+    window is not sent if the run is abandoned before the window closes (as a summary whose sends failed). On a chat
+    install an interrupt opened while its send is held still reads `pending`, so the PWA lists it as still to come.

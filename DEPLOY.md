@@ -27,8 +27,9 @@ interrupts open at their time (their ledger record is written, sent or not), and
 answers one. With `channel.platform: none` a whole run is done in the web app: nothing is sent, attempted or alerted.
 `GET /runs/{id}`'s phase gains `in_chat`, and its `delivered` means the phase is current.
 
-**Side and restart.** `programs.py` and `capture.py` (both gateway-loaded) and `serve/writes.py`, `serve/api.py`
-changed. So **a gateway restart, in a window** (the hook spawns `journal program settle`, which runs the new code at
+**Side and restart.** `programs.py` and `capture.py` (both gateway-loaded), `cli.py` (`journal program … --face`,
+which only serve passes: its spawned child runs serve's own code, so the two never disagree) and `serve/writes.py`,
+`serve/api.py` changed. So **a gateway restart, in a window** (the hook spawns `journal program settle`, which runs the new code at
 once, but the gateway's own imports of `programs` and `capture` need the restart); the tick runs the new code from
 the next tick after the pin moves; serve waits for `uv tool install --force` and the unit restart. Runs in progress
 read the same: a delivered phase (no `opened_at`, no send owed) is current, and a phase owed a send under the old code

@@ -191,7 +191,9 @@ written into the files. An empty `chat_id` on any other platform is not this: it
 that loses its chat id is noticed. Programs run there too: a phase becomes current with no message (the web app's run
 page shows it and takes the answer, and the run moves on by the program's rule), and session 10's interrupts open at
 their time and take an answer on the web (`POST /entries/{stem}/blocks` with `interrupt`; the web app has no control
-for it yet). If a chat is configured later, the annotation replies and reflections written meanwhile are sent then.
+for it yet). If a chat is configured later, the annotation replies and reflections written meanwhile are sent then; a program's
+summaries are not (they belong to sessions done with no chat), and the phase that is current goes to the chat when
+you `/start` the program.
 
 ### Another platform
 
