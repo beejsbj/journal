@@ -42,7 +42,8 @@ install should not start a program run yet: phases with no chat come with OPEN-P
 through the spawned `journal send`, which the tick's code runs. So **a gateway restart, in a window** (at least an hour
 from a ritual). The tick is a fresh process and runs the new code from the next tick after the pin moves; serve
 (`serve/api.py`) waits for `uv tool install --force` and the unit restart. Ledger records gain fields only when a face
-answers (none can until OPEN-FACES) or a send loses the race; existing records read the same.
+answers (none can until OPEN-FACES), a send loses the race, or a no-chat tick marks an annotation reply or a
+reflection `skipped: "no chat"` (with `skipped_at`); existing records read the same.
 
 1. In a window: merge to `main`; with `<sha>` the merge commit, install the CLI at `<sha>`, move the plugin pin
    (`hermes -p <profile> plugins install beejsbj/journal --force --ref <sha>`), `hermes gateway restart`,

@@ -3165,16 +3165,26 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   3. **No chat: annotation replies and reflection sends are skipped, not left pending.** With `channel.platform:
      none`, each that would have been sent is marked `skipped: "no chat"` (`annotation_reply` and the reflection's
      `telegram` record, with `skipped_at`), so a chat configured later never sends it, as OPEN-PROGRAMS does for a
-     summary (`summary_unsent: "no chat"`). A reply is marked only when `telegram.annotation_replies` is on (only
-     then would it have been sent). `status` lists no skipped reply as pending and reads a skipped reflection
-     "written, not sent: no chat". Instead the companion is told: `standing.collect` gains `no_chat`, the count of
-     annotations and reflections marked skipped since the newest prompt delivered to the chat (all of them while none
-     has been), and the pack's *Where things stand* and the today block's standing lines carry one line, e.g. "While
-     there was no chat: 12 annotations and 3 reflections were written; they are in the entries, never sent to the
-     chat." Counts only, never their words; the line goes once a prompt is delivered again. MCP's `journal_today`
+     summary (`summary_unsent: "no chat"`). A reply is marked whatever `telegram.annotation_replies` says, so
+     turning replies on with a chat later sends no backlog. `status` lists no skipped reply as pending and reads a
+     skipped reflection "written, not sent: no chat". Instead the companion is told: `standing.collect` gains
+     `no_chat`, the count of annotations and reflections written (by `annotated_at` / `written_at`) after the last
+     prompt delivered before the newest skip, and the pack's *Where things stand* and the today block's standing
+     lines carry one line, e.g. "While there was no chat: 12 annotations and 3 reflections were written; they are in
+     the entries, never sent to the chat." Counts only, never their words. A reply still owed from before the chat
+     was set to none is skipped too but not counted (it was written with a chat). Once the chat delivers again the
+     line stays a day (`standing.NO_CHAT_SHOWN`), so a plain opener's delivery does not take it away before an
+     opener's pack or the first thread's today block has carried it. MCP's `journal_today`
      does not get it: its today text does not take standing (`today.collect` without `with_standing`), so nothing
      there changed. Tests: `NoChannelTest` in `tests/test_open_core.py` (nothing pending or sent after a chat is set;
      the line in standing, the pack and the today lines, with no word of the annotation or reflection).
+     **Left open for the owner** (review of these changes): read to the letter, decision 1 also covers a practice
+     that closes the day. At 00:30, `/start evening` delivers tonight's evening (the 15th's, early): the tick's
+     23:00 send on the 15th is then done, words he writes at 00:35 answer that message (step 1, it is open), and
+     once they are annotated the 15th's day reflection is written from them at about 01:05 and not again. `main`
+     did the same (it sent the calendar date's evening), and the owner's example was a morning. If an evening
+     `/start` before `day_ends_at` should re-send or fill last night's instead, `_by_calendar` would keep step 1's
+     yesterday (a due or open slot) or leave `closes: day` practices on the journal day: a one-line rule change.
   4. **`enabled: false` means "not scheduled" only.** Every face can still open, write and deliver a disabled
      practice (the web app, `journal open`/`journal write`, MCP, `/start` and `journal send`); the schedule never
      sends it. Applied on OPEN-FACES (#28), recorded there.
