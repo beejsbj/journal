@@ -225,25 +225,41 @@ def _heard(cfg: Config, data: dict, now: datetime, chat_at: datetime | None, ent
     return out
 
 
-def without_chat(data: dict) -> dict:
-    """``{"annotations", "reflections"}``: how many were written while there was no chat (an annotation reply or a
-    reflection send marked skipped, ``no chat``) since the newest prompt delivered to the chat. Counts only: nothing
-    of their words is read."""
-    last = None
-    for p in _prompts(data):
-        at = _parse(p.get("sent_at")) if p.get("message_id") else None
-        if at is not None and (last is None or at > last):
-            last = at
+NO_CHAT_SHOWN = timedelta(days=1)  # how long the no-chat line stays once the chat delivers again
 
-    def after(mark) -> bool:
-        if not isinstance(mark, dict) or mark.get("skipped") != "no chat":
-            return False
-        at = _parse(mark.get("skipped_at"))
-        return last is None or (at is not None and at > last)
+
+def without_chat(data: dict, now: datetime | None = None) -> dict:
+    """``{"annotations", "reflections"}``: how many were written while there was no chat (an annotation reply or a
+    reflection send marked skipped, ``no chat``) since the last prompt delivered to the chat before them. The
+    stretch ends at the newest skip; an item written before the delivery that came before it (its reply was still
+    owed when the chat was set to none) was written with a chat and is not counted. Once the chat delivers again
+    the line stays for ``NO_CHAT_SHOWN`` (so the first openers and the first thread's today block carry it, a
+    plain opener's delivery included), then goes. Counts only: nothing of their words is read."""
+    marks = []
+    for p in _prompts(data):
+        r = p.get("annotation_reply")
+        if isinstance(r, dict) and r.get("skipped") == "no chat":
+            marks.append(("annotations", _parse(r.get("skipped_at")), _parse(p.get("annotated_at"))))
     found = data.get("reflections") if isinstance(data, dict) else None
-    return {"annotations": sum(after(p.get("annotation_reply")) for p in _prompts(data)),
-            "reflections": sum(after(r.get("telegram")) for r in (found if isinstance(found, list) else [])
-                               if isinstance(r, dict))}
+    for rec in (found if isinstance(found, list) else []):
+        t = rec.get("telegram") if isinstance(rec, dict) else None
+        if isinstance(t, dict) and t.get("skipped") == "no chat":
+            marks.append(("reflections", _parse(t.get("skipped_at")), _parse(rec.get("written_at"))))
+    out = {"annotations": 0, "reflections": 0}
+    skips = [s for _k, s, _w in marks if s is not None]
+    if not marks:
+        return out
+    newest = max(skips) if skips else None
+    sent = [t for t in (_parse(p.get("sent_at")) for p in _prompts(data) if p.get("message_id")) if t is not None]
+    before = max((t for t in sent if newest is None or t < newest), default=None)
+    back = min((t for t in sent if newest is not None and t > newest), default=None)
+    if back is not None and now is not None and now - back > NO_CHAT_SHOWN:
+        return out
+    for kind, skipped, written in marks:
+        when = written or skipped
+        if before is None or (when is not None and when > before):
+            out[kind] += 1
+    return out
 
 
 # ── programs ─────────────────────────────────────────────────────────────────
@@ -342,7 +358,7 @@ def collect(cfg: Config, now: datetime, chat: tuple[datetime | None, str] | None
     except Exception:  # noqa: BLE001
         out["unavailable"].append("the program runs")
     try:
-        out["no_chat"] = without_chat(data)
+        out["no_chat"] = without_chat(data, now)
     except Exception:  # noqa: BLE001 - the count is lost, never the pack
         pass
     return out
