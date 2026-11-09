@@ -74,7 +74,8 @@ Steps 2–4 work on the **journal day** of `at`: its local date, except that wor
    before `at`. An evening answer at 00:30 takes last night's slot.
 2. Else the journal day's newest slot that is **missed and unanswered**, whose time is at or before `at`. The chat's fold
    already says "missed — reply anytime".
-3. Else the **next slot later the same journal day** that has no record: doing it early fills that slot, and its
+3. Else the **next slot later the same journal day** that has no record, or only the record a failed send left (no
+   delivery, no captures): doing it early fills that slot, and its
    scheduled send is skipped. A slot that has already been delivered is not taken here, since WP10 refuses a prompt
    sent after `at`.
 4. Else **an extra entry of that practice** for the journal day: slot 1's id when the practice has no schedule and that
@@ -281,16 +282,18 @@ Not affected: entry files and their format, the ledger's locking, `/j` notes, bl
   each step of `slots.resolve`: 00:30 evening, a missed morning at 20:00, a second write staying with its slot on a
   multi-slot practice, early, unscheduled, and the record a failed send left (filled in, then off the
   *undelivered* list). Backdated words before a delivered prompt never answer it.
-- **Any time:** choosing an answered practice again makes an extra entry (`-<n>`), never a `/j` note; words dated
-  before yesterday make an extra entry on that day and fill no old slot.
+- **Any time:** choosing a practice again after answering a slot fills the next slot that fits (after a 09:00 answer,
+  choosing it at 10:00 fills the unrecorded 18:00 slot and skips its scheduled send); only when no slot fits does it
+  make an extra entry (`-<n>`), never a `/j` note. Words dated before the previous journal day make an extra entry on
+  that day and fill no old slot. A failed send's record still takes words through step 3.
 - **Push:** RFC 8291/8292 test vectors; a slot is pushed once, also when the tick delivered it before the thread's
   first look (`push.when: always`); a 410 drops the subscription; `push.when: no-chat`
   pushes nothing while a chat is configured; a push writes nothing to the ledger, `sent.jsonl`, `send-times.json` or
   the thread stamps (rule 12); the payload carries the title only.
 - **The lost race:** a scheduled send that goes out after a face answered keeps `opener` and gains `sent_opener`,
   `sent_html` and `sent_plain_text`; the next tick folds the message to "answered" with the sent opener; the sweep
-  matches a quote of the sent text. A deliberate `/start` after a face answer makes an extra entry, never touching
-  the answered record.
+  matches a quote of the sent text. A deliberate `/start` after a face answer, when no slot fits, makes an extra
+  entry, never touching the answered record.
 - **Overnight:** at 00:30 a missed 21:00 evening (two-hour window) takes the answer, and tonight's slot is untouched;
   at 15:00 the evening fills tonight's slot early. `day_ends_at` moves the boundary.
 - **Late direct replies:** a reply to an answered or expired delivered prompt is still captured by message id.
