@@ -23,6 +23,7 @@ annotations, reflections and transcripts without using up their attempts.
 """
 from __future__ import annotations
 
+import contextvars
 import fcntl
 import json
 import os
@@ -56,8 +57,12 @@ class SendFailed(Alert):
     """A prompt could not be delivered after SEND_ATTEMPTS ticks."""
 
 
+# the packs ``_opener`` builds while ``send_due`` holds them back until its pre-send check (rule 2 of OPEN-PROMPTS)
+_PACKS: contextvars.ContextVar[list | None] = contextvars.ContextVar("journal_tick_packs", default=None)
+
+
 def _opener(cfg: Config, practice: Practice | str, now_local: datetime, pid: str,
-            log: list[str] | None = None, packs: list[str] | None = None) -> tuple[str, str, list, list]:
+            log: list[str] | None = None) -> tuple[str, str, list, list]:
     """(opener, source, citations, asked) for a practice's prompt. ``opener.mode: plain`` asks no model; otherwise
     the companion's opener, validated, or the plain one whenever that fails (an opener is never deferred).
 
@@ -68,9 +73,9 @@ def _opener(cfg: Config, practice: Practice | str, now_local: datetime, pid: str
     ``errors.jsonl`` (kept to ``ERRORS_KEPT`` records) and ``journal status`` shows it under "Recent errors":
     wanted, since that is where one looks for why a prompt went out plain.
 
-    The context pack is saved under ``pid`` (``context.save``), unless ``packs`` is given: then it is appended there
-    for the caller to save once it knows the prompt goes out (``send_due``: a send skipped by the pre-send check
-    leaves no pack behind)."""
+    The context pack is saved under ``pid`` (``context.save``), unless the caller holds packs (``_PACKS``, set by
+    ``send_due``): then it is kept there to be saved once the caller knows the prompt goes out, so a send skipped by
+    the pre-send check leaves no pack behind."""
     practice = library.resolve(practice, cfg)
     plain = compose.plain_opener(practice, cfg.names)
     if practice.opener["mode"] == "plain":
@@ -80,10 +85,11 @@ def _opener(cfg: Config, practice: Practice | str, now_local: datetime, pid: str
     except Exception:  # noqa: BLE001 - never block an opener: the pack goes without it, the request without the stance
         stand = None
     pack = context.build(cfg, now_local, stand)
-    if packs is None:
+    held = _PACKS.get()
+    if held is None:
         context.save(cfg, pid, pack)
     else:
-        packs.append(pack)
+        held.append(pack)
     # the run the stand already holds (one read of the ledger); context.unanswered never raises either
     missed = stand["missed"]["run"] if stand else context.unanswered(cfg, now_local)
     try:
@@ -163,7 +169,11 @@ def send_due(cfg: Config, now_local: datetime, log: list[str], only: str | None 
     names = cfg.names
     for practice, local_date, pid, scheduled in due:
         packs: list[str] = []
-        opener, source, cites, asked = _opener(cfg, practice, now_local, pid, log, packs)
+        token = _PACKS.set(packs)
+        try:
+            opener, source, cites, asked = _opener(cfg, practice, now_local, pid, log)
+        finally:
+            _PACKS.reset(token)
         html = compose.telegram_html(practice, now_local, opener, names=names)
         questions = library.question_snapshot(practice)  # what this prompt carries, kept as sent (library.snapshot_sections)
         record = {
