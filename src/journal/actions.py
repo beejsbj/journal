@@ -16,7 +16,13 @@ Every face that saves his words calls here, so the rules hold in one place:
   nothing is mirrored into the companion's session (rule 8): a face's words never end a bare ``/x`` window, start a
   thread or take his next chat message. She reads them where she reads the ledger and the entries.
 
-Both run under the ledger lock (a face bounds the wait with ``ledger.deadline``). Both return what
+* **Opening is a view** (``view``): what the web app's *Write now*, ``journal open`` and MCP's ``journal_start`` show
+  is read here and writes nothing, so there is no "opened but not answered" record and an accidental tap changes
+  nothing.
+* **More words for an entry go through that entry** (``add``: ``journal write --entry``), not through the practice,
+  which would fill the next slot (OPEN-PROMPTS, *Adding more words to an entry already written*).
+
+The writes run under the ledger lock (a face bounds the wait with ``ledger.deadline``). They return what
 ``capture.record`` does, ``{prompt, path, rule}``, with ``slot`` and ``step`` for ``answer``; a repeated
 ``client_id`` returns the first write's result with ``duplicate``.
 """
@@ -35,7 +41,8 @@ FUTURE_SLACK = timedelta(minutes=5)  # a face's clock a little ahead of the serv
 
 class Refused(ValueError):
     """Words the journal turns away; nothing was written. ``code``: ``off-the-record``, ``reserved-line``,
-    ``placeholder``, ``empty``, ``not-a-practice`` or ``bad-time``; ``str(e)`` says why, in words a face can show."""
+    ``placeholder``, ``empty``, ``not-a-practice`` or ``bad-time``, and for ``add`` ``not-an-entry``,
+    ``not-engine-entry`` or ``program-entry``; ``str(e)`` says why, in words a face can show."""
 
     def __init__(self, code: str, message: str):
         super().__init__(message)
@@ -157,3 +164,78 @@ def note(cfg: Config, text: str | None, at: datetime | None = None, *, via: str,
             return {**capture.planned_info(cfg, done[0]), "rule": done[1].get("rule", ""), "duplicate": True}
         rec = capture.new_note_prompt(data, cfg, at)
         return capture._web_record(cfg, data, rec, "/j", words, at, client_id, media, ext, meta, via=via)
+
+
+def add(cfg: Config, stem: str, text: str | None, at: datetime | None = None, *, via: str,
+        now: datetime | None = None, client_id: str | None = None, media: str | None = None, ext: str = ".ogg",
+        meta: dict | None = None, key_of: Callable[[Path], str | None] | None = None) -> dict:
+    """More of his words for the entry ``stem``, appended as a block of their own (``capture.add_web_block``, the web
+    app's *Add*), stamped ``at`` (default now; not before the entry's day). Only an entry the engine wrote, and not a
+    program session's (its answers belong to a phase, which the chat and the web app keep). Raises ``Refused``
+    (nothing written)."""
+    via = _via(via)
+    words = _words(cfg, text, media)
+    now = now or datetime.now(timezone.utc)
+    at = _when(at, now)
+    if entries.entry_file(cfg.root, stem) is None:
+        raise Refused("not-an-entry", f"no journal entry {stem!r}: nothing was saved")
+    path = entries.engine_file(cfg.root, stem)
+    if path is None:
+        raise Refused("not-engine-entry", "this file is his own, not one the journal wrote, so no face writes to it: "
+                                          "nothing was saved")
+    fm = entries.front_matter_of(path)
+    if fm.get("program") or fm.get("run"):
+        raise Refused("program-entry", "this is a program session's entry: its answers go to the open phase, in the "
+                                       "chat or the web app: nothing was saved")
+    if at.astimezone(cfg.tz).date().isoformat() < stem[:10]:
+        raise Refused("bad-time", "the time on these words is before the day of this entry: nothing was saved")
+    info = capture.add_web_block(cfg, stem, words, at, media=media, ext=ext, meta=meta, client_id=client_id,
+                                 key_of=key_of, via=via)
+    return {**info, "stem": stem}
+
+
+# ── opening a practice: a view ───────────────────────────────────────────────
+
+def view(cfg: Config, practice, *, now: datetime | None = None) -> dict:
+    """The practice as a face shows it when he opens it (the web app's *Write now*, ``journal open``, MCP's
+    ``journal_start``), and the slot words written now would fill (``slots.resolve`` on a snapshot). Writes nothing.
+
+    ``prompt`` has the entry document's shape (``sent_at_local``, ``opener``, ``opener_source``, ``asked``,
+    ``questions``): the practice's plain opener and its questions, or, when the slot is a prompt the chat already
+    has, that prompt as it was sent. ``slot``: ``{id, date, state, step, at, delivered}`` (``at`` its scheduled
+    local time, None for an extra entry); ``fills``: the same in words. Raises ``Refused`` (``not-a-practice``)."""
+    p = _practice(cfg, practice)
+    now = now or datetime.now(timezone.utc)
+    slot = slots.resolve(cfg, p, now, now=now)
+    rec = slot.record if slot.delivered else None
+    if rec is not None:
+        sent = library.snapshot_sections(rec)
+        sections = list(sent) if sent else list(p.sections)
+        prompt = {"sent_at_local": rec.get("sent_at_local"), "opener": capture.stored_opener(cfg, rec),
+                  "opener_source": rec.get("opener_source"), "asked": list(rec.get("asked") or [])}
+    else:
+        sections = list(p.sections)
+        prompt = {"sent_at_local": None, "opener": compose.plain_opener(p, cfg.names), "opener_source": "plain",
+                  "asked": []}
+    prompt["questions"] = [{"id": q.id, "text": q.text, "section": title} for title, qs in sections for q in qs]
+    at = slot.at.astimezone(cfg.tz).strftime("%H:%M") if slot.at is not None and slot.n is not None else None
+    return {"practice": p.id, "title": p.title, "emoji": p.emoji, "prompt": prompt,
+            "slot": {"id": slot.id, "date": slot.local_date, "state": slot.state, "step": slot.step, "at": at,
+                     "delivered": slot.delivered},
+            "fills": fills(cfg, slot, now)}
+
+
+def fills(cfg: Config, slot: slots.Slot, now: datetime) -> str:
+    """Where words written at ``now`` go (``slot``, from ``resolve``), in words a face can show under the practice."""
+    when = slot.at.astimezone(cfg.tz).strftime("%H:%M") if slot.at is not None else None
+    day = "" if slot.local_date == slots.journal_day(cfg, now).isoformat() else f" of {slot.local_date}"
+    sent = slot.time.astimezone(cfg.tz).strftime("%H:%M") if slot.delivered and slot.time is not None else None
+    if slot.step == 1:
+        return (f"Answers the prompt the chat has{day}, sent at {sent}." if sent
+                else f"Fills the {when} slot{day}, due now.")
+    if slot.step == 2:
+        return (f"Answers the prompt sent at {sent}{day}, which went by unanswered." if sent
+                else f"Fills the {when} slot{day}, which went by unanswered.")
+    if slot.step == 3:
+        return f"Fills the {when} slot{day} early" + ("; it will not be sent." if cfg.has_channel else ".")
+    return f"Starts an extra entry of this practice ({slot.id})."

@@ -4,6 +4,11 @@
 
     tick                     one scheduler tick: send due practices, fold, annotate, reply, prune
     send <id>                send a practice now (any id in the library; waits for a running tick); --dry-run previews
+    open <id>                show a practice as you would write it (its opener, its questions, the slot it fills);
+                             writes nothing
+    write [<id>] [-]         write your words: for a practice (into the slot it fills), else a note; --entry STEM adds
+                             to an entry already written; --at TIME backdates. From $EDITOR as git commit does, or
+                             from stdin (piped, or `-`)
     sweep                    capture replies the gateway hook missed (busy path), from the sessions DB
     backfill-conversations   save past chat (both sides) into the journal by the thread rules; dry run by default
     status                   last tick, due rituals, open prompts, notebook, recent errors
@@ -56,6 +61,17 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--dry-run", action="store_true", help="Print the message instead of sending it")
     s.add_argument("--hold-off-record", action="store_true",
                    help="Send nothing while a bare /x window is open (a model asking for him: MCP's journal_start)")
+    op = subs.add_parser("open", help="Show a practice as you would write it: its opener, its questions, and the "
+                                      "slot your words would fill (writes nothing)")
+    op.add_argument("practice", metavar="ID", help="a practice id (journal practices list)")
+    op.add_argument("--json", action="store_true")
+    wr = subs.add_parser("write", help="Write your words: for a practice, into the slot it fills; with no id, a note; "
+                                       "from $EDITOR, or from stdin")
+    wr.add_argument("practice", metavar="ID", nargs="?", help="a practice id; leave it out for a note; `-` reads stdin")
+    wr.add_argument("dash", metavar="-", nargs="?", choices=["-"], help="read the words from stdin")
+    wr.add_argument("--entry", metavar="STEM", help="add to an entry already written (2026-10-14-evening)")
+    wr.add_argument("--at", metavar="TIME", help="when you wrote them: an ISO time (with or without its offset) or "
+                                                 "HH:MM today, in the journal's time zone")
     st = subs.add_parser("status", help="Show what the journal is doing")
     st.add_argument("--json", action="store_true")
     td = subs.add_parser("today", help="Print the today block the companion gets at the start of a thread")
@@ -262,6 +278,127 @@ def program(args, cfg: jconfig.Config) -> int:
     if log:
         print("\n".join(log))
     return code
+
+
+SCISSORS = "# ------------------------ >8 ------------------------"
+
+
+def open_command(args, cfg: jconfig.Config) -> int:
+    """``journal open <id>``: the practice as a face shows it (``actions.view``). Nothing is written."""
+    from . import actions
+    try:
+        v = actions.view(cfg, args.practice, now=datetime.now(timezone.utc))
+    except actions.Refused as e:
+        return _err(str(e).replace(": nothing was saved", ""))
+    if args.json:
+        print(json.dumps(v, indent=2, ensure_ascii=False))
+        return 0
+    print("\n".join([*_shown_practice(v), "", f"journal write {v['practice']}"]))
+    return 0
+
+
+def _shown_practice(v: dict) -> list[str]:
+    """A view (``actions.view``) as lines: title, opener, questions in their sections, and the slot it fills."""
+    out = [" ".join(x for x in (v.get("emoji"), v["title"]) if x), ""]
+    if v["prompt"].get("opener"):
+        out += [v["prompt"]["opener"], ""]
+    section = None
+    for q in v["prompt"]["questions"]:
+        if q["section"] and q["section"] != section:
+            out += ["", q["section"]] if out[-1] else [q["section"]]
+        section = q["section"]
+        out.append(f"{q['id']}. {q['text']}")
+    return out + ["", v["fills"]]
+
+
+def _at_arg(cfg: jconfig.Config, raw: str | None, now: datetime) -> datetime | None:
+    """``--at``: an ISO time (one without an offset is in the journal's time zone), or ``HH:MM`` today."""
+    if raw is None:
+        return None
+    try:
+        when = datetime.fromisoformat(raw)
+    except ValueError:
+        try:
+            hh, mm = (int(x) for x in raw.split(":"))
+            when = now.astimezone(cfg.tz).replace(hour=hh, minute=mm, second=0, microsecond=0)
+        except ValueError:
+            raise ValueError(f"--at must be an ISO time or HH:MM (got {raw!r})") from None
+    return when if when.tzinfo is not None else when.replace(tzinfo=cfg.tz)
+
+
+def _from_editor(template: str) -> str | None:
+    """His words from ``$VISUAL`` / ``$EDITOR`` (else ``vi``), as git commit asks for a message: the file opens with
+    ``template`` below a scissors line, and everything from that line down is left out. Nothing else is taken
+    out (a line of his starting with ``#`` is a heading, not a comment). None when the editor failed."""
+    import shlex
+    import subprocess
+    import tempfile
+    editor = os.environ.get("VISUAL") or os.environ.get("EDITOR") or "vi"
+    fd, name = tempfile.mkstemp(prefix="journal-", suffix=".md")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(f"\n{SCISSORS}\n{template}")
+        if subprocess.run([*shlex.split(editor), name]).returncode != 0:
+            return None
+        text = Path(name).read_text(encoding="utf-8")
+    finally:
+        os.unlink(name)
+    cut = text.find(SCISSORS)
+    return (text[:cut] if cut >= 0 else text).strip("\n")
+
+
+def _template(v: dict | None, stem: str | None) -> str:
+    lines = ["# Write above this line; everything from it down is left out.", "#"]
+    lines += [f"# {x}" if x else "#" for x in (_shown_practice(v) if v else [f"Adding to {stem}."])]
+    return "\n".join(lines) + "\n"
+
+
+def write_command(args, cfg: jconfig.Config) -> int:
+    """``journal write [<id>] [-] [--entry STEM] [--at TIME]``: his words through ``actions`` (``answer`` for a
+    practice, ``add`` for an entry, ``note`` otherwise), with the refusals every face has. The words come from stdin
+    when it is piped or ``-`` is given, else from the editor. Exit 0 saved, 1 nothing saved (refused, empty, the
+    editor failed), 2 an argument the journal cannot use."""
+    from . import actions, entries
+    practice, stdin = args.practice, args.dash == "-"
+    if practice == "-":
+        practice, stdin = None, True
+    if practice and args.entry:
+        return _err("name a practice or --entry, not both")
+    now = datetime.now(timezone.utc)
+    try:
+        at = _at_arg(cfg, args.at, now)
+    except ValueError as e:
+        return _err(str(e))
+    v = None
+    try:
+        if practice:
+            v = actions.view(cfg, practice, now=now)
+        elif args.entry and entries.engine_file(cfg.root, args.entry) is None:
+            raise actions.Refused("not-an-entry", f"no journal entry {args.entry!r} the journal wrote")
+    except actions.Refused as e:
+        return _err(str(e).replace(": nothing was saved", ""))
+    if stdin or not sys.stdin.isatty():
+        text = sys.stdin.read()
+    else:
+        text = _from_editor(_template(v, args.entry))
+        if text is None:
+            print("journal: the editor did not finish: nothing was saved", file=sys.stderr)
+            return 1
+    try:
+        if practice:
+            info = actions.answer(cfg, practice, text, at, via="cli", now=now)
+        elif args.entry:
+            info = actions.add(cfg, args.entry, text, at, via="cli", now=now)
+        else:
+            info = actions.note(cfg, text, at, via="cli", now=now)
+    except actions.Refused as e:
+        print(f"journal: {e}", file=sys.stderr)
+        return 2 if e.code in ("not-a-practice", "bad-time", "not-an-entry", "not-engine-entry", "program-entry") \
+            else 1
+    # (the slot the view named, said again: words saved in another one, a race with a tick, are only named by path)
+    said = f" {v['fills']}" if v and info.get("slot") == v["slot"]["id"] else ""
+    print(f"Saved in {info['path']}.{said}")
+    return 0
 
 
 def add_serve_parser(subs) -> None:
@@ -689,6 +826,10 @@ def run(args, cfg_loader=None, hermes_checks=None) -> int:
             return 1
         if not practice.enabled:
             return _err(f"{practice.id!r} is turned off (enabled: false in {practice.path})")
+    if cmd == "open":
+        return open_command(args, cfg)
+    if cmd == "write":
+        return write_command(args, cfg)
     if cmd in ("tick", "send"):
         from . import tick
         only = args.ritual if cmd == "send" else None
