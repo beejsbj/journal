@@ -44,8 +44,9 @@ def files(cfg: Config) -> list[Path]:
     return sorted(root.glob(_DATED)) if root.is_dir() else []
 
 
-def his_words_everywhere(cfg: Config) -> str:
-    """Every word of his in the journal, file after file: what a quote reached through search is checked against."""
+def his_texts(cfg: Config) -> list[str]:
+    """His words in each file of the journal, one item per file: what a quote reached through search is checked
+    against, file by file (``validate.unfound``: a quote stitched from several files is not his)."""
     out = []
     for p in files(cfg):
         try:
@@ -54,7 +55,7 @@ def his_words_everywhere(cfg: Config) -> str:
             continue
         if text:
             out.append(text)
-    return "\n\n".join(out)
+    return out
 
 
 def _needles(query: str) -> list[tuple[str, re.Pattern]]:
@@ -76,6 +77,7 @@ def _needles(query: str) -> list[tuple[str, re.Pattern]]:
 
 
 def _date(value, name: str) -> str | None:
+    """``value`` as an ISO date, None when not given; ``SearchError`` naming ``name`` when it is not a date."""
     if value in (None, ""):
         return None
     try:
@@ -85,6 +87,7 @@ def _date(value, name: str) -> str | None:
 
 
 def _excerpt(text: str, start: int, end: int) -> str:
+    """``text`` around a match at ``[start, end)``: ``WINDOW`` characters either side, cut at spaces, "…" where cut."""
     lo, hi = max(0, start - WINDOW), min(len(text), end + WINDOW)
     if lo > 0:
         cut = text.find(" ", lo, start)

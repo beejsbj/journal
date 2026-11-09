@@ -675,15 +675,43 @@ def entry_words(body: str) -> str:
     return text
 
 
+_COPY = re.compile(r"^(.+) \(\d+\)(\.md)$")  # a sync conflict's copy: ``2026-10-14-evening (1).md``
+
+
 def his_text(path: Path) -> str:
     """What in a journal file is his, for the quote check: an engine entry's words section and his conversation
     lines (``entry_words``), never her annotations, her notes, her folded replies, the opener under ``## Prompt`` or
     the engine's summary; a file of his own (no engine entry, not an analysis) whole, without its front matter;
-    nothing from a file the companion or the engine wrote (a reflection, a week review, an insights document)."""
+    nothing from a file the companion or the engine wrote (a reflection, a week review, an insights document).
+
+    A sync conflict's copy (``2026-10-14-evening (1).md``) is judged as the file it copies, by that name and its own
+    front matter (``_copy_text``), so a copy of her reflection gives nothing and a copy of an entry gives his words,
+    never the whole file."""
+    body = path.read_text(encoding="utf-8", errors="replace") if path.is_file() else ""
+    copy = _COPY.match(path.name)
+    if copy:
+        return _copy_text(body, copy.group(1) + copy.group(2))
     if authored_by_engine(path):
         return ""
-    body = path.read_text(encoding="utf-8", errors="replace")
     if kind_of(path) is not None:
+        return entry_words(body)
+    return re.sub(r"\A---\n.*?\n---\n", "", body, count=1, flags=re.S)
+
+
+def _copy_text(body: str, name: str) -> str:
+    """``his_text`` of a copy whose original is called ``name``: the rules of ``authored_by_engine`` and ``entry_key``
+    applied to that name and the copy's own front matter."""
+    fm = front_matter(body)
+    analysis = _ANALYSIS_NAME.match(name)
+    if analysis and fm.get("kind") == analysis.group(1) and fm.get("author"):
+        return ""
+    if _INSIGHTS_NAME.search(name) and fm.get("kind") == "insights" and fm.get("author") == "engine" and fm.get("run"):
+        return ""
+    cands = name_candidates(name)
+    ids = known_ids()
+    claimed = (fm.get("practice"), fm.get("kind"))
+    if cands and not any(c[0] in ANALYSIS_KINDS for c in cands) and (
+            any(c[0] in ids for c in cands) or fm.get("type") == ENGINE_TYPE and any(c[0] in claimed for c in cands)):
         return entry_words(body)
     return re.sub(r"\A---\n.*?\n---\n", "", body, count=1, flags=re.S)
 

@@ -91,10 +91,23 @@ class SearchTest(unittest.TestCase):
         with mock.patch.object(sqlite3, "connect", side_effect=AssertionError("search read a database")), \
                 mock.patch("journal.config.Config.transcript", side_effect=AssertionError("search read the chat")):
             self.assertTrue(search.search(self.cfg, "harbour")["results"])
-            self.assertIn("The harbour at dusk", search.his_words_everywhere(self.cfg))
+            self.assertTrue(any("The harbour at dusk" in t for t in search.his_texts(self.cfg)))
         self.assertEqual({p.name: p.read_bytes() for p in self.cfg.root.iterdir()}, before)
         self.assertEqual(sorted(p.name for p in self.cfg.state_dir.rglob("*")), state)
-        self.assertNotIn("lighthouse", search.his_words_everywhere(self.cfg))
+        self.assertFalse(any("lighthouse" in t for t in search.his_texts(self.cfg)))
+
+    def test_a_sync_conflict_copy_is_read_by_its_front_matter_not_whole(self):
+        ev = self.cfg.root / "2026-10-14-evening.md"
+        (self.cfg.root / "2026-10-14-evening (1).md").write_text(ev.read_text())
+        refl = self.cfg.root / "2026-10-14-reflection.md"
+        (self.cfg.root / "2026-10-14-reflection (1).md").write_text(refl.read_text())
+        self.assertEqual(entries.his_text(self.cfg.root / "2026-10-14-evening (1).md"), entries.his_text(ev))
+        self.assertEqual(entries.his_text(self.cfg.root / "2026-10-14-reflection (1).md"), "")
+        self.assertEqual(self.stems("lighthouse"), [])  # her annotation and reflection, copied or not, are not his
+        self.assertEqual(self.stems("Mother"), ["2026-10-14-evening (1)", "2026-10-14-evening"])
+        mine = self.cfg.root / "2026-10-20-plans.md"
+        mine.write_text("---\ntype: journal\n---\nmy own plans: the harbour first\n")  # his file, not entry-shaped
+        self.assertIn("my own plans: the harbour first", entries.his_text(mine))
 
     def test_registered_apart_as_the_one_read_only_tool(self):
         from journal.config import Names
