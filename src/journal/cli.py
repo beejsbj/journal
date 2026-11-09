@@ -27,6 +27,7 @@ Exit codes: 0 ok; 1 a check or delivery failed; 2 unusable configuration or argu
 from __future__ import annotations
 
 import argparse
+import contextlib
 import html
 import json
 import os
@@ -216,9 +217,13 @@ def program(args, cfg: jconfig.Config) -> int:
             return 1
         if pending is None:
             return 0
+    # Only the chat's commands pass --notify. Anything else (the web app's spawn, a shell) was not said in the chat:
+    # a chat send it causes waits for a bare /x window, and /next or /skip there moves on from a phase still owed
+    # to the chat (``programs.on_a_face``).
+    face = programs.on_a_face() if not notify else contextlib.nullcontext()
     try:
         expect = programs.parse_where(args.expect) if getattr(args, "expect", None) else None
-        with programs.locked(cfg):
+        with programs.locked(cfg), face:
             if pending is not None:   # (the tick's lock is held: an edit saved from here on needs a refresh of its own)
                 programs.release_refresh(pending)
                 pending = None

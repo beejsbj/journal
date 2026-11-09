@@ -41,6 +41,7 @@ waits on a model.
 from __future__ import annotations
 
 import contextlib
+import contextvars
 import fcntl
 import hashlib
 import html
@@ -70,6 +71,27 @@ REFLECT_BUDGET = 120  # seconds of model time for a reflect phase's construction
 SLOT_WORDS = 140  # a prose slot takes his answer only when it is one short line
 SKIPPED = "_(skipped)_"
 ABOVE = "_(in the answer above)_"
+
+
+_FACE = contextvars.ContextVar("journal_programs_face", default=False)
+
+
+@contextlib.contextmanager
+def on_a_face():
+    """The transitions inside were asked for on a face (the web app spawns ``journal program …`` without
+    ``--notify``; so does a shell), not in the chat: a chat send they cause is held while a bare ``/x`` window is open,
+    as an automatic one is, since a tap in the web app is not his act in the chat. ``/next`` and ``/skip`` given there
+    move on from a phase that is current and still owed to the chat (he has it in front of him)."""
+    token = _FACE.set(True)
+    try:
+        yield
+    finally:
+        _FACE.reset(token)
+
+
+def _held_for_chat(auto: bool) -> bool:
+    """A send that a ``/x`` window holds: the engine's own (``auto``), or one a face's command causes."""
+    return auto or _FACE.get()
 
 
 class ProgramError(ValueError):
@@ -486,21 +508,29 @@ def phase_opened(ph: dict) -> bool:
 
 
 def _build(cfg: Config, prog: Program, run: dict, s: int, p: int, now: datetime, log: list[str],
-           intro: str = "") -> tuple[dict, list[str]]:
+           intro: str = "", made: dict | None = None) -> tuple[dict, list[str]]:
     """The phase's ledger record and its messages (the last one is ``record["html"]``; a phase over Telegram's limit
     goes in two or more). A reflect phase asks the model for its construction here, and a bridge is asked for when
-    ``programs.bridges`` is on: this runs in the tick or a spawned ``journal program …``, never in serve."""
+    ``programs.bridges`` is on: this runs in the tick or a spawned ``journal program …``, never in serve. ``made``:
+    the record as it was opened; what the model wrote then (``construction``, ``bridge``) is used again, so a delivery
+    that waited says what the web app showed, and asks no model."""
     session = prog.session(s)
     phase = session.phase(p)
     sess = _session(run, s)
     lead = session.phase(p - 1).transition if p > 1 else ""
+    made = made or {}
     note = ""
     construction = None
     if phase.type == "reflect":
-        construction, note = _construction(cfg, prog, run, s, p, log)
+        if "construction" in made:
+            construction, note = made["construction"], made.get("reflect", "")
+        else:
+            construction, note = _construction(cfg, prog, run, s, p, log)
     fallback = (f"_({cfg.names.companion} would normally build this from your answers; write it yourself if you "
                 "like.)_")
-    bridge = _bridge(cfg, prog, run, s, p, log) if phase.type == "ask" else ""
+    bridge = ""
+    if phase.type == "ask":
+        bridge = made["bridge"] if "bridge" in made else _bridge(cfg, prog, run, s, p, log)
     parts = compose.phase_parts(prog, s, p, lead=lead, construction=construction, fallback=fallback, intro=intro,
                                 fill=filler(cfg, prog, run, s),
                                 ask=confirm_request(cfg, phase, now) if phase.type == "schedule" else "")
@@ -520,6 +550,9 @@ def _build(cfg: Config, prog: Program, run: dict, s: int, p: int, now: datetime,
         **({"emoji": prog.emoji} if prog.emoji else {}),
         **({"annotate": False} if not prog.annotate else {}),
         **({"reflect": note} if phase.type == "reflect" and note else {}),
+        # (what the model wrote for this visit, kept so a delivery that waits sends the same text: ``made``)
+        **({"construction": construction} if phase.type == "reflect" else {}),
+        **({"bridge": bridge} if phase.type == "ask" else {}),
     }
     return record, messages
 
@@ -546,17 +579,41 @@ def _open(cfg: Config, run: dict, s: int, p: int, record: dict, now: datetime) -
                       and not (k == "stem" and q.get("stem"))})
             if not q.get("message_id"):
                 q["sent_at"] = at
+        else:  # (what the model wrote for this visit, for a delivery that waits: ``_build``'s ``made``)
+            for k in ("construction", "bridge", "reflect"):
+                if k in record:
+                    q[k] = record[k]
+                else:
+                    q.pop(k, None)
         for other in data["prompts"]:  # one open phase per run
-            if other.get("run") == run["id"] and other is not q and other.get("phase_open"):
-                other["phase_open"] = False
-                _span(other, False, at)
-        q["phase_open"] = True
-        _span(q, True, at)
+            if other.get("run") == run["id"] and other is not q and (other.get("phase_open") or other.get("face_open")):
+                _close_one(other, at)
         q.pop("advanced_at", None)
+        if q.get("message_id") and cfg.has_channel:
+            # its old message is in the chat: it takes his chat messages again only once it has been sent again
+            # (``_deliver``), as before; until then the phase is current on the faces alone
+            q["face_open"] = True
+        else:
+            q["phase_open"] = True
+            _span(q, True, at)
     ph = _phase(run, s, p)
     ph.update(prompt_id=pid, opened_at=at, send_due=cfg.has_channel)
     run["last_activity_at"] = _iso(now)
     _save(cfg, run)
+
+
+def _close_one(q: dict, at: str) -> None:
+    """The phase record ``q`` is no longer the run's open phase (in the chat, or on the faces)."""
+    if q.get("phase_open"):
+        q["phase_open"] = False
+        _span(q, False, at)
+    q.pop("face_open", None)
+
+
+def face_open(prompt: dict | None) -> bool:
+    """A phase record a face can answer: the run's open phase (``capture.open_phase``), or one made current again
+    whose message the chat has not been sent again yet (``face_open``)."""
+    return bool(prompt) and (capture.open_phase(prompt) or bool(prompt.get("face_open")))
 
 
 def _answered_this_visit(cfg: Config, run: dict, s: int, p: int) -> bool:
@@ -596,6 +653,9 @@ def _send_phase(cfg: Config, prog: Program, run: dict, s: int, p: int, now: date
     if not phase_opened(ph):
         built = _build(cfg, prog, run, s, p, now, log, intro)
         _open(cfg, run, s, p, built[0], now)
+    if ph.get("send_due") and not cfg.has_channel:  # (the chat was removed while it was owed: nothing is owed now)
+        ph["send_due"] = False
+        _save(cfg, run)
     if not ph.get("send_due"):
         return True
     if auto and _answered_this_visit(cfg, run, s, p):
@@ -613,10 +673,12 @@ def _deliver(cfg: Config, prog: Program, run: dict, s: int, p: int, now: datetim
     """Send the open phase to the chat (``send_due``). ``built``: the record and messages ``_open`` was just given;
     without them (a delivery that waited) the phase is built again."""
     from . import tick
-    if auto and _held_off(cfg, run, s, p, now, log):
+    held = _held_for_chat(auto)
+    if held and _held_off(cfg, run, s, p, now, log):
         return False
-    record, messages = built or _build(cfg, prog, run, s, p, now, log, intro)
-    if auto and _held_off(cfg, run, s, p, now, log):
+    record, messages = built or _build(cfg, prog, run, s, p, now, log, intro,
+                                       made=ledger.find(ledger.snapshot(cfg.ledger_path), prompt_id(run["id"], s, p)))
+    if held and _held_off(cfg, run, s, p, now, log):
         return False
     pid = record["id"]
     ph0 = _phase(run, s, p)
@@ -647,7 +709,7 @@ def _deliver(cfg: Config, prog: Program, run: dict, s: int, p: int, now: datetim
         if q is not None:
             q["phase_open"] = True
             _span(q, True, q.get("sent_at") or _iso(datetime.now(timezone.utc)))
-            for k in ("advanced_at", "send_attempts", "send_error"):  # a later failure counts from zero again
+            for k in ("advanced_at", "send_attempts", "send_error", "face_open"):  # a later failure counts from zero
                 q.pop(k, None)
             q["needs_edit"] = False
     ph = _phase(run, s, p)
@@ -752,7 +814,8 @@ def _close_phases(cfg: Config, run: dict, **extra) -> None:
     """No phase of the run takes the next message any more (the run ended, expired or a session completed)."""
     with ledger.locked(cfg.ledger_path) as data:
         for q in data["prompts"]:
-            if q.get("run") == run["id"] and (q.get("phase_open") or extra):
+            if q.get("run") == run["id"] and (q.get("phase_open") or q.get("face_open") or extra):
+                q.pop("face_open", None)
                 if q.get("phase_open"):
                     q["phase_open"] = False
                     _span(q, False, _iso(datetime.now(timezone.utc)))
@@ -904,9 +967,10 @@ def advance(cfg: Config, run_id: str, now: datetime, log: list[str], *, reason: 
         _save(cfg, run)
         return _send_current(cfg, prog, run, now, log)
     ph = _phase(run, s, p)
-    if not phase_opened(ph) or (ph.get("send_due") and not _answered_this_visit(cfg, run, s, p)):
-        # not yet current, or current and owed to the chat with no answer yet: that is what was owed (an answer on a
-        # face moves it on whether or not the chat has it)
+    if not phase_opened(ph) or (ph.get("send_due") and cfg.has_channel and not _FACE.get()
+                                and not _answered_this_visit(cfg, run, s, p)):
+        # not yet current, or current and owed to the chat with no answer yet, and asked for in the chat: that is
+        # what was owed (an answer, or a command on a face, moves it on whether or not the chat has it)
         return _send_current(cfg, prog, run, now, log) if reason != "settle" else False
     key = f"{run['id']}:{s}:{p}:{capture_id or 'cmd' + str(ph.get('visit', 1))}"
     if key in (ph.get("advance_keys") or []):
@@ -927,6 +991,7 @@ def advance(cfg: Config, run_id: str, now: datetime, log: list[str], *, reason: 
         if q is not None:
             q.update(phase_open=False, advanced_at=_iso(now), needs_edit=True)
             _span(q, False, _iso(now))
+            q.pop("face_open", None)
     log.append(f"{run['id']}: session {s} phase {p} → " + ("next phase" if p < len(prog.session(s).phases)
                                                              else "session complete") + f" ({reason})")
     if p < len(prog.session(s).phases):
@@ -936,7 +1001,7 @@ def advance(cfg: Config, run_id: str, now: datetime, log: list[str], *, reason: 
     else:
         sess["completion_due"] = True  # until complete_session finishes: the tick's step finishes it if this dies
         _save(cfg, run)
-        complete_session(cfg, run, s, now, log)
+        complete_session(cfg, run, s, now, log, auto=reason == "settle")
     return True
 
 
@@ -958,7 +1023,8 @@ def skip(cfg: Config, run_id: str | None, now: datetime, log: list[str], expect:
         return False
     ph = _phase(run, s, p)
     if _session(run, s).get("status") == "in_progress" and phase_opened(ph) \
-            and not (ph.get("send_due") and not _answered_this_visit(cfg, run, s, p)):
+            and not (ph.get("send_due") and cfg.has_channel and not _FACE.get()
+                     and not _answered_this_visit(cfg, run, s, p)):
         ph["skipped"] = True
         _save(cfg, run)
     return advance(cfg, run["id"], now, log, reason="skip", expect=expect)
@@ -980,8 +1046,7 @@ def back(cfg: Config, run_id: str | None, now: datetime, log: list[str], expect:
     with ledger.locked(cfg.ledger_path) as data:
         q = ledger.find(data, _phase(run, s, p).get("prompt_id") or "")
         if q is not None:
-            q["phase_open"] = False
-            _span(q, False, _iso(now))
+            _close_one(q, _iso(now))
     _arrive(run, s, p - 1)
     _phase(run, s, p - 1)["reopened_at"] = _iso(now)
     run.update(last_activity_at=_iso(now))
@@ -1166,7 +1231,7 @@ def _say(cfg: Config, prog: Program, markup: str, log: list[str], now: datetime,
     """A short note from the engine (not a prompt: nothing answers it). Best effort; True when it was delivered.
     ``auto``: said on the engine's own move (a settle), which a face's answer can make while a bare ``/x`` holds the
     chat off the record: the note is then held back, as the phase that follows is."""
-    if auto and cfg.has_channel and _off_the_record(cfg, now):
+    if _held_for_chat(auto) and cfg.has_channel and _off_the_record(cfg, now):
         log.append(f"{prog.id}: note held back: off the record (or the privacy pass cannot say)")
         return False
     return _say_about(cfg, prog.id, markup, log, now)
@@ -1635,7 +1700,7 @@ def refresh_summary(cfg: Config, run_id: str, s: int, log: list[str]) -> bool:
     return True
 
 
-def complete_session(cfg: Config, run: dict, s: int, now: datetime, log: list[str]) -> None:
+def complete_session(cfg: Config, run: dict, s: int, now: datetime, log: list[str], auto: bool = False) -> None:
     """The session's last phase is done: fill ``## Summary`` (and the session's document) from his words into the
     entry, send it as the session-complete message with the keyboard removed, say what comes next, file the
     debrief follow-up, and, after the last session, compile the insights document."""
@@ -1664,7 +1729,7 @@ def complete_session(cfg: Config, run: dict, s: int, now: datetime, log: list[st
     run["last_activity_at"] = _iso(now)
     _save(cfg, run)
     log.append(f"{run['id']}: session {s} complete" + ("; run complete" if run["status"] == "completed" else ""))
-    _send_summary(cfg, prog, run, s, now, log, last.completion, summary, document, next_line)
+    _send_summary(cfg, prog, run, s, now, log, last.completion, summary, document, next_line, auto=auto)
     debrief = None
     if prog.debrief:
         with contextlib.suppress(library.UnknownDefinition):
@@ -1701,12 +1766,17 @@ def still_open_line(cfg: Config, prog: Program, now: datetime) -> str:
 
 
 def _send_summary(cfg: Config, prog: Program, run: dict, s: int, now: datetime, log: list[str], completion: str,
-                  summary: str, document: str, next_line: str) -> bool:
+                  summary: str, document: str, next_line: str, auto: bool = False) -> bool:
     session = prog.session(s)
     html = compose.summary_html(prog, s, completion, summary, session.document_title, document, next_line, cfg.names)
     sess = _session(run, s)
     if not cfg.has_channel:
         return False  # no chat: the summary is in the entry; nothing is attempted or counted (OPEN-PROMPTS rule 6)
+    if _held_for_chat(auto) and _off_the_record(cfg, now):
+        # (a session finished by a settle or on a face while a bare /x holds the chat: no attempt is counted, and
+        # the tick's step sends it once the window has closed, ``_retry_summary``)
+        log.append(f"{run['id']}: session {s} summary held back: off the record (or the privacy pass cannot say)")
+        return False
     try:
         mid = cfg.channel().send(cfg.chat_id, html, keyboard=compose.REMOVE_KEYBOARD)
     except ChannelError as e:
@@ -1790,7 +1860,7 @@ def _step_run(cfg: Config, run: dict, now: datetime, log: list[str], alerts: lis
         if sess.get("completion_due") and sess.get("status") == "in_progress":
             log.append(f"{run['id']}: session {k} was left completing; finishing it")
             try:
-                complete_session(cfg, run, int(k), now, log)
+                complete_session(cfg, run, int(k), now, log, auto=True)
             except Exception as e:  # noqa: BLE001 - tried again next tick; the log has why
                 log.append(f"{run['id']}: session {k} still cannot complete ({type(e).__name__}: {e})")
             run = find_run(cfg, run["id"]) or run
@@ -1820,7 +1890,8 @@ def _retry_summary(cfg: Config, prog: Program, run: dict, k: str, sess: dict, no
     session = prog.session(int(k))
     doc = fill_template(cfg, prog, run, int(k), session.document) if session.document else ""
     if not _send_summary(cfg, prog, run, int(k), now, log, session.phases[-1].completion,
-                         fill_template(cfg, prog, run, int(k), session.summary), doc, sess.get("next_line") or "") \
+                         fill_template(cfg, prog, run, int(k), session.summary), doc, sess.get("next_line") or "",
+                         auto=True) \
             and sess.get("summary_attempts", 0) >= SUMMARY_ATTEMPTS:
         alerts.append(f"{run['id']} session {k}: the completion message was not delivered after "
                       f"{SUMMARY_ATTEMPTS} attempts ({sess.get('summary_error', '')}); the summary is in the entry")
@@ -2092,7 +2163,7 @@ def describe(cfg: Config, run: dict, now: datetime) -> str:
     else:
         state += f" open since {_since(cfg, ph.get('opened_at') or ph.get('sent_at'), now)}"
     if phase_opened(ph) and ph.get("send_due"):
-        state += ", not in the chat yet"  # (current on the faces; its delivery waits: a /x window, a failed send)
+        state += ", still to be sent to the chat"  # (current on the faces; its send waits: a /x window, a failure)
     if ph.get("confirm_asked") and session.phase(p).type == "schedule":
         state += " · waiting for a day and wake time (YYYY-MM-DD HH:MM)"
     if run.get("status") == "paused":

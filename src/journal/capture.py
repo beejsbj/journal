@@ -355,7 +355,8 @@ def add_web_block(cfg: Config, stem: str, text: str, now: datetime, *, media: st
                     "untracked": True, "duplicate": True, "block": seen[client_id].get("block")}
         if phase_prompt is not None:
             prompt = ledger.find(data, phase_prompt)
-            if prompt is None or not open_phase(prompt):
+            # (open: in the chat, or current on the faces while its message waits to be sent again, ``face_open``)
+            if prompt is None or not (open_phase(prompt) or prompt.get("face_open")):
                 raise PhaseClosed(phase_prompt)
             return _web_record(cfg, data, prompt, WEB_RULE, text, now, client_id, media, ext, meta, key_of)
         if interrupt_prompt is not None:

@@ -664,7 +664,7 @@ def _open_phase(req: Request, run: dict) -> dict | None:
     delivered = bool(prompt) and programs.phase_opened(ph)
     out.update(sent_text=(prompt or {}).get("phase_text"), delivered=delivered,
                in_chat=delivered and bool(prompt.get("message_id")) and not ph.get("send_due"),
-               open=delivered and capture.open_phase(prompt) and run.get("status") == "active",
+               open=delivered and programs.face_open(prompt) and run.get("status") == "active",
                answered=bool(ledger.answers(prompt)), skipped=bool(ph.get("skipped")),
                phases_total=len(session.phases))
     return out

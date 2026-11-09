@@ -528,6 +528,134 @@ class ChatScheduleNoteTest(ti.Base):
 
 # ── review round 1 ───────────────────────────────────────────────────────────
 
+class ReviewHoldTest(ChatHoldTest):
+    """A face's own commands, a session's summary and a re-opened chat message, while the chat is off the record."""
+
+    def held_phase_two(self):
+        """Phase 1 answered in the web app inside a /x window: phase 2 is current, its delivery held."""
+        self.start()
+        rid = self.the_run()["id"]
+        self.now = tp.T0 + timedelta(minutes=1)
+        self.window()
+        self.now = tp.T0 + timedelta(minutes=2)
+        self.web("phase one in the web app")
+        self.now = tp.T0 + timedelta(minutes=5)
+        privacy._CACHE.clear()
+        self.assertTrue(programs.settle(self.cfg, rid, self.now, self.log))
+        self.assertTrue(self.the_run()["sessions"]["1"]["phases"]["2"]["send_due"])
+        return rid
+
+    def cli(self, *args):
+        from journal import cli
+        test = self
+
+        class Clock(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return test.now.astimezone(tz) if tz else test.now
+        privacy._CACHE.clear()
+        with mock.patch.object(cli, "datetime", Clock), mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+            return cli.run(cli.build_parser().parse_args(["program", *args]), cfg_loader=lambda: self.cfg)
+
+    def test_next_from_the_web_moves_on_and_its_send_waits_for_the_window(self):
+        rid = self.held_phase_two()
+        sends = len(self.bot.phase_sends())
+        self.now = tp.T0 + timedelta(minutes=6)
+        self.assertEqual(self.cli("next", rid), 0)  # what the web app spawns (no --notify: not said in the chat)
+        self.assertEqual(self.where(), (1, 3))
+        self.assertEqual(len(self.bot.phase_sends()), sends)  # his window is not ended by a tap in the web app
+        self.assertTrue(self.the_run()["sessions"]["1"]["phases"]["3"]["send_due"])
+        self.now = tp.T0 + timedelta(minutes=7)
+        out = self.msg("private B: still off the record")
+        self.assertIn("off the record", out["text"].lower())
+        self.assertNotIn("private B", self.entry(1).read_text(encoding="utf-8"))
+
+    def test_next_in_the_chat_still_delivers_what_was_owed(self):
+        rid = self.held_phase_two()
+        sends = len(self.bot.phase_sends())
+        self.now = tp.T0 + timedelta(minutes=6)
+        self.assertEqual(self.cli("next", rid, "--notify"), 0)
+        self.assertEqual(self.where(), (1, 2))
+        self.assertEqual(len(self.bot.phase_sends()), sends + 1)
+
+    def test_a_session_finished_on_the_web_inside_a_window_holds_its_summary(self):
+        self.start()
+        rid = self.the_run()["id"]
+        self.now = tp.T0 + timedelta(minutes=1)
+        self.window()
+        for p in range(1, 7):
+            self.now += timedelta(minutes=1)
+            self.web(f"S1P{p} in the web app")
+            self.now += timedelta(minutes=3)
+            privacy._CACHE.clear()
+            self.assertTrue(programs.settle(self.cfg, rid, self.now, self.log))
+        self.assertEqual(self.the_run()["sessions"]["1"]["status"], "completed")
+        self.assertEqual(self.bot.summaries(), [])
+        self.assertNotIn("summary_attempts", self.the_run()["sessions"]["1"])
+        self.now += timedelta(minutes=46)  # the window has gone quiet: the tick sends it
+        privacy._CACHE.clear()
+        programs.step(self.cfg, self.now, self.log)
+        self.assertEqual(len(self.bot.summaries()), 1)
+
+    def test_a_reopened_message_takes_no_chat_message_until_it_is_sent_again(self):
+        self.start()
+        rid = self.the_run()["id"]
+        self.now = tp.T0 + timedelta(minutes=1)
+        self.msg("my answer to phase one, in the chat")
+        self.now = tp.T0 + timedelta(minutes=4)
+        privacy._CACHE.clear()
+        self.assertTrue(programs.settle(self.cfg, rid, self.now, self.log))
+
+        def down(cfg, method, payload):
+            raise telegram.TelegramError("502 Bad Gateway")
+        self.now = tp.T0 + timedelta(minutes=5)
+        with mock.patch.object(telegram, "_call", down):
+            programs.back(self.cfg, rid, self.now, self.log)
+        self.assertEqual(self.where(), (1, 1))
+        self.now = tp.T0 + timedelta(minutes=6)
+        self.msg("just chatting about lunch")
+        self.assertEqual(entries.phase_answers(self.entry(1).read_text(encoding="utf-8")),
+                         {1: "my answer to phase one, in the chat"})
+        self.web("a second answer, in the web app")  # the web app can answer it
+        self.assertIn("a second answer", self.entry(1).read_text(encoding="utf-8"))
+
+    def test_a_held_reflect_phase_goes_out_as_the_web_app_showed_it(self):
+        texts = iter(["Construction ONE: stay with the Tuesday.", "Construction TWO: a different Tuesday."])
+        self.model = lambda q: next(texts)
+        self.held_phase_two()  # (phase 2 is session 1's reflect phase)
+        rid = self.the_run()["id"]
+        shown = self.prompt(f"{rid}-s01-p2")["phase_text"]
+        self.assertIn("Construction ONE", shown)
+        self.now = tp.T0 + timedelta(minutes=2 + 46)
+        privacy._CACHE.clear()
+        programs.step(self.cfg, self.now, self.log)
+        self.assertIn("Construction ONE", self.bot.phase_sends()[-1]["text"])
+        self.assertEqual(self.prompt(f"{rid}-s01-p2")["phase_text"], shown)
+        self.assertEqual(len(self.asked), 1)
+
+    def test_a_phase_owed_when_the_chat_is_removed_is_owed_no_more(self):
+        self.start()
+        rid = self.the_run()["id"]
+        self.now = tp.T0 + timedelta(minutes=1)
+        self.web("phase one in the web app")
+
+        def down(cfg, method, payload):
+            raise telegram.TelegramError("502 Bad Gateway")
+        self.now = tp.T0 + timedelta(minutes=4)
+        with mock.patch.object(telegram, "_call", down):
+            self.assertTrue(programs.settle(self.cfg, rid, self.now, self.log))
+        no_chat(self.cfg)
+        calls = len(self.bot.calls)
+        for _ in range(4):
+            self.now += timedelta(minutes=5)
+            programs.step(self.cfg, self.now, self.log)
+        self.assertEqual(len(self.bot.calls), calls)
+        self.assertEqual(self.prompt(f"{rid}-s01-p2")["send_attempts"], 1)
+        self.assertFalse(self.the_run()["sessions"]["1"]["phases"]["2"]["send_due"])
+        self.assertTrue(programs.advance(self.cfg, rid, self.now, self.log, reason="next"))
+        self.assertEqual(self.where(), (1, 3))
+
+
 class ReviewInterruptTest(ti.Base):
     def held(self):
         rid = self.reach_schedule_phase()
