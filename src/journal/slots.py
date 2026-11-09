@@ -218,7 +218,8 @@ def resolve(cfg: Config, practice: Practice | str, at: datetime, *, now: datetim
     3. else the next slot later the same journal day that has no record (doing it early fills it; the tick then
        skips its send); one already delivered is not taken;
     4. else an extra entry of the practice for the journal day: slot 1's id when no slot of the practice falls on
-       that day and the id is free, otherwise the next free number after the scheduled slots.
+       that day and the id is free, otherwise the next free number after the scheduled slots (free: no record, no
+       entry file, and not another practice's id).
 
     Words dated before the previous journal day go straight to step 4: an old miss stays a miss. The slot returned
     is never an answered one, so a delivery never lands on words he wrote on a face, and choosing a practice always
@@ -286,10 +287,14 @@ def _step3(cfg, p, at, now, data, jday: date) -> Slot | None:
 def _extra(cfg: Config, p: Practice, jday: date, data: dict, now: datetime) -> Slot:
     local_date = jday.isoformat()
     ids = {q.get("id") for q in data["prompts"]}
+    try:  # (``<id>-<n>`` may be another practice's id: its slot's stem, which an extra must never take)
+        owned = set(library.load(cfg).practices)
+    except Exception:  # noqa: BLE001 - a library that cannot load still has its records and files
+        owned = set()
 
     def free(n: int) -> bool:
         stem = entries.stem_for(local_date, p.id, n)
-        return stem not in ids and not entries.entry_path(cfg.root, stem).exists()
+        return f"{p.id}-{n}" not in owned and stem not in ids and not entries.entry_path(cfg.root, stem).exists()
     if not scheduled_on(p, local_date) and free(1):
         n = 1
     else:

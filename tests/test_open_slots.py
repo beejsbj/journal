@@ -243,6 +243,16 @@ class ResolveTest(SlotCase):
         (self.cfg.root / "2026-10-14-morning-2.md").write_text("an older entry\n", encoding="utf-8")
         self.assertEqual(self.resolve("morning", at(7)).id, "2026-10-14-morning-3")
 
+    def test_an_extra_never_takes_an_id_another_practice_owns(self):
+        """Review round 1: beside a practice named ``water-3`` (the library only warns about the pair), water's extra
+        entry skips ``<date>-water-3``, which is that practice's slot."""
+        (Path(self.cfg.practices_dir) / "water-3.md").write_text(WATER.replace("id: water", "id: water-3"),
+                                                                 encoding="utf-8")
+        self.delivered("2026-10-14-water", "water", "2026-10-14", at(9), captures=[{"at": at(9, 5).isoformat()}])
+        self.delivered("2026-10-14-water-2", "water", "2026-10-14", at(15), captures=[{"at": at(15, 5).isoformat()}])
+        got = self.resolve("water", at(16))
+        self.assertEqual((got.id, got.step), ("2026-10-14-water-4", 4))
+
     def test_an_unscheduled_practice_takes_slot_ones_id_then_the_next(self):
         self.assertEqual(self.resolve("walk", at(10)).id, "2026-10-14-walk")
         self.add(id="2026-10-14-walk", kind="walk", local_date="2026-10-14", message_id=None,
