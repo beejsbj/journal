@@ -331,6 +331,20 @@ class ScheduleTest(Base):
         self.send(at(15, 1))
         self.assertEqual(len(self.bot.texts()), 1)   # the 15:00 slot went out at 10:00
 
+    def test_start_before_day_ends_at_delivers_todays_slot_and_the_tick_then_skips_it(self):
+        """The owner, 2026-11-09 (decision 1): /start morning at 03:30 delivers today's morning, and today's 06:00
+        send is then done; words he wrote at 03:20 still went to yesterday's morning."""
+        self.answer("morning", "could not sleep", at(3, 20))
+        self.assertEqual(self.prompt("2026-10-13-morning")["opened_via"], "web")
+        self.send(at(3, 30), only="morning")
+        p = self.prompt("2026-10-14-morning")
+        self.assertEqual((p["message_id"], p["local_date"]), ("701", "2026-10-14"))
+        self.send(at(6, 1))
+        mornings = [q for q in self.prompts() if q.get("kind") == "morning"]
+        self.assertEqual(sorted(q["id"] for q in mornings), ["2026-10-13-morning", "2026-10-14-morning"])
+        p = self.prompt("2026-10-14-morning")
+        self.assertEqual((p["message_id"], p.get("previous_message_ids")), ("701", None))
+
     def test_start_takes_the_slot_that_is_due_not_always_slot_one(self):
         self.send(at(15, 30), only="water")
         self.assertIsNotNone(self.prompt("2026-10-14-water-2"))

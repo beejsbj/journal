@@ -70,6 +70,11 @@ Steps 2–4 work on the **journal day** of `at`: its local date, except that wor
 (a new setting, default `04:00`) belong to the day before. So a 21:00 evening with a two-hour window, missed by
 00:30, takes that answer from step 2, and tonight's evening is left alone.
 
+A deliberate delivery (`/start <id>`, `journal send <id>`, *Send to chat*) made before `day_ends_at` is the
+exception: its slot is of today's calendar date, not the previous journal day (the owner, 2026-11-09). The same steps
+run over today's slots only, so `/start morning` at 03:30 delivers today's morning (its 06:00 slot, early), and the
+tick's 06:00 send is then done. Words he writes at 03:30 still go to the journal day before.
+
 1. A slot of that practice that is **due or open** now, today's or yesterday's, newest first, whose time is at or
    before `at`. An evening answer at 00:30 takes last night's slot.
 2. Else the journal day's newest slot that is **missed and unanswered**, whose time is at or before `at`. The chat's fold

@@ -221,13 +221,17 @@ def resolve(cfg: Config, practice: Practice | str, at: datetime, *, now: datetim
        that day and the id is free, otherwise the next free number after the scheduled slots (free: no record, no
        entry file, and not another practice's id).
 
-    Words dated before the previous journal day go straight to step 4: an old miss stays a miss. The slot returned
-    is never an answered one, so a delivery never lands on words he wrote on a face, and choosing a practice always
-    starts something. Raises ``library.UnknownDefinition`` for an id the library does not have."""
+    Words dated before the previous journal day go straight to step 4: an old miss stays a miss. A deliberate
+    delivery before ``day_ends_at`` takes today's calendar date instead of the journal day before
+    (``_by_calendar``). The slot returned is never an answered one, so a delivery never lands on words he wrote on a
+    face, and choosing a practice always starts something. Raises ``library.UnknownDefinition`` for an id the
+    library does not have."""
     p = library.resolve(practice, cfg)
     now = now or datetime.now(timezone.utc)
     data = data if data is not None else ledger.snapshot(cfg.ledger_path)
     jday = journal_day(cfg, at)
+    if delivery and jday != at.astimezone(cfg.tz).date():
+        return _by_calendar(cfg, p, at, now, data, at.astimezone(cfg.tz).date())
     if jday >= journal_day(cfg, now) - timedelta(days=1):
         today = now.astimezone(cfg.tz).date()
         found = _step1(cfg, p, at, now, data, today, delivery) or _step2(cfg, p, at, now, data, jday, delivery) \
@@ -283,6 +287,22 @@ def _step3(cfg, p, at, now, data, jday: date) -> Slot | None:
              if s.n is not None and s.at is not None and s.at > at and (s.record is None or failed_send(s.record))]
     later.sort(key=lambda s: s.at.astimezone(timezone.utc))
     return _with_step(later[0], 3) if later else None
+
+
+def _by_calendar(cfg, p, at, now, data, today: date) -> Slot:
+    """A deliberate delivery (``/start``, ``journal send``, *Send to chat*) made before ``day_ends_at`` takes today's
+    calendar date for its slot, not the journal day before (the owner, 2026-11-09): the same steps over today's
+    slots only. A due or open one; else the newest missed one; else the next later one with no record, or only a
+    failed send's; else an extra entry dated today. So ``/start morning`` at 03:30 delivers today's morning, and the
+    tick's 06:00 send is then done. Words written at 03:30 still belong to the journal day before (``resolve``)."""
+    mine = day(cfg, today.isoformat(), now, data=data, practice=p)
+    for step, states in ((1, (DUE, OPEN)), (2, (MISSED,))):
+        found = [s for s in mine if s.state in states]
+        if found:
+            return _with_step(_newest(found)[0], step)
+    later = sorted((s for s in mine if s.n is not None and s.at is not None and s.at > at
+                    and (s.record is None or failed_send(s.record))), key=lambda s: s.at.astimezone(timezone.utc))
+    return _with_step(later[0], 3) if later else _extra(cfg, p, today, data, now)
 
 
 def _extra(cfg: Config, p: Practice, jday: date, data: dict, now: datetime) -> Slot:
