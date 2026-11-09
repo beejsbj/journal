@@ -41,7 +41,7 @@ FUTURE_SLACK = timedelta(minutes=5)  # a face's clock a little ahead of the serv
 
 class Refused(ValueError):
     """Words the journal turns away; nothing was written. ``code``: ``off-the-record``, ``reserved-line``,
-    ``placeholder``, ``empty``, ``not-a-practice`` or ``bad-time``, and for ``add`` ``not-an-entry``,
+    ``placeholder``, ``empty``, ``not-a-practice``, ``disabled`` (a practice turned off) or ``bad-time``, and for ``add`` ``not-an-entry``,
     ``not-engine-entry`` or ``program-entry``; ``str(e)`` says why, in words a face can show."""
 
     def __init__(self, code: str, message: str):
@@ -98,6 +98,8 @@ def _practice(cfg: Config, practice) -> library.Practice:
         raise Refused("not-a-practice", f"no practice {practice!r}: nothing was saved") from None
     if not isinstance(p, library.Practice) or p.kind != library.PRACTICE:
         raise Refused("not-a-practice", f"{practice!r} is not a practice: nothing was saved")
+    if not p.enabled:
+        raise Refused("disabled", f"{p.title} is turned off (enabled: false in its file): nothing was saved")
     return p
 
 

@@ -58,6 +58,17 @@ class ViewTest(Base):
         self.assertEqual(v["prompt"]["opener"], self.prompt("2026-10-14-water")["opener"])
         self.assertTrue(v["prompt"]["sent_at_local"])
 
+    def test_a_practice_turned_off_is_refused_as_send_refuses_it(self):
+        (Path(self.cfg.practices_dir) / "quiet.md").write_text(
+            "---\nkind: practice\nid: quiet\ntitle: Quiet\nenabled: false\n---\n- One?\n", encoding="utf-8")
+        before = checksum(self.cfg)
+        for call in (lambda: actions.view(self.cfg, "quiet", now=at(10)),
+                     lambda: actions.answer(self.cfg, "quiet", "words", via="web", now=at(10))):
+            with self.assertRaises(actions.Refused) as e:
+                call()
+            self.assertEqual(e.exception.code, "disabled")
+        self.assertEqual(checksum(self.cfg), before)
+
     def test_a_program_or_unknown_id_is_refused(self):
         for word in ("nope", "fix-life", ""):
             with self.subTest(word), self.assertRaises(actions.Refused) as e:

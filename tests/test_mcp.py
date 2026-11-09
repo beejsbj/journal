@@ -2,7 +2,8 @@
 is tested on (``serve_helpers``: Sam writes, Ada is the companion), then, when the SDK is installed, the same tools
 through ``MCPServer.call_tool`` in process. What must hold: a save lands verbatim and only appends; ``/x`` and the
 engine's marker are refused with nothing written; an entry's two voices are labelled apart; no tool opens the chat
-transcript; a send is a spawned ``journal send <id>``; ``journal mcp`` without the extra says how to install it."""
+transcript; ``journal_start`` returns the practice to answer and posts nothing into the chat; ``journal mcp`` without
+the extra says how to install it."""
 import ast
 import asyncio
 import contextlib
@@ -233,9 +234,17 @@ class SaveTest(Case):
         self.assertEqual((p["captures"][0]["source"], p["captures"][0]["via"]), ("mcp", "mcp"))
         self.assertIn("### 09:12 IST · text\n\nSlept well, woke at six.", Path(got["path"]).read_text(encoding="utf-8"))
 
-    def test_a_practice_with_no_open_prompt_is_a_note(self):
+    def test_a_practice_with_no_open_prompt_fills_its_slot_never_a_note(self):
+        # OPEN-FACES: words for a practice go through actions.answer (slots.resolve): at 09:12 tonight's evening slot
+        # has no record, so writing it now fills it early (step 3) and the tick skips its send
         got = handlers.save(self.cfg, NOW, "nothing was asked", practice="evening")
-        self.assertEqual((got["rule"], got["answered"]), ("/j", None))
+        self.assertEqual((got["stem"], got["rule"], got["answered"], got["slot"], got["step"]),
+                         ("2026-10-15-evening", "mcp", "evening", "2026-10-15-evening", 3))
+        p = ledger.find(ledger.snapshot(self.cfg.ledger_path), "2026-10-15-evening")
+        self.assertEqual((p["opened_via"], p["message_id"], p["captures"][0]["via"]), ("mcp", None, "mcp"))
+        again = handlers.save(self.cfg, NOW, "a second thought", practice="evening")
+        self.assertEqual((again["stem"], again["step"]), ("2026-10-15-evening-2", 4))   # an extra entry, not a note
+        self.assertFalse((self.cfg.state_dir / "sent.jsonl").exists())
 
     def test_refusals_write_nothing(self):
         before, ledger_before = _digest(self.cfg.root), self.cfg.ledger_path.read_bytes()
@@ -335,26 +344,26 @@ class NoteTest(Case):
 
 
 class StartTest(Case):
-    def test_a_practice_is_spawned_as_journal_send(self):
-        got = handlers.start(self.cfg, "evening", spawn=self.spawn)
-        self.assertEqual(self.spawned, [["send", "evening", "--hold-off-record"]])
-        self.assertEqual((got["spawned"], got["practice"]), (True, "evening"))
-        handlers.start(self.cfg, "evening-journal", spawn=self.spawn)  # the legacy alias, as /start takes it
-        self.assertEqual(self.spawned[-1], ["send", "evening", "--hold-off-record"])
+    """OPEN-FACES (choice C): ``journal_start`` returns the practice to answer, as the web app's Write now shows it,
+    and never posts into the chat: nothing is spawned, sent or written."""
 
-    def test_what_is_not_sent(self):
+    def test_a_practice_is_returned_to_answer_and_nothing_is_sent_or_written(self):
+        before, ledger_before = _digest(self.cfg.root), self.cfg.ledger_path.read_bytes()
+        with mock.patch("subprocess.Popen", side_effect=AssertionError("a spawn")):
+            got = handlers.start(self.cfg, "evening", NOW)
+        self.assertEqual((got["practice"], got["slot"]["id"], got["slot"]["step"]), ("evening", "2026-10-15-evening", 3))
+        self.assertTrue(got["prompt"]["opener"].startswith("Evening"))
+        self.assertIn("What's spinning in your mind?", [q["text"] for q in got["prompt"]["questions"]])
+        self.assertIn("journal_save", got["next"])
+        self.assertEqual((_digest(self.cfg.root), self.cfg.ledger_path.read_bytes()), (before, ledger_before))
+        self.assertEqual(handlers.start(self.cfg, "evening-journal", NOW)["practice"], "evening")  # the legacy alias
+
+    def test_what_is_not_a_practice_to_answer(self):
         (self.cfg.practices_dir / "quiet.md").write_text(
             "---\nkind: practice\nid: quiet\ntitle: Quiet\nenabled: false\n---\n- One?\n", encoding="utf-8")
         for word in ("nope", "fix-life", "quiet", "", "evening now"):
             with self.subTest(word), self.assertRaises(handlers.Refused):
-                handlers.start(self.cfg, word, spawn=self.spawn)
-        self.assertEqual(self.spawned, [])
-
-    def test_a_spawn_that_cannot_start_is_refused(self):
-        def broken(cfg, args):
-            raise OSError("no")
-        with self.assertRaises(handlers.Refused):
-            handlers.start(self.cfg, "evening", spawn=broken)
+                handlers.start(self.cfg, word, NOW)
 
 
 class PrivacyTest(Case):
@@ -379,7 +388,7 @@ class PrivacyTest(Case):
                     lambda: handlers.save(self.cfg, NOW, "a line", "morning"),
                     lambda: handlers.save(self.cfg, NOW, "another"),
                     lambda: handlers.add_note(self.cfg, NOW, "hers"),
-                    lambda: handlers.start(self.cfg, "evening", spawn=self.spawn),
+                    lambda: handlers.start(self.cfg, "evening", NOW),
                     lambda: handlers.recent_text(self.cfg, NOW)]
             for run in runs:
                 run()
@@ -459,7 +468,7 @@ class ServerTest(Case):
     def setUp(self):
         super().setUp()
         from journal.mcp import server
-        self.server = server.build(lambda: self.cfg, clock=lambda: NOW, spawn=self.spawn)
+        self.server = server.build(lambda: self.cfg, clock=lambda: NOW)
 
     def call(self, name, args):
         return asyncio.run(self.server.call_tool(name, args))
@@ -469,7 +478,7 @@ class ServerTest(Case):
         a bare command it is the client that must stop saving (this face cannot see the conversation)."""
         from journal.mcp import server
         self.cfg.conversations["opt_out_prefix"] = "/hush"
-        srv = server.build(lambda: self.cfg, clock=lambda: NOW, spawn=self.spawn)
+        srv = server.build(lambda: self.cfg, clock=lambda: NOW)
         tools = {t.name: t for t in asyncio.run(srv.list_tools())}
         texts = [server.instructions(self.cfg), tools["journal_save"].description,
                  tools["journal_add_note"].description]
@@ -504,7 +513,7 @@ class ServerTest(Case):
         self.assertEqual(sorted(t.name for t in tools), sorted(server.TOOLS))
         reads = {t.name for t in tools if t.annotations and t.annotations.read_only_hint}
         self.assertEqual(reads, {"journal_today", "journal_entries", "journal_entry", "journal_practices",
-                                 "journal_program_status"})
+                                 "journal_program_status", "journal_start"})
 
     def test_calls(self):
         text = self.call("journal_today", {}).content[0].text
@@ -513,8 +522,8 @@ class ServerTest(Case):
         self.assertIn("**Ada (companion, not his words)**", entry)
         saved = json.loads(self.call("journal_save", {"text": "from a client"}).content[0].text)
         self.assertIn("from a client", Path(saved["path"]).read_text(encoding="utf-8"))
-        self.call("journal_start", {"practice": "morning"})
-        self.assertEqual(self.spawned, [["send", "morning", "--hold-off-record"]])
+        shown = json.loads(self.call("journal_start", {"practice": "morning"}).content[0].text)
+        self.assertEqual((shown["practice"], self.spawned), ("morning", []))
 
     def test_a_refusal_is_the_tools_error_text(self):
         from mcp.server.mcpserver.exceptions import ToolError
