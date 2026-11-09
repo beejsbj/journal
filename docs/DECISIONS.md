@@ -22,6 +22,15 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
 
 ## Raised by packages (open, not decided)
 
+- **OPEN-PROMPTS — a practice can be done without a chat message (open, the owner's; issues #13, #14).** Today a
+  practice's prompt exists only once the chat has delivered it (`message_id`), so the web app, the CLI and MCP cannot
+  do a practice by themselves, and a web-only install counts every scheduled prompt as a failed send. The proposal in
+  [OPEN-PROMPTS.md](OPEN-PROMPTS.md): a record is written by a delivery or by his first words, and a slot with neither
+  is a state derived from the schedule. One slot resolution serves every face, and `channel.platform: none` means no
+  delivery by intent. The chat side does not change: nothing a face writes is a chat boundary, so it cannot end a
+  `/x` window. It maps every reader of the prompt record and plans three packages. To close: the owner's choices A–E
+  in that document.
+
 - **SCRUB-PERSONAL — the source adapters and `brain:` (open, the owner's).** The built-in context sources (tududi,
   chat-scrobbler, listenbrainz, storyteller, audiobookshelf, grimmory) are optional features, but together they
   describe one self-hosted stack. Kept as they are (renaming them is a config and test migration). To close: keep
