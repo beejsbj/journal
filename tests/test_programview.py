@@ -246,6 +246,10 @@ class BudgetTest(Driven):
         self.assertNotIn(stray, out)
         self.assertEqual(out.count("\n## Journal"), 1)  # two blocks: the notebook and the program block
         self.assertEqual(turncontext.BUDGET["blocks"], 2)
+        # the turn's context is fenced, and the program block opens with a head the transcript adapter knows
+        # (test_own_words.FenceTest: the other blocks)
+        self.assertTrue(out.startswith(turncontext.OPEN) and out.endswith(turncontext.CLOSE))
+        self.assertTrue(programview.block(self.cfg, self.ref(info), self.now).startswith(turncontext.HEADS))
 
     def test_the_block_comes_once_and_the_next_thread_start_gets_today(self):
         info = self.answered()
