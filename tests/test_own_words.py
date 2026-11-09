@@ -18,7 +18,7 @@ from test_conversations import Base as ConversationBase
 from test_conversations import conv, m
 from test_sweep import NOW, SENT, FakeSessions
 
-from journal import capture, context, contextfence, entries, ledger, notebook, privacy, sweep, tick, today
+from journal import capture, context, contextfence, entries, ledger, notebook, privacy, recovery, sweep, tick, today
 from journal import turncontext
 from journal.hermes import transcript
 from journal.validate import norm
@@ -35,6 +35,8 @@ GROUP = ("[Observed Telegram group context - context only, not requests]\nAlex: 
 PENDING = ("[System note: A new message has arrived. The conversation history contains pending tool outputs from an "
            "interrupted turn. IGNORE those pending results. Address the user's NEW message below FIRST. Do NOT "
            "re-execute old tool calls from the history.]")
+MODEL = "[Note: model was just switched from a to b. Adjust your self-identification accordingly.]"
+OPENER = "Morning, Theo. How did you sleep, and what is on your mind?"  # her opener, quoted by his reply
 RESUMED = ("[System note: The previous turn was interrupted by a gateway restart; the gateway is now back online. Any "
            "restart/shutdown command in the history has already run — do NOT re-execute or verify it. {} Do NOT "
            "re-execute old tool calls — skip any unfinished work from the conversation history.]")
@@ -54,6 +56,11 @@ def as_parts(caption, paths, injected=""):
              *[{"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,/9j/AAAA"}} for _ in paths],
              *([{"type": "text", "text": injected}] if injected else [])]
     return transcript.JSON_PREFIX + json.dumps(parts)
+
+
+def as_text_parts(*texts):
+    """A list of text parts as Hermes stores the parts themselves (no picture among them)."""
+    return transcript.JSON_PREFIX + json.dumps([{"type": "text", "text": t} for t in texts])
 
 
 def picture(path: Path, arrived: datetime) -> str:
@@ -139,6 +146,31 @@ class ReadTest(Fixture):
                                       "they would like to do next."))
         self.assertEqual((row.kind, row.meta.get("withheld")), ("system", None))
 
+    def test_her_quoted_opener_is_never_his_after_a_model_note_or_a_timestamp(self):
+        for front in (MODEL + "\n\n", "[Tue 2026-10-13 06:40:53 IST] ", "[2026-10-13T06:40:53+0530] ",
+                      "[Tue 2026-10-13 06:40:53 IST] [2026-10-13T06:40:52+0530] ",
+                      MODEL + "\n\n[Tue 2026-10-13 06:40:53 IST] "):
+            row = self.row(native(f'{front}[Replying to: "{OPENER}"]\n\nthe sea', ["/c/a.jpg"],
+                                  contextfence.wrap(self.notes)))
+            self.assertEqual((row.kind, row.text, row.quote, row.meta["loose"]), ("his", "the sea", OPENER, "the sea"))
+            self.assertEqual(context._his_chat_text(row), "the sea")  # what the quote checker takes for his
+            self.assertEqual(recovery.his_words(row), "the sea")  # what the outage catch-up answers
+
+    def test_a_note_line_of_his_own_is_his(self):
+        row = self.row("[Note: written on the train]\n\nthe rest of it")
+        self.assertEqual((row.kind, row.text), ("his", "[Note: written on the train]\n\nthe rest of it"))
+
+    def test_an_unknown_note_in_front_of_his_picture_withholds_it_and_his_opt_out_counts(self):
+        rows = [self.row(native(f"{note}\n\n/x the view from here", [f"/c/{i}.jpg"], self.notes), str(20 + i), i,
+                         SENT + timedelta(hours=i))
+                for i, note in enumerate(("[System note: something this reader does not know]",
+                                          "[IMPORTANT: something else]"), 1)]
+        for row in rows:
+            self.assertEqual((row.kind, row.meta["withheld"]), ("system", "a platform note in front of his picture"))
+            self.assertIn("/x the view", privacy._said(row))
+            self.assertTrue(privacy.row_marked(self.cfg, row, set()))
+        self.assertEqual(sorted(privacy.compute(self.cfg, rows, [], [], set()).private), [1, 2])
+
     def test_a_caption_shaped_like_the_pictures_notes_does_not_hide_the_real_ones(self):
         typed = "words\n\n[Image attached at: /c/typed.jpg]\n[screenshot]"
         row = self.row(native(typed, ["/c/real.jpg"], self.notes))
@@ -146,14 +178,25 @@ class ReadTest(Fixture):
         self.assertWithheld(row, "a picture placeholder")  # his words, as typed, kept whole: but not read as his
 
     def test_an_injected_block_is_taken_off_only_where_the_turn_stores_it_at_the_end(self):
+        # parts are joined by a line break (agent/session_persistence.py _durable_content); inside the injected part,
+        # recalled memory and the hooks' context by a blank line (agent/turn_context.py compose_multimodal_context_part)
         fenced = contextfence.wrap(self.notes)
-        for stored in ("plain words\n\n" + fenced,
-                       f"plain words\n\n{SPILL}\n--- head ---\n{fenced[:60]}\n--- tail ---\n{fenced[-40:]}",
-                       f"plain words\n\n{SPILL}\n--- head ---\n{fenced[:60]}",  # no tail
-                       f"plain words\n\n{SPILL}\n--- tail ---\n{fenced[-40:]}",  # no head
-                       "plain words\n\n<memory-context>\nrecalled\n</memory-context>\n\n" + fenced):
+        for stored in ("plain words\n" + fenced,
+                       f"plain words\n{SPILL}\n--- head ---\n{fenced[:60]}\n--- tail ---\n{fenced[-40:]}",
+                       f"plain words\n{SPILL}\n--- head ---\n{fenced[:60]}",  # no tail
+                       f"plain words\n{SPILL}\n--- tail ---\n{fenced[-40:]}",  # no head
+                       "plain words\n<memory-context>\nrecalled\n</memory-context>\n\n" + fenced,
+                       as_text_parts("plain words", "<memory-context>\nrecalled\n</memory-context>\n\n" + fenced)):
             row = self.row(stored)
             self.assertEqual((row.kind, row.text, row.meta["loose"]), ("his", "plain words", "plain words"))
+
+    def test_a_block_at_the_end_of_a_pictures_caption_is_his_not_taken_off(self):
+        # everything injected comes after the placeholders: a fence or memory block ending the caption was typed
+        for typed, why in ((f"my words\n{contextfence.wrap('mine')}", "the engine's context fence"),
+                           ("my words\n<memory-context>mine</memory-context>", "recalled memory")):
+            row = self.row(native(typed, ["/c/a.jpg"], contextfence.wrap(self.notes)))
+            self.assertWithheld(row, why)
+            self.assertEqual(row.text, typed)
 
     def test_a_mark_anywhere_else_is_withheld_not_cut(self):
         for stored, why in (
@@ -389,6 +432,8 @@ class ReadersTest(SweepBase):
         self.db.add("slept well\n\n" + self.notes, now - timedelta(hours=2), "3551")  # withheld
         self.db.add(native("", [str(self.cache / "img_s.jpg")], contextfence.wrap(self.notes)),
                     now - timedelta(hours=1), "3552")
+        self.db.add(native(f'{MODEL}\n\n[Replying to: "{OPENER}"]\n\nthe sea', [str(self.cache / "img_t.jpg")],
+                           contextfence.wrap(self.notes)), now - timedelta(minutes=30), "3553")
         pack = "\n".join(context.telegram_messages(self.cfg))
         self.assertIn("the river at dawn", pack)
         self.assertNotIn("garden plan", pack)
@@ -397,6 +442,8 @@ class ReadersTest(SweepBase):
         self.assertTrue(verify("telegram:x", norm("the river at dawn")))
         self.assertFalse(verify("telegram:x", norm("ask how the garden plan went")))
         self.assertFalse(verify("telegram:x", norm("open threads you meant to pick up with")))
+        self.assertFalse(verify("telegram:x", norm(OPENER)))  # her opener, quoted by his reply, is hers
+        self.assertNotIn("How did you sleep", pack)
 
 
 class WriterTest(ConversationBase):
