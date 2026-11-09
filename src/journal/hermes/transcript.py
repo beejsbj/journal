@@ -12,10 +12,12 @@ once what Hermes stored:
   already), a platform frame or placeholder (``system``; a ``[Cron delivery:`` is a ``boundary``), the journal's
   own mirror, or nothing. Voice notes arrive as a quoted transcript; audio files and voice notes without
   speech-to-text as a placeholder naming the cached file (``gateway/run_inbound.py``
-  ``_prepend_inbound_media_file_notes``). Before any of that, ``unwrap`` takes off what was added to his message
-  in storage: a picture attached natively is stored with Hermes' notes and the turn's injected context (the
-  engine's fenced blocks, recalled memory) in his own row. A row that still carries something added after that
-  is not read as his words (``withheld``): it fails closed, as a ``system`` row.
+  ``_prepend_inbound_media_file_notes``). A picture attached natively is stored with Hermes' own notes and the
+  turn's injected context (the engine's fenced blocks, recalled memory) in his row: what follows his envelopes is
+  cut at the pictures' placeholders (``native``), and an injected block that ends the text is taken off
+  (``trailing``). A row whose remaining words still carry a mark of something added (``leftover``) is not read as
+  his words (``withheld``): it fails closed, as a ``system`` row. A list of parts Hermes stored as JSON is read as
+  its text first (``decode``).
 * **Her rows.** A tool step (``tool_calls``), a failed turn (``display_kind = 'failed_turn'``, its notice, or
   the failure copy older Hermes stored), a turn closed without a reply (``[SILENT]``, an interruption), a typed or
   compaction row, or her reply.
@@ -46,7 +48,7 @@ from typing import Mapping
 
 from .. import audio, mirror
 from ..ports import ChatUnreadable, NotMirrored, Row
-from ..turncontext import CLOSE, HEADS, OPEN
+from ..contextfence import CLOSE, HEADS, OPEN
 from .companion import is_failure_text
 
 TIMEOUT = 5  # seconds a read waits for a lock (the gateway hook reads too: never long)
@@ -111,47 +113,95 @@ _ASCII_LOWER = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrst
 
 # ── what was added to his message ────────────────────────────────────────────
 
+# A message whose content is a list of parts is stored as this prefix and the list as JSON when Hermes writes the parts
+# themselves (hermes_state_messages.py _encode_content: an in-place compaction before the turn, a compaction's
+# copies); a string that starts with the prefix is stored as a JSON string. Read as the text Hermes itself makes of
+# the parts (agent/session_persistence.py _durable_content): text parts, a picture as "[screenshot]", one per line.
+JSON_PREFIX = "\x00json:"
+_PICTURE_PARTS = ("image", "image_url", "input_image")
 # A picture attached natively (agent/image_routing.py build_native_content_parts) is his caption, or Hermes' stand-in
-# for none, then a line naming each picture; the row stores the turn's parts as text (agent/session_persistence.py
-# _durable_content: a picture is "[screenshot]"), and whatever was injected into the turn is one more part after
-# them (agent/turn_context.py _append_multimodal_context: the engine's context, recalled memory, Hermes' turn
-# notes). Nothing after the pictures' placeholders is his.
+# for none, then a line naming each picture; the stored row is the turn's parts as text, and whatever was injected
+# into the turn is one more part after them (agent/turn_context.py _append_multimodal_context: the engine's context,
+# recalled memory, Hermes' turn notes). Nothing after the pictures' placeholders is his. (A placeholder run leaves its
+# last line break, so a caption of his shaped like one does not hide the real run after it.)
 NATIVE_STAND_IN = "What do you see in this image?"
-_NATIVE = re.compile(r"(?:\A|\n\n)((?:\[Image attached(?: at)?: [^\n]*\]\n)+)((?:\[screenshot\](?:\n|\Z))+)")
+_NATIVE = re.compile(r"(?:\A|\n\n)((?:\[Image attached(?: at)?: [^\n]*\]\n)+)((?:\[screenshot\]\n)*\[screenshot\])"
+                     r"(?=\n|\Z)")
 _ATTACHED_AT = re.compile(r"^\[Image attached at: (.*)\]$", re.M)
-# A fenced block wherever it sits: the engine's (turncontext.fence) and recalled memory (agent/memory_manager.py),
-# each with the header Hermes puts in front of a hook's output it cut short (tools/hook_output_spill.py). An
-# unclosed fence runs to the end: what follows its opening is never his.
-_FENCES = re.compile(r"(?:\[[^\]\n]* output truncated — [^\n]*\]\n(?:--- head ---\n)?)?"
-                     rf"(?:{re.escape(OPEN)}.*?(?:{re.escape(CLOSE)}|\Z)"
-                     r"|<\s*memory-context\s*>.*?(?:</\s*memory-context\s*>|\Z))", re.S | re.I)
-# What still looks added once those are gone: the row is then not read as his words.
-_RESIDUE = (
+# Notes the gateway puts in front of his message for the model, stored with it in a picture's row (Hermes' clean
+# transcript replaces text only: agent/session_persistence.py _override_replaces_content): a skills reload
+# (gateway/slash_commands.py, put in front by gateway/run_turn_runner.py _prepend_pending_note) and the group chat
+# around a message addressed to the companion (gateway/run.py _wrap_current_message_with_observed_context).
+_SKILLS_RELOAD = re.compile(r"^\[USER INITIATED SKILLS RELOAD:.*?Use skills_list to see the updated catalog\.\]\n\n",
+                            re.S)
+_GROUP = re.compile(r"^\[Observed Telegram group context - context only, not requests\]\n.*\n\[Current addressed "
+                    r"message - answer only this unless it explicitly asks you to use the observed context\]\n", re.S)
+# What was injected into a turn, when it is stored after his words: a block that ends the text (``trailing``, last
+# first). The engine's fenced context; the same cut short by Hermes (tools/hook_output_spill.py: a header, then a head
+# and a tail of it, either of which may be empty: taken off only when it holds the engine's fence); recalled memory
+# (agent/memory_manager.py). Anywhere else, such a mark is ``leftover``.
+_SPILL = r"\[[^\]\n]* output truncated — [^\n]*\]\n"
+_END_FENCE = re.compile(rf"(?:\A|\n\n){re.escape(OPEN)}(?:(?!{re.escape(OPEN)}).)*?{re.escape(CLOSE)}\s*\Z", re.S)
+_END_SPILL = re.compile(rf"(?:\A|\n\n){_SPILL}(?:(?!\n\n{_SPILL}).)*\Z", re.S)
+_END_MEMORY = re.compile(r"(?:\A|\n\n)<memory-context>(?:(?!<memory-context>).)*?</memory-context>\s*\Z", re.S | re.I)
+# What still marks something added, in what is left of his message: the row is then not read as his words.
+_LEFTOVER = (
     ("the engine's context fence", re.compile(f"{re.escape(OPEN)}|{re.escape(CLOSE)}")),
     ("recalled memory", re.compile(r"</?\s*memory-context\s*>", re.I)),
     ("a picture placeholder", re.compile(r"^(?:\[screenshot\]$|\[Image attached(?: at)?: )", re.M)),
     ("a cut-short hook output", re.compile(r"^\[[^\]\n]* output truncated — ", re.M)),
+    ("a gateway note", re.compile(r"^\[(?:USER INITIATED SKILLS RELOAD:|Observed Telegram group context - "
+                                  r"|Current addressed message - )", re.M)),
     ("an engine block", re.compile("|".join(f"^{re.escape(h)}" for h in HEADS), re.M)),
 )
 
 
-def unwrap(text: str) -> tuple[str, list[str], str | None]:
-    """His stored message without what was added to it: (text, pictures, why).
+def decode(content: str | None) -> tuple[str, bool]:
+    """(text, readable): the stored content as text. A list of parts stored as JSON is read as Hermes' own text of
+    it; content with Hermes' JSON prefix that is not a list or a string of it is not readable (``read`` withholds
+    it)."""
+    text = content or ""
+    if not text.startswith(JSON_PREFIX):
+        return text, True
+    try:
+        value = json.loads(text[len(JSON_PREFIX):])
+    except ValueError:
+        return text, False
+    if isinstance(value, str):
+        return value, True
+    if not isinstance(value, list):
+        return text, False
+    return "\n".join(str(p.get("text", "")) if p.get("type") == "text" else "[screenshot]" for p in value
+                     if isinstance(p, dict) and (p.get("type") == "text" or p.get("type") in _PICTURE_PARTS)), True
 
-    ``pictures`` are the local files of the pictures attached natively. ``why`` names what still looks added once
-    the known shapes are taken off (None: nothing); the caller then does not read the row as his words. The text
-    keeps the blank line before where the pictures' notes began, so the envelopes in front still parse."""
-    pictures: list[str] = []
-    m = None
-    for m in _NATIVE.finditer(text):  # (the last: a caption of his that looks like one stays his)
-        pass
-    if m and len(m.group(1).splitlines()) == len(m.group(2).split()):  # one placeholder per picture
-        pictures = [p.strip() for p in _ATTACHED_AT.findall(m.group(1))]
-        head = text[:m.start()]
-        text = "" if head.strip() == NATIVE_STAND_IN else head + ("\n\n" if head else "")
-    text = _FENCES.sub("", text)
-    why = next((label for label, rx in _RESIDUE if rx.search(text)), None)
-    return text, pictures, why
+
+def native(text: str) -> tuple[str, list[str]]:
+    """(his part, the pictures' files) of a turn with pictures attached natively: the text before the pictures'
+    notes, Hermes' stand-in read as no caption. Unchanged with no files when ``text`` is not such a turn, or when its
+    picture lines and placeholders do not agree in number (``leftover`` then finds them)."""
+    runs = list(_NATIVE.finditer(text))  # (the last: a caption of his shaped like one stays his)
+    m = runs[-1] if runs else None
+    if not m or len(m.group(1).splitlines()) != len(m.group(2).split()):
+        return text, []
+    head = text[:m.start()]
+    return ("" if head.strip() == NATIVE_STAND_IN else head), [p.strip() for p in _ATTACHED_AT.findall(m.group(1))]
+
+
+def trailing(text: str) -> str:
+    """``text`` without the injected blocks that end it (``_END_FENCE``, ``_END_SPILL``, ``_END_MEMORY``)."""
+    while True:
+        for rx in (_END_FENCE, _END_SPILL, _END_MEMORY):
+            m = rx.search(text)
+            if m and (rx is not _END_SPILL or OPEN in m.group(0) or CLOSE in m.group(0)):
+                text = text[:m.start()]
+                break
+        else:
+            return text
+
+
+def leftover(text: str) -> str | None:
+    """What in ``text`` still marks something added to his message (a fixed label, never his words), or None."""
+    return next((label for label, rx in _LEFTOVER if rx.search(text)), None)
 
 
 def is_failed_turn(content: str | None, display_kind: str | None = None) -> bool:
@@ -165,21 +215,27 @@ def read(content: str | None, platform_message_id: str | None) -> dict:
 
     ``kind`` is "his" (his words), "handled" (it carries the hook's journal note: already saved), "mirror"
     (the journal's own send), "system" (a Hermes or gateway row, not his words) or "empty". The text is
-    his words alone: no gateway origin note, no ``[Note: …]`` prefix, no reply quote (kept in ``quote``), nothing
-    ``unwrap`` takes off. ``images``: the files of pictures attached natively (a captionless one is "empty").
-    ``withheld``: what still looked added after ``unwrap``; the row is then "system" (or still "handled")."""
-    text = content or ""
+    his words alone: no gateway origin note, no ``[Note: …]`` or other gateway note in front, no reply quote (kept in
+    ``quote``), nothing after a native picture's placeholders, no injected block at the end. ``images``: the files of
+    pictures attached natively (a captionless one is "empty"). ``withheld``: what still marked something added in
+    the words left (``leftover``), or a stored list that could not be read; the row is then "system" (or still
+    "handled")."""
+    text, readable = decode(content)
     out = {"message_id": str(platform_message_id) if platform_message_id else None, "quote": None,
            "text": "", "source": "text", "audio_path": None, "kind": "empty"}
+    if not readable:  # fails closed: Hermes' JSON prefix on something that is not a list of parts it wrote
+        out["kind"], out["text"], out["withheld"] = "system", text, "a stored list that could not be read"
+        return out
     if mirror.is_mirror(text):
         out["kind"] = "mirror"
         return out
-    text, pictures, why = unwrap(text)
-    if pictures:
-        out["images"] = pictures
     m = _STEER.match(text)
     if m:
         text = m.group(1)
+    for envelope in (_GROUP, _SKILLS_RELOAD):
+        m = envelope.match(text)
+        if m:
+            text = text[m.end():]
     m = _ORIGIN.match(text)
     if m:  # folded into a running turn (redirect/steer): the id is in the origin note
         try:
@@ -191,8 +247,13 @@ def read(content: str | None, platform_message_id: str | None) -> dict:
     m = _REPLY.match(text)
     if m:
         out["quote"], text = m.group(1), text[m.end():]
+    text, pictures = native(text)
+    if pictures:
+        out["images"] = pictures
+    text = trailing(text)
     if not text.strip():
         return out
+    why = leftover(text)  # (in his words only: a reply quote of hers is not his message)
     if _HANDLED.search(text):
         out["kind"], out["text"] = "handled", text.strip()
         if why:
@@ -258,12 +319,15 @@ def caption(text: str) -> str:
 
 def clean_user_text(text: str) -> str:
     """His words alone, loosely: no gateway origin note, no quoted message he replied to, no journal hook note
-    (the last two hold the companion's own text), nothing ``unwrap`` takes off."""
-    text = _NOISE.sub("", unwrap(text or "")[0])
+    (the last two hold the companion's own text), no gateway note in front, nothing after a native picture's
+    placeholders, no injected block at the end (``read``; a withheld row's ``loose`` is empty instead)."""
+    text = _NOISE.sub("", text or "")
+    for envelope in (_GROUP, _SKILLS_RELOAD):
+        text = envelope.sub("", text.lstrip(), count=1)
     text = _REPLY_QUOTE.sub("", text.lstrip())  # the quoted message is hers, not his words
     text = _JOURNAL_NOTE_ANYWHERE.sub("\n\n", text)
     text = _JOURNAL_NOTE.sub("", text.lstrip())  # an older note with another ending
-    return text.strip()
+    return trailing(native(text)[0]).strip()
 
 
 def _like(text: str | None, prefixes) -> bool:
@@ -294,7 +358,7 @@ def to_row(raw: Mapping) -> Row | None:
     except (TypeError, ValueError, OverflowError, OSError):
         return None
     content = raw.get("content")
-    stored = content or ""
+    stored = decode(content)[0]  # (a list of parts Hermes stored as JSON: its text)
     pmid = raw.get("pmid")
     dk = raw.get("display_kind") or ""
     active = raw.get("active")
@@ -330,7 +394,7 @@ def to_row(raw: Mapping) -> Row | None:
         kind = "boundary"
     meta.update(notice=bool(dk) and dk != "steer", steer=dk == "steer", internal=dk == "internal_notification",
                 loose="" if withheld else clean_user_text(stored), frame=stored.lstrip().startswith(_FRAMES),
-                delivery=content is None or _like(content, _DELIVERIES))
+                delivery=content is None or _like(stored, _DELIVERIES))
     if kind == "system":
         meta["caption"] = "" if withheld else caption(msg["text"])
     if withheld:
