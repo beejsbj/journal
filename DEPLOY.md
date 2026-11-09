@@ -49,7 +49,8 @@ answers (none can until OPEN-FACES) or a send loses the race; existing records r
    slot that was never sent now reads `<id> at HH:MM, not sent to the chat (missed)`); the web app's Today loads (a due slot shows as still
    to come, with Send now) and its week strip still parses. `journal send <id> --dry-run` prints the message for the
    slot it would take. The next scheduled prompt goes out as before (the tick's log says `sent <id>`); a slot already
-   answered says `<id>: not sent: answered meanwhile`.
+   answered is done and logs nothing (only a face answer during the opener's model call logs `<id>: not sent:
+   answered meanwhile`, and none can come before OPEN-FACES).
 3. Rollback: the CLI and the plugin pin at the previous sha, `hermes gateway restart`, `systemctl --user restart
    journal-serve`. Old code reads a face-made record as an undelivered prompt with captures and would send it once
    more if the rollback lands inside its `grace_hours` (one chat message he has already answered; his words and the
