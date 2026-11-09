@@ -523,12 +523,41 @@ class NoChannelTest(Base):
         for words in ("Restless", "slept badly", "quietly"):
             self.assertNotIn(words, "\n".join(pack_lines + today_lines))
         self.assertIn(line, BUILD(self.cfg, at(9), stand))
-        # the next delivered prompt is the companion's chat again: the line goes
+        # the chat delivers again (water's opener is plain: no pack read the line): it stays a day after that, for
+        # the first openers and the first thread's today block (review), then goes
         self.send(at(9, 1))
         self.assertIsNotNone(self.prompt("2026-10-14-water")["message_id"])
-        stand = standing.collect(self.cfg, at(9, 2))
+        self.assertEqual(standing.collect(self.cfg, at(21))["no_chat"], {"annotations": 1, "reflections": 1})
+        stand = standing.collect(self.cfg, at(9, 2) + timedelta(days=1))
         self.assertEqual(stand["no_chat"], {"annotations": 0, "reflections": 0})
         self.assertFalse([l for l in standing.pack_lines(self.cfg, stand) if "no chat" in l])
+
+    def test_with_annotation_replies_off_they_are_still_skipped_and_never_sent_later(self):
+        """Review: replies switched off while there was no chat, then a chat and replies on: nothing is sent."""
+        self.cfg.telegram["annotation_replies"] = False
+        self._annotated()
+        self.assertEqual(self.prompt("2026-10-14-morning")["annotation_reply"]["skipped"], "no chat")
+        self._chat_later()
+        self.cfg.telegram["annotation_replies"] = True
+        tick.reply_annotations(self.cfg, at(8).astimezone(timezone.utc), [])
+        self.assertEqual(self.bot.calls, [])
+
+    def test_what_was_written_while_there_was_a_chat_is_not_counted_as_written_without_one(self):
+        """Review: an annotation written while the chat was there, its reply still owed when the chat is set to none,
+        is skipped (never sent) but not counted as written with no chat; one written after the switch is."""
+        self._chat_later()
+        self.answer("morning", "slept badly", at(6, 30))
+        self.ask = lambda cfg, query, *a, **k: "Restless night (inference)."
+        tick.annotate(self.cfg, at(7).astimezone(timezone.utc), [])
+        self.send(at(9, 1))   # a delivery after it was written
+        self.cfg.platform, self.cfg.chat_id = "none", ""
+        tick.reply_annotations(self.cfg, at(9, 30).astimezone(timezone.utc), [])
+        self.assertEqual(self.prompt("2026-10-14-morning")["annotation_reply"]["skipped"], "no chat")
+        self.assertEqual(standing.collect(self.cfg, at(10))["no_chat"], {"annotations": 0, "reflections": 0})
+        self.answer("water", "a glass", at(10))
+        tick.annotate(self.cfg, at(10, 30).astimezone(timezone.utc), [])
+        tick.reply_annotations(self.cfg, at(10, 35).astimezone(timezone.utc), [])
+        self.assertEqual(standing.collect(self.cfg, at(11))["no_chat"], {"annotations": 1, "reflections": 0})
 
     def test_reflections_notes_and_summaries_are_not_sent(self):
         """Review round 1: each path is given something to send, and the channel is never asked for."""
