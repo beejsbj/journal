@@ -3061,8 +3061,11 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     a face): the record keeps its fields and gains `message_id`, `sent_at`, `sent_at_local`, `chat_id`, `platform`,
     `sent_opener` (and `sent_opener_source`), `sent_html`, `sent_plain_text` and `needs_edit`. The issue's
     "deliberate send: the record's own opener, failure not alerting" has no path of its own: `resolve` never gives a
-    deliberate send an answered record, so a deliberate send never attaches. What remains of it: **a failed send
-    onto a record that has captures counts no attempt and raises no alert** (it is logged): nothing is owed.
+    deliberate send an answered record, and **a deliberate send resolves again** under the ledger lock once its
+    opener is built if he answered its slot on a face meanwhile (`tick._resolve_again`; review round 1), so it goes
+    to the next slot that fits or an extra entry. It can attach only in the instant between that check and the send,
+    as a scheduled send can. What remains of the issue's wording: **a failed send onto a record that has captures
+    counts no attempt and raises no alert** (it is logged): nothing is owed.
   - **The web app as built reads four states** (`web/src/types.ts`), so `GET /today` serves a *due* row as
     *upcoming* (with its `at`, and Send now) until OPEN-FACES teaches the PWA *due*; `today.collect`, the block and
     MCP's today text have *due*. A row now also appears for a past slot with no record (*missed*, or *due*), where it

@@ -258,6 +258,21 @@ class ScheduleTest(Base):
         extra = self.prompt("2026-10-14-morning-2")
         self.assertEqual((extra["message_id"], extra["stem"]), ("701", "2026-10-14-morning-2"))
 
+    def test_a_deliberate_send_answered_during_its_opener_goes_to_an_extra_entry(self):
+        """Review round 1: /start resolves its slot before the opener's model call; words saved on a face meanwhile
+        make that slot answered, so the send resolves again and never attaches to his record (rule 3)."""
+        def answers_meanwhile(cfg, query, *a, **k):
+            actions.answer(self.cfg, "morning", "wrote it in the web app", at(7, 1), via="web", now=at(7, 1))
+            raise agent.AgentUnavailable("slow model")
+        self.ask = answers_meanwhile
+        self.send(at(7, 1), only="morning")
+        face = self.prompt("2026-10-14-morning")
+        self.assertEqual((face["message_id"], face.get("sent_opener"), face.get("needs_edit")), (None, None, False))
+        extra = self.prompt("2026-10-14-morning-2")
+        self.assertEqual((extra["message_id"], extra["stem"]), ("701", "2026-10-14-morning-2"))
+        self.assertTrue((self.cfg.state_dir / "packs" / "2026-10-14-morning-2.md").exists())
+        self.assertFalse((self.cfg.state_dir / "packs" / "2026-10-14-morning.md").exists())
+
     def test_start_after_an_answer_delivers_the_next_slot_that_fits_and_the_tick_skips_it(self):
         self.answer("water", "a glass", at(9, 30))
         self.send(at(10), only="water")

@@ -151,7 +151,8 @@ def send_due(cfg: Config, now_local: datetime, log: list[str], only: str | None 
     OPEN-PROMPTS). A scheduled send reads its record again under the ledger lock just before it goes (rule 2): words
     saved on a face during the opener's model call stop it, and its pack is saved only after that check. A deliberate
     send (``only``) takes its slot from ``slots.resolve`` (rule 3): the practice's due or open slot, its missed one,
-    the next one later today, else an extra entry; never an answered record. With ``channel.platform: none`` nothing
+    the next one later today, else an extra entry; never an answered record, and it resolves again if he answered
+    that slot on a face while its opener was built (``_resolve_again``). With ``channel.platform: none`` nothing
     is sent, written or counted (rule 6)."""
     if not cfg.has_channel and not dry_run:
         if only:
@@ -174,6 +175,8 @@ def send_due(cfg: Config, now_local: datetime, log: list[str], only: str | None 
             opener, source, cites, asked = _opener(cfg, practice, now_local, pid, log)
         finally:
             _PACKS.reset(token)
+        if only and not dry_run:
+            pid, local_date = _resolve_again(cfg, practice, pid, local_date, now_local, log)
         html = compose.telegram_html(practice, now_local, opener, names=names)
         questions = library.question_snapshot(practice)  # what this prompt carries, kept as sent (library.snapshot_sections)
         record = {
@@ -209,6 +212,20 @@ def send_due(cfg: Config, now_local: datetime, log: list[str], only: str | None 
                         practice, now_local, capture.stored_opener(cfg, old, sent=True), "sent again below", names),
                     refold_bare=lambda old, practice=practice: compose.telegram_html(
                         practice, now_local, None, "sent again below", names))
+
+
+def _resolve_again(cfg: Config, practice: Practice, pid: str, local_date: str, now_local: datetime,
+                   log: list[str]) -> tuple[str, str]:
+    """A deliberate send's slot, read again under the ledger lock once its opener is built: if his words on a face
+    made it a record of his meanwhile (the model call can take minutes), the send resolves again (the next slot that
+    fits, else an extra entry), so a deliberate delivery never attaches to his record (rule 3). (pid, local_date)."""
+    with ledger.locked(cfg.ledger_path) as data:
+        q = ledger.find(data, pid)
+        if not (q and not q.get("message_id") and (q.get("captures") or q.get("opened_via"))):
+            return pid, local_date
+        slot = slots.resolve(cfg, practice, now_local, now=now_local, data=data, delivery=True)
+    log.append(f"{pid}: answered meanwhile in {slots.FACES.get(q.get('opened_via'), 'a face')}; sending {slot.id}")
+    return slot.id, slot.local_date
 
 
 def _answered_meanwhile(cfg: Config, pid: str, log: list[str]) -> bool:
