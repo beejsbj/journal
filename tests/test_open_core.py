@@ -250,6 +250,18 @@ class ScheduleTest(Base):
         # the sweep knows a quote of the message as sent
         self.assertIn(sweep.words(TICK_OPENER), " ".join(sweep.prompt_texts(self.cfg, p)))
 
+    def test_a_failed_send_onto_a_face_answer_counts_nothing_and_alerts_nothing(self):
+        """Review round 1: a send that fails after he answered on a face owes nothing: no attempt, no alert, at any
+        count."""
+        self.answer("morning", "the web app was quicker", at(6, 1))
+        record = {"id": "2026-10-14-morning", "kind": "morning", "local_date": "2026-10-14",
+                  "scheduled": at(6).isoformat()}
+        for _ in range(tick.SEND_ATTEMPTS + 1):
+            log = []
+            tick.count_send_failure(self.cfg, record, telegram.TelegramError("Bad Gateway"), log)
+            self.assertIn("not counted", log[0])
+        self.assertNotIn("send_attempts", self.prompt("2026-10-14-morning"))
+
     def test_a_deliberate_start_after_a_face_answer_makes_an_extra_entry(self):
         self.answer("morning", "slept well", at(7))
         before = dict(self.prompt("2026-10-14-morning"))
@@ -373,10 +385,28 @@ class NoChannelTest(Base):
         self.assertEqual((s["pending_annotation_replies"], s["undelivered"]), ([], []))
 
     def test_reflections_notes_and_summaries_are_not_sent(self):
-        self.assertEqual(reflect.send(self.cfg, at(7), []), [])
-        self.assertFalse(programs._say_about(self.cfg, "fix-life", "<b>hi</b>", [], at(7)))
-        cli._notify(self.cfg, "hello")
-        self.assertEqual(self.bot.calls, [])
+        """Review round 1: each path is given something to send, and the channel is never asked for."""
+        asked = []
+        with mock.patch.object(type(self.cfg), "channel", lambda cfg: asked.append(cfg) or self.fail("channel()")):
+            written = Path(self.cfg.root) / "2026-10-13-reflection.md"
+            written.parent.mkdir(parents=True, exist_ok=True)
+            written.write_text("# A day\n\nIt went.\n", encoding="utf-8")
+            with ledger.locked(self.cfg.ledger_path) as data:
+                data.setdefault("reflections", []).append(
+                    {"id": "2026-10-13-reflection", "kind": "day", "local_date": "2026-10-13", "path": str(written),
+                     "written_at": at(5).isoformat()})
+            self.assertEqual(reflect.send(self.cfg, at(7), []), [])
+            self.assertNotIn("telegram", ledger.snapshot(self.cfg.ledger_path)["reflections"][0])
+            self.assertFalse(programs._say_about(self.cfg, "fix-life", "<b>hi</b>", [], at(7)))
+            cli._notify(self.cfg, "hello")
+            run = {"id": "r1", "program": "fix-life"}
+            with mock.patch.object(programs.compose, "summary_html", lambda *a: "<b>summary</b>"):
+                self.assertFalse(programs._send_summary(self.cfg, mock.MagicMock(), run, 1, at(7), [], "done", "s",
+                                                        "", ""))
+            alerts = []
+            programs._retry_summary(self.cfg, None, run, "1", {"status": "completed"}, at(7), [], alerts)
+            self.assertEqual((run.get("sessions", {}).get("1", {}).get("summary_attempts"), alerts), (None, []))
+        self.assertEqual((asked, self.bot.calls), ([], []))
 
     def test_doctor_says_there_is_no_chat_on_purpose(self):
         row = status._channel_row(self.cfg)
