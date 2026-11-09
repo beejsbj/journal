@@ -3064,27 +3064,40 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   - **The adapter reads his part of a row only where the turn put it** (`hermes/transcript.py` `read`). A list of
     parts Hermes stored as JSON (`\x00json:` and the list: an in-place compaction, a compaction's copies) is read as
     Hermes' own text of it first (`decode`; one it cannot read is withheld). Then the envelopes in front come off: the
-    origin note, a `[Note: …]`, a skills reload note, Hermes' note in front of a resumed turn ("A new message has
+    origin note, the `[Note: model was just switched …]` of a `/model` switch (only that note: a first line of his
+    that opens `[Note: ` is his), Hermes' timestamps (`[Tue 2026-04-28 13:40:53 CEST] `, or the older ISO form, with
+    `gateway.message_timestamps` on), a skills reload note, Hermes' note in front of a resumed turn ("A new message has
     arrived …", "The previous turn was interrupted by …", when a message follows it; the note alone stays a system
     row) and the group context around a message addressed to her (all stored in a picture's row, since Hermes' clean
     transcript replaces text only), the reply quote (hers: kept as the quote, never checked as his). In a native picture's row nothing after the placeholders is his (`native`: the last
     run of picture lines and placeholders, when they agree in number; a run leaves its last line break, so a caption
     shaped like one does not hide the real one); Hermes' stand-in is no caption, and the files go in
-    `Row.meta["images"]`. An injected block that **ends** the text comes off (`trailing`): the engine's closed fence,
-    the same cut short by Hermes (its header, then a head and a tail, either possibly empty: only when it holds the
-    engine's fence), recalled memory (`<memory-context>`). `loose` (packs, the quote checker, the outage catch-up) is
-    read the same way.
+    `Row.meta["images"]` (`meta["native"]`: the row is such a picture's). In a row with no such picture, an injected
+    block that **ends** the text, at a line start, comes off (`trailing`): the engine's closed fence, the same cut
+    short by Hermes (its header, then a head and a tail, either possibly empty: only when it holds the engine's
+    fence), recalled memory (`<memory-context>`). After a native cut nothing is taken off the caption: everything
+    injected came after the placeholders, so a block ending the caption is his, and a leftover. `loose` (packs, the
+    quote checker, the outage catch-up) peels the envelopes in the same order as the reader (it kept the model note
+    and, behind it, her quoted opener, which the quote checker then took for his words); `loose` otherwise keeps
+    what it always kept (steer markers, audio placeholders, a voice note's quotes: `tests/golden/hermes_rows.json`).
+    The one golden value that changed on purpose: the model-switch row's `loose` and `his_text` are now his words
+    alone ("after the note"), no longer the note in front of them.
   - **Any other mark fails closed.** If what is left of his words still holds a fence tag (an unclosed one with no
     cut-short header in front included: CodeRabbit's question, taken this way), a memory tag, a picture line or
-    placeholder, a cut-short header, a gateway note or a line opening with one of `HEADS`, the row is **withheld**:
+    placeholder, a cut-short header, a gateway note or a line opening with one of `HEADS`, or a native picture's row
+    opens with a platform note this reader does not know (`[System note: …`, `[IMPORTANT: …` and the other
+    `_SKIP_PREFIXES`), the row is **withheld**:
     `kind` `system` with no caption (a row the hook saved stays `handled`), `meta["withheld"]` names what was found,
     `loose` is empty. Nothing writes it, packs and the quote checker skip it, and the sweep logs one line per row (row
     and message id and the reason, never words) under `sweep.WITHHELD`, which the tick files in `errors.jsonl`
     (`tick.files_as_error`). The privacy pass still reads the whole of it for an opt-out (`privacy._said`), so
-    withholding never hides a `/x` (a withheld delivery or platform frame excepted: no message of his). **The cost,
-    named:** a message he types that holds `<journal-context>` or `<memory-context>` anywhere, a line `[screenshot]`,
-    or a line starting `## Journal: today — ` (or another head) is not saved, whole rather than cut; it stays in the
-    chat, and the errors line names the row. The trade-off for an unclosed fence: Hermes cuts the engine's context
+    withholding never hides a `/x` (a withheld delivery or platform frame excepted: no message of his, unless it
+    carries his native picture). **The cost, named, and kept on purpose** (the owner's delegate, review round 3: the
+    same rule guards against a later Hermes storing its additions in a new place): a message he types that holds
+    `<journal-context>` or `<memory-context>` anywhere, a line `[screenshot]`, a line starting `[Image attached: ` or
+    `[Image attached at: `, a line starting `## Journal: today — ` (or another head) or one of the gateway's note
+    openings is not saved, whole rather than cut: it stays in the chat, and the sweep's errors line names the row
+    (ids only). The trade-off for an unclosed fence: Hermes cuts the engine's context
     short only with its header in front, so an unclosed tag without one is his, or something unknown: withheld.
   - **A swept picture is kept and stamped when it arrived.** The sweep takes a native picture's row with or without a
     caption, copies each named file that lies in Hermes' picture cache (`<home>/cache/images` or the older
