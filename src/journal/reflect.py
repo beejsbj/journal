@@ -21,8 +21,9 @@ notebook, as with annotations.
 Quotation fails closed (``validate.unfound``): only well-formed double quotation and blockquote lines count, and
 each must be his words, found in one paragraph of one file (or one reply of his) with its parts around "…" in order
 and close together: the period's entries, his replies, or his words anywhere in the journal; her own words, old or
-new, never count. Any other quote-like mark is irregular. A bad answer (such a quote or mark, or no reflection at
-all: empty, too long, not prose) writes nothing and is retried on later ticks, ``ATTEMPTS`` times, then alerted
+new, never count. Any other quote-like mark, any HTML, and a "you wrote" with no quotation in its sentence are
+irregular. A bad answer (such a quote or mark, or no reflection at all: empty, too long, not prose) writes nothing
+and is retried on later ticks, ``ATTEMPTS`` times, then alerted
 once; on the last attempt a reflection whose only fault is its quotes is written with the sentences that hold them
 dropped (``validate.strike``), and that is logged, so a stubborn misquote costs a sentence, not the reflection. A
 model that cannot be reached at all is different: that is an outage, which defers the reflection without using an
@@ -490,7 +491,7 @@ def write_one(cfg: Config, kind: str, end: date, trigger: str, now: datetime,
                                lambda: search.his_texts(cfg)) if ok else []
         if bad and not last:
             what = bad[0][2]
-            ok, reason = False, (what[:80] if what.startswith("irregular quote mark")
+            ok, reason = False, (what[:80] if what.startswith(("irregular", "attribution"))
                                  else f"quote not in his words: {what[:60]!r}")
         elif bad:  # the last attempt: drop the sentences that hold them rather than lose the reflection
             text, struck = validate.strike(text, bad), [q[:60] for _, _, q in bad]

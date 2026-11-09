@@ -263,7 +263,8 @@ class QuotesTest(Earlier):
                 self.answer = GOOD.replace("That reads as patience held lightly (inference).", text)
                 for minute in (45, 50):
                     _, log = self.tick(minute)
-                    self.assertTrue(any("failed (irregular quote mark" in l for l in log), log)
+                    self.assertTrue(any("failed (irregular quote mark" in l or "failed (attribution" in l
+                                        for l in log), log)
                     self.assertFalse((self.cfg.root / "2026-10-14-reflection.md").exists())
                 _, log = self.tick(55)
                 body = (self.cfg.root / "2026-10-14-reflection.md").read_text()
@@ -282,7 +283,7 @@ class QuotesTest(Earlier):
                             for l in log), log)  # ('n' opens a word: a single quote, so it fails closed)
         with ledger.locked(self.cfg.ledger_path) as data:
             data["reflections"] = []
-        self.answer = GOOD.replace("That reads as", "You're right that Theo's walk and the students’ notes are "
+        self.answer = GOOD.replace("That reads as", "You're right that Theo's walk and the dog's bed are "
                                                    "fine. That reads as")
         _, log = self.tick(50)
         self.assertIn("wrote 2026-10-14-reflection.md (annotated) (+1 notebook)", log)
@@ -293,6 +294,115 @@ class QuotesTest(Earlier):
         _, log = self.tick(45)
         self.assertIn("2026-10-14-reflection: reflection attempt 1/3 failed (empty or too short)", log)
         self.assertFalse((self.cfg.root / "2026-10-14-reflection.md").exists())
+
+
+class EveryQuoteLikeMarkTest(Earlier):
+    """Review round 4: irregular is a class of characters, not a list; Obsidian's blockquote shapes; HTML; words
+    reported as his with no quotation. Each input wrote an invented line into a saved reflection on attempt 1."""
+
+    INVENTED = "I hate my job"
+
+    def tick(self, minute):
+        return self.reflect(datetime(2026, 10, 14, 23, minute, tzinfo=IST))
+    INPUTS = ([f"You wrote ″{INVENTED}″ today.", f"You wrote ＂{INVENTED}＂ today.", f"You wrote ❝{INVENTED}❞ today.",
+               f"You wrote ❛{INVENTED}❜ today.", f"You wrote 〝{INVENTED}〞 today.", f"You wrote 「{INVENTED}」 today.",
+               f"You wrote ‛{INVENTED}’ today.", f"You wrote ’{INVENTED}’ today.",
+               f"You wrote &quot;{INVENTED}&quot; today.", f"You wrote &ldquo;{INVENTED}&rdquo; today.",
+               f"You wrote <q>{INVENTED}</q> today.", f"<blockquote>{INVENTED}</blockquote>",
+               f"You wrote: {INVENTED}.", f"As you put it, {INVENTED}.", f"You wrote *{INVENTED}*.",
+               f"In your words, {INVENTED}.", f"You told me {INVENTED} once."])
+    BLOCKS = [f"   > {INVENTED}", f"- > {INVENTED}", f"1. > {INVENTED}",
+              f"> rain all day, walked anyway\n{INVENTED}"]  # (lazy continuation: Obsidian renders it in the quote)
+
+    def test_none_of_them_is_saved_on_attempt_one_and_the_last_attempt_drops_them(self):
+        self.evening()
+        for text in self.INPUTS:
+            self.run_one(GOOD.replace("That reads as patience held lightly (inference).", text), text)
+        for text in self.BLOCKS:
+            self.run_one(GOOD.replace("**To carry forward**", text + "\n\n**To carry forward**"), text)
+
+    def run_one(self, answer, text):
+        with self.subTest(text):
+            with ledger.locked(self.cfg.ledger_path) as data:
+                data["reflections"] = []
+            (self.cfg.root / "2026-10-14-reflection.md").unlink(missing_ok=True)
+            self.answer = answer
+            _, log = self.tick(45)
+            self.assertTrue(any("reflection attempt 1/3 failed" in l for l in log), log)
+            self.assertFalse((self.cfg.root / "2026-10-14-reflection.md").exists())
+            self.tick(50)
+            self.tick(55)
+            body = (self.cfg.root / "2026-10-14-reflection.md").read_text()
+            self.assertNotIn("hate my job", body)
+            self.assertIn("**To carry forward** — What would being there look like, on your terms?", body)
+
+    def test_the_whole_initial_and_final_punctuation_class_is_irregular(self):
+        import unicodedata
+        docs = [f"{self.INVENTED}, he said"]
+        marks = [chr(c) for c in range(0x110000) if unicodedata.category(chr(c)) in ("Pi", "Pf")]
+        marks += list("″‴‶‷ʺ＂＇❝❞❛❜❮❯〝〞〟「」『』﹁﹂﹃﹄｢｣🙶🙷🙸«»‹›„‚`'")
+        self.assertGreaterEqual(len(marks), 49)
+        for c in marks:
+            with self.subTest(hex(ord(c))):
+                self.assertTrue(validate.quote_like(c))
+                if c in "’'":
+                    continue  # (an apostrophe inside a word is the one exception: below)
+                for text in (f"The {c}{self.INVENTED}{c} line.", f"The {c}word here.", f"The word{c} here."):
+                    self.assertTrue(any(q.startswith("irregular") for _, _, q in validate.unfound(text, docs)),
+                                    (c, text))
+        self.assertEqual(validate.unfound(f'He said "{self.INVENTED}".', docs), [])
+        self.assertEqual(validate.unfound(f"He said “{self.INVENTED}”.", docs), [])
+        self.assertEqual(validate.unfound("Theo's walk, don't, it’s fine, rock'n'roll.", docs), [])
+        for text in ("the kids’ room", "the kids' room", "the '90s", "'cause I said so", "a 'scare' quote"):
+            with self.subTest(text):  # (harmless, and failing closed: DECISIONS.md, CONTINUITY)
+                self.assertTrue(validate.unfound(text, docs))
+
+    def test_blockquote_shapes_and_their_lazy_lines_are_checked_and_struck_whole(self):
+        docs = ["rain all day, walked anyway"]
+        for text in self.BLOCKS:
+            with self.subTest(text):
+                found = validate.unfound(text, docs)
+                self.assertEqual(len(found), 1)
+                self.assertEqual(validate.strike("Before.\n\n" + text + "\n\nAfter.",
+                                                 validate.unfound("Before.\n\n" + text + "\n\nAfter.", docs)),
+                                 "Before.\n\nAfter.")
+        self.assertEqual(validate.unfound("> rain all day, walked anyway", docs), [])
+        self.assertEqual(validate.unfound("- > rain all day,\n  walked anyway", docs), [])
+        self.assertEqual(validate.unfound("    > four spaces is code, not a quote", docs), [])
+
+    def test_html_and_entities_are_irregular(self):
+        for text in ("Fine &amp; well.", "A &#8220;line&#8221;.", "A &#x201C;line&#x201D;.", "Fine <b>bold</b>.",
+                     "<br> a break", "</p> stray"):
+            with self.subTest(text):
+                self.assertTrue(any(q.startswith("irregular HTML") for _, _, q in validate.unfound(text, [])))
+        self.assertEqual(validate.unfound("3 < 4 and 5 > 2, and a <3 heart; AT&T", []), [])
+
+    def test_attribution_needs_a_quotation_in_its_sentence(self):
+        docs = [f"{self.INVENTED}, honestly"]
+        self.assertEqual(validate.unfound(f'You wrote "{self.INVENTED}" and meant it.', docs), [])
+        self.assertEqual(validate.unfound(f'"{self.INVENTED}", as you put it.', docs), [])
+        for text in (f"You wrote: {self.INVENTED}.", f"As you put it, {self.INVENTED}.", "You wrote about the rain.",
+                     f"Your words were {self.INVENTED}.", f"You described it as {self.INVENTED}.",
+                     f"You called it {self.INVENTED}.", f"You said {self.INVENTED}, then slept."):
+            with self.subTest(text):
+                self.assertTrue(any(q.startswith("attribution") for _, _, q in validate.unfound(text, docs)))
+        # (the cost: an honest paraphrase that says "you wrote" is retried; the prompt asks for a quote instead)
+        self.assertEqual(validate.strike(f"Fine day. You wrote: {self.INVENTED}. Then rain.",
+                                         validate.unfound(f"Fine day. You wrote: {self.INVENTED}. Then rain.", docs)),
+                         "Fine day. Then rain.")
+        self.assertEqual(validate.unfound(f"You wrote: {self.INVENTED}.", docs, attribution=False), [])
+
+    def test_the_program_and_catch_up_checks_use_the_same_check(self):
+        corpus = "I want to sleep, honestly. " + "x " * 200 + "Then to quit."
+        for text in (f"You wrote ‛{self.INVENTED}’ today, so rest.", 'You said "No" and slept.',
+                     '"I want … to quit" is what you said.', f"You wrote <q>{self.INVENTED}</q>, so rest."):
+            with self.subTest(text):
+                self.assertFalse(validate.check_catchup(text, corpus)[0])
+                self.assertFalse(validate.check_reflect_phase(text, corpus)[0])
+                self.assertFalse(validate.check_reflection("insights", "x" * 80 + "\n" + text, corpus)[0])
+                self.assertFalse(validate.check_bridge(text.rstrip("."), corpus)[0])
+        self.assertTrue(validate.check_catchup('You said "I want to sleep, honestly" and you should.', corpus)[0])
+        self.assertTrue(validate.check_catchup("You said you wanted to sleep; do.", corpus)[0])  # (no attribution rule)
 
 
 class LongRunTest(Earlier):
@@ -349,8 +459,8 @@ class QuoteCheckTest(unittest.TestCase):
                                             'You wrote ”I adore naps” and slept.'):
             with self.subTest(text):
                 found = self.bad(text)
-                self.assertTrue(found and all(f.startswith("irregular quote mark") for f in found), found)
-        self.assertEqual(self.bad("You're right; Theo's walk, the students’ notes, don't."), [])
+                self.assertTrue(any(f.startswith("irregular quote mark") for f in found), found)
+        self.assertEqual(self.bad("You're right; Theo's walk, it’s fine, don't."), [])
 
     def test_a_quote_with_nothing_to_check_is_not_his(self):
         self.assertEqual(self.bad('You said "No".'), ["No"])
@@ -383,10 +493,13 @@ class QuoteCheckTest(unittest.TestCase):
 
     def test_strike_drops_the_sentence_with_its_attribution(self):
         text = ('**What I notice** — Fine day. You wrote, "I am done pretending…" and it showed. Then rain.\n'
-                '- As you put it, *"a slow kind of drowning"*. The walk helped.\n'
-                '> I never rest\n'
+                '- As you put it, *"a slow kind of drowning"*. The walk helped.\n\n'
+                '> I never rest\n\n'
                 'End.')
-        self.assertEqual(self.strike(text), "**What I notice** — Fine day. Then rain.\n- The walk helped.\nEnd.")
+        self.assertEqual(self.strike(text),
+                         "**What I notice** — Fine day. Then rain.\n- The walk helped.\n\nEnd.")
+        # (with no blank line after it, "End." would be the blockquote's lazy continuation and go with it)
+        self.assertEqual(self.strike("Start.\n\n> I never rest\nEnd."), "Start.")
 
     def test_strike_takes_a_hard_wrapped_sentence_whole(self):
         self.assertEqual(self.strike('I was tired, and\nyou wrote "I adore naps". Rest came.'), "Rest came.")
@@ -412,10 +525,12 @@ class QuoteCheckTest(unittest.TestCase):
         self.assertEqual(self.strike(text), '- first item\n  - nested "rain all day, walked anyway" stays\n'
                                             '  - nested keeps its  indent\n\n\nA paragraph  with two spaces.')
 
-    def test_an_attribution_in_the_sentence_before_stays(self):
-        # (accepted: DECISIONS.md, CONTINUITY) the quote goes, the sentence before it is not taken with it
-        self.assertEqual(self.strike('You wrote this on Monday. "I adore naps" was the line.\n\nNext.'),
-                         "You wrote this on Monday.\n\nNext.")
+    def test_an_attribution_in_the_sentence_before_goes_too_when_it_says_so(self):
+        # a "you wrote" sentence with no quotation is a problem of its own (round 4), so it goes with the quote; an
+        # attribution in other words stays (accepted: DECISIONS.md, CONTINUITY)
+        self.assertEqual(self.strike('You wrote this on Monday. "I adore naps" was the line.\n\nNext.'), "Next.")
+        self.assertEqual(self.strike('On Monday, this. "I adore naps" was the line.\n\nNext.'),
+                         "On Monday, this.\n\nNext.")
 
     def test_the_other_checks_reject_a_misquote_and_an_irregular_mark(self):
         text = "x" * 80 + '\nYou said "I am exhausted"'
@@ -424,7 +539,8 @@ class QuoteCheckTest(unittest.TestCase):
         self.assertFalse(validate.check_catchup('You said "No" and then "I never loved any of it" last night.',
                                                 "No, and then I left. I loved some of it")[0])
         ok, why = validate.check_catchup("You wrote ‘I adore naps’ and slept. Glad you rested.", "I adore naps")
-        self.assertEqual((ok, why), (False, "quote not in his messages: \"irregular quote mark '‘'\""))
+        self.assertFalse(ok)
+        self.assertIn("irregular quote mark '‘'", why)
 
 
 class ReplyThroughConversationsTest(test_conversations.Base):

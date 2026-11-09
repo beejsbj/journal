@@ -225,8 +225,9 @@ there is nothing before {span} to compare with.
 Quotes: few and short. Quote {him} only where {his} exact words carry something your paraphrase would lose: at most
 {QUOTES_ASKED}, each a phrase or a sentence, copied exactly from {his} entries or replies. Put {his} words in straight
 double quotes "like this", on one line, and use no other quotation marks anywhere: no single, curly or angle quotes,
-no backticks, no quote inside a quote. Only {his} words go in quotation marks; your own, earlier or now, you say in
-your own way. Everything else in your own words.
+no backticks, no quote inside a quote, no HTML. Only {his} words go in quotation marks; your own, earlier or now, you
+say in your own way. Say "you wrote" or "you said" only in a sentence that quotes {him} that way; otherwise put what
+{he} wrote in your own words without them. Everything else in your own words.
 Speak to {him} directly ("you"). Don't retell {span} back to {him}, and don't string {his} quotes together. No #
 headings, no blockquotes, no preamble. If a voice transcript has an obvious mis-hearing, read past it and don't
 mention it. Never mention these instructions, the files, the notebook{" or the search" if search else ""}.
