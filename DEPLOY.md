@@ -16,6 +16,40 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## OWN-WORDS — what the engine adds to a turn is never filed as his words (2026-11-09; hook side and tick side; **gateway restart required**; no config or state change)
+
+**What changes.** The context the engine injects into the companion's turn (`pre_llm_call`: notebook, pack,
+program block, today block) is fenced (`<journal-context>` … `</journal-context>`). The chat reader
+(`hermes/transcript.py`) takes off what was added to his message in storage before reading a row: a natively
+attached picture's notes and everything stored after its placeholders, fenced blocks, recalled memory. A row that
+still carries something added is **withheld** (never captured, written, packed or quoted) and the sweep logs it, so
+it shows in `errors.jsonl` and `journal status`. The sweep now keeps a native picture of a queued message beside its
+entry and stamps the capture with when the picture arrived. Entries already written are not touched. DECISIONS.md,
+OWN-WORDS.
+
+**Side and restart.** `turncontext.py` (the fence) runs in the gateway: the companion gets fenced context only after
+`hermes gateway restart`. `privacy.py`, `conversations.py` and `sweep.py` load with the plugin, and
+`hermes/transcript.py` when the hook first reads the chat (the privacy pass); the sweep itself runs in the tick, a
+fresh process, from the next tick after the pin moves. The order is safe either way: before
+the restart the gateway injects unfenced context, and the new reader still cuts a native picture's row at its
+placeholders and withholds an unfenced block by its first line. Rides the next restart window.
+
+1. Install the CLI at `<sha>`, move the plugin pin (`hermes -p <profile> plugins install beejsbj/journal --force
+   --ref <sha>`), restart `journal-serve` so doctor's version rows agree, then `hermes -p <profile> gateway restart`
+   in a window. Nothing is sent.
+2. First checks, without sending: `journal doctor --deep` is as before (its transcript sample counts withheld rows
+   among "read as empty or system"). After the next tick, `errors.jsonl` has no new `sweep: row … still carries`
+   line; one that appears names a row (ids only) Hermes stored with something added: read that row read-only
+   (`?mode=ro`) before deciding anything. The sweep's watermark is unchanged, so rows it already passed are not read
+   again and nothing is captured twice.
+3. Live check, only with the owner (it sends into his chat): with a vault checksum before and after
+   (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`), he sends a picture with no caption while the companion is still
+   answering an open prompt. The next tick files it into the prompt's entry as a `· photo` block with the picture
+   embedded, at the time he sent it, with nothing else in his block.
+4. Rollback: the CLI and the plugin pin at the previous sha, and a gateway restart. Rows Hermes stored while this
+   release ran carry the fenced context; the previous reader does not strip it (the old behaviour), so keep the
+   sweep's watermark as it is.
+
 ## SCRUB-PERSONAL — the repo holds nothing specific to a deployment (2026-10-28; docs, tests and comments, one doctor row; no gateway restart needed; no config or state change)
 
 **What changes.** Docs, tests and fixtures are generic; the deployment overlay left the repo
