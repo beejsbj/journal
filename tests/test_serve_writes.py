@@ -187,6 +187,9 @@ class NotesTest(WriteCase):
             with self.subTest(text):
                 got = self.refused("POST", "/api/v1/entries", {"practice": "morning", "text": text}, want=422)
                 self.assertEqual(got["error"], "off-the-record")
+                # the web's own words, which the page shows him (web/e2e/writes.spec.ts reads "not saved")
+                self.assertIn("not saved", got["detail"])
+                self.assertIn("still in your browser", got["detail"])
                 self.refused("POST", "/api/v1/entries/2026-10-14-evening/blocks", {"text": text}, want=422)
         self.assertEqual((checksum(self.cfg.root), (self.cfg.state_dir / "ledger.json").read_bytes()), before)
         self.ok("POST", "/api/v1/entries", {"text": "/xylophone is a word"}, want=201)   # only the command, not a prefix

@@ -76,6 +76,15 @@ def _text(body: dict, key: str = "text") -> str | None:
     return value.replace("\r\n", "\n").replace("\r", "\n")
 
 
+# The refusals' words on this face, which speaks to him (the rule is ``actions.refuse``, the same for every face)
+SAID = {"off-the-record": "this, or a line of it, starts with the off-the-record command, so it is not saved; what you "
+                          "typed is still in your browser",
+        "reserved-line": "a line shaped like `%% journal … %%` is the engine's own marker and cannot be part of your "
+                         "words; nothing was saved",
+        "placeholder": f"“{audio.TRANSCRIBING}” is the journal's line for a recording still being transcribed and "
+                       "cannot be part of your words; nothing was saved"}
+
+
 def _his_words(req: Request, text: str | None) -> str | None:
     """His text, if he sent any, after the refusals every face has (``actions.refuse``): off the record, the engine's
     own marker lines, and the engine's transcript-pending placeholder. 422 with the refusal's code."""
@@ -84,7 +93,7 @@ def _his_words(req: Request, text: str | None) -> str | None:
     try:
         actions.refuse(req.cfg, text)
     except actions.Refused as e:
-        raise HTTPError(422, e.code, f"{e}; what you typed is still in your browser") from None
+        raise HTTPError(422, e.code, SAID.get(e.code, str(e))) from None
     return text
 
 
@@ -187,7 +196,8 @@ REFUSED = {"off-the-record": 422, "reserved-line": 422, "placeholder": 422, "emp
 
 def _refused(e: actions.Refused) -> HTTPError:
     status = REFUSED.get(e.code, 400)
-    return HTTPError(status, "bad-request" if status == 400 else "not-found" if status == 404 else e.code, str(e))
+    return HTTPError(status, "bad-request" if status == 400 else "not-found" if status == 404 else e.code,
+                     SAID.get(e.code, str(e)))
 
 
 @bounded
