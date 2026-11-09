@@ -173,7 +173,10 @@ class EngineOnlyTest(unittest.TestCase):
                     self.assertEqual(out.returncode, 0, (argv, out.stdout, out.stderr))
             leaked = subprocess.run([sys.executable, "-I", "-c",
                                      "import sys; sys.path.insert(0, sys.argv[1]); import journal.tick, journal.today, "
-                                     "journal.status, journal.actions, journal.slots; print(journal.__file__)",
+                                     "journal.status, journal.actions, journal.slots, journal.agent; "
+                                     # (an agent's failure printed with exit 0 is recognised without the adapter)
+                                     "assert journal.agent.is_failure_text('⚠ the model is unreachable'); "
+                                     "print(journal.__file__)",
                                      str(Path(t) / "src")],
                                     capture_output=True, text=True, timeout=60)
             # (the copy without its faces was imported, not the checkout or an installed journal)
