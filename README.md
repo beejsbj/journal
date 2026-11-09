@@ -188,7 +188,9 @@ or alerted (prompts, annotation replies, reflections, program summaries and note
 Each slot still has its state, read from the schedule (upcoming, due, missed), and words written for a practice fill
 its slot (`actions.answer`; the web app, the CLI and MCP move onto it in OPEN-FACES, docs/OPEN-PROMPTS.md). Annotations and reflections are still
 written into the files. An empty `chat_id` on any other platform is not this: it still fails and alerts, so an install
-that loses its chat id is noticed.
+that loses its chat id is noticed. Program phases and interrupts still need a chat until OPEN-PROGRAMS: on a no-chat
+install a program run's phase fails and alerts, so don't start one there yet. If a chat is configured later, the
+annotation replies and reflections written meanwhile are sent then.
 
 ### Another platform
 
