@@ -554,6 +554,7 @@ def _build(cfg: Config, prog: Program, run: dict, s: int, p: int, now: datetime,
         # (what the model wrote for this visit, kept so a delivery that waits sends the same text: ``made``)
         **({"construction": construction} if phase.type == "reflect" else {}),
         **({"bridge": bridge} if phase.type == "ask" else {}),
+        **({"intro": intro} if intro else {}),
     }
     return record, messages
 
@@ -580,8 +581,8 @@ def _open(cfg: Config, run: dict, s: int, p: int, record: dict, now: datetime) -
                       and not (k == "stem" and q.get("stem"))})
             if not q.get("message_id"):
                 q["sent_at"] = at
-        else:  # (what the model wrote for this visit, for a delivery that waits: ``_build``'s ``made``)
-            for k in ("construction", "bridge", "reflect"):
+        else:  # (what this visit says, for the faces and for a delivery that waits: ``_build``'s ``made``)
+            for k in ("construction", "bridge", "reflect", "intro", "phase_text"):
                 if k in record:
                     q[k] = record[k]
                 else:
@@ -608,7 +609,17 @@ def _close_one(q: dict, at: str) -> None:
     if q.get("phase_open"):
         q["phase_open"] = False
         _span(q, False, at)
+    _left(q)
+
+
+def _left(q: dict) -> None:
+    """The run has moved off the phase record ``q``: it is no longer current on the faces, and a delivery the chat
+    never got is owed no more (its failed attempts would otherwise keep it in ``status``'s undelivered rows, and make a
+    later visit's delivery look given up)."""
     q.pop("face_open", None)
+    if not q.get("message_id"):
+        q.pop("send_attempts", None)
+        q.pop("send_error", None)
 
 
 def face_open(prompt: dict | None) -> bool:
@@ -677,8 +688,8 @@ def _deliver(cfg: Config, prog: Program, run: dict, s: int, p: int, now: datetim
     held = _held_for_chat(auto)
     if held and _held_off(cfg, run, s, p, now, log):
         return False
-    record, messages = built or _build(cfg, prog, run, s, p, now, log, intro,
-                                       made=ledger.find(ledger.snapshot(cfg.ledger_path), prompt_id(run["id"], s, p)))
+    made = ledger.find(ledger.snapshot(cfg.ledger_path), prompt_id(run["id"], s, p)) or {}
+    record, messages = built or _build(cfg, prog, run, s, p, now, log, intro or made.get("intro", ""), made=made)
     if held and _held_off(cfg, run, s, p, now, log):
         return False
     pid = record["id"]
@@ -992,7 +1003,7 @@ def advance(cfg: Config, run_id: str, now: datetime, log: list[str], *, reason: 
         if q is not None:
             q.update(phase_open=False, advanced_at=_iso(now), needs_edit=True)
             _span(q, False, _iso(now))
-            q.pop("face_open", None)
+            _left(q)
     log.append(f"{run['id']}: session {s} phase {p} → " + ("next phase" if p < len(prog.session(s).phases)
                                                              else "session complete") + f" ({reason})")
     if p < len(prog.session(s).phases):
@@ -1334,6 +1345,7 @@ def confirm_schedule(cfg: Config, prog: Program, run: dict, s: int, p: int, now:
         return "none", ""
     if ends <= now:
         return "past", f"{day.isoformat()} {hour:02d}:{minute:02d}"
+    _reconcile_sent(cfg, run)  # (one opened and answered on a face, not yet noted, is kept as answered)
     keep = [i for i in run.get("scheduled") or [] if not (i.get("session") == s and i.get("status", "pending") == "pending")]
     run["scheduled"] = keep + items
     ph = _phase(run, s, p)
@@ -1772,7 +1784,12 @@ def _send_summary(cfg: Config, prog: Program, run: dict, s: int, now: datetime, 
     html = compose.summary_html(prog, s, completion, summary, session.document_title, document, next_line, cfg.names)
     sess = _session(run, s)
     if not cfg.has_channel:
-        return False  # no chat: the summary is in the entry; nothing is attempted or counted (OPEN-PROMPTS rule 6)
+        # no chat: the summary is in the entry; nothing is attempted or counted (OPEN-PROMPTS rule 6), and a chat set
+        # later does not get it (its "Next:" line would be out of date by then)
+        if not sess.get("summary_sent_at") and not sess.get("summary_unsent"):
+            sess["summary_unsent"] = "no chat"
+            _save(cfg, run)
+        return False
     if _held_for_chat(auto) and _off_the_record(cfg, now):
         # (a session finished by a settle or on a face while a bare /x holds the chat: no attempt is counted, and
         # the tick's step sends it once the window has closed, ``_retry_summary``)
@@ -1886,6 +1903,7 @@ def _retry_summary(cfg: Config, prog: Program, run: dict, k: str, sess: dict, no
     """Send a session's completion message again after a failed send (the same text: summary and document are
     recomputed from his words, the next-session line was kept). The failure that uses the last attempt is alerted."""
     if sess.get("status") != "completed" or sess.get("summary_sent_at") or not cfg.has_channel \
+            or sess.get("summary_unsent") \
             or sess.get("summary_attempts", 0) >= SUMMARY_ATTEMPTS:
         return  # (zero attempts is a completion that was saved but died before its message)
     session = prog.session(int(k))
@@ -1941,11 +1959,14 @@ def _sections(cfg: Config, prog: Program, run: dict) -> list[str]:
                        key=lambda i: (i.get("local", ""), i.get("n", 0)))
         if items:
             said = entries.interrupt_answers(body) if body else {}
+            snap = ledger.snapshot(cfg.ledger_path)
             out.append(f"### {cfg.names.user_possessive_title} answers to the interrupts\n")
             for i in items:
                 at = datetime.fromisoformat(i["local"]).strftime("%a %-d %b %H:%M")
                 state = i.get("status", "pending")
-                words = said.get(i["n"])  # (on a face too, whatever became of it in the chat)
+                # (answered in the chat or on a face, whatever became of its message; another confirmation's interrupt
+                # with the same number is not this one: its own record must have the answer)
+                words = said.get(i["n"]) if ledger.answers(ledger.find(snap, f"{run['id']}-{i['id']}")) else None
                 out.append(f"**Interrupt {i['n']}/{i['of']} ({i['offset']}) · {at}** — {i['text']}\n\n"
                            + (entries.demote_headings(words) if words else
                               "_(no answer)_" if state in ("sent", "open", "answered") else
