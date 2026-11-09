@@ -726,6 +726,9 @@ def library_send(req: Request):
         raise HTTPError(404, "not-found", "no practice by that id")
     if not current.enabled:
         raise HTTPError(409, "disabled", "this practice is turned off (enabled: false)")
+    if not req.cfg.has_channel:   # (``journal send`` would log that nothing was sent; say it here instead)
+        raise HTTPError(409, "no-chat", "this journal has no chat (channel.platform: none), so nothing is sent to "
+                                        "one: use Write now")
     return _spawned(req, ["send", pid])
 
 

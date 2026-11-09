@@ -97,5 +97,6 @@
     "his": "Sam",
     "hers": "Ada"
   },
+  "chat": true,
   "location_source": null
 }

@@ -239,6 +239,22 @@ class NotesTest(WriteCase):
         self.assertIn("### 07:40 IST · text", self.entry("2026-10-15-morning"))
 
 
+class NoChatTest(WriteCase):
+    """Review round 1, finding 7: on a journal with no chat (``channel.platform: none``) the web app does not offer
+    to send to one. Today says so (``chat: false``), and a send asked for anyway is ``409 no-chat``, nothing spawned:
+    ``journal send`` would only log that nothing was sent, while the page said "On its way…"."""
+
+    def test_today_says_whether_there_is_a_chat(self):
+        self.assertIs(self.ok("GET", "/api/v1/today", headers={})["chat"], True)
+        self.cfg.platform = "none"
+        self.assertIs(self.ok("GET", "/api/v1/today", headers={})["chat"], False)
+
+    def test_a_send_with_no_chat_is_409_and_nothing_is_spawned(self):
+        self.cfg.platform = "none"
+        self.assertEqual(self.refused("POST", "/api/v1/library/evening/send", want=409)["error"], "no-chat")
+        self.assertEqual(self.spawned, [])
+
+
 class WriteNowTest(WriteCase):
     """``GET /library/{id}/open``: the practice as Write now shows it (``actions.view``), and the slot words saved now
     would fill. A view: nothing is written, nothing spawned."""

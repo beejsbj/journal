@@ -236,6 +236,8 @@ def today_(req: Request):
                 log.exception("journal serve: today: the prompt of %s could not be built", r.get("id"))
     return {**data, "week": week_strip(req.cfg, req.now),
             "voices": {"his": req.cfg.names.user or "You", "hers": req.cfg.names.companion},
+            # whether there is a chat to send to (``channel.platform: none`` is a journal without one): Send to chat
+            "chat": req.cfg.has_channel,
             # the header shows the place: when OpenStreetMap named it, the page credits it there (Nominatim's policy)
             "location_source": location.place_source(req.cfg)}
 
