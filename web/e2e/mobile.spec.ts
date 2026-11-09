@@ -91,13 +91,16 @@ test("at 360 px nothing scrolls sideways on any route", async ({ page }) => {
   }
 });
 
-test("the entry's other tab, the raw editor and the + sheet are as large", async ({ page }) => {
+// WEB-UX: the entry's Analysis tab is gone; her readings unfold at the end of the entry (DECISIONS.md WEB-UX-ENTRY-TABS)
+test("the entry's readings and its passage sheet, the raw editor and the + sheet are as large", async ({ page }) => {
   await page.goto("/entries/2026-10-14-evening");
-  await page.getByRole("tab", { name: "Analysis" }).click();
+  await page.getByRole("button", { name: /What she noticed/ }).click();
+  await page.getByRole("button", { name: /reflection/ }).click();
   await expect(page.getByRole("link", { name: "In Insights" })).toBeVisible();   // the day's reflection has been read
   expect(await small(page)).toEqual([]);
   await page.goto("/entries/2026-10-14-evening");
-  await page.locator("details.hers summary").click();
+  await page.getByRole("button", { name: "More for this passage" }).first().click();   // a passage's tools, on touch
+  await expect(page.getByRole("dialog")).toBeVisible();
   expect(await small(page)).toEqual([]);
   await page.goto("/library/gratitude/edit");
   await page.getByRole("tab", { name: "Raw Markdown" }).click();

@@ -104,5 +104,5 @@ test("mood and a star on an entry", async ({ page }) => {
   await page.getByLabel("Mood", { exact: true }).press("Enter");
   await page.getByLabel("Starred", { exact: true }).check();
   await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.locator(".chips .chip")).toContainText(["starred", "calm"]);
+  await expect(page.locator(".entry-tags .entry-tag")).toContainText(["starred", "calm"]);   // WEB-UX: words, not chips
 });

@@ -16,57 +16,65 @@ test("Today reads the day, the week and the practices", async ({ page }, info) =
   await shot(page, info, "today");
 });
 
-test("an entry keeps his words plain and hers folded", async ({ page }, info) => {
+// WEB-UX (round 02): her chat replies stand in the right margin as her notes (they were folded callouts), and her
+// readings unfold at the end of the entry (the Entry/Analysis tabs are gone: DECISIONS.md WEB-UX-ENTRY-TABS).
+test("an entry keeps his words plain, hers in the margin, and her readings at the end", async ({ page }, info) => {
   await page.goto("/entries");
   await expect(page.locator(".entry-row").first()).toBeVisible();
   await shot(page, info, "entries");
   await expect(page.locator(".week-head").first()).toHaveText("Week of 12 Oct");
-  await page.getByRole("link", { name: /Evening journal/ }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Evening journal");
+  await page.getByRole("link", { name: /Evening journal/ }).first().click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Wednesday 14 October 2026");
   await expect(page.locator("article.his .words").first()).toHaveText("First words, about the lighthouse.");
-  const hers = page.locator("details.hers");
+  const hers = page.locator(".block.hers");
   await expect(hers).toHaveCount(1);
-  await expect(hers).not.toHaveAttribute("open", "");
-  await expect(hers.locator(".callout-body")).toBeHidden();
-  await shot(page, info, "entry-folded");
-  await hers.locator("summary").click();
-  await expect(hers.locator(".callout-body")).toContainText("Second line.");
+  await expect(hers).toContainText("Second line.");
   await expect(page.locator("audio")).toHaveCount(1);
-  await page.getByRole("tab", { name: "Analysis" }).click();
+  await shot(page, info, "entry");
+  await page.getByRole("button", { name: /What she noticed/ }).click();
   await expect(page.locator(".analysis")).toContainText("A note of hers.");
   await shot(page, info, "analysis");
 });
 
-test("on a wide screen her words stand in a column beside his, where she spoke, and offer no edit", async ({ page }, info) => {
+test("on a wide screen her notes stand in the right margin, level with the passage they follow, and offer no edit", async ({ page }, info) => {
   test.skip(info.project.name === "phone", "the spread is for a wide screen; a phone reads one column");
+  // the dates-and-dots sidebar leaves the page wide enough for both margins at 1100 px
+  await page.addInitScript(() => localStorage.setItem("journal:sidebar", "rail"));
   await page.goto("/entries/2026-10-14-evening");
-  const first = page.locator("article.his").first();
-  await expect(first).toBeVisible();
-  const his = (await first.boundingBox()) as { x: number; y: number; width: number };
-  const prompt = (await page.locator(".document > .prompt").boundingBox()) as { x: number; y: number };
-  const note = (await page.locator("details.hers").boundingBox()) as { x: number; y: number };
-  const before = (await page.locator("article.his", { hasText: "Later I thought" }).boundingBox()) as { y: number; height: number };
-  const after = (await page.locator("article.his", { hasText: "yes, and the gulls" }).boundingBox()) as { y: number };
-  expect(prompt.x).toBeGreaterThanOrEqual(his.x + his.width);     // her letter is in the column to the right
-  expect(Math.abs(prompt.y - his.y)).toBeLessThan(2);              // at the head of the page, level with his first words
-  expect(note.x).toBeGreaterThanOrEqual(his.x + his.width);
-  expect(note.y).toBeGreaterThanOrEqual(before.y + before.height - 1);   // from the end of the paragraph it follows
-  expect(note.y).toBeLessThanOrEqual(after.y + 2);                        // and no lower than the next one
-  // his column runs on without a hole: the paragraph after her note follows the one before it at the usual spacing
-  expect(after.y - (before.y + before.height)).toBeLessThan(60);
-  await expect(page.locator("details.hers").locator("button, textarea, [contenteditable]")).toHaveCount(0);
-  await expect(page.locator("details.hers").getByText(/^(Edit|Delete)$/)).toHaveCount(0);
+  const before = page.locator("article.his", { hasText: "Later I thought" });
+  await expect(before).toBeVisible();
+  const passage = (await before.boundingBox()) as { x: number; y: number; width: number; height: number };
+  const words = (await before.locator(".words").boundingBox()) as { x: number; width: number };
+  const note = (await page.locator(".block.hers").boundingBox()) as { x: number; y: number };
+  expect(note.x).toBeGreaterThanOrEqual(words.x + words.width);       // in the right margin
+  expect(note.y).toBeGreaterThanOrEqual(passage.y - 2);                // level with the passage it follows
+  expect(note.y).toBeLessThan(passage.y + passage.height);
+  // her letter heads his column, above his first words
+  const letter = (await page.locator(".doc-letter .letter").boundingBox()) as { x: number; y: number; height: number };
+  const first = (await page.locator("article.his .words").first().boundingBox()) as { x: number; y: number };
+  expect(Math.abs(letter.x - first.x)).toBeLessThan(2);
+  expect(letter.y + letter.height).toBeLessThanOrEqual(first.y);
+  await expect(page.locator(".block.hers").locator("button, textarea, [contenteditable]")).toHaveCount(0);
+  await expect(page.locator(".block.hers").getByText(/^(Edit|Delete)$/)).toHaveCount(0);
+  // with the titled list beside it the page is narrower than 840 px: her note goes under the passage instead
+  await page.getByRole("radio", { name: "Titles beside the entry" }).click();
+  await expect(page.locator(".side-pane.list")).toBeVisible();
+  await expect.poll(async () => {
+    const p = (await before.boundingBox()) as { y: number; height: number };
+    const n = (await page.locator(".block.hers").boundingBox()) as { y: number };
+    return n.y >= p.y + p.height - 1;
+  }).toBe(true);
 });
 
-test("on a wide screen a program session's first phase starts beside her letter, not below it", async ({ page }, info) => {
+test("on a wide screen a program session's phases run down his column under her letter", async ({ page }, info) => {
   test.skip(info.project.name === "phone", "the spread is for a wide screen");
   await page.goto("/entries/2026-10-15-fix-life-s01");
   const divider = page.locator(".document > .phase-divider").first();
   await expect(divider).toBeVisible();
-  const prompt = (await page.locator(".document > .prompt").boundingBox()) as { x: number; y: number; height: number };
-  const top = (await divider.boundingBox()) as { x: number; y: number; width: number };
-  expect(Math.abs(top.y - prompt.y)).toBeLessThan(2);                  // his column opens at the head of the page
-  expect(top.x + top.width).toBeLessThanOrEqual(prompt.x);              // and the divider stays in his column
+  const letter = (await page.locator(".doc-letter .letter").boundingBox()) as { x: number; y: number; height: number };
+  const top = (await divider.boundingBox()) as { x: number; y: number };
+  expect(top.y).toBeGreaterThanOrEqual(letter.y + letter.height);       // under her letter
+  expect(Math.abs(top.x - letter.x)).toBeLessThan(2);                    // and in his column, as the letter is
 });
 
 test("searching his words finds the entry and never hers", async ({ page }) => {
