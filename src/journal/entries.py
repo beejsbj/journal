@@ -675,7 +675,25 @@ def entry_words(body: str) -> str:
     return text
 
 
-_COPY = re.compile(r"^(.+) \(\d+\)(\.md)$")  # a sync conflict's copy: ``2026-10-14-evening (1).md``
+_COPY_TAIL = re.compile(r"(?: \(\d+\)| \d+| \([^()\n]*conflicted copy[^()\n]*\)"
+                        r"|\.sync-conflict-\d{8}-\d{6}-[A-Z0-9]{7})$")
+# (what a sync tool adds to a file's name when it keeps a conflicting copy: `` (1)`` and `` 2`` (repeated, as in
+# `` (1) (2)``), Dropbox's `` (<who>'s conflicted copy <date>)``, Syncthing's ``.sync-conflict-<date>-<time>-<id>``)
+
+
+def original_name(name: str) -> str | None:
+    """The name a sync conflict's copy was made from (``2026-10-14-evening (1) (2).md`` → ``2026-10-14-evening.md``),
+    or None for a name that is no such copy. ``2026-10-14 (draft).md`` is none; ``notes (1).md`` is, of
+    ``notes.md``, which is his whatever it holds."""
+    if not name.endswith(".md"):
+        return None
+    stem = base = name[:-3]
+    while True:
+        cut = _COPY_TAIL.sub("", base)
+        if cut == base or not cut:
+            break
+        base = cut
+    return base + ".md" if base != stem else None
 
 
 def his_text(path: Path) -> str:
@@ -684,13 +702,14 @@ def his_text(path: Path) -> str:
     the engine's summary; a file of his own (no engine entry, not an analysis) whole, without its front matter;
     nothing from a file the companion or the engine wrote (a reflection, a week review, an insights document).
 
-    A sync conflict's copy (``2026-10-14-evening (1).md``) is judged as the file it copies, by that name and its own
-    front matter (``_copy_text``), so a copy of her reflection gives nothing and a copy of an entry gives his words,
-    never the whole file."""
+    A sync conflict's copy (``original_name``: ``2026-10-14-evening (1).md``, ``… 2.md``, a Dropbox conflicted copy, a
+    Syncthing ``.sync-conflict-…``) is judged as the file it copies, by that name and its own front matter
+    (``_copy_text``), so a copy of her reflection gives nothing and a copy of an entry gives his words, never the whole
+    file."""
     body = path.read_text(encoding="utf-8", errors="replace") if path.is_file() else ""
-    copy = _COPY.match(path.name)
-    if copy:
-        return _copy_text(body, copy.group(1) + copy.group(2))
+    original = original_name(path.name)
+    if original:
+        return _copy_text(body, original)
     if authored_by_engine(path):
         return ""
     if kind_of(path) is not None:
@@ -710,9 +729,9 @@ def _copy_text(body: str, name: str) -> str:
     cands = name_candidates(name)
     ids = known_ids()
     claimed = (fm.get("practice"), fm.get("kind"))
-    if cands and not any(c[0] in ANALYSIS_KINDS for c in cands) and (
+    if cands and not any(c[0] in ANALYSIS_KINDS for c in cands) and words_span(body) is not None and (
             any(c[0] in ids for c in cands) or fm.get("type") == ENGINE_TYPE and any(c[0] in claimed for c in cands)):
-        return entry_words(body)
+        return entry_words(body)  # (laid out as an entry: a file of his merely named like a copy stays his, whole)
     return re.sub(r"\A---\n.*?\n---\n", "", body, count=1, flags=re.S)
 
 

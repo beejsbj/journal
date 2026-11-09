@@ -96,18 +96,32 @@ class SearchTest(unittest.TestCase):
         self.assertEqual(sorted(p.name for p in self.cfg.state_dir.rglob("*")), state)
         self.assertFalse(any("lighthouse" in t for t in search.his_texts(self.cfg)))
 
-    def test_a_sync_conflict_copy_is_read_by_its_front_matter_not_whole(self):
+    def test_a_sync_conflict_copy_is_read_as_the_file_it_copies(self):
         ev = self.cfg.root / "2026-10-14-evening.md"
-        (self.cfg.root / "2026-10-14-evening (1).md").write_text(ev.read_text())
         refl = self.cfg.root / "2026-10-14-reflection.md"
-        (self.cfg.root / "2026-10-14-reflection (1).md").write_text(refl.read_text())
-        self.assertEqual(entries.his_text(self.cfg.root / "2026-10-14-evening (1).md"), entries.his_text(ev))
-        self.assertEqual(entries.his_text(self.cfg.root / "2026-10-14-reflection (1).md"), "")
+        for name in ("2026-10-14-evening (1).md", "2026-10-14-evening (1) (2).md", "2026-10-14-evening 2.md",
+                     "2026-10-14-evening (Theo's conflicted copy 2026-10-15).md",
+                     "2026-10-14-evening.sync-conflict-20261015-101010-ABCDEFG.md"):
+            with self.subTest(name):
+                (self.cfg.root / name).write_text(ev.read_text())
+                self.assertEqual(entries.his_text(self.cfg.root / name), entries.his_text(ev))
+                self.assertNotIn("lighthouse", entries.his_text(self.cfg.root / name))  # her annotation, her reply
+        for name in ("2026-10-14-reflection (1).md", "2026-10-14-reflection 2.md",
+                     "2026-10-14-reflection.sync-conflict-20261015-101010-ABCDEFG.md"):
+            with self.subTest(name):
+                (self.cfg.root / name).write_text(refl.read_text())
+                self.assertEqual(entries.his_text(self.cfg.root / name), "")
         self.assertEqual(self.stems("lighthouse"), [])  # her annotation and reflection, copied or not, are not his
-        self.assertEqual(self.stems("Mother"), ["2026-10-14-evening (1)", "2026-10-14-evening"])
-        mine = self.cfg.root / "2026-10-20-plans.md"
-        mine.write_text("---\ntype: journal\n---\nmy own plans: the harbour first\n")  # his file, not entry-shaped
-        self.assertIn("my own plans: the harbour first", entries.his_text(mine))
+        self.assertIn("2026-10-14-evening (1)", self.stems("Mother", limit=20))
+        for name, text in (("2026-10-14 (draft).md", "my draft: the harbour first\n"),
+                           ("notes (1).md", "---\nkind: reflection\nauthor: me\n---\nmy notes on the harbour\n"),
+                           ("2026-10-14-evening 3.md", "my own evening file, by hand\n"),
+                           ("2026-10-20-plans.md", "---\ntype: journal\n---\nmy own plans: the harbour first\n")):
+            with self.subTest(name):
+                (self.cfg.root / name).write_text(text)
+                self.assertIn(text.split("---\n")[-1].strip(), entries.his_text(self.cfg.root / name))  # his, whole
+        self.assertIsNone(entries.original_name("2026-10-14 (draft).md"))
+        self.assertEqual(entries.original_name("notes (1).md"), "notes.md")
 
     def test_registered_apart_as_the_one_read_only_tool(self):
         from journal.config import Names
