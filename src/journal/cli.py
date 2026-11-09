@@ -139,6 +139,10 @@ PROGRAM_ACTIONS = ("start", "next", "skip", "back", "pause", "resume", "abandon"
                    "refresh-summary")
 
 
+FACE_HELP = ("Asked for on a face (what the web app sends), not in the chat: a chat send it causes waits while a "
+             "bare /x holds the chat off the record, and next or skip move on from a phase still owed to the chat")
+
+
 def add_program_parser(subs) -> None:
     pr = subs.add_parser("program", help="Programs and situational sessions: start, move on, pause, status, insights")
     ps = pr.add_subparsers(dest="program_command", metavar="<action>")
@@ -147,6 +151,7 @@ def add_program_parser(subs) -> None:
     st.add_argument("--session", type=int, metavar="N", help="Jump to session N")
     st.add_argument("--new", action="store_true", help="Only if the program has no run in progress (what the web "
                     "app sends, so two requests at once start one run)")
+    st.add_argument("--face", action="store_true", help=FACE_HELP)
     for name, what in (("next", "Move the run on to the next phase now"), ("skip", "Skip the open phase"),
                        ("back", "Send the previous phase again"), ("pause", "Pause the run"),
                        ("resume", "Resume a paused run"), ("abandon", "End the run where it is (its entries stay)")):
@@ -157,6 +162,8 @@ def add_program_parser(subs) -> None:
         if name in ("next", "skip", "back"):
             a.add_argument("--expect", metavar="S:P:V", help="Only if the run is still at session S, phase P, "
                            "visit V (the phase the command was given for); otherwise do nothing")
+        if name in ("next", "skip", "back", "resume"):
+            a.add_argument("--face", action="store_true", help=FACE_HELP)
     se = ps.add_parser("settle", help="Wait programs.settle_minutes, then move the run on if he has gone quiet")
     se.add_argument("target", metavar="RUN")
     se.add_argument("--now", action="store_true", help="Check at once instead of waiting first")
@@ -217,10 +224,9 @@ def program(args, cfg: jconfig.Config) -> int:
             return 1
         if pending is None:
             return 0
-    # Only the chat's commands pass --notify. Anything else (the web app's spawn, a shell) was not said in the chat:
-    # a chat send it causes waits for a bare /x window, and /next or /skip there moves on from a phase still owed
-    # to the chat (``programs.on_a_face``).
-    face = programs.on_a_face() if not notify else contextlib.nullcontext()
+    # --face: the web app asked (``programs.on_a_face``); a chat send it causes waits for a bare /x window, and next
+    # or skip there move on from a phase still owed to the chat. The chat's commands and a shell's act as before.
+    face = programs.on_a_face() if getattr(args, "face", False) else contextlib.nullcontext()
     try:
         expect = programs.parse_where(args.expect) if getattr(args, "expect", None) else None
         with programs.locked(cfg), face:

@@ -78,10 +78,11 @@ _FACE = contextvars.ContextVar("journal_programs_face", default=False)
 
 @contextlib.contextmanager
 def on_a_face():
-    """The transitions inside were asked for on a face (the web app spawns ``journal program …`` without
-    ``--notify``; so does a shell), not in the chat: a chat send they cause is held while a bare ``/x`` window is open,
-    as an automatic one is, since a tap in the web app is not his act in the chat. ``/next`` and ``/skip`` given there
-    move on from a phase that is current and still owed to the chat (he has it in front of him)."""
+    """The transitions inside were asked for on a face (the web app spawns ``journal program … --face``), not in the
+    chat: a chat send they cause is held while a bare ``/x`` window is open, as an automatic one is, since a tap in the
+    web app is not his act in the chat. Next and Skip given there move on from a phase that is current and still owed
+    to the chat (he has it in front of him). A shell's ``journal program …`` is not a face's: it acts as the chat's
+    commands do."""
     token = _FACE.set(True)
     try:
         yield

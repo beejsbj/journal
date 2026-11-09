@@ -421,14 +421,14 @@ class WebTest(ProgramCase):
         self.assertEqual(self.spawned, [])
         programs.abandon(self.cfg, self.rid, NOW, self.log)
         self.ok("POST", "/api/v1/runs", {"program": "course"}, want=202)
-        self.assertEqual(self.spawned, [["program", "start", "course", "--new"]])
+        self.assertEqual(self.spawned, [["program", "start", "course", "--new", "--face"]])
 
     def test_a_situational_start_and_the_runs_own_actions_go_ahead(self):
         self.ok("POST", "/api/v1/runs", {"program": "conversation-prep"}, want=202)
         programs.pause(self.cfg, self.rid, NOW, self.log)
         self.ok("POST", f"/api/v1/runs/{self.rid}/resume", want=202)
-        self.assertEqual(self.spawned, [["program", "start", "conversation-prep", "--new"],
-                                        ["program", "resume", self.rid, "--paused"]])
+        self.assertEqual(self.spawned, [["program", "start", "conversation-prep", "--new", "--face"],
+                                        ["program", "resume", self.rid, "--paused", "--face"]])
 
     def test_the_spawned_child_refuses_a_start_that_lost_the_race(self):
         """Both requests passed the check; the second child, under the lock, finds the first one's run."""

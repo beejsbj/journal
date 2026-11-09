@@ -5,6 +5,7 @@ the moment it became current, ``phase_open``) and then delivers it when there is
 delivery". The ``/x`` hold covers the delivery only, so a run answered on a face moves on while the chat is off the
 record. Interrupts open at their time and can be answered on a face. With ``channel.platform: none`` nothing is sent,
 attempted, counted or alerted, and a ten-session run completes from the web app alone."""
+import contextlib
 import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
@@ -363,14 +364,17 @@ class WebCase(WriteCase):
         for args in todo:
             self.assertEqual(args[0], "program", args)
             action, rest = args[1], args[2:]
+            face = programs.on_a_face() if "--face" in rest else contextlib.nullcontext()  # (as cli.program does)
             if action == "start":
-                programs.start(self.cfg, rest[0], self.now, self.log, only_new="--new" in rest)
+                with face:
+                    programs.start(self.cfg, rest[0], self.now, self.log, only_new="--new" in rest)
             elif action == "settle":
                 self.now += timedelta(minutes=3)   # (the child waits programs.settle_minutes first)
                 programs.settle(self.cfg, rest[0], self.now, self.log)
             elif action == "next":
                 expect = programs.parse_where(rest[rest.index("--expect") + 1]) if "--expect" in rest else None
-                programs.advance(self.cfg, rest[0], self.now, self.log, reason="next", expect=expect)
+                with face:
+                    programs.advance(self.cfg, rest[0], self.now, self.log, reason="next", expect=expect)
             else:
                 self.fail(f"unexpected spawn {args}")
 
@@ -561,7 +565,7 @@ class ReviewHoldTest(ChatHoldTest):
         rid = self.held_phase_two()
         sends = len(self.bot.phase_sends())
         self.now = tp.T0 + timedelta(minutes=6)
-        self.assertEqual(self.cli("next", rid), 0)  # what the web app spawns (no --notify: not said in the chat)
+        self.assertEqual(self.cli("next", rid, "--face"), 0)  # what the web app spawns: not said in the chat
         self.assertEqual(self.where(), (1, 3))
         self.assertEqual(len(self.bot.phase_sends()), sends)  # his window is not ended by a tap in the web app
         self.assertTrue(self.the_run()["sessions"]["1"]["phases"]["3"]["send_due"])
@@ -694,3 +698,16 @@ class ReviewInterruptTest(ti.Base):
         new = [i for i in self.items() if i["local"].startswith("2026-11-03")]
         self.assertEqual(len(new), 8)
         self.assertNotIn("s10-i1", {i["id"] for i in new})
+
+
+# ── review round 2 ───────────────────────────────────────────────────────────
+
+class ReviewTwoHoldTest(ReviewHoldTest):
+    def test_a_shell_next_still_delivers_what_was_owed(self):
+        """Only the web app passes --face: the operator's `journal program next` keeps the chat's meaning."""
+        rid = self.held_phase_two()
+        sends = len(self.bot.phase_sends())
+        self.now = tp.T0 + timedelta(minutes=6)
+        self.assertEqual(self.cli("next", rid), 0)
+        self.assertEqual(self.where(), (1, 2))
+        self.assertEqual(len(self.bot.phase_sends()), sends + 1)

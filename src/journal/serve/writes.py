@@ -774,7 +774,7 @@ def run_start(req: Request):
         raise HTTPError(409, "active-run", "this program has a run in progress: carry on with it, or abandon it first",
                         run=run["id"], run_status=run["status"])
     _one_at_a_time(req, prog.id)
-    args = ["program", "start", prog.id, "--new"] + (["--session", str(session)] if session else [])
+    args = ["program", "start", prog.id, "--new"] + (["--session", str(session)] if session else []) + ["--face"]
     return _spawned(req, args)
 
 
@@ -800,6 +800,8 @@ def run_action(req: Request):
             raise HTTPError(409, "moved-on", "the run is not at that phase any more; reload it",
                             run=run["id"], where=programs.where(run))
         args += ["--expect", expect]
+    if action in ("next", "skip", "back", "resume"):  # (asked for here, not in the chat: ``programs.on_a_face``)
+        args.append("--face")
     # (a run's own transitions are never refused for another program: an unfinished run already holds its slot)
     return _spawned(req, args)
 
