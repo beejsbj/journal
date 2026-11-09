@@ -174,8 +174,8 @@ class QuotesTest(Earlier):
             self.assertFalse((self.cfg.root / "2026-10-14-reflection.md").exists())
         alerts, log = self.tick(55)
         self.assertEqual(alerts, [])
-        self.assertIn("wrote 2026-10-14-reflection.md (annotated) (+1 notebook) (last attempt: 1 sentence with a quote "
-                      "not in his words dropped)", log)
+        self.assertIn("wrote 2026-10-14-reflection.md (annotated) (+1 notebook) (last attempt: 1 quote not his or "
+                      "irregular, sentences dropped)", log)
         body = (self.cfg.root / "2026-10-14-reflection.md").read_text()
         self.assertNotIn("lake house", body)
         self.assertIn("**Patterns and tensions** — That reads as patience held lightly (inference).", body)
@@ -241,12 +241,51 @@ class QuotesTest(Earlier):
         self.assertNotIn("I never said this", body)
         self.assertIn("**To carry forward** — What would being there look like, on your terms?", body)
 
-    def test_a_stray_quote_mark_is_dropped(self):
+    IRREGULAR = ('You wrote "I adore naps” and slept.',                          # mixed: straight opens, curly closes
+                 'You wrote "I love resting\non Sundays" and slept.',              # across a line break
+                 'You wrote ”I adore naps“ and slept.',                            # curly marks the wrong way round
+                 'You wrote „I adore naps“ and slept.',                            # low-9
+                 'You wrote "I told her "I adore naps" and left early" on Tuesday.',  # a quote inside a quote
+                 'You wrote " I never loved any of it " on Tuesday.',              # spaces inside the marks
+                 'You wrote ‘I adore naps’ and slept.',                            # single quotes as quotation
+                 "You wrote 'I adore naps' and slept.",
+                 'You wrote «I adore naps» and slept.',
+                 'You wrote `I adore naps` and slept.',
+                 'You said “so much. That reads as rest.')                         # a mark with no partner
+
+    def test_an_irregular_quote_mark_is_a_bad_answer_and_its_sentence_goes_on_the_last_attempt(self):
         self.evening()
-        self.answer = GOOD.replace("That reads as", "You said “so much. That reads as")
+        for text in self.IRREGULAR:
+            with self.subTest(text):
+                with ledger.locked(self.cfg.ledger_path) as data:
+                    data["reflections"] = []
+                (self.cfg.root / "2026-10-14-reflection.md").unlink(missing_ok=True)
+                self.answer = GOOD.replace("That reads as patience held lightly (inference).", text)
+                for minute in (45, 50):
+                    _, log = self.tick(minute)
+                    self.assertTrue(any("failed (irregular quote mark" in l for l in log), log)
+                    self.assertFalse((self.cfg.root / "2026-10-14-reflection.md").exists())
+                _, log = self.tick(55)
+                body = (self.cfg.root / "2026-10-14-reflection.md").read_text()
+                self.assertNotIn("adore", body)
+                self.assertNotIn("Sundays", body)
+                self.assertNotIn("never loved", body)
+                self.assertNotIn("so much", body)
+                self.assertIn("“the soup was good … the bus can wait”", body)  # the sentence before it stands
+
+    def test_apostrophes_are_not_quotation(self):
+        self.evening()
+        self.answer = GOOD.replace("That reads as", "You're right that Theo's walk, the students’ notes and "
+                                                   "rock 'n' roll aside, it's fine. That reads as")
         _, log = self.tick(45)
-        self.assertIn("wrote 2026-10-14-reflection.md (annotated) (+1 notebook) (1 stray quote mark dropped)", log)
-        self.assertIn("You said so much. That reads as", (self.cfg.root / "2026-10-14-reflection.md").read_text())
+        self.assertTrue(any(l.startswith("2026-10-14-reflection: reflection attempt 1/3 failed (irregular quote mark")
+                            for l in log), log)  # ('n' opens a word: a single quote, so it fails closed)
+        with ledger.locked(self.cfg.ledger_path) as data:
+            data["reflections"] = []
+        self.answer = GOOD.replace("That reads as", "You're right that Theo's walk and the students’ notes are "
+                                                   "fine. That reads as")
+        _, log = self.tick(50)
+        self.assertIn("wrote 2026-10-14-reflection.md (annotated) (+1 notebook)", log)
 
     def test_an_answer_that_is_no_reflection_still_writes_nothing(self):
         self.evening()
@@ -282,33 +321,50 @@ class LongRunTest(Earlier):
         self.assertNotIn("attempts", rec)
         self.assertIn("deferred_since", rec)
 
+    def test_after_a_deferred_timeout_the_next_try_goes_without_the_search(self):
+        with mock.patch.object(agent, "answered_this_run", return_value=False):
+            self.reflect(datetime(2026, 10, 14, 23, 45, tzinfo=IST))
+            self.reflect(datetime(2026, 10, 15, 0, 20, tzinfo=IST))  # retried after 30 minutes
+        (q1, tools1, budget1), (q2, tools2, budget2) = self.asked
+        self.assertEqual((tools1, budget1), (tools.READ_TOOLSET, reflect.BUDGET))
+        self.assertEqual((tools2, budget2), ("none", reflect.RETRY_BUDGET))
+        self.assertIn("journal_search", q1)
+        self.assertNotIn("journal_search", q2)
+        self.assertNotIn("look it up", q2)
+        self.assertEqual(self.rec("2026-10-14-reflection")["defer_error"], "timed out after 360s")
+
 
 class QuoteCheckTest(unittest.TestCase):
     DOCS = ["rain all day, walked anyway. the soup was good. But idk. the bus can wait",
-            "I want to sleep. the window was open"]
+            "I want to sleep. the window was open\n\nanother paragraph: go on, be brave, it is late"]
 
     def bad(self, text, docs=None, wider=None):
         return [q for _, _, q in validate.unfound(text, self.DOCS if docs is None else docs, wider)]
 
-    def test_straight_quotes_pair_left_to_right_whatever_their_length(self):
-        self.assertEqual(self.bad('You said "No" and then "I never loved any of it" last night.'),
-                         ["I never loved any of it"])
-        self.assertEqual(self.bad('You wrote " I never loved any of it " on Tuesday.'), ["I never loved any of it"])
-        self.assertEqual(self.bad('"she told me "I never loved any of it" and left"'), ["she told me", "and left"])
+    def test_only_well_formed_double_quotation_counts(self):
         self.assertEqual(self.bad('You wrote "rain all day, walked anyway" and “the soup was good … the bus can wait”.'),
                          [])
-        # the other checks read the same pairs: the catch-up's and a program's quote checks see the misquote too
-        self.assertFalse(validate.check_catchup('You said "No" and then "I never loved any of it" last night.',
-                                                "No, and then I left. I loved some of it")[0])
+        self.assertEqual(self.bad("> the window was open"), [])
+        for text in QuotesTest.IRREGULAR + ('"she told me "I never loved any of it" and left"',
+                                            'You wrote ”I adore naps” and slept.'):
+            with self.subTest(text):
+                found = self.bad(text)
+                self.assertTrue(found and all(f.startswith("irregular quote mark") for f in found), found)
+        self.assertEqual(self.bad("You're right; Theo's walk, the students’ notes, don't."), [])
 
-    def test_a_stray_mark_is_dropped(self):
-        self.assertEqual(validate.drop_stray_marks('You said “I never rest, and "then" more " left.'),
-                         ('You said I never rest, and "then" more  left.', 2))
+    def test_a_quote_with_nothing_to_check_is_not_his(self):
+        self.assertEqual(self.bad('You said "No".'), ["No"])
+        self.assertEqual(self.bad('"Go … be … it"'), ["Go … be … it"])
+        self.assertEqual(self.bad('"go on, be brave"'), [])
 
-    def test_fragments_must_be_in_one_document_in_order(self):
+    def test_parts_around_an_ellipsis_must_be_in_one_paragraph_in_order_and_close(self):
         self.assertEqual(self.bad("“the soup … the bus”"), [])
-        self.assertEqual(self.bad("“the bus … the soup”"), ["the bus … the soup"])        # out of order
-        self.assertEqual(self.bad("“I want … the bus can wait”"), ["I want … the bus can wait"])  # two documents
+        self.assertEqual(self.bad("“the bus … the soup”"), ["the bus … the soup"])                 # out of order
+        self.assertEqual(self.bad("“I want … the bus can wait”"), ["I want … the bus can wait"])   # two documents
+        self.assertEqual(self.bad("“the window … go on”"), ["the window … go on"])                 # two paragraphs
+        far = ["I want " + "x " * 200 + "to quit"]
+        self.assertEqual(self.bad("“I want … to quit”", docs=far), ["I want … to quit"])            # 400 apart
+        self.assertEqual(self.bad("“I want … to quit”", docs=["I want, more than anything, to quit"]), [])
 
     def test_the_wider_documents_are_read_once_and_only_when_needed(self):
         calls = []
@@ -322,18 +378,53 @@ class QuoteCheckTest(unittest.TestCase):
                          ["made up words"])
         self.assertEqual(calls, [1])
 
+    def strike(self, text):
+        return validate.strike(text, validate.unfound(text, self.DOCS))
+
     def test_strike_drops_the_sentence_with_its_attribution(self):
         text = ('**What I notice** — Fine day. You wrote, "I am done pretending…" and it showed. Then rain.\n'
                 '- As you put it, *"a slow kind of drowning"*. The walk helped.\n'
                 '> I never rest\n'
                 'End.')
-        out = validate.strike(text, validate.unfound(text, self.DOCS))
-        self.assertEqual(out, "**What I notice** — Fine day. Then rain.\n- The walk helped.\nEnd.")
+        self.assertEqual(self.strike(text), "**What I notice** — Fine day. Then rain.\n- The walk helped.\nEnd.")
 
-    def test_the_other_checks_still_reject_a_misquote(self):
+    def test_strike_takes_a_hard_wrapped_sentence_whole(self):
+        self.assertEqual(self.strike('I was tired, and\nyou wrote "I adore naps". Rest came.'), "Rest came.")
+        self.assertEqual(self.strike('Fine. I was tired, and\nyou wrote "I adore naps" then.\nRest came.'),
+                         "Fine.\nRest came.")  # (the wrap that was there stays: only the seam is tidied)
+
+    def test_strike_does_not_end_a_sentence_at_an_abbreviation(self):
+        self.assertEqual(self.strike('**What I notice** — We talked, e.g. about rain. You wrote "I adore naps" today, '
+                                     'i.e. on a Sunday. Dr. Rao called.'),
+                         "**What I notice** — We talked, e.g. about rain. Dr. Rao called.")
+
+    def test_strike_drops_a_line_left_with_only_its_lead_in_or_marker(self):
+        text = ('**What I notice** — Fine day.\n\n**What moved** — You wrote "I adore naps".\n\n'
+                '**To carry forward** — Is "I adore naps" still true?\n')
+        out = self.strike(text)
+        self.assertEqual(out, "**What I notice** — Fine day.")
+        self.assertEqual(reflect._carried(out), "")  # the today block and the web app read nothing, not a wrong line
+        self.assertEqual(self.strike('- first\n- You wrote "I adore naps".\n- third'), "- first\n- third")
+
+    def test_strike_leaves_the_rest_of_the_text_as_it_was(self):
+        text = ('- first item\n  - nested "rain all day, walked anyway" stays\n- second, "I adore naps" goes\n'
+                '  - nested keeps its  indent\n\n\nA paragraph  with two spaces.')
+        self.assertEqual(self.strike(text), '- first item\n  - nested "rain all day, walked anyway" stays\n'
+                                            '  - nested keeps its  indent\n\n\nA paragraph  with two spaces.')
+
+    def test_an_attribution_in_the_sentence_before_stays(self):
+        # (accepted: DECISIONS.md, CONTINUITY) the quote goes, the sentence before it is not taken with it
+        self.assertEqual(self.strike('You wrote this on Monday. "I adore naps" was the line.\n\nNext.'),
+                         "You wrote this on Monday.\n\nNext.")
+
+    def test_the_other_checks_reject_a_misquote_and_an_irregular_mark(self):
         text = "x" * 80 + '\nYou said "I am exhausted"'
         self.assertFalse(validate.check_reflection("insights", text, "nothing")[0])
         self.assertTrue(validate.check_reflection("reflection", text, "nothing", misquotes=False)[0])
+        self.assertFalse(validate.check_catchup('You said "No" and then "I never loved any of it" last night.',
+                                                "No, and then I left. I loved some of it")[0])
+        ok, why = validate.check_catchup("You wrote ‘I adore naps’ and slept. Glad you rested.", "I adore naps")
+        self.assertEqual((ok, why), (False, "quote not in his messages: \"irregular quote mark '‘'\""))
 
 
 class ReplyThroughConversationsTest(test_conversations.Base):
@@ -377,6 +468,14 @@ class ReplyThroughConversationsTest(test_conversations.Base):
     def test_under_capture_arm(self):
         self.run_both("arm")
 
+    def test_a_reply_after_the_period_is_not_read_into_it(self):
+        self.run_both("everything")
+        data = ledger.snapshot(self.cfg.ledger_path)
+        rec = reflect.find(data, "2026-10-15-reflection")
+        path = self.cfg.root / "2026-10-15-reflection.md"
+        self.assertTrue(reflect._replies_to(self.cfg, rec, path, date(2026, 10, 16), data))
+        self.assertEqual(reflect._replies_to(self.cfg, rec, path, date(2026, 10, 15), data), [])  # (sent on the 16th)
+
     def test_a_plain_message_is_no_reply(self):
         self.his("just thinking about the bank today, nothing else", tc_m(600), "700")
         conversations.run(self.cfg, tc_m(620), [])
@@ -413,7 +512,9 @@ class VoiceTest(unittest.TestCase):
             self.assertIn(part, text)
         self.assertNotIn("is thrown away", text)
         self.assertNotIn("loses its quotation marks", text)  # the model is not told how a misquote is handled
-        self.assertIn("words go in quotation marks; your own, earlier or now, you say in your own way", text)
+        self.assertIn("Only his words go in quotation marks", text)
+        self.assertIn('Put his words in straight\ndouble quotes "like this", on one line, and use no other quotation '
+                      "marks anywhere", text)
         self.assertIn("## Before the day (your own words, except his replies, which are marked as his)\nBEFORE", text)
 
     def test_the_annotation_is_about_him_in_the_third_person_and_her_reading_in_the_first(self):

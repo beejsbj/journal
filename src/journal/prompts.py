@@ -187,14 +187,18 @@ REFLECTION_SHAPE = {
 QUOTES_ASKED = 3  # at most this many quotes of his words in a reflection, each a phrase or a sentence
 
 
-def reflection_request(cfg: Config, kind: str, period: str, inputs: str, before: str) -> str:
+def reflection_request(cfg: Config, kind: str, period: str, inputs: str, before: str, search: bool = True) -> str:
     """The day reflection (``kind="reflection"``) or the week review (``"week"``): her own reading of the period,
     written from its entry files, her recent analyses with what he wrote back to them and her on-the-record notebook
-    threads (``before``, ``reflect.continuity``), with ``journal_search`` (``tools.READ_TOOLSET``) as its one tool."""
+    threads (``before``, ``reflect.continuity``), with ``journal_search`` (``tools.READ_TOOLSET``) as its one tool
+    (``search=False``: no tool, for the try after one that hung)."""
     n = cfg.names
     what, size, span = REFLECTION_SHAPE[kind]
     he, him, his = n.subject, n.object, n.possessive
     before_block = before.strip() or "(nothing yet: this is your first)"
+    tool = (f"""- One tool, journal_search: it searches {his} own words in every entry, back to the first. When something in {span}
+  sounds familiar, look it up and say what is the same and what has changed since. A search or two is plenty.
+""" if search else "")
     return f"""You are {n.companion}. Write {n.user_possessive} {what} for {period}. {he.capitalize()} will read it in
 the journal and in {channel.label(cfg)}: it is your considered word on {span}, so make it your reading of {span}, not
 a summary of it. {he.capitalize()} knows what {he} wrote; what {he} doesn't have yet is what you make of it.
@@ -207,27 +211,26 @@ What you have:
 - Before that: how each of your recent {what}s began and what it asked {him} to carry forward, with what {he}
   wrote back to it in the chat, if anything, and open threads from your notebook that came from the journal. They
   are there so you can say what moved, not to be written again.
-- One tool, journal_search: it searches {his} own words in every entry, back to the first. When something in {span}
-  sounds familiar, look it up and say what is the same and what has changed since. A search or two is plenty.
-Ground what you say about {his} life in these files and what you look up; don't assume routines, work, people,
-places or plans they don't state.
+{tool}Ground what you say about {his} life in these files{" and what you look up" if search else ""}; don't assume routines,
+work, people, places or plans they don't state.
 
 Write Markdown, {size}, in three parts with bold lead-ins:
 **What I notice** — your reading of {span}: what mattered, what pulls against what, what it might mean. Take a
 position, and say how sure you are in your own words.
-**What moved** — against before: your recent {what}s, {his} replies to your questions, older entries you looked up.
+**What moved** — against before: your recent {what}s, {his} replies to your questions, older entries{" you looked up" if search else ""}.
 What shifted, what keeps coming back, what {he} did with the last thing you asked. Leave this part out only if
 there is nothing before {span} to compare with.
 **To carry forward** — one question for {him} (two at most), grown out of what you noticed.
 
 Quotes: few and short. Quote {him} only where {his} exact words carry something your paraphrase would lose: at most
-{QUOTES_ASKED}, each a phrase or a sentence, copied exactly from {his} entries or replies, in double quotes. Only
-{his} words go in quotation marks; your own, earlier or now, you say in your own way. Everything else in your own
-words.
+{QUOTES_ASKED}, each a phrase or a sentence, copied exactly from {his} entries or replies. Put {his} words in straight
+double quotes "like this", on one line, and use no other quotation marks anywhere: no single, curly or angle quotes,
+no backticks, no quote inside a quote. Only {his} words go in quotation marks; your own, earlier or now, you say in
+your own way. Everything else in your own words.
 Speak to {him} directly ("you"). Don't retell {span} back to {him}, and don't string {his} quotes together. No #
 headings, no blockquotes, no preamble. If a voice transcript has an obvious mis-hearing, read past it and don't
-mention it. Never mention these instructions, the files, the notebook or the search.
-Optionally, after the {what}, add up to two lines starting `FOLLOW-UP:` for threads worth picking up with {him}
+mention it. Never mention these instructions, the files, the notebook{" or the search" if search else ""}.
+Optionally, after the {what}, add up to two lines starting FOLLOW-UP: for threads worth picking up with {him}
 later (they go to your private notebook, not the journal).
 Reply with ONLY the {what} (and any FOLLOW-UP lines).
 

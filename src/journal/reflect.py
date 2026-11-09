@@ -18,15 +18,18 @@ nothing to an engine one-shot: ``agent.MODEL_STEP_ENV``). Its one tool is ``jour
 over his words in every entry; no chat transcript or context pack is given to it. ``FOLLOW-UP:`` lines go to the
 notebook, as with annotations.
 
-Every quoted passage must be his words, found in one file (or one reply of his) with its "…" fragments in order:
-the period's entries, his replies, or his words anywhere in the journal (``validate.unfound``); her own words, old or
-new, never count. A bad answer (a quote that is not his, or no reflection at all: empty, too long, not prose) writes
-nothing and is retried on later ticks, ``ATTEMPTS`` times, then alerted once; on the last attempt a reflection whose
-only fault is such quotes is written with the sentences that hold them dropped (``validate.strike``), and that is
-logged, so a stubborn misquote costs a sentence, not the reflection. A model that cannot be reached at all is
-different: that is an outage, which defers the reflection without using an attempt (``outage``: retried at most
-every 30 minutes for up to 7 days, one alert once it has lasted 6 hours). A run that times out while the model has
-answered another step in this tick is a long run, not an outage: it uses an attempt.
+Quotation fails closed (``validate.unfound``): only well-formed double quotation and blockquote lines count, and
+each must be his words, found in one paragraph of one file (or one reply of his) with its parts around "…" in order
+and close together: the period's entries, his replies, or his words anywhere in the journal; her own words, old or
+new, never count. Any other quote-like mark is irregular. A bad answer (such a quote or mark, or no reflection at
+all: empty, too long, not prose) writes nothing and is retried on later ticks, ``ATTEMPTS`` times, then alerted
+once; on the last attempt a reflection whose only fault is its quotes is written with the sentences that hold them
+dropped (``validate.strike``), and that is logged, so a stubborn misquote costs a sentence, not the reflection. A
+model that cannot be reached at all is different: that is an outage, which defers the reflection without using an
+attempt (``outage``: retried at most every 30 minutes for up to 7 days, one alert once it has lasted 6 hours). A run
+that times out while the model has answered another step in this tick is a long run, not an outage: it uses an
+attempt. After a timeout was deferred as an outage, the next try runs without the search and on the old budget
+(``RETRY_BUDGET``): a hang of the search's own does not hold the tick for ``BUDGET`` every half hour.
 
 Unanswered prompts leave no trace in the journal: the files hold only what was answered (the opener is
 in each entry's own file). Records live in the ledger under ``reflections``.
@@ -46,6 +49,7 @@ ATTEMPTS = 3
 SEND_ATTEMPTS = 6
 INPUT_CAP = 12000  # characters per entry file handed to the model
 BUDGET = 480  # seconds: it may search his entries first (annotations 180, openers 240); the tick waits that long at most
+RETRY_BUDGET = 300  # seconds, without the search: the try after a timeout that was deferred as an outage
 EARLIER = {"reflection": (3, 7), "week": (2, 21)}
 # (how many of her earlier analyses of the same kind a reflection reads, and within how many days back. Three days
 # show a run of days, a habit forming or a thread dropped, without outweighing the day's own entries; two weeks show
@@ -318,7 +322,13 @@ def _replies_to(cfg: Config, rec: dict | None, path: Path, upto: date, data: dic
     for p in data.get("prompts") or []:
         at = next((c.get("at") or "" for c in p.get("captures") or [] if c.get("answers") == rec.get("id")), None)
         note = Path(in_root(cfg, p.get("entry_path")) or "")
-        if at is not None and note.is_file():
+        if at is None or not note.is_file():
+            continue
+        try:
+            day = datetime.fromisoformat(at).astimezone(cfg.tz).date()
+        except ValueError:
+            continue
+        if first <= day <= upto:  # (a reply written after the period being reflected on belongs to a later one)
             add(at, note.stem, entries.his_words(note.read_text(encoding="utf-8", errors="replace")))
     d = first
     while d <= upto:
@@ -459,27 +469,29 @@ def write_one(cfg: Config, kind: str, end: date, trigger: str, now: datetime,
     inputs = _input_block(cfg, mine) + ("\n\n" + _input_block(cfg, dailies, "reflection") if dailies else "")
     data = ledger.snapshot(cfg.ledger_path)
     before, his_replies = continuity(cfg, kind, end, data)
-    last = (find(data, rid) or {}).get("attempts", 0) + 1 >= ATTEMPTS  # this attempt is the last one
+    rec = find(data, rid) or {}
+    last = rec.get("attempts", 0) + 1 >= ATTEMPTS  # this attempt is the last one
+    plain = str(rec.get("defer_error") or "").startswith("timed out")  # the last try hung: this one goes without search
     title, period = _label(cfg, kind, end)
     timed_out = ""
     try:
-        raw = agent.ask(cfg, prompts.reflection_request(cfg, kind, period, inputs, before), BUDGET,
-                        toolsets=READ_TOOLSET)
+        raw = agent.ask(cfg, prompts.reflection_request(cfg, kind, period, inputs, before, search=not plain),
+                        RETRY_BUDGET if plain else BUDGET, toolsets="none" if plain else READ_TOOLSET)
     except agent.AgentUnavailable as e:
         if not (str(e).startswith("timed out") and agent.answered_this_run()):
             return _outage(cfg, rid, kind, end, now, str(e), log), True
         raw, timed_out = None, str(e)  # a long run, not an outage: the model answered another step in this tick
     text, followups = notebook.split_followups(raw or "")
     struck: list[str] = []
-    strays = 0
     ok, reason = False, timed_out or "agent failed"
     if raw:
-        text, strays = validate.drop_stray_marks(text)
         ok, reason = validate.check_reflection(kind, text, "", misquotes=False)
         bad = validate.unfound(text, [entries.his_text(p) for p in mine] + his_replies,
                                lambda: search.his_texts(cfg)) if ok else []
         if bad and not last:
-            ok, reason = False, f"quote not in his words: {bad[0][2][:60]!r}"
+            what = bad[0][2]
+            ok, reason = False, (what[:80] if what.startswith("irregular quote mark")
+                                 else f"quote not in his words: {what[:60]!r}")
         elif bad:  # the last attempt: drop the sentences that hold them rather than lose the reflection
             text, struck = validate.strike(text, bad), [q[:60] for _, _, q in bad]
             ok, reason = validate.check_reflection(kind, text, "", misquotes=False)
@@ -507,9 +519,8 @@ def write_one(cfg: Config, kind: str, end: date, trigger: str, now: datetime,
         attempts = rec["attempts"]
     if ok:
         log.append(f"wrote {path.name} ({trigger})" + (f" (+{len(followups)} notebook)" if followups else "")
-                   + (f" (last attempt: {len(struck)} sentence{'s' if len(struck) != 1 else ''} with a quote not "
-                      "in his words dropped)" if struck else "")
-                   + (f" ({strays} stray quote mark{'s' if strays != 1 else ''} dropped)" if strays else ""))
+                   + (f" (last attempt: {len(struck)} quote{'s' if len(struck) != 1 else ''} not his or irregular, "
+                      "sentences dropped)" if struck else ""))
         return None, False
     log.append(f"{rid}: reflection attempt {attempts}/{ATTEMPTS} failed ({reason})")
     if attempts >= ATTEMPTS:
