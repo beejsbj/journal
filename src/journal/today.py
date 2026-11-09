@@ -444,8 +444,9 @@ def _practice_text(r: dict) -> str:
             else f"{r['id']} sent {r['sent']}, answered"
     if r["state"] == "open":
         return f"{r['id']} sent {r['sent']}, no reply yet"
-    if not r.get("sent"):
-        return f"{r['id']} at {r['at']} (missed)" if r.get("at") else f"{r['id']} (missed)"
+    if not r.get("sent"):  # (the chat never got it: on a chat install it is no miss of a prompt he saw)
+        return f"{r['id']} at {r['at']}, not sent to the chat (missed)" if r.get("at") \
+            else f"{r['id']}, not sent to the chat (missed)"
     return f"{r['id']} sent {r['sent']} (missed, reply anytime)"
 
 

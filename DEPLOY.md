@@ -46,7 +46,7 @@ answers (none can until OPEN-FACES) or a send loses the race; existing records r
    `systemctl --user restart journal-serve`. Nothing is sent by the deploy.
 2. First checks, without sending: `journal doctor` (the `channel` row as before; no new failure); `journal status`
    shows a `Today:` line with each slot's state and `Due now` as before; `journal today` renders the block (a past
-   slot that was never sent now reads `<id> at HH:MM (missed)`); the web app's Today loads (a due slot shows as still
+   slot that was never sent now reads `<id> at HH:MM, not sent to the chat (missed)`); the web app's Today loads (a due slot shows as still
    to come, with Send now) and its week strip still parses. `journal send <id> --dry-run` prints the message for the
    slot it would take. The next scheduled prompt goes out as before (the tick's log says `sent <id>`); a slot already
    answered says `<id>: not sent: answered meanwhile`.

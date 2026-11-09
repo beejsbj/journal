@@ -70,7 +70,8 @@ class TodayTest(ReaderCase):
         data = today.collect(self.cfg, at(20).astimezone(timezone.utc))
         morning = data["practices"]["rows"][0]
         self.assertEqual(morning, {"id": "morning", "state": "missed", "at": "06:00"})
-        self.assertIn("morning at 06:00 (missed)", today.lines_of(data)[0])
+        # (review round 2: the chat never got it, so it is no miss of a prompt he saw; say so)
+        self.assertIn("morning at 06:00, not sent to the chat (missed)", today.lines_of(data)[0])
 
 class ServedTodayTest(ServeCase):
     def test_the_web_app_as_built_is_served_a_due_row_as_upcoming(self):
