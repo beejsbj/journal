@@ -173,9 +173,12 @@ class EngineOnlyTest(unittest.TestCase):
                     self.assertEqual(out.returncode, 0, (argv, out.stdout, out.stderr))
             leaked = subprocess.run([sys.executable, "-I", "-c",
                                      "import sys; sys.path.insert(0, sys.argv[1]); import journal.tick, journal.today, "
-                                     "journal.status, journal.actions, journal.slots; print('ok')", str(Path(t) / "src")],
+                                     "journal.status, journal.actions, journal.slots; print(journal.__file__)",
+                                     str(Path(t) / "src")],
                                     capture_output=True, text=True, timeout=60)
-            self.assertEqual(leaked.stdout.strip(), "ok", leaked.stderr)
+            # (the copy without its faces was imported, not the checkout or an installed journal)
+            self.assertEqual(leaked.stdout.strip(), str(pkg / "__init__.py"), leaked.stderr)
+            self.assertFalse((pkg / "serve").exists() or (pkg / "hermes").exists() or (pkg / "mcp").exists())
 
 
 if __name__ == "__main__":

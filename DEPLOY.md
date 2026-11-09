@@ -29,7 +29,8 @@ the three refusals) is new; no face calls it yet (OPEN-FACES). Today's rows, the
 unanswered count and the web app's week strip and insights read slot states: a past slot that was never delivered now
 shows (missed, or due), and the web app is served a due row as upcoming. `channel.platform: none` is a journal with
 no chat: nothing is sent, written, counted or alerted. New setting `windows.day_ends_at` (default `04:00`). `agent`
-no longer imports the Hermes adapter for its failure copy; `status` does not need `serve/` for doctor.
+no longer imports the Hermes adapter for its failure copy; `status` does not need `serve/` for doctor. A no-chat
+install should not start a program run yet: phases with no chat come with OPEN-PROGRAMS.
 
 **Side and restart.** `tick.py`, `slots.py`, `actions.py`, `capture.py` (`sent_opener`), `sweep.py`, `today.py`,
 `standing.py`, `prompts.py`, `conversations.py`, `entries.py`, `config.py`, `library.py`, `status.py`, `agent.py`,

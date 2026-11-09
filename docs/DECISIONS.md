@@ -3088,3 +3088,23 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   - **Engine alone:** `agent.is_failure_text` holds Hermes' failure copy itself (the adapter re-exports it), and
     `status.serve_rows` answers one row when `serve/` is not installed; a test runs `today`, `status`, `doctor` and
     `tick` from a copy of the package without `hermes/`, `serve/` and `mcp/`.
+  - **Built against the doc as merged (#16, `c7ab632`).** Step 3 of `resolve` also takes a later slot whose only
+    record is a failed send's (no delivery, no captures), and `actions.answer` fills that record in; choosing a
+    practice again after an answer fills the next slot that fits (a 09:30 answer, then `/start water` or words at
+    10:00, take the unrecorded 15:00 slot, and the tick skips its send) before any extra entry.
+  - **"A second write staying with its slot on a multi-slot practice"** (the doc's test list) is read through its
+    paragraph *Adding more words to an entry already written goes through that entry*: more words for a slot already
+    answered go through the entry (the web app's `POST …/blocks` today, `journal write --entry` in OPEN-FACES), and
+    `actions.answer`, which is "choosing the practice", fills the next slot that fits. So OPEN-CORE has no entry-level
+    write in `actions`; the two sentences of the doc only agree read this way.
+  - **Tests changed.** `tests/test_serve.py`'s `GET /today` equality maps a *due* row to *upcoming* before comparing
+    with `today.collect` (the served mapping above), and `tests/fixtures/api/today.json` gains the 06:00 morning row,
+    *due* at 09:12 and served *upcoming*. `tests/fixtures/today.json` (the block's fixture) does not change, unlike
+    the doc's test list expects: its fixed day has neither a due slot nor a face answer, and the new lines are pinned
+    in `tests/test_open_readers.py`. No other existing test changed: the pre-send check holds the opener's pack back
+    through a context variable in `tick` rather than a new `_opener` parameter, so the tests that stand in for
+    `_opener` with its five-argument signature keep working.
+  - **Left for OPEN-PROGRAMS:** with `channel.platform: none`, a program phase (`programs._send_phase`) and an
+    interrupt still go to the channel, which refuses them, so they count and alert as before. The doc puts phases
+    and interrupts with no chat in package 4. Until then a no-chat install should not start a program run: its
+    first phase would fail and alert as on any install whose channel refuses a send.
