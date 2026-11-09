@@ -169,6 +169,10 @@ export function Notifications(props: { device?: Device | null; env?: PushEnv }) 
     body = <p>On an iPhone or iPad, add the journal to the Home Screen first (Share, then Add to Home Screen), open it from there, and turn notifications on here.</p>;
   } else if (support(env) !== "ok" || !device) {
     body = <p>This browser can't take notifications from the journal.</p>;
+  } else if (!key) {
+    body = <p>The server has no key yet to subscribe with; it makes one at its start. Try again in a minute.</p>;
+  } else if (on === undefined) {
+    body = <p class="hint" role="status">Checking this device…</p>;
   } else {
     const blocked = device.permission() === "denied" || state.at === "denied";
     const busy = state.at === "busy";
@@ -181,11 +185,11 @@ export function Notifications(props: { device?: Device | null; env?: PushEnv }) 
         <div class="actions">
           {on ? (
             <button type="button" class="button" disabled={busy} onClick={() => flip(false)}>Turn off</button>
-          ) : on === false ? (
+          ) : (
             <button type="button" class="button primary" disabled={busy || device.permission() === "denied"} onClick={() => flip(true)}>
               Turn on notifications
             </button>
-          ) : null}
+          )}
         </div>
         {state.at === "failed" && (typeof state.why === "string" ? <p class="field-error" role="alert">{state.why}</p> : <ErrorLine error={state.why} />)}
       </>
@@ -196,7 +200,8 @@ export function Notifications(props: { device?: Device | null; env?: PushEnv }) 
       <h2 id="push-h">Notifications</h2>
       <p class="section-note">
         A notification says a practice's name and that it is due, nothing else. It travels through the browser maker's
-        push service (Apple, Google or Mozilla), which sees when it was sent but cannot read it.
+        push service (Apple, Google, Mozilla or Microsoft), which cannot read it but learns that this site sends this
+        device notifications, and when.
       </p>
       <div class="panel">
         {body}

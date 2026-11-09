@@ -92,7 +92,15 @@ export async function turnOn(publicKey: string, device: Device): Promise<"on" | 
   const old = await reg.pushManager.getSubscription();
   if (old) await old.unsubscribe();
   const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(publicKey) as BufferSource });
-  await api.subscribePush(sub.toJSON());
+  try {
+    await api.subscribePush(sub.toJSON());
+  } catch (e) {
+    // the server did not keep it: no subscription in the browser either, or Settings would say On for nothing
+    await sub.unsubscribe().catch(() => undefined);
+    throw e;
+  }
+  // the one replaced, which the server may still count (it would wait for a push service's 410 to learn)
+  if (old && old.endpoint !== sub.endpoint) await api.unsubscribePush(old.endpoint).catch(() => undefined);
   return "on";
 }
 

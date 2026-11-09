@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { nudge, openTarget, writeUrl } from "../src/swCore";
+import { nudge, openTarget, renew, writeUrl } from "../src/swCore";
 import { keyBytes, sameKey, support, turnOff, turnOn, type Device } from "../src/push";
 import { Notifications } from "../src/routes/settings";
 import { json, mount, must, stubFetch, tick, until } from "./helpers";
@@ -14,6 +14,7 @@ describe("what a push shows (the service worker)", () => {
     expect(n.options.body).toBe("due now");
     expect(n.options.tag).toBe("practice:morning");
     expect(n.options.data).toEqual({ url: "/today?write=morning" });
+    expect(n.options.renotify).toBe(true);   // a later slot replacing one still showing still alerts (review round 1, 5)
   });
 
   it("says something plain when the payload is not what the server sends", () => {
@@ -62,6 +63,20 @@ describe("a tap on the notification", () => {
     expect(c.opened).toEqual([]);
   });
 
+  it("brings the page forward before it navigates (a browser allows focus only just after the tap)", async () => {
+    const order: string[] = [];
+    const page = { url: `${ORIGIN}/entries`, focus: async () => { order.push("focus"); }, navigate: async () => { order.push("navigate"); } };
+    await openTarget("/today", { matchAll: async () => [page], openWindow: async () => null }, ORIGIN);
+    expect(order).toEqual(["focus", "navigate"]);
+  });
+
+  it("opens the address in a new window when the page cannot be navigated (one the worker does not control)", async () => {
+    const opened: string[] = [];
+    const page = { url: `${ORIGIN}/entries`, focus: async () => undefined, navigate: async () => { throw new TypeError("not controlled"); } };
+    await openTarget("/today?write=morning", { matchAll: async () => [page], openWindow: async (u: string) => { opened.push(u); } }, ORIGIN);
+    expect(opened).toEqual([`${ORIGIN}/today?write=morning`]);
+  });
+
   it("opens the app when none is open", async () => {
     const c = clients([]);
     await openTarget("/today?write=morning", c.api, ORIGIN);
@@ -74,6 +89,38 @@ describe("a tap on the notification", () => {
     await openTarget("//elsewhere.example/today", c.api, ORIGIN);
     await openTarget(42, c.api, ORIGIN);
     expect(c.opened).toEqual([`${ORIGIN}/today`, `${ORIGIN}/today`, `${ORIGIN}/today`]);
+  });
+});
+
+describe("a subscription the browser replaced (pushsubscriptionchange)", () => {
+  it("gives the server the new one and drops the old", async () => {
+    const calls: [string, string, unknown][] = [];
+    const fetcher = async (url: string, init: RequestInit) => { calls.push([init.method ?? "GET", url, JSON.parse(String(init.body))]); return new Response(null, { status: 201 }); };
+    const fresh = { toJSON: () => ({ endpoint: "https://fcm.googleapis.com/fcm/send/new", keys: { p256dh: KEY, auth: "a" } }) };
+    await renew({ endpoint: "https://fcm.googleapis.com/fcm/send/old", options: { applicationServerKey: keyBytes(KEY) as BufferSource } },
+      fresh, { subscribe: async () => { throw new Error("not needed"); }, fetch: fetcher });
+    expect(calls).toEqual([
+      ["POST", "/api/v1/push/subscriptions", { endpoint: "https://fcm.googleapis.com/fcm/send/new", keys: { p256dh: KEY, auth: "a" } }],
+      ["DELETE", "/api/v1/push/subscriptions", { endpoint: "https://fcm.googleapis.com/fcm/send/old" }],
+    ]);
+  });
+
+  it("subscribes again with the old key when the browser gave no new one", async () => {
+    const asked: unknown[] = [];
+    const calls: string[] = [];
+    const fresh = { toJSON: () => ({ endpoint: "https://fcm.googleapis.com/fcm/send/new", keys: {} }) };
+    await renew({ endpoint: "https://fcm.googleapis.com/fcm/send/old", options: { applicationServerKey: keyBytes(KEY) as BufferSource } }, null, {
+      subscribe: async (opts) => { asked.push(opts.userVisibleOnly); return fresh; },
+      fetch: async (url: string, init: RequestInit) => { calls.push(`${init.method} ${url}`); return new Response(null, { status: 204 }); },
+    });
+    expect(asked).toEqual([true]);
+    expect(calls).toEqual(["POST /api/v1/push/subscriptions", "DELETE /api/v1/push/subscriptions"]);
+  });
+
+  it("does nothing it cannot: no old key and no new subscription", async () => {
+    const calls: string[] = [];
+    await renew(null, null, { subscribe: async () => { throw new Error("no"); }, fetch: async (u: string) => { calls.push(u); return new Response(null); } });
+    expect(calls).toEqual([]);
   });
 });
 
@@ -129,6 +176,21 @@ describe("this device's subscription", () => {
     expect(await turnOn(KEY, dev)).toBe("on");
     expect(calls).toEqual(["ask", "subscribe true 65"]);
     expect(posted).toEqual([{ endpoint: "https://fcm.googleapis.com/fcm/send/new", keys: { p256dh: KEY, auth: "BTBZMqHH6r4Tts7J_aSIgg" } }]);
+  });
+
+  it("ends the browser's subscription when the server refuses it, so Settings never says On for nothing", async () => {
+    stubFetch({ "/api/v1/push/subscriptions": () => json({ error: "bad-subscription", detail: "not a push service" }, 422) });
+    const { dev, calls } = device("granted");
+    await expect(turnOn(KEY, dev)).rejects.toMatchObject({ status: 422 });
+    expect(calls).toEqual(["ask", "subscribe true 65", "unsubscribe new"]);
+  });
+
+  it("tells the server to forget the subscription it replaces", async () => {
+    const seen: string[] = [];
+    stubFetch({ "/api/v1/push/subscriptions": (_u: URL, init?: RequestInit) => { seen.push(`${init?.method} ${JSON.parse(String(init?.body)).endpoint}`); return init?.method === "DELETE" ? new Response(null, { status: 204 }) : json({ subscriptions: 1 }, 201); } });
+    const { dev } = device("granted", { endpoint: "https://fcm.googleapis.com/fcm/send/old" });
+    await turnOn(KEY, dev);
+    expect(seen).toEqual(["POST https://fcm.googleapis.com/fcm/send/new", "DELETE https://fcm.googleapis.com/fcm/send/old"]);
   });
 
   it("does nothing more when permission is refused", async () => {
@@ -206,6 +268,21 @@ describe("Settings: notifications", () => {
     expect(ask).toHaveBeenCalledTimes(1);
     expect(host.textContent).toContain("On for this device");
     await tick();
+  });
+
+  it("says it is checking the device while it reads the subscription, not Off", async () => {
+    stubFetch({ "/api/v1/push": INFO });
+    const dev: Device = { permission: () => "default", requestPermission: async () => "granted", registration: () => new Promise(() => undefined) };
+    const host = mount(<Notifications device={dev} env={{ worker: true, push: true, notification: true, standalone: true, ios: false }} />);
+    await until(() => must(host.textContent?.match(/Checking this device/)));
+    expect(host.textContent).not.toContain("Off for this device");
+  });
+
+  it("says so when the server has no key yet", async () => {
+    stubFetch({ "/api/v1/push": { ...INFO, public_key: null } });
+    const dev: Device = { permission: () => "default", requestPermission: async () => "granted", registration: () => new Promise(() => undefined) };
+    const host = mount(<Notifications device={dev} env={{ worker: true, push: true, notification: true, standalone: true, ios: false }} />);
+    await until(() => must(host.textContent?.match(/no key yet/)));
   });
 
   it("says when this journal pushes nothing (a chat, push.when no-chat)", async () => {

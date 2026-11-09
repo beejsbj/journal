@@ -239,7 +239,7 @@ export function writeUrl(practice: unknown): string {
 /** A notification as the worker shows it. */
 export interface Nudge {
   title: string;
-  options: { body: string; tag: string; icon: string; badge: string; data: { url: string } };
+  options: { body: string; tag: string; renotify: boolean; icon: string; badge: string; data: { url: string } };
 }
 
 /** What a push says, from the server's payload (`serve/push.py`: the practice's title, "due now" and its id). A payload
@@ -254,6 +254,7 @@ export function nudge(data: unknown): Nudge {
     options: {
       body: known && typeof p.body === "string" && p.body ? p.body : "A practice is due",
       tag: practice ? `practice:${practice}` : "practice",
+      renotify: true,   // a newer one replacing one still showing (last night's, or a second slot) alerts again
       icon: "/icons/icon-192.png",
       badge: "/icons/icon-192.png",
       data: { url: known ? writeUrl(practice) : "/today" },
@@ -283,9 +284,40 @@ export async function openTarget(url: unknown, clients: ClientsLike, origin: str
     .filter((c) => c.url.startsWith(`${origin}/`) || c.url === origin);
   const page = open[0];
   if (page) {
-    if (page.navigate) await page.navigate(target).catch(() => undefined);
+    // focus first: a browser lets the worker focus a page only just after the tap, and navigating waits for a load
     await page.focus().catch(() => undefined);
-    return;
+    try {
+      if (!page.navigate) throw new TypeError("no navigate");
+      await page.navigate(target);
+      return;
+    } catch {
+      // a page the worker does not control cannot be navigated: open the address beside it
+    }
   }
   await clients.openWindow(target);
+}
+
+/** What `renew` needs of the worker: its push manager's `subscribe`, and `fetch`. */
+export interface RenewEnv {
+  subscribe(options: { userVisibleOnly: boolean; applicationServerKey: BufferSource }): Promise<{ toJSON(): unknown }>;
+  fetch(url: string, init: RequestInit): Promise<Response>;
+}
+
+/** `pushsubscriptionchange`: the browser replaced this device's subscription (Firefox rotates them). The server is
+ *  given the new one (the browser's, else one made again with the old one's key) and told to drop the old, so pushes
+ *  do not stop until he next opens Settings. Signed in by the page's cookie, as every request from the worker is. */
+export async function renew(
+  old: { endpoint: string; options?: { applicationServerKey?: BufferSource | null } } | null,
+  fresh: { toJSON(): unknown } | null,
+  env: RenewEnv,
+): Promise<void> {
+  let sub = fresh;
+  const key = old?.options?.applicationServerKey;
+  if (!sub && key) sub = await env.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+  const send = (method: string, body: unknown) => env.fetch(`${API}push/subscriptions`, {
+    method, credentials: "same-origin", headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (sub) await send("POST", sub.toJSON());
+  if (old) await send("DELETE", { endpoint: old.endpoint });
 }
