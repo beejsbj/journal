@@ -392,6 +392,123 @@ class EditorReviewTest(Clocked):
         self.assertIn("nothing was saved", err)
 
 
+class EditorExitsTest(Clocked):
+    """Review round 2: the editor's file lives in a private directory of its own, and on every way out of ``journal
+    write`` it is either removed (off the record, or nothing of his in it) or kept and named: never left behind
+    unnamed, and never with off-the-record words in it (finding 1, 5, 6); and the smaller ones (3, 4, 8)."""
+
+    def setUp(self):
+        super().setUp()
+        self.tmpdir = Path(self.tmp.name) / "editor-tmp"
+        self.tmpdir.mkdir()
+        p = mock.patch("tempfile.tempdir", str(self.tmpdir))
+        p.start()
+        self.addCleanup(p.stop)
+        self.now = at(10)
+
+    def left(self) -> list[Path]:
+        return [f for f in self.tmpdir.rglob("*") if f.is_file()]
+
+    def editor(self, body: bytes | str, *, code=0, raise_after=None):
+        def fake(argv):
+            path = Path(argv[-1])
+            old = path.read_bytes()
+            path.write_bytes((body.encode() if isinstance(body, str) else body) + old)
+            if raise_after is not None:
+                raise raise_after
+            return code
+        return mock.patch.object(cli, "_edit", fake)
+
+    def kept(self, err: str) -> Path:
+        return Path(err.split("kept in ")[1].split()[0].rstrip(".;"))
+
+    def test_an_interrupt_while_editing_off_the_record_words_leaves_nothing(self):
+        with self.editor("/x the thing I do not want kept\n", raise_after=KeyboardInterrupt()), \
+                self.assertRaises(KeyboardInterrupt):
+            self.cli("write", "water", tty=True)
+        self.assertEqual(self.left(), [])
+        self.assertFalse(self.prompts())
+
+    def test_an_interrupt_after_ordinary_words_keeps_them_and_says_where(self):
+        err = io.StringIO()
+        with self.editor("ordinary words\n", raise_after=KeyboardInterrupt()), \
+                self.assertRaises(KeyboardInterrupt), contextlib.redirect_stderr(err):
+            args = cli.build_parser().parse_args(["write", "water"])
+            fake_in = io.StringIO("")
+            fake_in.isatty = lambda: True
+            with mock.patch.object(sys, "stdin", fake_in):
+                cli.run(args, cfg_loader=lambda: self.cfg)
+        self.assertIn("ordinary words", self.kept(err.getvalue()).read_text(encoding="utf-8"))
+
+    def test_words_the_journal_cannot_read_leave_nothing_when_off_the_record(self):
+        with self.editor(b"/x caf\xe9, not for the journal\n"):
+            code, _, err = self.cli("write", "water", tty=True)
+        self.assertEqual(code, 1)
+        self.assertNotIn("Traceback", err)
+        self.assertEqual(self.left(), [])
+
+    def test_a_failure_at_the_save_keeps_his_words_and_names_the_file(self):
+        with self.editor("ordinary words\n"), \
+                mock.patch("journal.actions.answer", side_effect=PermissionError("the ledger")):
+            code, _, err = self.cli("write", "water", tty=True)
+        self.assertEqual(code, 1)
+        self.assertNotIn("Traceback", err)
+        self.assertIn("ordinary words", self.kept(err).read_text(encoding="utf-8"))
+
+    def test_words_typed_below_the_scissors_are_kept_not_destroyed(self):
+        def below(argv):
+            path = Path(argv[-1])
+            path.write_text(path.read_text(encoding="utf-8") + "my answer, under the question\n", encoding="utf-8")
+            return 0
+        with mock.patch.object(cli, "_edit", below):
+            code, _, err = self.cli("write", "water", tty=True)
+        self.assertEqual(code, 1)
+        self.assertIn("my answer, under the question", self.kept(err).read_text(encoding="utf-8"))
+
+    def test_an_editor_that_fails_after_he_saved_keeps_his_words(self):
+        with self.editor("saved, then the editor failed\n", code=1):
+            code, _, err = self.cli("write", "water", tty=True)
+        self.assertEqual(code, 1)
+        self.assertIn("saved, then the editor failed", self.kept(err).read_text(encoding="utf-8"))
+
+    def test_nothing_is_left_after_a_save_an_off_the_record_refusal_or_an_untouched_template(self):
+        with self.editor("two glasses\n"):
+            self.assertEqual(self.cli("write", "water", tty=True)[0], 0)
+        with self.editor("/x private\n"):
+            self.assertEqual(self.cli("write", "water", tty=True)[0], 1)
+        with self.editor(""):
+            self.assertEqual(self.cli("write", "water", tty=True)[0], 1)
+        self.assertEqual(self.left(), [])
+        self.assertEqual(list(self.tmpdir.iterdir()), [])   # the private directory goes with the file
+
+    def test_a_clock_time_within_the_slack_is_todays(self):
+        code, _, err = self.cli("write", "water", "--at", "10:04", stdin="nearly now")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self.prompt("2026-10-14-water")["sent_at"], at(10, 4).isoformat())
+
+    def test_the_template_names_the_slot_the_backdated_words_fill(self):
+        seen = {}
+
+        def look(argv):
+            path = Path(argv[-1])
+            seen["t"] = path.read_text(encoding="utf-8")
+            path.write_text("earlier words\n" + seen["t"], encoding="utf-8")
+            return 0
+        monday = at(9, 30, day=WED - timedelta(days=2))
+        with mock.patch.object(cli, "_edit", look):
+            code, out, err = self.cli("write", "water", "--at", monday.isoformat(), tty=True)
+        self.assertEqual(code, 0, err)
+        self.assertIn("2026-10-12-water", out)
+        self.assertIn("extra entry of this practice (2026-10-12-water", seen["t"])
+
+    def test_a_slot_after_midnight_is_tonights_not_tomorrows(self):
+        (Path(self.cfg.practices_dir) / "late.md").write_text(
+            "---\nkind: practice\nid: late\ntitle: Late\nschedule.time: 00:30\n---\n- Still up?\n",
+            encoding="utf-8")
+        v = actions.view(self.cfg, "late", now=at(1) + timedelta(days=1))   # 01:00 Thursday: Wednesday's night
+        self.assertEqual(v["fills"], "Fills the 00:30 slot, due now.")
+
+
 if __name__ == "__main__":
     import unittest
     unittest.main()

@@ -313,7 +313,9 @@ def _shown_practice(v: dict) -> list[str]:
 
 def _at_arg(cfg: jconfig.Config, raw: str | None, now: datetime) -> datetime | None:
     """``--at``: an ISO time (one without an offset is in the journal's time zone), or ``HH:MM``: the latest such
-    time that is not ahead of now (at 00:30, ``23:30`` is last night's)."""
+    time that is not ahead of now by more than a face's slack (at 00:30, ``23:30`` is last night's; at 10:00,
+    ``10:04`` is this morning's, as the same time written in full would be)."""
+    from .actions import FUTURE_SLACK
     if raw is None:
         return None
     try:
@@ -324,7 +326,7 @@ def _at_arg(cfg: jconfig.Config, raw: str | None, now: datetime) -> datetime | N
             when = now.astimezone(cfg.tz).replace(hour=hh, minute=mm, second=0, microsecond=0)
         except ValueError:
             raise ValueError(f"--at must be an ISO time or HH:MM (got {raw!r})") from None
-        if when > now:
+        if when > now + FUTURE_SLACK:
             when -= timedelta(days=1)
     return when if when.tzinfo is not None else when.replace(tzinfo=cfg.tz)
 
@@ -333,34 +335,74 @@ TEMPLATE_HEAD = "# Write above this line; everything from it down is left out."
 
 
 def _edit(argv: list[str]) -> int:
-    """Run the editor on a file and wait for it (its exit status)."""
+    """Run the editor and wait for it (its exit status). While it runs this process ignores the terminal's interrupt
+    and quit, as git does: a Ctrl-C or an editor's C-g reaches the editor, and this process lives on to remove or
+    keep the file (``_Draft``) rather than dying with his words in it. The editor itself starts with them as usual."""
+    import signal
     import subprocess
-    return subprocess.run(argv).returncode
-
-
-def _from_editor(template: str) -> tuple[str | None, Path]:
-    """His words from ``$VISUAL`` / ``$EDITOR`` (else ``vi``), as git commit asks for a message: the file opens with
-    ``template`` below a scissors line, and everything from that line down is left out; were the scissors line
-    removed, from the template's first line down. Only a whole line counts, and nothing else is taken out (a line of
-    his starting with ``#`` is a heading, not a comment). Returns (the words, or None when the editor failed, and the
-    file, which the caller removes once the words are saved or are not to be kept)."""
-    import shlex
-    import tempfile
-    editor = os.environ.get("VISUAL") or os.environ.get("EDITOR") or "vi"
-    fd, name = tempfile.mkstemp(prefix="journal-", suffix=".md")   # (0600: his words, until they are saved)
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
-        f.write(f"\n{SCISSORS}\n{template}")
+    child = subprocess.Popen(argv)
+    held = {sig: signal.signal(sig, signal.SIG_IGN) for sig in (signal.SIGINT, signal.SIGQUIT)}
     try:
-        if _edit([*shlex.split(editor), name]) != 0:
-            return None, Path(name)
-    except OSError:
-        return None, Path(name)
-    lines = Path(name).read_text(encoding="utf-8").split("\n")
-    for mark in (SCISSORS, TEMPLATE_HEAD):
-        if mark in lines:
-            lines = lines[:lines.index(mark)]
-            break
-    return "\n".join(lines).strip("\n"), Path(name)
+        return child.wait()
+    finally:
+        for sig, old in held.items():
+            signal.signal(sig, old)
+
+
+class _Draft:
+    """The file the editor opens, as git commit asks for a message: ``template`` below a scissors line, in a private
+    directory of its own (0700: the editor's swap, backup and auto-save files land beside it, and go with it).
+
+    Whatever happens, it ends one of two ways (``settle``): removed, when nothing of his is in it or when any of it
+    is off the record (``actions.refuse``'s first refusal: a line starting with the command); otherwise kept, and
+    its path named, so words a refusal, a failure or an interrupt stopped are never lost and never left unnamed."""
+
+    def __init__(self, template: str):
+        import tempfile
+        self.dir = Path(tempfile.mkdtemp(prefix="journal-write-"))
+        self.path = self.dir / "words.md"
+        self.blank = f"\n{SCISSORS}\n{template}"
+        self.path.write_text(self.blank, encoding="utf-8")
+        self.path.chmod(0o600)
+
+    def edit(self) -> str | None:
+        """His words: everything above the scissors line (were it removed, above the template's first line); only a
+        whole line counts, and nothing else is taken out (a line of his starting with ``#`` is a heading). None when
+        the editor failed or could not start, or wrote what cannot be read as text."""
+        editor = os.environ.get("VISUAL") or os.environ.get("EDITOR") or "vi"
+        try:   # through the shell, as git runs it: ``code --wait``, ``~/bin/ed`` and quoting all work
+            if _edit(["/bin/sh", "-c", f'{editor} "$@"', editor, str(self.path)]) != 0:
+                return None
+            lines = self.path.read_text(encoding="utf-8").split("\n")
+        except (OSError, UnicodeDecodeError):
+            return None
+        for mark in (SCISSORS, TEMPLATE_HEAD):
+            if mark in lines:
+                lines = lines[:lines.index(mark)]
+                break
+        return "\n".join(lines).strip("\n")
+
+    def remove(self) -> None:
+        import shutil
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def settle(self, cfg: jconfig.Config) -> Path | None:
+        """Remove the file, or keep it (its path) when it holds words of his that are not off the record."""
+        from . import actions
+        try:
+            text = self.path.read_text(encoding="utf-8", errors="surrogateescape")
+        except OSError:
+            text = self.blank
+        keep = text != self.blank
+        if keep:
+            try:
+                actions.refuse(cfg, text)
+            except actions.Refused as e:
+                keep = e.code != "off-the-record"
+        if keep:
+            return self.path
+        self.remove()
+        return None
 
 
 def _template(v: dict | None, stem: str | None) -> str:
@@ -376,11 +418,11 @@ ARGUMENT_CODES = ("not-a-practice", "disabled", "bad-time", "not-an-entry", "not
 def write_command(args, cfg: jconfig.Config) -> int:
     """``journal write [<id>] [-] [--entry STEM] [--at TIME]``: his words through ``actions`` (``answer`` for a
     practice, ``add`` for an entry, ``note`` otherwise), with the refusals every face has. The words come from stdin
-    when it is piped or ``-`` is given, else from the editor. What can be checked before he writes is (the practice,
-    the entry, the time), so the editor never opens for words that cannot be saved; words from the editor refused
-    after it (a marker line, the placeholder) are kept in its file, which the message names, unless they are off
-    the record. The clock is read when he saves. Exit 0 saved, 1 nothing saved (refused, empty, the editor failed),
-    2 an argument the journal cannot use."""
+    when it is piped or ``-`` is given, else from the editor (``_Draft``). What can be checked before he writes is
+    (the practice, the entry, the time), so the editor never opens for words that cannot be saved; the clock is read
+    again when he saves. Words from the editor that are not saved (refused, empty above the scissors, a failure, an
+    interrupt) are kept in its file, which the message names, unless they are off the record. Exit 0 saved, 1
+    nothing saved, 2 an argument the journal cannot use."""
     from . import actions, entries
     practice, stdin = args.practice, args.dash == "-"
     if practice == "-":
@@ -395,20 +437,37 @@ def write_command(args, cfg: jconfig.Config) -> int:
         at = _at_arg(cfg, args.at, now)
         actions.when(cfg, at, now)
         if practice:
-            v = actions.view(cfg, practice, now=now)
+            v = actions.view(cfg, practice, now=now, at=at)
         elif args.entry:
             actions.entry_for(cfg, args.entry, at or now)
     except ValueError as e:   # (``actions.Refused`` is one)
         return _err(str(e).replace(": nothing was saved", ""))
-    kept = None
     if stdin or not sys.stdin.isatty():
-        text = sys.stdin.read()
-    else:
-        text, kept = _from_editor(_template(v, args.entry))
+        return _save(cfg, args, practice, sys.stdin.read(), at, v)
+    draft = _Draft(_template(v, args.entry))
+    try:
+        text = draft.edit()
         if text is None:
-            kept.unlink(missing_ok=True)
-            print("journal: the editor did not finish: nothing was saved", file=sys.stderr)
-            return 1
+            return _unsaved(draft.settle(cfg), "the editor did not finish: nothing was saved")
+        code = _save(cfg, args, practice, text, at, v, draft)
+    except OSError as e:   # the journal could not be written (a lock, a permission): his words stay where they are
+        return _unsaved(draft.settle(cfg), f"cannot write the journal ({type(e).__name__}: {e}): nothing was saved")
+    except BaseException:
+        _unsaved(draft.settle(cfg), "stopped: nothing was saved")
+        raise
+    if code == 0:
+        draft.remove()   # (saved: the words are in the journal now)
+    return code
+
+
+def _unsaved(kept: Path | None, why: str) -> int:
+    print(f"journal: {why}" + (f"; your words are kept in {kept}" if kept else ""), file=sys.stderr)
+    return 1
+
+
+def _save(cfg: jconfig.Config, args, practice: str | None, text: str, at: datetime | None, v: dict | None,
+          draft: "_Draft | None" = None) -> int:
+    from . import actions
     now = datetime.now(timezone.utc)   # he saves now, perhaps minutes after the editor opened
     try:
         if practice:
@@ -418,13 +477,9 @@ def write_command(args, cfg: jconfig.Config) -> int:
         else:
             info = actions.note(cfg, text, at, via="cli", now=now)
     except actions.Refused as e:
-        keep = kept is not None and e.code not in ("off-the-record", "empty")
-        if kept is not None and not keep:
-            kept.unlink(missing_ok=True)
-        print(f"journal: {e}" + (f"; your words are kept in {kept}" if keep else ""), file=sys.stderr)
+        kept = draft.settle(cfg) if draft is not None else None
+        print(f"journal: {e}" + (f"; your words are kept in {kept}" if kept else ""), file=sys.stderr)
         return 2 if e.code in ARGUMENT_CODES else 1
-    if kept is not None:
-        kept.unlink(missing_ok=True)
     # (the slot the view named, said again: words saved in another one, a race with a tick, are only named by path)
     said = f" {v['fills']}" if v and info.get("slot") == v["slot"]["id"] else ""
     print(f"Saved in {info['path']}.{said}")

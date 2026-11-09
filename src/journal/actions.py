@@ -219,17 +219,19 @@ def entry_for(cfg: Config, stem: str, at: datetime) -> Path:
 
 # ── opening a practice: a view ───────────────────────────────────────────────
 
-def view(cfg: Config, practice, *, now: datetime | None = None) -> dict:
+def view(cfg: Config, practice, *, now: datetime | None = None, at: datetime | None = None) -> dict:
     """The practice as a face shows it when he opens it (the web app's *Write now*, ``journal open``, MCP's
     ``journal_start``), and the slot words written now would fill (``slots.resolve`` on a snapshot). Writes nothing.
 
     ``prompt`` has the entry document's shape (``sent_at_local``, ``opener``, ``opener_source``, ``asked``,
     ``questions``): the practice's plain opener and its questions, or, when the slot is a prompt the chat already
     has, that prompt as it was sent. ``slot``: ``{id, date, state, step, at, delivered}`` (``at`` its scheduled
-    local time, None for an extra entry); ``fills``: the same in words. Raises ``Refused`` (``not-a-practice``)."""
+    local time, None for an extra entry); ``fills``: the same in words. ``at``: the time the words will carry, when he
+    backdates them (``journal write --at``), so the view names the slot they will fill. Raises ``Refused``
+    (``not-a-practice``, ``disabled``, ``bad-time``)."""
     p = _practice(cfg, practice)
     now = now or datetime.now(timezone.utc)
-    slot = slots.resolve(cfg, p, now, now=now)
+    slot = slots.resolve(cfg, p, when(cfg, at, now), now=now)
     rec = slot.record if slot.delivered else None
     if rec is not None:
         sent = library.snapshot_sections(rec)
@@ -252,10 +254,11 @@ def fills(cfg: Config, slot: slots.Slot, now: datetime) -> str:
     """Where words written at ``now`` go (``slot``, from ``resolve``), in words a face can show under the practice."""
     when = slot.at.astimezone(cfg.tz).strftime("%H:%M") if slot.at is not None else None
     sent = slot.time.astimezone(cfg.tz).strftime("%H:%M") if slot.delivered and slot.time is not None else None
-    today = slots.journal_day(cfg, now)
-    days = (today - date.fromisoformat(slot.local_date)).days
+    # (by journal days: a 00:30 slot on Thursday's date is Wednesday night's, as ``resolve`` reckons it)
+    of = slots.journal_day(cfg, slot.at) if slot.at is not None else date.fromisoformat(slot.local_date)
+    days = (slots.journal_day(cfg, now) - of).days
     whose = "the" if days == 0 else "yesterday's" if days == 1 else "tomorrow's" if days == -1 else \
-        f"{slot.local_date}'s"
+        f"{of.isoformat()}'s"
     if slot.step == 1:
         return (f"Answers {whose} prompt in the chat, sent at {sent}." if sent
                 else f"Fills {whose} {when} slot, due now.")
