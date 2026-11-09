@@ -275,6 +275,17 @@ class ScheduleTest(Base):
             self.assertIn("not counted", log[0])
         self.assertNotIn("send_attempts", self.prompt("2026-10-14-morning"))
 
+    def test_after_a_lost_race_her_messages_say_what_the_chat_message_says(self):
+        """Review round 2: ``her_messages`` is what she said in the chat, so it reads the sent opener."""
+        self.bot.before_send = lambda: actions.answer(self.cfg, "morning", "the web app was quicker", at(6, 1),
+                                                      via="web", now=at(6, 1))
+        with mock.patch.object(tick, "_opener", lambda *a: (TICK_OPENER, "ada", [], [])):
+            self.send(at(6, 1))
+        lines = [line for _, line in context.her_messages(self.cfg, at(7))]
+        self.assertEqual(len(lines), 1, lines)
+        self.assertIn("the tick's own opener", lines[0])
+        self.assertNotIn("stock opener", lines[0])
+
     def test_a_deliberate_start_after_a_face_answer_makes_an_extra_entry(self):
         self.answer("morning", "slept well", at(7))
         before = dict(self.prompt("2026-10-14-morning"))
