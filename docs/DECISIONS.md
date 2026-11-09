@@ -3037,7 +3037,10 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   Asked whether `/x` should mean "not stored anywhere" (refuse every write tool in the turn, so "/x remind me to…"
   stops working) or "not in the journal", the owner chose the journal. README's guarantee now says so: nothing marked
   `/x` is saved in the journal, read back into the journal's context or quoted; tools that are not the journal's are
-  not refused. Consequence for later packages: the companion's memory may hold what was said off the record, so no
+  not refused, and a connected source does not know where its data came from: with `sources.tududi` on, a task
+  made from an `/x` turn can come back through the context pack (and an opener written from it), the Today
+  block, `today-cache.json` and the web app. The guarantee is about what the journal captures, not about
+  what may re-enter as source data. Consequence for later packages: the companion's memory may hold what was said off the record, so no
   journal step that writes a permanent file (openers, annotations, reflections, week reviews) may read her memory.
   This raises the weight of the open WEB-DESIGN point above (whether the one-shot model call can reach her memory):
   it is no longer hypothetical, and closing it means showing that call cannot load her memory, or narrowing it.
