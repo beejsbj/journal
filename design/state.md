@@ -5,8 +5,8 @@ direction is chosen; FRONTEND.md §2 and DECISIONS.md *IDENTITY* record the iden
 
 ## Current pass: WEB-UX (2026-10-28)
 
-- **Stage:** 4, key-application loop. Round 01's directions were reviewed; the owner combined Folio and Night
-  Room (below). Round 02 builds that combination as one prototype for his "looks good" before the system is written.
+- **Stage:** 5–6, build. Round 02 (the Folio × Night Room combination) is accepted with two changes (below); the
+  system is being written (DESIGN.md, tokens, components) and adopted across every screen on branch `web-ux`.
 - **Why:** the owner's verdict on the built app (2026-10-28, verbatim): "its currently like lame, and feels like a
   typical 'cli served dashboard app' vibes. like i want it to have proper ui/ux feel. i want its settings menu to not
   look so ugly. immersive and inviting typing(literally a writing webapp). insight page text could be more
@@ -80,6 +80,30 @@ Folio's warmth. Light = Folio's warm paper; dark = Night Room's cool dark. Alman
 
 **Agent calls, unconfirmed (reversible):** her voice stays typed as in A's letter (IBM Plex Mono). Analysis and her
 reflection unfold at the end of the entry, with no tabs. Today follows A. Both are logged for his check on round 02.
+
+## Round 02 result (2026-11-09, the owner's words, verbatim, on the round-02 screenshots and live prototype)
+
+"I don't like the stamps. Rumruther stamps. They look kinda lame. Okay, I'm just looking through everything. So that
+time in the entry sidebar, couldn't the time on the right be just below the date or something like that? They could
+all the time and date related things in the same place, so I don't like the stamp. Now I'm looking at entry date
+rail. Entry date rail looks nice. Two good job. Entry no sidebar. Looks good. Entry dark looks beautiful, right? Looks
+good. I like the sectioned out from Ada, but I don't like that stamp and the wavy thing. One thing is missing in the
+right is the margins, but I guess you just not have not demonstrated that in your screenshots. Today page is very
+nice. I like your mother today page. Entries is beautiful. Though I think the entries no entries looks good. It's
+good. Insights looks good as well. Settings looks great, good job. I like margin J for the mark. look amazong
+otherwise, great job"
+
+**Accepted (user-accepted, 2026-11-09):** round 02 as the system, with:
+- **No fastening on her letter:** no postmark stamp, no wavy cancel lines, no clip, no tape. Keep the sectioned "From
+  Ada" letter itself.
+- **Entry sidebar rows:** the time goes under the date, with the date and time together in the left column, instead
+  of at the right of the row.
+- **Her margin notes must show in dark too** (he missed them in the dark screenshot).
+- **The mark is the "margin j"** (option 01 on `#mark`).
+- Today, Entries, Entry (all three sidebar modes), dark, Insights and Settings were each approved by name.
+- Calls he did not contest (stand, reversible): her voice typed in IBM Plex Mono; Analysis and Reflection unfold at
+  the end of the entry, no tabs; Instrument Sans for the interface; the rail folds to icons while an entry is open;
+  focus greying on by default in the write room; the titled list as the default sidebar.
 
 ## Next
 
