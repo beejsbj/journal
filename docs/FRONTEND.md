@@ -58,8 +58,13 @@ programs with no active run).
   emoji + title, a state (`Comes at 23:00` / `Waiting since 06:00` / `Answered 06:41` / `Missed · reply anytime`),
   and, once sent, **the whole prompt in her voice, opener and every question, whatever its state** (the row's
   `prompt`; the web never folds a prompt, only Telegram does), then the first line of his reply in his serif when
-  there is one; actions: *Reply* (opens the entry composer; for a prompt with no entry yet, POST `/entries` with `practice`),
-  *Send now* (POST `/library/{id}/send`, shows "on its way", resolves on `ledger-changed`).
+  there is one; actions: *Write now* on every card, whatever its state (OPEN-FACES: opens the practice as a view,
+  `GET /library/{id}/open`, her plain opener and questions unless the card already shows the prompt, and the line
+  saying which slot the words fill, above a composer; *Save* is POST `/entries` with `practice`, which fills the slot
+  `slots.resolve` gives or makes an extra entry, never a `/j` note; nothing is fetched or written before he opens it),
+  *Send to chat* (POST `/library/{id}/send`, shows "on its way", resolves on `ledger-changed`). A *due* card ("due
+  since 09:00") is a slot whose time has come with no chat message for it. `/today?write=<id>` (Today's second path)
+  opens *Write now* on that practice's first row still to answer, or the practice alone when it has no row today.
 - Program card for each active run: "Session 3/10 · The Identity Construction Tracer · Phase 2/5 open since
   Sunday", buttons *Continue* (opens the Run screen), *Pause*.
 - Scheduled one-offs today (session-10 interrupts) as a quiet list with times.
@@ -104,7 +109,7 @@ programs with no active run).
 - Source badge: built-in / yours / edited (`source: fork`, a built-in he edited in place), and "default changed"
   when the shipped default has moved on since his edit. Enabled toggle for built-ins (`enabled: false` saved in place).
 - Card → Detail: title, description/intro, the question set (practices) or the sessions and phases (programs),
-  buttons *Send now* (practices), *Start* / *Continue* / *Insights* (programs; `/runs`), *Edit* on every definition,
+  buttons *Write now* (Today, `?write=<id>`) and *Send to chat* (practices), *Start* / *Continue* / *Insights* (programs; `/runs`), *Edit* on every definition,
   a built-in included (it is edited in place: BUILTIN-EDIT), *New practice* (the five-minute path: a form with title,
   time, and one question field pre-filled; saving writes a complete file).
 - An edited built-in shows an *Edited* panel under the actions: his version is used in place of the built-in; "The

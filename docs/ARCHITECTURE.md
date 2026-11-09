@@ -97,8 +97,10 @@ src/journal/
   slots.py            NEW  slot states (upcoming, due, open, answered, missed) from the schedule and the ledger; the
                            journal day (`windows.day_ends_at`); resolve(): which slot words or a deliberate send go to
                            (OPEN-PROMPTS)
-  actions.py          NEW  his words from a face: answer() into the slot resolve() gives, note(); the refusals (`/x`,
-                           marker lines, the transcript placeholder) for every face; never a chat boundary
+  actions.py          NEW  his words from a face: answer() into the slot resolve() gives, note(), add() to an entry;
+                           the refusals (`/x`, marker lines, the transcript placeholder) for every face; view(): a
+                           practice opened on a face (Write now, `journal open`, `journal_start`), a read; never a
+                           chat boundary
   capture.py, entries.py, compose.py, prompts.py, validate.py, reflect.py   keyed by Practice, not `kind in KINDS`
   privacy.py, conversations.py, sweep.py, recovery.py, context.py, mirror.py   consume ports.Row via cfg.transcript()
   agent.py            ask() facade + CommandCompanion (argv template); raises AgentUnavailable
@@ -322,8 +324,10 @@ Four processes may touch the journal; locks and order are fixed:
 | Spawned one-shots (`journal send <id>`, `journal program <action> <run>`) | one send or one program transition | `tick.lock` blocking, then `ledger.locked` |
 | `journal serve` (long-running, user unit) | reads; small locked writes; spawns for anything that sends | `ledger.locked` / `locked_state` for writes; **never** `tick.lock` |
 
-His words from a face (`actions.answer`, `actions.note`) are one `ledger.locked` call each: the slot is resolved, its
-record made or filled in, and the capture written under the same lock, never under `tick.lock`. The tick's scheduled
+His words from a face (`actions.answer`, `actions.note`, `actions.add`: serve's `POST /entries`, `journal write`, MCP's
+`journal_save`) are one `ledger.locked` call each: the slot is resolved, its record made or filled in, and the capture
+written under the same lock, never under `tick.lock`. Opening a practice (`actions.view`) takes no lock and writes
+nothing. The tick's scheduled
 send re-reads its record under `ledger.locked` just before `chat.send` (OPEN-PROMPTS rule 2), so a face answer made
 during the opener's model call stops the send; one made between that check and the send attaches the delivery to the
 face's record (rule 3) instead of overwriting it.

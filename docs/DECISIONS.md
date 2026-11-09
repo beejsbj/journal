@@ -30,7 +30,7 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   none` means no delivery by intent, and Web Push from `journal serve` nudges the PWA. Nothing a face writes, and no
   push, is a chat boundary, so neither can end a `/x` window. The owner took choices A–E on 2026-11-09 (recorded
   there). To close: packages OPEN-CORE, OPEN-FACES, OPEN-PUSH and OPEN-PROGRAMS land. *OPEN-CORE built*: see
-  "OPEN-CORE" under *Taken*, which records where it read the doc.
+  "OPEN-CORE" under *Taken*, which records where it read the doc. *OPEN-FACES built*: see "OPEN-FACES" under *Taken*.
 
 - **SCRUB-PERSONAL — the source adapters and `brain:` (open, the owner's).** The built-in context sources (tududi,
   chat-scrobbler, listenbrainz, storyteller, audiobookshelf, grimmory) are optional features, but together they
@@ -3144,3 +3144,75 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     stay by calendar date, so that 15th row reads missed while the words wait in the 16th's slot. If the owner wants
     such a practice's daytime words in last night's slot instead, step 2 would also take the missed slots of `at`'s
     calendar date: a doc change.
+- **OPEN-FACES (2026-11-09) — a practice done and answered on the web app, the CLI and MCP** (docs/OPEN-PROMPTS.md,
+  package 2; issue #18; stacked on OPEN-CORE). What the package built, and what it decided where the doc or the issue
+  left room:
+  - **Opening is a view: `actions.view`.** One function gives what *Write now*, `journal open <id>` and MCP's
+    `journal_start` show: the practice's title, `prompt` in the entry document's shape (the plain opener and every
+    question), and the slot words written now would fill (`slots.resolve` on a snapshot: `slot` with its step, and
+    `fills`, the same in words: "Fills the 23:00 slot early; it will not be sent."). Nothing is written. **Where the
+    slot is a prompt the chat already has** (step 1 open, or step 2 a delivered miss), the view shows that prompt as
+    it was sent (`capture.stored_opener`, its question snapshot, `asked`) rather than the plain opener: his words will
+    answer that message, and showing him different words would be wrong. The doc's "the practice's plain opener" is
+    read as the opener of a slot nothing was delivered for. The slot a view names can change before he saves (a tick
+    sends meanwhile); the save resolves again under the lock, and `journal write` repeats the view's line only when
+    the slot it filled is the one named.
+  - **The answer route is `POST /entries`.** The issue's "an answer route over `actions.answer` (practice, text, at,
+    client_id, media as `POST /entries` has)" is read as `POST /entries` with `practice` becoming that route, not a
+    second write route beside it: the body is the same, the PWA's Reply already posts there, and two routes for one
+    act would be two places for the refusals and the upload handling to drift. With `practice` it is
+    `actions.answer` (never a `/j` note: Decision D), without one (or `j`, `note`) `actions.note`. The response adds
+    `slot` (the record's id), not the step: a retry is answered from the ledger, which does not keep the step. The
+    new route is the view, `GET /library/{id}/open` (a sample in `test_serve_privacy.py`).
+  - **A practice turned off is refused** by `actions` (`Refused.code` `disabled`; serve `409 disabled`, the CLI exit
+    2, an MCP refusal), as `/start` and `journal send` refuse it. The doc's "a practice can be done at any time" says
+    nothing about one he switched off; refusing matches the chat, and a practice turned on again takes words at once.
+  - **More words for an entry: `actions.add`** (`journal write --entry <stem>`), the doc's *Adding more words to an
+    entry already written goes through that entry*: the three refusals, only an entry the engine wrote
+    (`entries.engine_file`, moved there from `serve/document.py` so the CLI has it without `serve/`), not a program
+    session's (its answers belong to a phase: OPEN-PROGRAMS), and not dated before the entry's day; it writes through
+    `capture.add_web_block`, which now takes the face's `via`. The web app's *Add* (`POST …/blocks`) stays on
+    `add_web_block` directly, since it carries the program-phase rules; its refusals are `actions.refuse` now.
+  - **One set of refusals.** `serve/writes._his_words` and MCP's checks (for `journal_add_note` too) call
+    `actions.refuse` instead of holding copies (rule 7): the codes are the same (`off-the-record`, `reserved-line`,
+    `placeholder`), the words are `actions`' (the web adds that what he typed is still in the browser). `actions`
+    answers a repeated `client_id` before its empty check, so a retry whose upload the first request consumed is the
+    first result, as `POST /entries` always answered it.
+  - **The web app.** *Write now* on every Today card, whatever the state (the doc's table and the issue: answered
+    starts the next slot that fits or an extra entry, the server says which), replacing *Reply*: both were the same
+    act, and the card shows the prompt the chat has above it already. It fetches the view only when he opens it, and
+    shows the view's prompt only when the card has none. *Send now* is called **Send to chat**, the doc's name, on
+    Today and in the Library: beside *Write now*, "Send now" read as the same thing. The Library gains a *Write now*
+    link (`/today?write=<id>`), so a practice with no slot today can be done too. **`/today`** is Today's second path
+    (the doc's link, which a push notification will carry in OPEN-PUSH); `?write=<id>` opens that practice's first
+    row still to answer, else its first row, else the practice alone. The PWA reads the fifth state, `due` ("due since
+    09:00"), so `GET /today` serves it as `collect` has it.
+  - **The CLI.** `journal write` takes its words from stdin when stdin is not a terminal or `-` is given, else from
+    `$VISUAL` / `$EDITOR` (else `vi`) on a temporary file, as git commit asks for a message, with **git's scissors
+    line** (`# ---- >8 ----`) above the practice shown as a template: everything from it down is left out and nothing
+    else is, so a line of his starting with `#` (a Markdown heading) is kept, which git's comment stripping would
+    lose. Empty words or an editor that fails save nothing (exit 1); refusals exit 1; an argument the journal cannot
+    use (an unknown practice, a bad `--at`, an id with `--entry`, an unknown entry) exits 2. `--at` takes an ISO time
+    and, unlike the web's API, also one without an offset or a bare `HH:MM` today, both read in the journal's time
+    zone (a person typing at a terminal); there is no 31-day limit here (serve keeps its own): words before the
+    previous journal day make an extra entry and fill no old slot (OPEN-CORE). `hermes journal` does not gain `open`
+    and `write` (it mirrors the chat-side subset); `journal` has them.
+  - **MCP.** `journal_start` returns the view plus a `next` line naming `journal_save`, spawns nothing, and is
+    annotated read-only (choice C). So the hold inside a bare-`/x` window it had (a spawned `journal send
+    --hold-off-record`) has nothing left to hold: it cannot end a window or take his next private message at all.
+    `journal send --hold-off-record` stays for a script that asks for a send. `server.build` loses its `spawn`
+    argument. `journal_save` with `practice` is `actions.answer` and answers with `slot` and `step`.
+  - **The chat.** The two chat changes the doc names (`/start` and `journal send` take their slot from
+    `slots.resolve`) were built in OPEN-CORE (`tick.send_due` with `only`; `/start` spawns `journal send`), with its
+    tests (`test_start_takes_the_slot_that_is_due_not_always_slot_one`,
+    `test_a_deliberate_start_after_a_face_answer_makes_an_extra_entry`); this package adds nothing there.
+  - **`capture.capture_web`** is called by no face now (`actions` replaced it in serve and MCP). It stays, with its
+    tests, for a later cleanup rather than as part of this package.
+  - **Tests changed.** `tests/test_mcp.py`: `journal_start` returns the view and spawns nothing (was: spawns `journal
+    send … --hold-off-record`), a practice with no open prompt fills its slot (was: a `/j` note), the SDK's read-only
+    tool set gains `journal_start`, `build` takes no `spawn`. `tests/test_serve_writes.py`: the evening with no open
+    prompt fills its slot (was: a `/j` note; that half of the test moved to a test of its own). `tests/test_serve.py`
+    and `tests/test_open_readers.py`: `GET /today` serves `due` (OPEN-CORE's mapping to `upcoming` is gone).
+    `tests/fixtures/api/today.json`: the 06:00 morning row reads `due`. `tests/test_privacy_seams_d.py`: the
+    `journal_start` window test now pins that nothing is spawned or written inside a window (was: the spawned send
+    carries `--hold-off-record`). `web/tests`: *Reply* is *Write now* and *Send now* is *Send to chat*.

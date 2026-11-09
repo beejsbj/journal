@@ -153,7 +153,7 @@ class HistoryTest(ReaderCase):
 
 class EngineOnlyTest(unittest.TestCase):
     """With ``hermes/``, ``serve/`` and ``mcp/`` removed from a copy of the package, the engine imports, and
-    ``today``, ``status``, ``doctor`` and ``tick`` run on a journal with no chat."""
+    ``today``, ``status``, ``doctor``, ``tick``, ``open`` and ``write`` run on a journal with no chat."""
 
     def test_the_engine_runs_without_its_faces(self):
         with tempfile.TemporaryDirectory() as t:
@@ -167,12 +167,14 @@ class EngineOnlyTest(unittest.TestCase):
                                         "channel": {"platform": "none"},
                                         "sources": {"weather": {"enabled": False}}}), encoding="utf-8")
             env = {"PATH": os.environ.get("PATH", ""), "HOME": str(home), "PYTHONPATH": str(Path(t) / "src")}
-            for argv in (["today"], ["status"], ["doctor"], ["tick"]):
+            (Path(t) / "Journal").mkdir()
+            for argv in (["today"], ["status"], ["doctor"], ["tick"], ["open", "evening"], ["write", "evening"]):
                 out = subprocess.run([sys.executable, "-m", "journal", "--config", str(conf), *argv], env=env,
-                                     cwd=t, capture_output=True, text=True, timeout=120)
+                                     cwd=t, capture_output=True, text=True, timeout=120, input="a few words")
                 self.assertNotIn("Traceback", out.stderr, (argv, out.stderr))
                 if argv != ["doctor"]:   # (doctor exits 1 on a missing journal folder: that is its job)
                     self.assertEqual(out.returncode, 0, (argv, out.stdout, out.stderr))
+            self.assertTrue(list((Path(t) / "Journal").glob("*-evening*.md")))   # written by `write`, no serve/
             leaked = subprocess.run([sys.executable, "-I", "-c",
                                      "import sys; sys.path.insert(0, sys.argv[1]); import journal.tick, journal.today, "
                                      "journal.status, journal.actions, journal.slots, journal.agent; "
