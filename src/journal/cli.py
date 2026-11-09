@@ -540,6 +540,7 @@ def serve(args, cfg: jconfig.Config, cfg_loader) -> int:
         print(format_doctor(rows))
         return exit_code(rows)
     from .serve import app as serve_app
+    from .serve import push as serve_push
     bind = args.bind or str(cfg.serve.get("bind") or "127.0.0.1")
     port = args.port if args.port is not None else jconfig.serve_port(cfg)
     if port is None or not 0 < port < 65536:
@@ -552,6 +553,7 @@ def serve(args, cfg: jconfig.Config, cfg_loader) -> int:
     if not ok:
         print(f"journal serve: {why}", file=sys.stderr)
         return 1
+    serve_push.start(application)   # Web Push: the keys at the first start, then a pass a minute (a daemon thread)
     return serve_app.run(application, bind, port, socket_path=sock)
 
 

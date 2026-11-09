@@ -12,7 +12,7 @@ from unittest import mock
 from serve_helpers import HERS, IST, NOW, ServeCase
 
 from journal import conversations, ledger, privacy
-from journal.serve import api, auth, writes
+from journal.serve import api, auth, push, writes
 
 SAMPLES = {
     r"/healthz": [("/healthz", 200)],
@@ -72,6 +72,18 @@ WRITE_SAMPLES = {
                                      ({"conversations": {"quiet_minutes": 30}}, "/api/v1/settings", 200),
                                      ({"location": "Lisbon"}, "/api/v1/settings", 200)],
     ("POST", r"/api/v1/settings/location"): [({"lat": 38.7, "lon": -9.1}, "/api/v1/settings/location", 200)],
+}
+
+# Web Push (``push.ROUTES``): the settings read and the subscriptions, which reach no chat either
+PHONE = {"endpoint": "https://fcm.googleapis.com/fcm/send/device-one",
+         "keys": {"p256dh": "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4",
+                  "auth": "BTBZMqHH6r4Tts7J_aSIgg"}}
+PUSH_SAMPLES = {
+    ("GET", r"/api/v1/push"): [(None, "/api/v1/push", 200)],
+    ("POST", r"/api/v1/push/subscriptions"): [(PHONE, "/api/v1/push/subscriptions", 201),
+                                              ({"endpoint": "https://push.example.org/x"},
+                                               "/api/v1/push/subscriptions", 422)],
+    ("DELETE", r"/api/v1/push/subscriptions"): [({"endpoint": PHONE["endpoint"]}, "/api/v1/push/subscriptions", 204)],
 }
 
 
@@ -165,6 +177,29 @@ class PrivacyTest(ServeCase):
                     with self.subTest(method=method, path=path, body=body):
                         code, _h, raw = self.request(method, path, body, headers={"Origin": self.origin})
                         self.assertEqual(code, want, raw[:300])
+        self.assertEqual(calls, [])
+
+    def test_every_push_route_and_a_pass_answer_without_the_sessions_database(self):
+        walked = {(m, p) for m, p, _fn, _a in push.ROUTES}
+        self.assertEqual(walked - set(PUSH_SAMPLES), set(), "add a sample for each new push route")
+        self.cfg.platform = "none"   # a journal that pushes: the pass below reads its slots
+        calls = []
+
+        def refuse(*a, **k):
+            calls.append(a)
+            raise AssertionError("journal serve reached for the chat transcript on a push")
+        with mock.patch.object(sqlite3, "connect", refuse), mock.patch.object(privacy, "view", refuse):
+            for (method, _pattern), samples in PUSH_SAMPLES.items():
+                for body, path, want in samples:
+                    with self.subTest(method=method, path=path):
+                        code, _h, raw = self.request(method, path, body, headers={"Origin": self.origin})
+                        self.assertEqual(code, want, raw[:300])
+            (self.cfg.state_dir / push.STATE).write_text(json.dumps(
+                {"vapid": {"private": "k", "public": "p"}, "subscriptions": [PHONE]}), "utf-8")
+            sent = []
+            pushed = push.run_once(self.cfg, datetime(2026, 10, 15, 6, 5, tzinfo=IST),
+                                   send=lambda sub, body, **k: sent.append(body) or push.webpush.Result("sent", 201))
+        self.assertEqual(pushed, ["2026-10-15-morning"])
         self.assertEqual(calls, [])
 
     def test_the_status_route_leaves_out_what_the_privacy_pass_knows(self):
