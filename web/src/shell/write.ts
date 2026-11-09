@@ -9,10 +9,13 @@
 import { useEffect, useState } from "preact/hooks";
 
 export interface WriteRequest {
-  /** What he is writing: a note (the default), an answer to a practice (its id), or more for an entry (its stem). */
-  for?: { kind: "note" } | { kind: "answer"; practice: string } | { kind: "entry"; stem: string };
+  /** What he is writing: a note (the default), an answer to a practice (its id; `slot`, the row of today's practices
+   *  it answers, when the practice has two in a day), or more for an entry (its stem). */
+  for?: { kind: "note" } | { kind: "answer"; practice: string; slot?: number } | { kind: "entry"; stem: string };
   /** Where it was opened from: the surface grows from this control and gives focus back to it. */
   from?: HTMLElement | null;
+  /** Begin with the voice: the room opens recording ("Speak it"). */
+  voice?: boolean;
 }
 
 let request: WriteRequest | null = null;

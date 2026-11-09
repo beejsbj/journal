@@ -91,7 +91,7 @@ test("at 360 px nothing scrolls sideways on any route", async ({ page }) => {
   }
 });
 
-test("the entry's other tab, the raw editor and the + sheet are as large", async ({ page }) => {
+test("the entry's other tab, the raw editor and the write room are as large", async ({ page }) => {
   await page.goto("/entries/2026-10-14-evening");
   await page.getByRole("tab", { name: "Analysis" }).click();
   await expect(page.getByRole("link", { name: "In Insights" })).toBeVisible();   // the day's reflection has been read
@@ -106,7 +106,8 @@ test("the entry's other tab, the raw editor and the + sheet are as large", async
   await page.getByRole("button", { name: "Write", exact: true }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   expect(await small(page)).toEqual([]);
-  await page.getByRole("button", { name: "Quick note" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Start a program" }).click();   // the room's start: its programs
+  await expect(page.getByRole("dialog").locator(".room-program-list button, .empty").first()).toBeVisible();
   expect(await small(page)).toEqual([]);
 });
 

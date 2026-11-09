@@ -67,15 +67,15 @@ test("a built-in is edited in place, then reset to the default", async ({ page }
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Weekly pattern scan");
 });
 
-test("a note from the + sheet, and a block added to an entry", async ({ page }, info) => {
+test("a note from the write room, and a block added to an entry", async ({ page }, info) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Write", exact: true }).click();
-  await page.getByRole("button", { name: "Quick note" }).click();
   await page.getByLabel("A note", { exact: true }).fill("Buy stamps.");
-  await shot(page, info, "quick-add");
-  await page.getByRole("button", { name: "Save the note" }).click();
+  await shot(page, info, "write-room");
+  await page.getByRole("button", { name: "Put it in the journal" }).click();
   await expect(page.getByText("Saved as a note.")).toBeVisible();
   await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 
   await page.goto("/entries/2026-10-14-evening");
   await expect(page.locator("article.his").first()).toBeVisible();   // the document has been drawn
