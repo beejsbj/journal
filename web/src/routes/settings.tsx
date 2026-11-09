@@ -8,6 +8,7 @@ import { asApiError, useAction, useResource } from "../hooks";
 import { Pin } from "../icons";
 import { INKS, chooseInk, savedInk, type Ink } from "../ink";
 import { isOnline } from "../offline";
+import { browserDevice, browserEnv, current, sameKey, support, turnOff, turnOn, type Device, type PushEnv } from "../push";
 import { FIELDS, GROUPS, buildPatch, keyOf, problem, shown, valueAt, type SettingField } from "../settingsModel";
 import { useTitle } from "../title";
 import type { Json } from "../schema";
@@ -101,6 +102,107 @@ function Pairing() {
       <div class="panel">
         {body}
         {error && <ErrorLine error={error} />}
+      </div>
+    </section>
+  );
+}
+
+type Switch = { at: "idle" } | { at: "busy" } | { at: "denied" } | { at: "failed"; why: ApiError | string };
+
+/**
+ * Notifications on this device (Web Push from the server): a practice's name and "due now" when its slot comes, and
+ * nothing else. Turned on from a tap, which asks the browser's permission then; each device is turned on by itself.
+ * The section says why it cannot be offered: the server lacks the extra, the browser has no push, or (an iPhone)
+ * the app is not on the Home Screen yet.
+ */
+export function Notifications(props: { device?: Device | null; env?: PushEnv }) {
+  // read once: a device made at each render would restart the effect below for ever
+  const [device] = useState(() => (props.device === undefined ? browserDevice() : props.device));
+  const [env] = useState(() => props.env ?? browserEnv());
+  const [res, reload] = useResource((signal) => api.push(signal), []);
+  const [on, setOn] = useState<boolean | undefined>(undefined);
+  const [state, setState] = useState<Switch>({ at: "idle" });
+  const info = res.state === "ready" ? res.data : null;
+  const key = info?.public_key ?? null;
+  useEffect(() => {
+    if (!device || !key) return;
+    let live = true;
+    current(device)
+      .then((sub) => {
+        if (!live) return;
+        const mine = !!sub && sameKey(sub, key);
+        setOn(mine);
+        // the server may have dropped it (a push service said it was gone) or lost its file: give it back, quietly
+        if (sub && mine) void api.subscribePush(sub.toJSON()).catch(() => undefined);
+      })
+      .catch(() => live && setOn(false));
+    return () => {
+      live = false;
+    };
+  }, [device, key]);
+  const flip = (want: boolean) => {
+    if (!device || !key) return;
+    setState({ at: "busy" });
+    const work = want ? turnOn(key, device) : turnOff(device).then(() => "off" as const);
+    work
+      .then((out) => {
+        if (out === "denied") {
+          setState({ at: "denied" });
+          return;
+        }
+        setOn(out === "on");
+        setState({ at: "idle" });
+        reload();
+      })
+      .catch((e: unknown) => setState({ at: "failed", why: e instanceof ApiError ? e : "The browser could not change the subscription. Try again." }));
+  };
+  let body;
+  if (res.state === "error") {
+    body = res.error.status === 404
+      ? <p class="hint">This server does not offer notifications yet.</p>
+      : <ErrorLine error={res.error} />;
+  } else if (!info) {
+    body = <p class="hint" role="status">Asking the server…</p>;
+  } else if (!info.available) {
+    body = <p>Notifications are not set up on the server. {info.detail}</p>;
+  } else if (support(env) === "install-first") {
+    body = <p>On an iPhone or iPad, add the journal to the Home Screen first (Share, then Add to Home Screen), open it from there, and turn notifications on here.</p>;
+  } else if (support(env) !== "ok" || !device) {
+    body = <p>This browser can't take notifications from the journal.</p>;
+  } else {
+    const blocked = device.permission() === "denied" || state.at === "denied";
+    const busy = state.at === "busy";
+    body = (
+      <>
+        {on ? <p>On for this device.</p> : <p>Off for this device.</p>}
+        {blocked && !on && (
+          <p class="field-error" role="alert">Notifications are blocked for this site. Allow them in the browser's settings, then try again.</p>
+        )}
+        <div class="actions">
+          {on ? (
+            <button type="button" class="button" disabled={busy} onClick={() => flip(false)}>Turn off</button>
+          ) : on === false ? (
+            <button type="button" class="button primary" disabled={busy || device.permission() === "denied"} onClick={() => flip(true)}>
+              Turn on notifications
+            </button>
+          ) : null}
+        </div>
+        {state.at === "failed" && (typeof state.why === "string" ? <p class="field-error" role="alert">{state.why}</p> : <ErrorLine error={state.why} />)}
+      </>
+    );
+  }
+  return (
+    <section class="settings-section" aria-labelledby="push-h">
+      <h2 id="push-h">Notifications</h2>
+      <p class="section-note">
+        A notification says a practice's name and that it is due, nothing else. It travels through the browser maker's
+        push service (Apple, Google or Mozilla), which sees when it was sent but cannot read it.
+      </p>
+      <div class="panel">
+        {body}
+        {info && info.available && !info.active && (
+          <p class="hint">This journal has a chat, so nothing is pushed (push.when is no-chat; set it to always to be nudged here too).</p>
+        )}
       </div>
     </section>
   );
@@ -475,6 +577,7 @@ export function SettingsRoute() {
         <h1>Settings</h1>
       </header>
       <Pairing />
+      <Notifications />
       <InkChoice />
       <SettingsTable />
       <Version />

@@ -367,6 +367,13 @@ export type Settings = Infer<typeof Settings>;
 export const Session = obj({ via: str, login: nullable(str) });
 export type Session = Infer<typeof Session>;
 
+/** Web Push on this server (`GET /push`): whether it can push (`available`, else `detail` says why), the key a browser
+ *  subscribes with, `push.when`, whether this journal pushes at all (`active`), and how many devices are subscribed. */
+export const PushInfo = obj({
+  available: bool, detail: str, public_key: nullable(str), when: str, active: bool, subscriptions: num,
+});
+export type PushInfo = Infer<typeof PushInfo>;
+
 export const DoctorRow = obj({ check: str, status: str, detail: str });
 export type DoctorRow = Infer<typeof DoctorRow>;
 

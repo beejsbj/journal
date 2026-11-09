@@ -15,6 +15,9 @@
  *    when the page was already shown the kept copy), and any `logout` request, empty the data caches (the page does the
  *    same on its side, `offline.ts`). An answer that was in flight when the caches were emptied is not stored when it
  *    lands: it was read under the session that has just ended.
+ *
+ * And for Web Push (`nudge`, `openTarget`): a push shows the practice's title and "due now", and a tap opens
+ * `/today?write=<id>` on this site; the payload is read as data, never as an address to open.
  */
 
 export const API = "/api/v1/";
@@ -223,4 +226,66 @@ export function respond(request: Request, env: Env): Promise<Response> | undefin
     default:
       return undefined;
   }
+}
+
+// ── Web Push ─────────────────────────────────────────────────────────────
+
+/** Where a notification opens: Today with that practice ready to write, or Today. Only a path of this site: the
+ *  payload names a practice id, never an address. */
+export function writeUrl(practice: unknown): string {
+  return typeof practice === "string" && practice ? `/today?write=${encodeURIComponent(practice)}` : "/today";
+}
+
+/** A notification as the worker shows it. */
+export interface Nudge {
+  title: string;
+  options: { body: string; tag: string; icon: string; badge: string; data: { url: string } };
+}
+
+/** What a push says, from the server's payload (`serve/push.py`: the practice's title, "due now" and its id). A payload
+ *  that is not that shape still shows something plain: a push the worker received must show a notification. One per
+ *  practice at a time (`tag`): a newer one replaces an older one still showing. */
+export function nudge(data: unknown): Nudge {
+  const p = data !== null && typeof data === "object" ? (data as Record<string, unknown>) : {};
+  const practice = typeof p.practice === "string" && p.practice ? p.practice : "";
+  const known = typeof p.title === "string" && p.title !== "";
+  return {
+    title: known ? (p.title as string) : "Journal",
+    options: {
+      body: known && typeof p.body === "string" && p.body ? p.body : "A practice is due",
+      tag: practice ? `practice:${practice}` : "practice",
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      data: { url: known ? writeUrl(practice) : "/today" },
+    },
+  };
+}
+
+/** The worker's `clients`, as far as a tap needs it. */
+export interface ClientsLike {
+  matchAll(options?: { type?: string; includeUncontrolled?: boolean }): Promise<ReadonlyArray<{
+    url: string;
+    focus(): Promise<unknown>;
+    navigate?(url: string): Promise<unknown>;
+  }>>;
+  openWindow(url: string): Promise<unknown>;
+}
+
+/** A tap on a notification: an open page of the app comes forward and goes to `url`, else the app opens there. `url`
+ *  must be a path of this site; anything else opens Today. */
+export async function openTarget(url: unknown, clients: ClientsLike, origin: string): Promise<void> {
+  let target = `${origin}/today`;
+  if (typeof url === "string" && url.startsWith("/") && !url.startsWith("//")) {
+    const parsed = new URL(url, origin);
+    if (parsed.origin === origin) target = parsed.href;
+  }
+  const open = (await clients.matchAll({ type: "window", includeUncontrolled: true }))
+    .filter((c) => c.url.startsWith(`${origin}/`) || c.url === origin);
+  const page = open[0];
+  if (page) {
+    if (page.navigate) await page.navigate(target).catch(() => undefined);
+    await page.focus().catch(() => undefined);
+    return;
+  }
+  await clients.openWindow(target);
 }
