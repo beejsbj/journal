@@ -14,7 +14,8 @@ from unittest import mock
 import yaml
 from helpers import CHAT, ROOT
 
-from journal import audio, capture, entries, hookstate, inbound, notebook, programs, programview, today, turncontext
+from journal import audio, capture, contextfence, entries, hookstate, inbound, notebook, programs, programview
+from journal import today, turncontext
 from journal.hermes import commands as hcommands
 from journal import tools as jtools
 from journal.hermes import hooks, runtime, tools
@@ -248,8 +249,8 @@ class BudgetTest(Driven):
         self.assertEqual(turncontext.BUDGET["blocks"], 2)
         # the turn's context is fenced, and the program block opens with a head the transcript adapter knows
         # (test_own_words.FenceTest: the other blocks)
-        self.assertTrue(out.startswith(turncontext.OPEN) and out.endswith(turncontext.CLOSE))
-        self.assertTrue(programview.block(self.cfg, self.ref(info), self.now).startswith(turncontext.HEADS))
+        self.assertTrue(out.startswith(contextfence.OPEN) and out.endswith(contextfence.CLOSE))
+        self.assertTrue(programview.block(self.cfg, self.ref(info), self.now).startswith(contextfence.HEADS))
 
     def test_the_block_comes_once_and_the_next_thread_start_gets_today(self):
         info = self.answered()

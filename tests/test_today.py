@@ -11,7 +11,8 @@ from zoneinfo import ZoneInfo
 
 from helpers import CHAT, CleanEnv, add_prompt, make_cfg, write_config
 
-from journal import capture, hookstate, ledger, notebook, reflect, sources, status, tick, today, turncontext
+from journal import (capture, contextfence, hookstate, ledger, notebook, reflect, sources, status, tick, today,
+                     turncontext)
 from journal.hermes import hooks
 
 IST = ZoneInfo("Asia/Kolkata")
@@ -25,8 +26,8 @@ def at(h, m=0, day=15):
 
 def blocks(out):
     """The blocks of a turn's context, inside the fence ``turncontext.build`` puts around them."""
-    assert out.startswith(turncontext.OPEN + "\n") and out.endswith("\n" + turncontext.CLOSE), out
-    return out[len(turncontext.OPEN) + 1:-len(turncontext.CLOSE) - 1].split("\n\n")
+    assert out.startswith(contextfence.OPEN + "\n") and out.endswith("\n" + contextfence.CLOSE), out
+    return out[len(contextfence.OPEN) + 1:-len(contextfence.CLOSE) - 1].split("\n\n")
 
 
 def turn(cfg, when, text="hello", platform="telegram"):
