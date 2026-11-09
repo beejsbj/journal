@@ -309,6 +309,7 @@ def _replies_to(cfg: Config, rec: dict | None, path: Path, upto: date, data: dic
     found: list[tuple[str, str]] = []  # (when, line)
 
     def add(at: str, stem: str, text: str) -> None:
+        """One reply of his, once (the same words found both ways count once), cut at ``REPLY_CAP``."""
         text = " ".join(entries.ENGINE_MARK.sub("", text).split())
         if text and not any(text[:80] in line for _, line in found):
             cut = text if len(text) <= REPLY_CAP else text[:REPLY_CAP].rsplit(" ", 1)[0] + " …"
@@ -331,6 +332,7 @@ def _replies_to(cfg: Config, rec: dict | None, path: Path, upto: date, data: dic
 
 
 def _cut(text: str) -> str:
+    """``text`` on one line, cut at a space before ``EARLIER_CAP`` characters ("…" where cut)."""
     text = " ".join(text.split())
     return text if len(text) <= EARLIER_CAP else text[:EARLIER_CAP].rsplit(" ", 1)[0] + " …"
 

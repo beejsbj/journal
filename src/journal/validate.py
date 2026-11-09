@@ -250,6 +250,8 @@ def drop_stray_marks(text: str) -> tuple[str, int]:
 
 
 def _fragments(q: str) -> list[str]:
+    """A quoted passage's parts around "…", folded as the check compares them (``_plain``), each of three characters
+    or more."""
     return [f for f in (_plain(part).strip(" .,;:!?'\"-") for part in _ELLIPSIS.split(q)) if len(f) >= 3]
 
 

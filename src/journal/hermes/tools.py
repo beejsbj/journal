@@ -5,8 +5,10 @@ writes in an off-the-record turn. (``hooks.on_tool_call`` turns them away earlie
 
 The read-only tools (``tools.READ_ONLY``: ``journal_search``) go in a toolset of their own, ``journal_read``
 (``tools.READ_TOOLSET``), so the reflection's one-shot can be given them and nothing else (``-t journal_read``). A
-plugin's toolsets are on by default for a platform whose toolsets were never saved (Hermes' ``tools_config``
-``_enabled_plugin_toolsets``), so she has them in her chat as well; a profile with a saved list needs it added there.
+new plugin toolset is on in her chat too, even where the platform's toolsets were saved, unless the last save
+already knew it and left it out (Hermes' ``tools_config._enabled_plugin_toolsets``: ``known_plugin_toolsets``). To
+keep search out of her chat, switch ``journal_read`` off for that platform in ``hermes tools``; the reflection names
+the toolset itself and keeps it. ``agent.disabled_toolsets`` would take it from the reflection as well.
 
 Hermes passes the handler the session (and, when it has one, the turn) as keyword arguments; a handler never raises.
 """
