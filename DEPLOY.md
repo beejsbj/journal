@@ -92,7 +92,10 @@ entry (`<date>-morning-2`) instead of re-sending into the answered one. `journal
 the three refusals) is new; no face calls it yet (OPEN-FACES). Today's rows, the today block, `status`, the opener's
 unanswered count and the web app's week strip and insights read slot states: a past slot that was never delivered now
 shows (missed, or due), and the web app is served a due row as upcoming. `channel.platform: none` is a journal with
-no chat: nothing is sent, written, counted or alerted. New setting `windows.day_ends_at` (default `04:00`). `agent`
+no chat: nothing is sent, written, counted or alerted; an annotation reply or reflection that would have been sent is
+marked skipped (`no chat`) and never sent, also after a chat is set, and the pack and today block count them (owner's
+decision 3, 2026-11-09). New setting `windows.day_ends_at` (default `04:00`); a deliberate send before it takes
+today's date (`/start morning` at 03:30 delivers today's morning; owner's decision 1). `agent`
 no longer imports the Hermes adapter for its failure copy; `status` does not need `serve/` for doctor. A no-chat
 install should not start a program run yet: phases with no chat come with OPEN-PROGRAMS.
 
@@ -122,7 +125,9 @@ answers (none can until OPEN-FACES) or a send loses the race; existing records r
    package's own rollback there is none. An extra entry made by `/start` (`<date>-<id>-<n>`) stays a delivered
    record old code reads normally. **A no-chat install** (`channel.platform: none`) must not be rolled back as it
    is: old code reads `none` as a platform with no chat, so every slot, reflection and summary fails and alerts; set
-   a real channel or stop its tick first.
+   a real channel or stop its tick first. Old code does not know the `skipped: "no chat"` mark either: with a real
+   channel set, it sends the annotation replies and reflections skipped meanwhile (it checks only for a message id and
+   attempts left), so stopping the tick is the safe choice.
 
 ## SCRUB-PERSONAL — the repo holds nothing specific to a deployment (2026-10-28; docs, tests and comments, one doctor row; no gateway restart needed; no config or state change)
 
