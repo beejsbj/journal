@@ -3051,7 +3051,9 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     is left out (it is true by construction, and a check against a send time from another clock would turn a re-send
     into an extra entry). `scheduled` on a deliberate send's record is still the moment it was asked for, as before.
   - **`actions.answer` / `actions.note`** hold the three refusals (`Refused.code`: `off-the-record`, `reserved-line`,
-    `placeholder`, plus `empty` and `not-a-practice`), take the ledger lock once for the record and the capture, and
+    `placeholder`, plus `empty`, `not-a-practice` and `bad-time`: a time with no offset, or more than five
+    minutes ahead of the server's clock, as `serve/writes._at` refuses; no past limit here, since words before the
+    previous journal day make an extra entry and fill no old slot), take the ledger lock once for the record and the capture, and
     write through `capture._web_record` (the web app's path), so rule, source and via are the face's (`web`, `cli`,
     `mcp`). A face-made record: `message_id: None`, `sent_at` and `opened_at` the time of his words,
     `opened_at_local`, `opened_via`, the plain opener (`opener_source: plain:<face>`), the question snapshot and the

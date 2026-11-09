@@ -22,7 +22,7 @@ Both run under the ledger lock (a face bounds the wait with ``ledger.deadline``)
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable
 
@@ -30,11 +30,12 @@ from . import audio, capture, channel, compose, entries, ledger, library, slots
 from .config import Config
 
 FACES = tuple(entries.FACES)  # web, cli, mcp
+FUTURE_SLACK = timedelta(minutes=5)  # a face's clock a little ahead of the server's (as ``serve/writes`` allows)
 
 
 class Refused(ValueError):
     """Words the journal turns away; nothing was written. ``code``: ``off-the-record``, ``reserved-line``,
-    ``placeholder``, ``empty`` or ``not-a-practice``; ``str(e)`` says why, in words a face can show."""
+    ``placeholder``, ``empty``, ``not-a-practice`` or ``bad-time``; ``str(e)`` says why, in words a face can show."""
 
     def __init__(self, code: str, message: str):
         super().__init__(message)
@@ -64,6 +65,17 @@ def _words(cfg: Config, text: str | None, media: str | None) -> str:
     if not text.strip() and not media:
         raise Refused("empty", "there are no words to save: nothing was saved")
     return text
+
+
+def _when(at: datetime | None, now: datetime) -> datetime:
+    """The time on his words: ``at`` (with its offset, not in the future), else now."""
+    if at is None:
+        return now
+    if at.tzinfo is None or at.utcoffset() is None:
+        raise Refused("bad-time", "the time on these words has no offset, so it cannot be placed: nothing was saved")
+    if at > now + FUTURE_SLACK:
+        raise Refused("bad-time", "the time on these words is in the future: nothing was saved")
+    return at
 
 
 def _via(via: str) -> str:
@@ -118,7 +130,7 @@ def answer(cfg: Config, practice, text: str | None, at: datetime | None = None, 
     via = _via(via)
     words = _words(cfg, text, media)
     now = now or datetime.now(timezone.utc)
-    at = at or now
+    at = _when(at, now)
     p = _practice(cfg, practice)
     with ledger.locked(cfg.ledger_path) as data:
         done = ledger.capture_of_client(data, client_id)
@@ -138,7 +150,7 @@ def note(cfg: Config, text: str | None, at: datetime | None = None, *, via: str,
     via = _via(via)
     words = _words(cfg, text, media)
     now = now or datetime.now(timezone.utc)
-    at = at or now
+    at = _when(at, now)
     with ledger.locked(cfg.ledger_path) as data:
         done = ledger.capture_of_client(data, client_id)
         if done:

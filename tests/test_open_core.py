@@ -195,6 +195,19 @@ class AnswerTest(Base):
         self.assertEqual(self.prompts(), [])
         self.assertEqual(list(self.cfg.root.iterdir()), [])
 
+    def test_a_time_with_no_offset_or_in_the_future_is_refused(self):
+        """Review round 1: serve checks ``at``, but every face's words come here, so the engine checks it too."""
+        for when in (datetime(2026, 10, 14, 10, 0), at(10) + timedelta(days=1)):
+            with self.subTest(when=when):
+                with self.assertRaises(actions.Refused) as e:
+                    actions.answer(self.cfg, "water", "a glass", when, via="cli", now=at(10))
+                self.assertEqual(e.exception.code, "bad-time")
+                with self.assertRaises(actions.Refused) as e:
+                    actions.note(self.cfg, "a note", when, via="cli", now=at(10))
+                self.assertEqual(e.exception.code, "bad-time")
+        self.assertEqual(self.prompts(), [])
+        self.answer("water", "a minute ahead of the server's clock", at(10, 1), now=at(10))   # (clock skew is fine)
+
     def test_a_program_or_unknown_id_is_not_a_practice(self):
         for word in ("nope", "fix-life"):
             with self.assertRaises(actions.Refused) as e:
