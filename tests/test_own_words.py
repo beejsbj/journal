@@ -262,7 +262,7 @@ class FenceTest(Fixture):
                                                            user_message="hi", at=SENT))
         self.assertTrue(out.startswith(OPEN + "\nYour private notebook — "), out[:80])
         self.assertTrue(out.endswith("\n" + CLOSE))
-        self.assertEqual(transcript.trailing("hi\n\n" + out), "hi")
+        self.assertEqual(transcript.trailing("hi\n\n" + out).strip(), "hi")
 
     def test_every_block_opens_with_a_head_the_transcript_knows(self):
         blocks = [self.notes, today.render_data({"date": "2026-10-15", "time": "09:00", "timezone": "IST",

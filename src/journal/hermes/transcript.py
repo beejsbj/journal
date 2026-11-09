@@ -212,11 +212,11 @@ def timestamps(text: str) -> str:
 
 
 def trailing(text: str) -> str:
-    """``text`` without the injected blocks that end it (``_END_FENCE``, ``_END_SPILL``, ``_END_MEMORY``). Not for
+    """``text`` without the injected blocks that end it (``_END_SPILL``, ``_END_FENCE``, ``_END_MEMORY``). Not for
     what is left of a native picture's row: everything injected came after its placeholders, so a block at the end of
     the caption is his, and ``leftover``."""
     while True:
-        for rx in (_END_FENCE, _END_SPILL, _END_MEMORY):
+        for rx in (_END_SPILL, _END_FENCE, _END_MEMORY):  # (a cut-short block first: its head opens a fence)
             m = rx.search(text)
             if m and (rx is not _END_SPILL or OPEN in m.group(0) or CLOSE in m.group(0)):
                 text = text[:m.start()]
