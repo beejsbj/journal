@@ -69,6 +69,10 @@ Read `docs/DECISIONS.md` before changing anything, and your package's section of
 - The spec, as each package references it: `docs/ARCHITECTURE.md`, `docs/PRACTICES.md` (definition format, programs,
   the today block), `docs/API.md` (serve routes, privacy at the surface, locking), `docs/FRONTEND.md` (the PWA),
   `docs/DEPLOY-FRONTEND.md` (exposing serve on a private name).
+- **Design system (the web app).** `design/DESIGN.md` is the design language (and its agent guide);
+  `web/src/tokens.css` the tokens; `web/src/ui/` the components; `/design` in the running app draws every one. New
+  web work draws from these: a missing part is added to `ui/` and shown on `/design`, not invented in a route, and
+  nothing new goes into `web/src/styles/legacy.css`.
 - `tests/golden/` freezes the built-in rituals byte for byte (`tests/test_golden.py`, `tests/test_golden_engine.py`);
   `tools/gen_builtins.py --check` keeps the files canonical. A deliberate change to a built-in edits its file,
   regenerates the goldens, and says why in the commit.

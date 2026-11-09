@@ -189,6 +189,13 @@ from 641 px the page is two columns, on a phone one. The engine's interface is *
 (`web/public/fonts`, licences beside them; two cut down by `tools/web_fonts.py`) and precached. The mark is his ruled
 page with a postmark ring in her ink in its margin, with no date in it.
 
+As built (WEB-UX, 2026-11-09; DECISIONS.md, WEB-UX-IDENTITY): the owner's round-02 pick, **Folio × Night Room**,
+supersedes the paragraph above where they differ. The language is written in `design/DESIGN.md`; the tokens are
+`web/src/tokens.css` (light Folio's warm paper, dark Night Room's cool room, a theme the reader may choose on the
+device); the components are `web/src/ui/`; `/design` in the app draws every one. Her voice is IBM Plex Mono (Courier
+Prime and the Fraunces figures are gone), her letter has no fastening, the mark is the "margin j", and a wide screen is
+a rail and panes on a desk while a phone keeps its tab bar at the foot.
+
 ## 3. Build and repository layout
 
 ```
@@ -203,9 +210,12 @@ web/
     editorModel.ts settingsModel.ts drafts.ts   the editor's form and moves, the settings the server allows, unsent drafts
     sw.ts swCore.ts      the service worker (Workbox precache + the runtime rules) and its testable rules
     offline.ts pwa.ts    what the page knows about cached answers and being offline; registration and the update prompt
+    tokens.css           the design tokens (design/DESIGN.md); theme.ts and ink.ts keep the device's theme and her ink
+    styles/              base.css (reset, element defaults, the two voices); legacy.css (the old rules, until each route moves)
+    ui/                  the design system's components, one TSX and one CSS each (index.ts); drawn at /design
+    shell/               the rail, panes, page transitions, the write surface's seam (app.tsx lays them out)
   public/icons/          mark.svg, favicon.svg and the PNGs made from them (scripts/make-icons.mjs)
   scripts/               source-hash.ts, manifest.ts (the manifest, colours read from tokens.css), make-icons.mjs
-    tokens.css, app.css
   tests/                 vitest on fixture JSON from tests/fixtures/ (shared with the Python suite)
 .github/workflows/web.yml   npm ci && npm run build; `git diff --exit-code src/journal/serve/static` fails the PR;
                             Playwright smoke against `journal serve --dev` on an ephemeral port (CI only, never the host)
@@ -218,7 +228,7 @@ step is the pinned install; the PWA is already in the package.
 ## 4. Offline behaviour, in detail
 
 - **Install.** `manifest.webmanifest`: `name` Journal, `start_url` and `scope` `/`, `id` `/`, `display: standalone`,
-  `theme_color` and `background_color` from `tokens.css` (`--bg`; a test pins them), icons made from `public/icons/mark.svg`
+  `theme_color` and `background_color` from `tokens.css` (`--pane`; a test pins them), icons made from `public/icons/mark.svg`
   (192, 512, a maskable 512, and the iOS touch icon). Nothing in it names a host or a port: the same build installs
   from the tailnet origin (`https://<name>.ts.net:8790`), from a published host or from loopback. The route is served at
   `/` with no path prefix (`Host` routing at the reverse proxy). A phone must be on the tailnet to reach it; a service

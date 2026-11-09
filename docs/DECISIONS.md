@@ -3027,3 +3027,31 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   SVG favicons): a `j` in his ink whose dot is the postmark ring in her default ink, on the paper. Its colours are fixed,
   on an opaque tile, so it reads on light and dark tabs with no style in the SVG. The installed app's icons and `Mark` in
   `icons.tsx` stay the page; **open:** whether they follow it belongs to the WEB-UX identity pass.
+- **WEB-UX-IDENTITY (2026-11-09) — the web app's design system: round 02, "Folio × Night Room".** The owner accepted
+  the round-02 prototype (`design/rounds/02-combined/`) with four changes; his words are in `design/state.md`, *Round 02
+  result* ("I like the sectioned out from Ada, but I don't like that stamp and the wavy thing"; "I like margin J for
+  the mark"; Today, Entries, the entry in all three sidebar modes, dark, Insights and Settings each approved by name).
+  `design/DESIGN.md` is now the written language, `web/src/tokens.css` its tokens, `web/src/ui/` its components and
+  `/design` draws them. What changes from IDENTITY (2026-10-27), and why:
+  - **Her voice moves from Courier Prime to IBM Plex Mono** (400, 400 italic, 500): typed still, but a quieter, more
+    even face that sits with Newsreader on warm paper and reads at 13–14.5 px in her margin notes. A round-01 call he
+    left standing in round 02. Her ink keeps its four values; `--her-soft` is now mixed in oklab and every ink is held
+    at AA on every ground and on her letter's wash (`web/tests/ink.test.tsx`).
+  - **The Fraunces figures are dropped**, and **times are no longer typed**: figures are Newsreader (lining, tabular
+    where they align) or the interface's sans; her face never sets interface text. Courier Prime and Fraunces leave
+    `web/public/fonts`; `tools/web_fonts.py` now cuts only the Newsreader italic. The faces served stay about the
+    same: 273 KB before, 272 KB now (Plex Mono is three latin files of 15–16 KB).
+  - **No fastening on her letter** (no postmark, wavy lines, clip or tape) and **no dated stamps**, as before.
+  - **The theme can be chosen on the device**: System (the default, `prefers-color-scheme`), Paper or Night, kept like
+    the ink (`web/src/theme.ts`, `localStorage["journal:theme"]`, `<html data-theme>`), never sent to the server, for
+    the same reasons as the ink (DECISIONS IDENTITY, *Her ink is the reader's choice*). The dark roles are written twice
+    in `tokens.css` (the media query and `[data-theme="dark"]`); the test holds the copies equal. The browser's
+    theme colour follows the choice, and the manifest's is the page (`--pane`, `#fbf8f1`), not the old paper.
+  - **The mark is the "margin j"** (round 02, option 01): the in-app `Mark`, `mark.svg` and the installed icons. The tab
+    keeps the small `j` (FAVICON), which closes FAVICON's open point.
+  - **Layout:** a rail and floating panes on the desk on a wide screen (the rail folds to icons while an entry is open
+    and under 1100 px); the page, a top bar and a floating tab bar on a phone. The e2e check that the desktop navigation
+    sits in a header (`web/e2e/smoke.spec.ts`) now checks the rail.
+  - **Still open, for the route builders of this pass:** the entry's Analysis and Reflection unfolding at the end
+    (replacing FRONTEND §1.3's tabs), the write room replacing the + sheet, the sidebar beside an entry. Each is
+    recorded with its route when it lands.
