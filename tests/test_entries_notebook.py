@@ -312,6 +312,27 @@ class NotebookTest(unittest.TestCase):
         self.assertNotIn("duplicate", other)
         self.assertEqual(len(notebook.open_items(self.cfg)), 2)
 
+    def test_a_repeat_raises_the_open_item_and_takes_the_newer_date(self):
+        from datetime import datetime, timezone
+        t0 = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        t1 = datetime(2026, 1, 20, tzinfo=timezone.utc)
+        first = notebook.add(self.cfg, "Ask about the dentist.", source="a", now=t0)
+        again = notebook.add(self.cfg, "ask about the dentist", source="b", bring_up_after="2026-01-23", now=t1)
+        self.assertTrue(again["duplicate"] and again["date_changed"], again)
+        [item] = notebook.open_items(self.cfg)
+        self.assertEqual((item["id"], item["touched_at"], item["bring_up_after"], item["source"]),
+                         (first["id"], t1.isoformat(), "2026-01-23", "b"))
+        same = notebook.add(self.cfg, "Ask about the dentist", now=t1)
+        self.assertTrue(same["duplicate"])
+        self.assertNotIn("date_changed", same)
+        self.assertEqual(notebook.open_items(self.cfg)[0]["bring_up_after"], "2026-01-23")
+
+    def test_the_comparison_ignores_quote_style_and_a_list_marker_but_not_emptiness(self):
+        notebook.add(self.cfg, "Don\u2019t forget the call")
+        self.assertTrue(notebook.add(self.cfg, "- don't forget the call.")["duplicate"])
+        notebook.add(self.cfg, "...")
+        self.assertNotIn("duplicate", notebook.add(self.cfg, "!!!"))
+
     def test_a_resolved_item_may_be_added_again(self):
         now = datetime(2026, 10, 14, 9, 0, tzinfo=timezone.utc)
         a = notebook.add(self.cfg, "check the garden", now=now)

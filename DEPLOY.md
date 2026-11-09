@@ -22,8 +22,9 @@ The gateway restarts in **windows**, at least an hour from a ritual (the built-i
 items, so at the cap of 40 it hid every recent note and showed the ones about to be pruned. It now lists the items
 that are due (`bring_up_after` reached; oldest due first), then the rest newest first, still with "(+N more)". Adding
 an item whose text equals an open one's (case, spacing and trailing punctuation ignored) adds nothing: the
-`journal_notebook` result carries `"duplicate": true` and the open item, and the annotation and reflection passes log
-it and count only what they added. State files are unchanged in shape; open items already stored are read as before.
+`journal_notebook` result carries `"duplicate": true` and the open item, raised again (its stale clock restarts, a
+date given replaces its date, with `"date_changed": true`), and the annotation and reflection passes log it and count
+only what they added. State files are unchanged in shape; open items already stored are read as before.
 
 **Side and restart.** `notebook.py` and `tools.py` are imported by the gateway (`journal.hermes` loads both through
 `tools`, `turncontext` and `context`; check with the import probe in *What needs what*), and the chat turn's block

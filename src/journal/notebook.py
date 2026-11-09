@@ -11,6 +11,7 @@ import json
 import re
 import secrets
 import string
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -35,15 +36,24 @@ def _archive(cfg: Config, items: list[dict]) -> None:
             fh.write(json.dumps(it, ensure_ascii=False) + "\n")
 
 
+_QUOTES = str.maketrans({"\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"'})
+
+
 def _same(text: str) -> str:
-    """``text`` as the duplicate check compares it: case folded, whitespace collapsed, trailing punctuation gone."""
-    return re.sub(r"\s+", " ", text).casefold().rstrip(string.punctuation + "…").rstrip()
+    """``text`` as the duplicate check compares it: NFKC, curly quotes made straight, case folded, whitespace
+    collapsed, a leading list marker and trailing punctuation gone."""
+    t = unicodedata.normalize("NFKC", text).translate(_QUOTES)
+    t = re.sub(r"\s+", " ", t).casefold().strip()
+    t = re.sub(r"^[-*•]\s+", "", t)
+    return t.rstrip(string.punctuation + "…").rstrip()
 
 
 def add(cfg: Config, text: str, source: str = "", bring_up_after: str | None = None,
         now: datetime | None = None) -> dict:
-    """Add an open item. A text the same as an open item's (``_same``) adds nothing: the open item comes back with
-    ``"duplicate": True``, so a caller can say so."""
+    """Add an open item. A text the same as an open item's (``_same``) adds no item: the open item is raised again
+    instead (``touched_at`` now, so the stale sweep and the cap count from the repeat; a ``bring_up_after`` given
+    replaces its date, the latest ask winning; a ``source`` given replaces its source) and comes back with
+    ``"duplicate": True``, plus ``"date_changed": True`` when its date moved, so a caller can say so."""
     text = (text or "").strip()
     if not text:
         raise ValueError("empty notebook item")
@@ -56,9 +66,15 @@ def add(cfg: Config, text: str, source: str = "", bring_up_after: str | None = N
     with ledger.locked(path) as data:
         items = data.setdefault("items", [])
         same = _same(item["text"])
-        dup = next((i for i in items if _same(i.get("text", "")) == same), None)
+        dup = next((i for i in items if _same(i.get("text", "")) == same), None) if same else None
         if dup is not None:
-            return {**dup, "duplicate": True}
+            dup["touched_at"] = now.isoformat()
+            if source:
+                dup["source"] = source
+            moved = bool(bring_up_after) and dup.get("bring_up_after") != bring_up_after
+            if moved:
+                dup["bring_up_after"] = bring_up_after
+            return {**dup, "duplicate": True, **({"date_changed": True} if moved else {})}
         items.append(item)
         data.pop("prompts", None)
     return item

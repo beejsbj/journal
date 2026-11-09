@@ -3037,6 +3037,10 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   them. Now: items whose `bring_up_after` has come (oldest due first), then the rest newest first; the "(+N more)"
   tail stays. `notebook.add` compares an item's text, case folded, whitespace collapsed and trailing punctuation
   stripped, with the open items', and a match adds nothing: the open item comes back marked `duplicate`, the tool
-  result says so, and the annotation and reflection passes count only what they added. The matching ignores
-  `bring_up_after`, so a repeat with a different date does not move the open item's date. **Not done, on purpose:**
+  result says so, and the annotation and reflection passes log the repeat and count only what they added. A repeat
+  raises the open item again: `touched_at` becomes now (the stale sweep and the cap prune count from the repeat, as
+  they did when a repeat was a new item), a `bring_up_after` given replaces its date (the latest ask wins, earlier or
+  later; the tool result says `date_changed`), and a `source` given replaces its source. The comparison also applies
+  NFKC, makes curly quotes straight and drops a leading list marker; a text that compares as empty matches nothing.
+  **Not done, on purpose:**
   notebook items are still not fed into the annotation or reflection prompts (a separate privacy decision).
