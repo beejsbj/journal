@@ -30,7 +30,8 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   none` means no delivery by intent, and Web Push from `journal serve` nudges the PWA. Nothing a face writes, and no
   push, is a chat boundary, so neither can end a `/x` window. The owner took choices A–E on 2026-11-09 (recorded
   there). To close: packages OPEN-CORE, OPEN-FACES, OPEN-PUSH and OPEN-PROGRAMS land. *OPEN-CORE built*: see
-  "OPEN-CORE" under *Taken*, which records where it read the doc.
+  "OPEN-CORE" under *Taken*, which records where it read the doc. *OPEN-PROGRAMS built*: see "OPEN-PROGRAMS" under
+  *Taken*, with its follow-ups for OPEN-FACES and OPEN-PUSH.
 
 - **SCRUB-PERSONAL — the source adapters and `brain:` (open, the owner's).** The built-in context sources (tududi,
   chat-scrobbler, listenbrainz, storyteller, audiobookshelf, grimmory) are optional features, but together they
@@ -3144,3 +3145,61 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     stay by calendar date, so that 15th row reads missed while the words wait in the 16th's slot. If the owner wants
     such a practice's daytime words in last night's slot instead, step 2 would also take the missed slots of `at`'s
     calendar date: a doc change.
+- **OPEN-PROGRAMS (2026-11-09) — programs and interrupts with no chat** (docs/OPEN-PROMPTS.md, package 4 and its
+  constraints; issue #20; stacked on OPEN-CORE). What the package built, and what it decided where the doc left room:
+  - **A phase is opened, then delivered.** `_send_phase` is now `_build` (the record and its messages; a reflect
+    phase's construction and a bridge are asked for here, in the tick or a spawned `journal program …`, never in
+    serve), `_open` (the ledger record with `message_id: None`, `sent_at` the moment it became current, `phase_open`
+    and an open span; the run's phase gets `prompt_id` and `opened_at`; the run's other phases close) and `_deliver`
+    (the old send, through `tick.send_prompt`). `send_due` means "owed a delivery": `_arrive` still sets it (so a
+    transition that dies before opening is picked up by the step, as `test_restart_mid_transition…` pins) and `_open`
+    sets it to `Config.has_channel`. `programs.phase_opened(ph)` is the one reader of what that means: a prompt and
+    `opened_at`, or (a run from before this package) a prompt and no send owed. Opening writes nothing to `sent.jsonl`,
+    `send-times.json` or the thread stamps and mirrors nothing, so it is never a chat boundary; everything that reads
+    the chat still requires `message_id`. A record the chat already has (a `/back`, `/start` taking the phase up
+    again) keeps its message and send times when opened; the re-send that follows brings the new text, as before.
+  - **The `/x` hold covers the delivery only**, as the doc asks; two readings of it. *The settle*: a settle on an
+    answer made on a face (`capture.by_face` of the newest capture) no longer asks `_off_the_record`; a settle on an
+    answer in the chat still waits for the window (`test_programs_review`'s `test_a_settle_waits…` pins that, and
+    moving on there would make his next private message the next phase's answer). The next phase is opened at once
+    and its delivery is held. *The engine's notes from a settle* (a schedule phase's "interrupts timed" and "send a
+    day and time") are held back too (`_say(auto=True)`); one held back is not said later (the schedule is in the run,
+    `journal program status` and the web app). A phase opened inside a window still has its reflect construction built
+    (the old code skipped that model call while held); a delivery that waited builds the phase again, as the old
+    owed send did.
+  - **Nothing owed for what he has answered.** An automatic delivery (the tick's step, a settle) of a phase answered
+    on a face since it was opened is not made (`send_due` cleared, logged); an interrupt answered on a face before its
+    delivery is not sent (item `answered`). His own `/next` or `/skip` on a phase that is current, unanswered and
+    owed to the chat still delivers it rather than moving on (`test_an_owed_send_that_keeps_failing…` pins that); on
+    a no-chat install nothing is ever owed, so Next moves on. A delivery given up on (`SEND_ATTEMPTS`, alerted once)
+    is not tried again by the step, as before, and the phase still settles on a face's answer.
+  - **Interrupts open at their time on every install** (`_open_interrupts`, from `send_interrupts`): each due one,
+    the older ones a late tick records as missed included, gets its ledger record with no `message_id`. With no chat
+    its item reads `open` and nothing is attempted; with one it stays `pending` until delivered (`sent`), answered on
+    a face (`answered`) or missed, and the `/x` hold, the grace window and the alerts are as before. The insights
+    document reads his words for an interrupt that is `sent`, `open` or `answered`.
+  - **The web app.** `POST /entries/{stem}/blocks` takes `interrupt: N` (instead of `phase`) for an interrupt that
+    has opened: any age, any run status but a cancelled item, nothing moves on (no `advance`), `409
+    interrupt-not-open` otherwise; the refusals are `_Words`' as for every block. `GET /runs/{id}`'s `delivered` now
+    means "current for this visit" (the PWA as built shows the answer box on it, as OPEN-CORE served *due* as
+    *upcoming* to the same PWA), and a new `in_chat` says whether the chat has it. Serve still reads no chat and calls
+    no model: a phase's construction is made by the spawned child, and the route walk and a new test run an interrupt
+    answer with `sqlite3.connect` and `privacy.view` failing.
+  - **Where the issue and the doc differ** (the doc wins): the issue lists `journal write` on the CLI for
+    interrupts; the doc's table says phases and interrupts on the CLI and MCP come later, and `journal write` is
+    OPEN-FACES's (not built yet). So the faces here are the web app's API; **follow-up for OPEN-FACES**: `journal
+    write` (and MCP, if it takes program answers) answers the open phase or an opened interrupt through
+    `capture.add_web_block(phase_prompt=|interrupt_prompt=)` behind `actions.refuse`, and the PWA gets a control for
+    an interrupt (a web change, so a CI build of `static/`; the API is ready). **Follow-up for OPEN-PUSH** (not
+    landed): push a phase made current with no delivery and an interrupt that opens, under `push.when` and rule 12
+    (no ledger write, never a boundary).
+  - **Tests changed.** `tests/test_serve_programs.py`'s `test_a_phase_that_is_owed_a_send_is_not_open` now also
+    takes the phase's `opened_at` away: a phase owed only its delivery is open (the issue's "`_phase_target` stops
+    reading `send_due` as not delivered"), one a transition has not yet made current is not.
+    `tests/fixtures/api/run-one.json` gains `in_chat`; `tests/test_serve_privacy.py` gains an interrupt sample. No
+    golden changes. New: `tests/test_open_programs.py` (the ten sessions from the web app alone with no chat, extending
+    `test_ten_sessions_with_no_model`; phases and interrupts with no chat; the hold on a chat install; the web
+    routes and their refusals).
+  - **Rollback** (DEPLOY.md): old code reads an opened, undelivered phase with no send owed (no chat) as delivered and
+    never sends it; `journal program start <id>` sends the open phase again. Old code reads an interrupt item `open`
+    or `answered` as not pending and never sends it.

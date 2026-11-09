@@ -13,7 +13,7 @@ One engine in `src/journal`, four faces over the same config, state and entry fi
 | Face | Where | What it is |
 | --- | --- | --- |
 | `journal` CLI | `cli.py` (console script `journal`) | `journal tick`, run every five minutes, does all scheduled work; the other subcommands inspect and maintain (`journal --help`). |
-| Hermes plugin | repo root: `plugin.yaml`, `__init__.py` → `hermes/` | The companion's integration: hooks (`pre_gateway_dispatch` capture, `pre_llm_call` context, `pre_tool_call` guard), the companion's tools, slash commands, the `skills/journal-system` skill, `hermes journal …`. The journal works in one chat on any gateway platform (the `channel` setting; default Telegram and `telegram.chat_id`): `channel.py` decides which messages and turns are the journal's (platform, chat, owners), and every send goes through the `Channel` port (`telegram.TelegramChannel`, else `hermes/channel.py` through `hermes journal deliver`). With `channel.platform: none` there is no chat at all: prompts, annotation replies, reflections, program summaries and notes are not sent, attempted, counted or alerted, and practices are done on the other faces (program phases still need a chat until OPEN-PROGRAMS). |
+| Hermes plugin | repo root: `plugin.yaml`, `__init__.py` → `hermes/` | The companion's integration: hooks (`pre_gateway_dispatch` capture, `pre_llm_call` context, `pre_tool_call` guard), the companion's tools, slash commands, the `skills/journal-system` skill, `hermes journal …`. The journal works in one chat on any gateway platform (the `channel` setting; default Telegram and `telegram.chat_id`): `channel.py` decides which messages and turns are the journal's (platform, chat, owners), and every send goes through the `Channel` port (`telegram.TelegramChannel`, else `hermes/channel.py` through `hermes journal deliver`). With `channel.platform: none` there is no chat at all: prompts, annotation replies, reflections, program summaries and notes are not sent, attempted, counted or alerted, and practices are done on the other faces. A program phase becomes current with no delivery (`programs._open`; `send_due` is "owed a delivery") and an interrupt opens at its time, so a run is done on the web app with no chat too. |
 | `journal serve` + PWA | `serve/` (stdlib HTTP server and API); `web/` (Preact source) built into `serve/static/` | A private web app over the same files. Reads entries and state JSON, never the chat transcript; calls no model; sends by spawning `journal send`. |
 | `journal mcp` | `mcp/` (optional extra `journal[mcp]`) | The engine's calls as MCP tools over stdio, under serve's rules. |
 
@@ -43,7 +43,8 @@ them onto it).
    Words on a face go through `actions.answer` into the slot `slots.resolve` gives, in one locked call: a record with
    `opened_via` and no `message_id`, so nothing that reads the chat (matching, the sweep, folding, thread boundaries,
    the `/x` windows) ever sees it, and nothing goes to `sent.jsonl`, `send-times.json` or the thread stamps.
-5. **After.** Later ticks move program runs (`programs.py`), fold the sent message where the platform allows edits
+5. **After.** Later ticks move program runs (`programs.py`: a phase is opened, its ledger record written with no
+   `message_id`, then delivered when there is a chat; only the delivery waits for a `/x` window), fold the sent message where the platform allows edits
    (header, the opener as sent when it fits and parses, a status line; elsewhere the prompt is closed as sent), transcribe audio and describe pictures (`tick.process_audio`, `tick.process_images`),
    annotate and reply (`tick.annotate`, `tick.reply_annotations`), write reflections (`reflect.py`), and catch up
    after an outage (`recovery.py`, `outage.py`).
