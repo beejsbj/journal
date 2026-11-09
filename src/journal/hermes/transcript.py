@@ -12,7 +12,10 @@ once what Hermes stored:
   already), a platform frame or placeholder (``system``; a ``[Cron delivery:`` is a ``boundary``), the journal's
   own mirror, or nothing. Voice notes arrive as a quoted transcript; audio files and voice notes without
   speech-to-text as a placeholder naming the cached file (``gateway/run_inbound.py``
-  ``_prepend_inbound_media_file_notes``).
+  ``_prepend_inbound_media_file_notes``). Before any of that, ``unwrap`` takes off what was added to his message
+  in storage: a picture attached natively is stored with Hermes' notes and the turn's injected context (the
+  engine's fenced blocks, recalled memory) in his own row. A row that still carries something added after that
+  is not read as his words (``withheld``): it fails closed, as a ``system`` row.
 * **Her rows.** A tool step (``tool_calls``), a failed turn (``display_kind = 'failed_turn'``, its notice, or
   the failure copy older Hermes stored), a turn closed without a reply (``[SILENT]``, an interruption), a typed or
   compaction row, or her reply.
@@ -43,6 +46,7 @@ from typing import Mapping
 
 from .. import audio, mirror
 from ..ports import ChatUnreadable, NotMirrored, Row
+from ..turncontext import CLOSE, HEADS, OPEN
 from .companion import is_failure_text
 
 TIMEOUT = 5  # seconds a read waits for a lock (the gateway hook reads too: never long)
@@ -105,23 +109,74 @@ _REPLY_QUOTE = re.compile(r'^\[Replying to(?: your previous message)?: ".*?"\]\s
 _ASCII_LOWER = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
 
 
+# ── what was added to his message ────────────────────────────────────────────
+
+# A picture attached natively (agent/image_routing.py build_native_content_parts) is his caption, or Hermes' stand-in
+# for none, then a line naming each picture; the row stores the turn's parts as text (agent/session_persistence.py
+# _durable_content: a picture is "[screenshot]"), and whatever was injected into the turn is one more part after
+# them (agent/turn_context.py _append_multimodal_context: the engine's context, recalled memory, Hermes' turn
+# notes). Nothing after the pictures' placeholders is his.
+NATIVE_STAND_IN = "What do you see in this image?"
+_NATIVE = re.compile(r"(?:\A|\n\n)((?:\[Image attached(?: at)?: [^\n]*\]\n)+)((?:\[screenshot\](?:\n|\Z))+)")
+_ATTACHED_AT = re.compile(r"^\[Image attached at: (.*)\]$", re.M)
+# A fenced block wherever it sits: the engine's (turncontext.fence) and recalled memory (agent/memory_manager.py),
+# each with the header Hermes puts in front of a hook's output it cut short (tools/hook_output_spill.py). An
+# unclosed fence runs to the end: what follows its opening is never his.
+_FENCES = re.compile(r"(?:\[[^\]\n]* output truncated — [^\n]*\]\n(?:--- head ---\n)?)?"
+                     rf"(?:{re.escape(OPEN)}.*?(?:{re.escape(CLOSE)}|\Z)"
+                     r"|<\s*memory-context\s*>.*?(?:</\s*memory-context\s*>|\Z))", re.S | re.I)
+# What still looks added once those are gone: the row is then not read as his words.
+_RESIDUE = (
+    ("the engine's context fence", re.compile(f"{re.escape(OPEN)}|{re.escape(CLOSE)}")),
+    ("recalled memory", re.compile(r"</?\s*memory-context\s*>", re.I)),
+    ("a picture placeholder", re.compile(r"^(?:\[screenshot\]$|\[Image attached(?: at)?: )", re.M)),
+    ("a cut-short hook output", re.compile(r"^\[[^\]\n]* output truncated — ", re.M)),
+    ("an engine block", re.compile("|".join(f"^{re.escape(h)}" for h in HEADS), re.M)),
+)
+
+
+def unwrap(text: str) -> tuple[str, list[str], str | None]:
+    """His stored message without what was added to it: (text, pictures, why).
+
+    ``pictures`` are the local files of the pictures attached natively. ``why`` names what still looks added once
+    the known shapes are taken off (None: nothing); the caller then does not read the row as his words. The text
+    keeps the blank line before where the pictures' notes began, so the envelopes in front still parse."""
+    pictures: list[str] = []
+    m = None
+    for m in _NATIVE.finditer(text):  # (the last: a caption of his that looks like one stays his)
+        pass
+    if m and len(m.group(1).splitlines()) == len(m.group(2).split()):  # one placeholder per picture
+        pictures = [p.strip() for p in _ATTACHED_AT.findall(m.group(1))]
+        head = text[:m.start()]
+        text = "" if head.strip() == NATIVE_STAND_IN else head + ("\n\n" if head else "")
+    text = _FENCES.sub("", text)
+    why = next((label for label, rx in _RESIDUE if rx.search(text)), None)
+    return text, pictures, why
+
+
 def is_failed_turn(content: str | None, display_kind: str | None = None) -> bool:
     """A stored assistant row that closes a failed chat turn (not something the companion said)."""
     return display_kind == FAILED_TURN_KIND or (content or "").strip() in FAILED_TURN_NOTICES
 
 
 def read(content: str | None, platform_message_id: str | None) -> dict:
-    """One stored user message, read: {message_id, quote, text, source, audio_path, kind} (+ file_name).
+    """One stored user message, read: {message_id, quote, text, source, audio_path, kind} (+ file_name, images,
+    withheld).
 
     ``kind`` is "his" (his words), "handled" (it carries the hook's journal note: already saved), "mirror"
     (the journal's own send), "system" (a Hermes or gateway row, not his words) or "empty". The text is
-    his words alone: no gateway origin note, no ``[Note: …]`` prefix, no reply quote (kept in ``quote``)."""
+    his words alone: no gateway origin note, no ``[Note: …]`` prefix, no reply quote (kept in ``quote``), nothing
+    ``unwrap`` takes off. ``images``: the files of pictures attached natively (a captionless one is "empty").
+    ``withheld``: what still looked added after ``unwrap``; the row is then "system" (or still "handled")."""
     text = content or ""
     out = {"message_id": str(platform_message_id) if platform_message_id else None, "quote": None,
            "text": "", "source": "text", "audio_path": None, "kind": "empty"}
     if mirror.is_mirror(text):
         out["kind"] = "mirror"
         return out
+    text, pictures, why = unwrap(text)
+    if pictures:
+        out["images"] = pictures
     m = _STEER.match(text)
     if m:
         text = m.group(1)
@@ -140,6 +195,11 @@ def read(content: str | None, platform_message_id: str | None) -> dict:
         return out
     if _HANDLED.search(text):
         out["kind"], out["text"] = "handled", text.strip()
+        if why:
+            out["withheld"] = why
+        return out
+    if why:  # fails closed: what is left could be his words or what was added to them, so it is not read as his
+        out["kind"], out["text"], out["withheld"] = "system", text.strip(), why
         return out
     if text.startswith(_SKIP_PREFIXES):
         out["kind"], out["text"] = "system", text.strip()
@@ -198,8 +258,8 @@ def caption(text: str) -> str:
 
 def clean_user_text(text: str) -> str:
     """His words alone, loosely: no gateway origin note, no quoted message he replied to, no journal hook note
-    (the last two hold the companion's own text)."""
-    text = _NOISE.sub("", text or "")
+    (the last two hold the companion's own text), nothing ``unwrap`` takes off."""
+    text = _NOISE.sub("", unwrap(text or "")[0])
     text = _REPLY_QUOTE.sub("", text.lstrip())  # the quoted message is hers, not his words
     text = _JOURNAL_NOTE_ANYWHERE.sub("\n\n", text)
     text = _JOURNAL_NOTE.sub("", text.lstrip())  # an older note with another ending
@@ -265,13 +325,18 @@ def to_row(raw: Mapping) -> Row | None:
                    stored=stored)
     msg = read(content, pmid)
     kind = msg["kind"]
-    if kind == "system" and msg["text"].startswith("[Cron delivery:"):
+    withheld = msg.get("withheld")
+    if kind == "system" and msg["text"].startswith("[Cron delivery:") and not withheld:
         kind = "boundary"
     meta.update(notice=bool(dk) and dk != "steer", steer=dk == "steer", internal=dk == "internal_notification",
-                loose=clean_user_text(stored), frame=stored.lstrip().startswith(_FRAMES),
+                loose="" if withheld else clean_user_text(stored), frame=stored.lstrip().startswith(_FRAMES),
                 delivery=content is None or _like(content, _DELIVERIES))
     if kind == "system":
-        meta["caption"] = caption(msg["text"])
+        meta["caption"] = "" if withheld else caption(msg["text"])
+    if withheld:
+        meta["withheld"] = withheld
+    if msg.get("images"):
+        meta["images"] = msg["images"]
     if msg.get("file_name"):
         meta["file_name"] = msg["file_name"]
     return Row(int(raw["id"]), at, "user", kind, msg["text"], msg["message_id"], msg["quote"], msg["source"],

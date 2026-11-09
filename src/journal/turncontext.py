@@ -9,6 +9,11 @@ next turn).
 
 Nothing here reads the chat transcript or calls a source; every piece comes from state the tick and the
 hooks already wrote. Each piece fails on its own: a notebook that cannot be read costs the notebook, not the pack.
+
+What ``build`` returns is fenced (``OPEN`` … ``CLOSE``). The platform adds it to his message for the model, and may
+store it with his message too: Hermes keeps a picture's turn as one row holding his caption, its own image notes and
+this context (``hermes/transcript.py``, ``unwrap``). The fence is how a reader of the stored chat tells what the
+engine added from what he wrote; ``HEADS`` are the blocks' own first lines, for a row stored without the fence.
 """
 from __future__ import annotations
 
@@ -22,6 +27,16 @@ from .config import Config
 log = logging.getLogger("journal.turncontext")
 
 BUDGET = {"blocks": 2, "today_with_pack": False}
+
+OPEN, CLOSE = "<journal-context>", "</journal-context>"
+# The first line of each block (notebook.render, context.pack_for_turn, programview.block, today.header_of)
+HEADS = ("Your private notebook — open threads", "## Journal: the context your", "## Journal: program session",
+         "## Journal: today — ")
+
+
+def fence(text: str) -> str:
+    """The engine's context for a turn, between the markers a transcript reader strips."""
+    return f"{OPEN}\n{text}\n{CLOSE}"
 
 
 @dataclass(frozen=True)
@@ -37,7 +52,7 @@ class Turn:
 
 
 def build(cfg: Config, turn: Turn) -> str | None:
-    """The context for ``turn``: the blocks joined by blank lines, or None when there are none."""
+    """The context for ``turn``: the blocks joined by blank lines and fenced, or None when there are none."""
     blocks: list[str] = []
     try:
         block = notebook.render(cfg, turn.at.astimezone(cfg.tz).date().isoformat())
@@ -54,7 +69,7 @@ def build(cfg: Config, turn: Turn) -> str | None:
         block = _today(cfg, turn, with_pack=bool(primary))
         if block and (not primary or BUDGET["today_with_pack"]) and len(blocks) < BUDGET["blocks"]:
             blocks.append(block)
-    return "\n\n".join(blocks[:BUDGET["blocks"]]) if blocks else None
+    return fence("\n\n".join(blocks[:BUDGET["blocks"]])) if blocks else None
 
 
 def _program(cfg: Config, turn: Turn) -> str | None:
