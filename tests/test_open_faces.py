@@ -58,6 +58,12 @@ class ViewTest(Base):
         self.assertEqual(v["prompt"]["opener"], self.prompt("2026-10-14-water")["opener"])
         self.assertTrue(v["prompt"]["sent_at_local"])
 
+    def test_a_slot_of_another_day_is_named_plainly(self):
+        self.send(at(23), only="evening")
+        v = actions.view(self.cfg, "evening", now=at(4, 30) + timedelta(days=1))   # 04:30 Thursday: Wednesday's is open (6 h)
+        self.assertEqual((v["slot"]["date"], v["slot"]["step"]), ("2026-10-14", 1))
+        self.assertEqual(v["fills"], "Answers yesterday's prompt in the chat, sent at 23:00.")
+
     def test_a_practice_turned_off_is_refused_as_send_refuses_it(self):
         (Path(self.cfg.practices_dir) / "quiet.md").write_text(
             "---\nkind: practice\nid: quiet\ntitle: Quiet\nenabled: false\n---\n- One?\n", encoding="utf-8")

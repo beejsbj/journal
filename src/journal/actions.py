@@ -28,7 +28,7 @@ The writes run under the ledger lock (a face bounds the wait with ``ledger.deadl
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable
 
@@ -251,14 +251,17 @@ def view(cfg: Config, practice, *, now: datetime | None = None) -> dict:
 def fills(cfg: Config, slot: slots.Slot, now: datetime) -> str:
     """Where words written at ``now`` go (``slot``, from ``resolve``), in words a face can show under the practice."""
     when = slot.at.astimezone(cfg.tz).strftime("%H:%M") if slot.at is not None else None
-    day = "" if slot.local_date == slots.journal_day(cfg, now).isoformat() else f" of {slot.local_date}"
     sent = slot.time.astimezone(cfg.tz).strftime("%H:%M") if slot.delivered and slot.time is not None else None
+    today = slots.journal_day(cfg, now)
+    days = (today - date.fromisoformat(slot.local_date)).days
+    whose = "the" if days == 0 else "yesterday's" if days == 1 else "tomorrow's" if days == -1 else \
+        f"{slot.local_date}'s"
     if slot.step == 1:
-        return (f"Answers the prompt the chat has{day}, sent at {sent}." if sent
-                else f"Fills the {when} slot{day}, due now.")
+        return (f"Answers {whose} prompt in the chat, sent at {sent}." if sent
+                else f"Fills {whose} {when} slot, due now.")
     if slot.step == 2:
-        return (f"Answers the prompt sent at {sent}{day}, which went by unanswered." if sent
-                else f"Fills the {when} slot{day}, which went by unanswered.")
+        return (f"Answers {whose} prompt in the chat, sent at {sent}, which went by unanswered." if sent
+                else f"Fills {whose} {when} slot, which went by unanswered.")
     if slot.step == 3:
-        return f"Fills the {when} slot{day} early" + ("; it will not be sent." if cfg.has_channel else ".")
+        return f"Fills {whose} {when} slot early" + ("; it will not be sent." if cfg.has_channel else ".")
     return f"Starts an extra entry of this practice ({slot.id})."

@@ -326,11 +326,11 @@ describe("Today", () => {
   it("replies to a waiting prompt as a new entry of that practice", async () => {
     visit("/");
     const { writes } = stubApi({ ...reads, "GET /api/v1/today": open, "POST /api/v1/entries": { stem: "2026-10-15-morning", path: "x", rule: "web" },
-                                 "GET /api/v1/library/morning/open": view("morning", "Answers the prompt the chat has, sent at 06:00.") });
+                                 "GET /api/v1/library/morning/open": view("morning", "Answers the prompt in the chat, sent at 06:00.") });
     const host = mount(<App />);
     const card = await until(() => must(host.querySelector("li.practice.open")));
     await click(byText(card, "button", "Write now"));
-    await until(() => expect(card.querySelector(".fills")?.textContent).toBe("Answers the prompt the chat has, sent at 06:00."));
+    await until(() => expect(card.querySelector(".fills")?.textContent).toBe("Answers the prompt in the chat, sent at 06:00."));
     expect(card.querySelectorAll(".prompt")).toHaveLength(1);   // the card shows the prompt the chat has, and only once
     await type(card.querySelector("textarea"), "Slept badly, but the light is good.");
     await click(byText(card, "button", "Save"));

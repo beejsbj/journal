@@ -5,7 +5,7 @@ added to ``api.ROUTES`` without a sample here fails the test, so the walk stays 
 import json
 import sqlite3
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest import mock
 
@@ -118,6 +118,24 @@ class PrivacyTest(ServeCase):
             self.assertEqual(self.request("POST", "/api/v1/logout", headers={"Origin": self.origin})[0], 204)
             self.assertEqual(self.request("GET", "/", token=False)[0], 200)
         self.assertEqual(calls, [])
+
+    def test_write_nows_view_of_a_prompt_the_chat_has_opens_no_database(self):
+        """``GET /library/{id}/open`` on a delivered, unanswered prompt shows it as sent (``capture.stored_opener``):
+        the walk above samples the undelivered branch; this one the other (review round 1)."""
+        from journal import ledger
+        with ledger.locked(self.cfg.ledger_path) as data:
+            data["prompts"].append({"id": "2026-10-15-morning", "stem": "2026-10-15-morning", "kind": "morning",
+                                    "local_date": "2026-10-15", "chat_id": self.cfg.chat_id, "message_id": "900",
+                                    "sent_at": (NOW - timedelta(hours=2)).isoformat(), "sent_at_local": "07:12 IST",
+                                    "opener": "Morning. The rain again.", "opener_source": "ada", "asked": []})
+
+        def refuse(*a, **k):
+            raise AssertionError("journal serve opened a SQLite database or asked the privacy pass")
+        with mock.patch.object(sqlite3, "connect", refuse), mock.patch.object(privacy, "view", refuse):
+            code, _h, body = self.request("GET", "/api/v1/library/morning/open")
+        self.assertEqual(code, 200, body[:300])
+        got = json.loads(body)
+        self.assertEqual((got["slot"]["delivered"], got["prompt"]["opener"]), (True, "Morning. The rain again."))
 
     def test_every_write_route_answers_without_the_sessions_database_either(self):
         walked = {(m, p) for m, p, _fn, _a in writes.ROUTES}
