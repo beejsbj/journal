@@ -6,9 +6,26 @@ import { readFileSync } from "node:fs";
 
 async function settle(page: Page): Promise<void> {
   await page.waitForLoadState("networkidle");
-  await expect(page.locator(".skeleton")).toHaveCount(0);
+  await expect(page.locator(".skeleton:not([data-specimen] .skeleton)")).toHaveCount(0);   // /design draws some on purpose
   await page.evaluate(() => document.fonts?.ready);
   await page.waitForTimeout(150);
+}
+
+/** On a wide screen the page pane scrolls inside a fixed desk, so a full-page shot would show one screen: let the
+ *  document grow to the pane's content first (through the CSSOM: the app's CSP refuses inline style tags). */
+async function unroll(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const set = (sel: string, prop: string, value: string) =>
+      document.querySelectorAll<HTMLElement>(sel).forEach((el) => el.style.setProperty(prop, value, "important"));
+    set("html, body", "height", "auto");
+    set("html, body", "overflow", "visible");
+    set(".shell, .stage, .rail", "height", "auto");
+    set(".main-pane", "overflow", "visible");
+    set(".rail", "position", "sticky");
+    set(".rail", "top", "0");
+    set(".rail", "align-self", "start");
+    set(".rail", "height", "100vh");
+  });
 }
 
 /** The fixture server has no program run in progress, so the run screen is drawn from tests/fixtures/api/run-one.json. */
@@ -37,8 +54,9 @@ const SCREENS: [string, string][] = [
   ["editor-builtin", "/library/morning/edit"],
   ["editor-program", "/library/fix-life/edit"],
   ["insights", "/insights"],
+  ["design", "/design"],
 ];
-const DARK = ["today", "entry", "run", "settings", "insights"];
+const DARK = ["today", "entry", "run", "settings", "insights", "design"];
 const INKS = ["blue-black", "brown", "violet", "green"];
 const OUT = process.env.OUT ?? "shots/out";
 
@@ -53,10 +71,37 @@ test.describe("paired", () => {
         await settle(page);
         const at = `${OUT}/${info.project.name}-${scheme}-${name}`;
         await page.screenshot({ path: `${at}.png` });
+        await unroll(page);
         await page.screenshot({ path: `${at}-full.png`, fullPage: true });
+        if (name === "design") {
+          // one shot per section: the whole guide is taller than a browser will draw in one image
+          const secs = page.locator(".ds-sec");
+          for (let i = 0; i < (await secs.count()); i++) await secs.nth(i).screenshot({ path: `${at}-${String(i + 1).padStart(2, "0")}.png` });
+        }
       });
     }
   }
+
+  test("design system, opened", async ({ page }, info) => {
+    await page.goto("/design");
+    await settle(page);
+    const at = `${OUT}/${info.project.name}-light-design-open`;
+    await page.getByRole("button", { name: /every entry/ }).click();
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${at}-menu.png` });
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: /What she noticed/ }).click();
+    await page.waitForTimeout(800);
+    await page.locator("#ds-folds").screenshot({ path: `${at}-fold.png` });
+    await page.getByRole("button", { name: "Open a sheet" }).click();
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: `${at}-sheet.png` });
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(400);
+    await page.getByRole("button", { name: "Show a toast" }).click();
+    await page.waitForTimeout(700);
+    await page.screenshot({ path: `${at}-toast.png` });
+  });
 
   test("entry with her note open", async ({ page }, info) => {
     await page.goto("/entries/2026-10-14-evening");
@@ -112,11 +157,11 @@ test.describe("paired", () => {
         tiles.push((await p.screenshot({ clip })).toString("base64"));
         await ctx.close();
       }
-      const bg = scheme === "dark" ? "#161513" : "#f4efe4";
-      const ink = scheme === "dark" ? "#958a79" : "#6e6457";
+      const bg = scheme === "dark" ? "#0a0d12" : "#eee7d9";   // the desk (tokens.css --room)
+      const ink = scheme === "dark" ? "#8a91a0" : "#6d6356";   // --text-3
       await page.setContent(`<!doctype html><body style="margin:0;background:${bg};font:14px ui-monospace,monospace;color:${ink}">
         <div style="display:flex;gap:16px;padding:16px;align-items:flex-start">
-        ${tiles.map((t, i) => `<figure style="margin:0"><img src="data:image/png;base64,${t}" style="display:block;width:${info.project.name === "desktop" ? 640 : 390}px"><figcaption style="padding:8px 12px;letter-spacing:.1em;text-transform:uppercase">${INKS[i]}</figcaption></figure>`).join("")}
+        ${tiles.map((t, i) => `<figure style="margin:0"><img src="data:image/png;base64,${t}" style="display:block;width:${info.project.name === "desktop" ? 640 : 390}px"><figcaption style="padding:8px 12px">${INKS[i]}</figcaption></figure>`).join("")}
         </div></body>`);
       await page.setViewportSize({ width: (info.project.name === "desktop" ? 656 : 406) * 4 + 16, height: 400 });
       await page.screenshot({ path: `${OUT}/${info.project.name}-${scheme}-inks.png`, fullPage: true });
@@ -139,8 +184,8 @@ test.describe("paired", () => {
        <span style="font:italic 400 44px Newsreader,serif;color:${ink}">journal</span></div>`;
     await page.setContent(`<!doctype html><style>@font-face{font-family:Newsreader;font-style:italic;src:url(data:font/woff2;base64,${face})}</style>
       <body style="margin:0;font-family:sans-serif;width:760px">
-      ${row("#f4efe4", "#1b1813", "#28367f")}${row("#161513", "#ece4d6", "#b6c0ff")}
-      <div style="display:flex;gap:36px;align-items:flex-end;padding:28px 36px;background:#ebe4d5">
+      ${row("#fbf8f1", "#1d1a15", "#28367f")}${row("#141921", "#ebe8e1", "#b6c0ff")}
+      <div style="display:flex;gap:36px;align-items:flex-end;padding:28px 36px;background:#eee7d9">
         <img src="data:image/png;base64,${icon("icon-512.png")}" width="160" style="border-radius:36px">
         <img src="data:image/png;base64,${icon("icon-maskable-512.png")}" width="160" style="border-radius:50%">
         <img src="data:image/png;base64,${icon("apple-touch-icon.png")}" width="120" style="border-radius:27px">

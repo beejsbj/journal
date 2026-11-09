@@ -8,6 +8,8 @@
   font: 550 var(--t-ui) / 1 var(--f-ui); text-decoration: none; transform: translateY(-160%); transition: transform var(--d-2) var(--e-out);
 }
 .skip-link:focus { transform: none; }
+/* out of sight and of size until a keyboard reaches it */
+.skip-link:not(:focus) { width: 0; height: 0; min-height: 0; padding: 0; overflow: hidden; }
 
 .brand {
   display: flex; align-items: center; gap: 10px; min-height: var(--tap); padding: 0 6px; color: var(--text); text-decoration: none;

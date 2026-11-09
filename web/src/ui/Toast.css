@@ -1,7 +1,7 @@
 /* Toast (ui/Toast.tsx); the update prompt's markup (.toast > span + .button + .button.primary) is the contract */
 .toast {
   position: fixed; z-index: var(--z-toast); left: 50%; bottom: max(28px, calc(env(safe-area-inset-bottom) + 16px));
-  display: flex; align-items: center; gap: var(--s2); max-width: calc(100vw - 24px); min-height: 48px; padding: 6px 6px 6px 18px;
+  display: flex; align-items: center; gap: var(--s2); width: max-content; max-width: calc(100vw - 24px); min-height: 48px; padding: 6px 6px 6px 18px;
   border-radius: var(--r-pill); background: var(--lamp); color: var(--on-lamp); box-shadow: var(--elev-pop);
   font: 500 14px / 1.3 var(--f-ui); transform: translateX(-50%);
   animation: toast-in var(--spring-dur) var(--spring) both;

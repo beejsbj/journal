@@ -12,6 +12,7 @@ import { FIELDS, GROUPS, buildPatch, keyOf, problem, shown, valueAt, type Settin
 import { useTitle } from "../title";
 import type { Json } from "../schema";
 import type { Located, Session } from "../types";
+import { ThemeChoice } from "../ui/ThemeChoice";
 
 /** A settings tree as dotted rows ("windows.collapse_hours"), the way the config names its keys. */
 export function flatten(value: Json, prefix = ""): [string, string][] {
@@ -136,6 +137,14 @@ export function InkChoice() {
           </label>
         ))}
       </fieldset>
+      {/* WEB-UX foundation: the page's theme and the style guide, on this device (the Settings rebuild places them) */}
+      <div class="device-row">
+        <span class="label">Page</span>
+        <ThemeChoice />
+      </div>
+      <p class="section-note">
+        <a href="/design">Design system</a>: every part of the app's look, on one page.
+      </p>
     </section>
   );
 }

@@ -764,3 +764,7 @@ details[open] > summary .chev { transform: rotate(90deg); }
   .head-actions { grid-column: 1; grid-row: auto; margin-top: var(--s4); }
   .kv div { grid-template-columns: 1fr; gap: 0.1rem; }
 }
+
+/* the foundation's one addition, for its theme choice in Settings (the Settings rebuild replaces it) */
+.device-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s3); margin: var(--s5) 0 var(--s3); }
+.device-row .label { font-weight: 500; }
