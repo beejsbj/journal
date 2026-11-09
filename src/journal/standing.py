@@ -165,13 +165,18 @@ def unanswered(cfg: Config, now_local: datetime, data: dict | None = None) -> tu
     prompt, or None; whether the count stopped at ``pack.lookback_days`` before reaching one). Ordered by send
     time: a late reply to an older prompt does not reach past newer ones. A program phase and a note are not
     practice prompts. A record that can't be read is skipped (a corrupt one must never stop a prompt going out).
-    The ``context.unanswered`` run."""
+    The ``context.unanswered`` run.
+
+    Only slots he saw count (OPEN-PROMPTS): a prompt delivered to the chat, or a practice he answered on a face
+    (``opened_via``). A slot that was due with no chat message (a no-chat install) and went by is not "his last
+    prompts got no reply", and the record a failed send left was never seen."""
     data = data if data is not None else ledger.snapshot(cfg.ledger_path)
     cutoff = now_local - timedelta(days=pack_lookback_days(cfg))
     sent = []
     for p in _prompts(data):
         try:
-            if (p.get("kind") not in entries.FREEFORM_IDS and p.get("message_id") and not p.get("program")
+            if (p.get("kind") not in entries.FREEFORM_IDS and (p.get("message_id") or p.get("opened_via"))
+                    and not p.get("program")
                     and _parse(p.get("sent_at")) is not None):
                 sent.append((_parse(p["sent_at"]), p))
         except Exception:  # noqa: BLE001 - one odd record costs itself

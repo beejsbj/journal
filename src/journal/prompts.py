@@ -32,6 +32,17 @@ def reading_guidance(cfg: Config) -> str:
 MISSED_LISTED = 4  # a run this short is named prompt by prompt; a longer one is counted per practice
 
 
+def _when(cfg: Config, p: dict, fmt: str) -> str:
+    """When a prompt in the run went out (``sent_at``; the run holds delivered prompts only, ``standing.unanswered``),
+    else its scheduled time, else its date: a record without a send time costs its time, never the note."""
+    for key in ("sent_at", "scheduled"):
+        try:
+            return datetime.fromisoformat(p[key]).astimezone(cfg.tz).strftime(fmt)
+        except (KeyError, TypeError, ValueError):
+            continue
+    return str(p.get("local_date") or "?")
+
+
 def missed_note(cfg: Config, missed: list[dict] | None, now_local: datetime) -> str:
     """One sentence naming the run of recent prompts that got no reply (``context.unanswered``), or ''. Up to
     ``MISSED_LISTED`` are named one by one; a longer run (he has been away) is counted per practice."""
@@ -44,11 +55,10 @@ def missed_note(cfg: Config, missed: list[dict] | None, now_local: datetime) -> 
         for p in missed:
             counts[str(p.get("kind") or "?")] = counts.get(str(p.get("kind") or "?"), 0) + 1
         per = ", ".join(f"{k} {c}" for k, c in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])))
-        first = datetime.fromisoformat(missed[-1]["sent_at"]).astimezone(cfg.tz).strftime("%a %-d %b")
+        first = _when(cfg, missed[-1], "%a %-d %b")
         return f"{who} last {n} prompts got no reply, since {first}: {per}. "
     # by id: for the four rituals that is the first word of the title, which is what this always said
-    when = ", ".join(f"{p.get('kind')} ({datetime.fromisoformat(p['sent_at']).astimezone(cfg.tz).strftime('%a %H:%M')})"
-                     for p in missed)
+    when = ", ".join(f"{p.get('kind')} ({_when(cfg, p, '%a %H:%M')})" for p in missed)
     return f"{who} last {'prompt' if n == 1 else f'{n} prompts'} got no reply: {when}. "
 
 

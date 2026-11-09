@@ -28,7 +28,7 @@ import tempfile
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-from . import audio, context, entries, hookstate, ledger, library, reflect, sources, standing
+from . import audio, entries, hookstate, reflect, slots, sources, standing
 from .config import Config, pack_lookback_days, quiet_minutes, today_cache_minutes, today_max_chars
 
 log = logging.getLogger("journal.today")
@@ -260,40 +260,42 @@ def _hhmm(iso: str, cfg: Config) -> str:
 
 
 def _practices(cfg: Config, now_local: datetime, stems: bool = False) -> dict:
-    """How today's practices went, from the ledger, plus the slots still to come. ``stems``: each row that has a
-    prompt names its entry's stem (``journal serve`` links rows to entries by it; a practice with two slots has two
-    rows with one id, and a prefix match on the id would give both the first slot's entry)."""
-    today = now_local.date().isoformat()
-    prompts = {p["id"]: p for p in ledger.snapshot(cfg.ledger_path)["prompts"]
-               if p.get("local_date") == today and p.get("message_id") and p.get("sent_at")}
-    rows, seen = [], set()
+    """How today's practices went: every slot of the day in its state (``slots.day``: upcoming, due, open, answered,
+    missed), then what was done off the schedule. ``stems``: each row that has a record names its entry's stem
+    (``journal serve`` links rows to entries by it; a practice with two slots has two rows with one id, and a prefix
+    match on the id would give both the first slot's entry).
 
-    def row(p: dict, label: str) -> dict:
-        state = context.prompt_state(cfg, p, now_local)
-        kind = {"answered": "answered", "no reply yet": "open", "missed, never answered": "missed"}[state]
-        first = (p.get("captures") or [{}])[0].get("at")
-        out = {"id": label, "state": kind, "sent": _hhmm(p["sent_at"], cfg),
-               "answered": _hhmm(first, cfg) if first else None}
-        # the file its replies are in: a hand-written entry on the base name sends it to ``<stem>-2`` (capture.entry_stem)
-        stem = Path(p["entry_path"]).stem if p.get("entry_path") else p.get("stem") or p["id"]
-        return {**out, "stem": stem} if stems else out
-
-    for practice in library.scheduled(cfg):
-        for n, slot in enumerate(practice.schedule, 1):
-            if slot.weekday is not None and now_local.weekday() != slot.weekday:
-                continue
-            pid = entries.stem_for(today, practice.id, n)
-            if pid in prompts:
-                seen.add(pid)
-                rows.append(row(prompts[pid], practice.id))
-                continue
-            hh, mm = (int(x) for x in slot.time.split(":"))
-            if now_local.replace(hour=hh, minute=mm, second=0, microsecond=0) > now_local:
-                rows.append({"id": practice.id, "state": "upcoming", "at": slot.time})
-    for pid, p in sorted(prompts.items(), key=lambda kv: kv[1]["sent_at"]):
-        if pid not in seen and p.get("kind") not in entries.FREEFORM_IDS and not p.get("program"):  # on demand
-            rows.append(row(p, p.get("kind") or pid))
+    A row says where things happened: ``sent`` for a prompt delivered to the chat, ``via`` for words written first on
+    a face (the web app, the CLI, MCP), ``at`` for the slot's time when nothing was delivered. Only a delivered prompt
+    is ``open``, and only open rows are listed as awaiting a reply in the chat (``open``)."""
+    rows = []
+    for s in slots.day(cfg, now_local.date().isoformat(), now_local):
+        p = s.record
+        if s.n is None and not (slots.delivered(p) or (p or {}).get("captures")):
+            continue  # off the schedule with nothing done (a deliberate send that failed): no row, as before
+        rows.append(_row(cfg, s, stems))
     return {"rows": rows, "open": [r["id"] for r in rows if r["state"] == "open"]}
+
+
+def _row(cfg: Config, s, stems: bool) -> dict:
+    p = s.record or {}
+    out: dict = {"id": s.practice, "state": s.state}
+    if slots.delivered(p):
+        first = (p.get("captures") or [{}])[0].get("at")
+        out.update(sent=_hhmm(p["sent_at"], cfg), answered=_hhmm(first, cfg) if first else None)
+    elif s.state == slots.ANSWERED:
+        first = (p.get("captures") or [{}])[0].get("at")
+        if s.at is not None:
+            out["at"] = s.at.strftime("%H:%M")
+        out["answered"] = _hhmm(first, cfg) if first else None
+    elif s.at is not None:
+        out["at"] = s.at.strftime("%H:%M")
+    if p.get("opened_via"):
+        out["via"] = p["opened_via"]
+    if stems and p and (slots.delivered(p) or p.get("captures")):
+        # the file its replies are in: a hand-written entry on the base name sends it to ``<stem>-2`` (capture.entry_stem)
+        out["stem"] = Path(p["entry_path"]).stem if p.get("entry_path") else p.get("stem") or p["id"]
+    return out
 
 
 def _is_his_line(line: str) -> bool:
@@ -428,13 +430,22 @@ def _standing(cfg: Config, now: datetime) -> dict:
 # ── rendering ────────────────────────────────────────────────────────────────
 
 def _practice_text(r: dict) -> str:
+    """One row as the block says it. Only a prompt delivered to the chat is said to wait for a reply there: a slot
+    that is due with no chat message, or was done on a face, says so (OPEN-PROMPTS rule 8)."""
     if r["state"] == "upcoming":
         return f"{r['id']} at {r['at']}"
+    if r["state"] == "due":
+        return f"{r['id']} due at {r['at']}, not sent to the chat"
+    where = f" in {entries.FACES.get(r['via'], r['via'])}" if r.get("via") else ""
     if r["state"] == "answered":
+        if not r.get("sent"):
+            return f"{r['id']} answered at {r['answered']}{where}" if r.get("answered") else f"{r['id']} answered{where}"
         return f"{r['id']} sent {r['sent']}, answered {r['answered']}" if r.get("answered") \
             else f"{r['id']} sent {r['sent']}, answered"
     if r["state"] == "open":
         return f"{r['id']} sent {r['sent']}, no reply yet"
+    if not r.get("sent"):
+        return f"{r['id']} at {r['at']} (missed)" if r.get("at") else f"{r['id']} (missed)"
     return f"{r['id']} sent {r['sent']} (missed, reply anytime)"
 
 
