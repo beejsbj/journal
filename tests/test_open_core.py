@@ -12,7 +12,9 @@ from zoneinfo import ZoneInfo
 from helpers import CHAT, NEUTRAL, CleanEnv, make_cfg
 
 from journal import (actions, agent, audio, capture, cli, context, conversations, entries, hookstate, ledger, privacy,
-                     programs, reflect, slots, status, sweep, telegram, tick)
+                     programs, reflect, slots, standing, status, sweep, telegram, tick)
+
+BUILD = context.build  # (Base stands a stub in for the pack; the no-chat line is checked in the real one)
 
 IST = ZoneInfo("Asia/Kolkata")
 WED = datetime(2026, 10, 14, 0, 0, tzinfo=IST)  # a Wednesday
@@ -458,16 +460,75 @@ class NoChannelTest(Base):
         self.assertEqual((self.prompts(), self.bot.calls), ([], []))
         self.assertIn("no chat", log[0])
 
-    def test_annotations_are_written_and_no_reply_is_attempted(self):
+    def _annotated(self):
         info = self.answer("morning", "slept badly", at(6, 30))
         self.ask = lambda cfg, query, *a, **k: "Restless night (inference)."
         tick.annotate(self.cfg, at(7).astimezone(timezone.utc), [])
         tick.reply_annotations(self.cfg, at(7, 5).astimezone(timezone.utc), [])
+        return info
+
+    def _reflection(self):
+        written = Path(self.cfg.root) / "2026-10-13-reflection.md"
+        written.parent.mkdir(parents=True, exist_ok=True)
+        written.write_text("# A day\n\nIt went quietly.\n", encoding="utf-8")
+        with ledger.locked(self.cfg.ledger_path) as data:
+            data.setdefault("reflections", []).append(
+                {"id": "2026-10-13-reflection", "kind": "day", "local_date": "2026-10-13", "path": str(written),
+                 "written_at": at(5).isoformat()})
+        return reflect.send(self.cfg, at(7), [])
+
+    def _chat_later(self):
+        self.cfg.platform, self.cfg.chat_id = "telegram", CHAT
+
+    def test_annotations_are_written_and_their_reply_is_skipped_for_good(self):
+        """The owner, 2026-11-09 (decision 3): with no chat an annotation reply is not left pending but marked
+        skipped, "no chat", so a chat configured later never sends it."""
+        info = self._annotated()
         self.assertIn("Restless night", Path(info["path"]).read_text(encoding="utf-8"))
-        self.assertNotIn("annotation_reply", self.prompt("2026-10-14-morning"))
+        reply = self.prompt("2026-10-14-morning")["annotation_reply"]
+        self.assertEqual((reply["skipped"], reply.get("message_id"), reply.get("attempts")), ("no chat", None, None))
         self.assertEqual(self.bot.calls, [])
         s = status.status(self.cfg, at(7, 6))
         self.assertEqual((s["pending_annotation_replies"], s["undelivered"]), ([], []))
+        self._chat_later()
+        tick.reply_annotations(self.cfg, at(8).astimezone(timezone.utc), [])
+        self.assertEqual(self.bot.calls, [])
+        self.assertEqual(self.prompt("2026-10-14-morning")["annotation_reply"], reply)
+        self.assertEqual(status.status(self.cfg, at(8, 1))["pending_annotation_replies"], [])
+
+    def test_a_reflection_written_with_no_chat_is_skipped_and_never_sent_later(self):
+        self.assertEqual(self._reflection(), [])
+        tg = ledger.snapshot(self.cfg.ledger_path)["reflections"][0]["telegram"]
+        self.assertEqual((tg["skipped"], tg.get("message_id"), tg.get("attempts")), ("no chat", None, None))
+        self._chat_later()
+        self.assertEqual(reflect.send(self.cfg, at(8), []), [])
+        self.assertEqual(self.bot.calls, [])
+        self.assertEqual(ledger.snapshot(self.cfg.ledger_path)["reflections"][0]["telegram"], tg)
+        self.assertIn("written, not sent: no chat", status.format_status(status.status(self.cfg, at(8, 1))))
+
+    def test_standing_counts_what_was_written_with_no_chat_and_never_its_words(self):
+        """Decision 3: the companion is told how many annotations and reflections were written while there was no
+        chat since the last delivered prompt: in standing, the pack and the today block; counts only."""
+        self._annotated()
+        self._reflection()
+        self._chat_later()
+        stand = standing.collect(self.cfg, at(9))
+        self.assertEqual(stand["no_chat"], {"annotations": 1, "reflections": 1})
+        line = ("- While there was no chat: 1 annotation and 1 reflection were written; they are in the entries, "
+                "never sent to the chat.")
+        pack_lines, today_lines = standing.pack_lines(self.cfg, stand), standing.today_lines(self.cfg, stand)
+        self.assertIn(line, pack_lines)
+        self.assertIn("- while there was no chat: 1 annotation and 1 reflection were written; they are in the "
+                      "entries, never sent to the chat", today_lines)
+        for words in ("Restless", "slept badly", "quietly"):
+            self.assertNotIn(words, "\n".join(pack_lines + today_lines))
+        self.assertIn(line, BUILD(self.cfg, at(9), stand))
+        # the next delivered prompt is the companion's chat again: the line goes
+        self.send(at(9, 1))
+        self.assertIsNotNone(self.prompt("2026-10-14-water")["message_id"])
+        stand = standing.collect(self.cfg, at(9, 2))
+        self.assertEqual(stand["no_chat"], {"annotations": 0, "reflections": 0})
+        self.assertFalse([l for l in standing.pack_lines(self.cfg, stand) if "no chat" in l])
 
     def test_reflections_notes_and_summaries_are_not_sent(self):
         """Review round 1: each path is given something to send, and the channel is never asked for."""
@@ -481,7 +542,8 @@ class NoChannelTest(Base):
                     {"id": "2026-10-13-reflection", "kind": "day", "local_date": "2026-10-13", "path": str(written),
                      "written_at": at(5).isoformat()})
             self.assertEqual(reflect.send(self.cfg, at(7), []), [])
-            self.assertNotIn("telegram", ledger.snapshot(self.cfg.ledger_path)["reflections"][0])
+            tg = ledger.snapshot(self.cfg.ledger_path)["reflections"][0]["telegram"]
+            self.assertEqual((tg["skipped"], tg.get("attempts")), ("no chat", None))   # (decision 3)
             self.assertFalse(programs._say_about(self.cfg, "fix-life", "<b>hi</b>", [], at(7)))
             cli._notify(self.cfg, "hello")
             run = {"id": "r1", "program": "fix-life"}
