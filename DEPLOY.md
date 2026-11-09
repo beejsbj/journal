@@ -51,10 +51,16 @@ starts `journal mcp` (restart the client, or reconnect the server, to see `journ
 **First checks** (read-only, or writing only under a temporary root):
 
 1. `journal serve check` and `journal doctor`: same version as the tick, no new problems.
-2. The web app: Today loads (a due slot reads "due since HH:MM", not "at HH:MM"); every card has **Write now**;
+2. **The installed PWA must take the update.** Its old build reads four states and refuses a Today answer with a
+   `due` row ("The server's answer has an unexpected shape"): on a chat install for the minutes between a slot's
+   time and its send, on a no-chat install whenever a slot is due. After the unit restart, open the app and tap
+   **Update available** (or reload it twice in a browser tab); Settings then shows the new build. Rolling serve back
+   while the PWA is new is harmless (the old server serves `due` as `upcoming`, which the new build reads).
+   The web app: Today loads (a due slot reads "due since HH:MM", not "at HH:MM"); every card has **Write now**;
    pressing it shows the practice and a line such as "Fills the 23:00 slot early; it will not be sent." and writes
    nothing (`ledger.json`'s mtime and the vault checksum unchanged); **Not now** closes it. `/today?write=evening`
-   opens it on the evening card. Do not press **Save** as a check: it writes into tonight's slot and the tick then
+   opens it on the evening card. On a no-chat install there is no **Send to chat** on Today, and the Library's
+   answers `409 no-chat`. Do not press **Save** as a check: it writes into tonight's slot and the tick then
    skips that send (use it when he wants to write).
 3. `journal open evening` prints the practice and the slot line and changes nothing (vault checksum before and
    after). `journal write` is a real write: try it against a temporary journal (`JOURNAL_CONFIG` pointing at a config

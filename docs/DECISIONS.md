@@ -3216,3 +3216,20 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     `tests/fixtures/api/today.json`: the 06:00 morning row reads `due`. `tests/test_privacy_seams_d.py`: the
     `journal_start` window test now pins that nothing is spawned or written inside a window (was: the spawned send
     carries `--hold-off-record`). `web/tests`: *Reply* is *Write now* and *Send now* is *Send to chat*.
+  - **Review round 1** (an independent Opus pass over the branch): no blocker, no privacy leak (refusals before any
+    write, no face write a chat boundary, serve and MCP reach no database, chat or model; the fences and the route
+    walk hold). Fixed, each in a commit naming it: `journal write` checked `--at` and `--entry` only after the editor
+    and then deleted the file, losing his words (major: now checked before, and words refused after it are kept in
+    the editor's file unless off the record); the CLI's clock was read before the editor, so a prompt delivered
+    while he wrote was not the one answered (major: read again at the save); the template was saved as his words,
+    her opener with it, when the scissors line was removed, and a scissors string inside a line of his cut it;
+    `--at` in year 1 was a traceback (now `bad-time` in `actions.when`, every face); after a save from
+    `/today?write=`, the reload opened Write now again (now `?write` is used once and leaves the address); *Send to
+    chat* on a journal with no chat said "On its way…" for good (now `GET /today` says `chat`, Today leaves the
+    button out, and the send route is `409 no-chat`); nits (a note's template, `journal write j` as a note, a
+    missing editor, the slot of another day named plainly, a privacy sample for a delivered prompt's view). `HH:MM`
+    is now the latest such time not ahead of now. **Recorded rather than changed:** the installed PWA's old build
+    refuses a `due` row until it takes the update (DEPLOY's first checks say to tap *Update available*; keeping
+    OPEN-CORE's mapping for old clients would need the server to tell builds apart, for a window of minutes);
+    `--at` has no lower bound beyond what the calendar can place (a typo years back makes an extra entry on that
+    day, which is visible and his to move; serve's 31-day limit is the web's).
