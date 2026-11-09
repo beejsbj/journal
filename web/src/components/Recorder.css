@@ -1,0 +1,48 @@
+/* Recorder (components/Recorder.tsx): the inline "Voice" button, and the write room's breathing orb. Recording is the
+   lamp, never a red dot: status has no hue. */
+
+.recorder { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); }
+.recorder .button.recording { background: var(--lamp); color: var(--on-lamp); box-shadow: none; }
+.rec-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: currentColor;
+  animation: rec-pulse 1.2s ease-in-out infinite;
+}
+@keyframes rec-pulse { 50% { opacity: 0.3; } }
+.recorder-problem { margin: 0; flex-basis: 100%; }
+
+/* the orb: a raised disc that, recording, becomes the lamp, breathes, and swells with his voice (--lvl, 0-1) */
+.orb-wrap { position: relative; display: grid; place-items: center; width: 60px; height: 60px; flex-wrap: nowrap; }
+.orb {
+  position: relative; z-index: 1; display: grid; place-items: center; width: 52px; height: 52px; padding: 0; border: 0;
+  border-radius: 50%; color: var(--text); cursor: pointer;
+  background: radial-gradient(circle at 50% 35%, var(--raised-2), var(--raised));
+  box-shadow: inset 0 0 0 1px var(--hair-2), 0 6px 18px -8px rgb(0 0 0 / 0.4);
+  transition: transform var(--spring-dur) var(--spring), background var(--d-2), color var(--d-2);
+}
+.orb:hover:not(:disabled) { transform: scale(1.05); }
+.orb:active:not(:disabled) { transform: scale(0.95); }
+.orb:disabled { opacity: 0.45; cursor: default; }
+.orb > svg { width: 22px; height: 22px; }
+.orb-ring {
+  position: absolute; inset: 4px; border-radius: 50%; pointer-events: none; opacity: 0;
+  background: color-mix(in oklab, var(--lamp) 14%, transparent);
+}
+.orb-wrap.rec .orb { background: var(--lamp); color: var(--on-lamp); animation: orb-breathe 3.2s ease-in-out infinite; }
+.orb-wrap.rec .orb-ring { opacity: 1; transform: scale(calc(1.15 + var(--lvl, 0.25) * 0.55)); transition: transform 120ms linear; }
+.orb-wrap.rec .orb-ring.halo {
+  background: none; box-shadow: 0 0 0 1px color-mix(in oklab, var(--lamp) 30%, transparent);
+  animation: orb-halo 2.6s ease-out infinite;
+}
+@keyframes orb-breathe { 50% { transform: scale(1.07); } }
+@keyframes orb-halo { from { transform: scale(1); opacity: 0.8; } to { transform: scale(2.1); opacity: 0; } }
+/* a problem (the microphone blocked) floats above the orb, in the dock's words */
+.orb-wrap .recorder-problem {
+  position: absolute; bottom: calc(100% + 14px); left: 50%; width: max-content; max-width: min(320px, 80vw); transform: translateX(-50%);
+  padding: var(--s2) var(--s3); border-radius: var(--r-m); background: var(--frost); box-shadow: var(--elev-pop);
+  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); color: var(--text-2); text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orb-wrap.rec .orb, .orb-wrap.rec .orb-ring.halo { animation: none; }
+  .orb-wrap.rec .orb-ring { transform: scale(1.2); }
+}

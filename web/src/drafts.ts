@@ -21,12 +21,17 @@ export function loadDraft(key: string): string {
   }
 }
 
-export function saveDraft(key: string, text: string): void {
+/** Keep (or, for nothing, forget) the draft. Says whether the store took it: the write room only says "Draft kept"
+ *  when it was. */
+export function saveDraft(key: string, text: string): boolean {
   try {
-    if (text) store()?.setItem(PREFIX + key, text);
-    else store()?.removeItem(PREFIX + key);
+    const s = store();
+    if (!s) return false;
+    if (text) s.setItem(PREFIX + key, text);
+    else s.removeItem(PREFIX + key);
+    return true;
   } catch {
-    /* a full or blocked store: the text stays on the page */
+    return false;   // a full or blocked store: the text stays on the page
   }
 }
 
