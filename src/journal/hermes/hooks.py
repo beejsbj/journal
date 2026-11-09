@@ -5,7 +5,8 @@ which tools refuse in an off-the-record turn is ``journal.tools``.
 pre_gateway_dispatch  a message event becomes an ``inbound.Inbound``; the ``Outcome`` goes back as Hermes' dict
                       (``rewrite`` the text, ``skip`` a command the engine already ran, or None to pass).
 pre_llm_call          ``inbound.begin_turn`` writes the voice transcripts that arrived and marks an off-record turn;
-                      ``turncontext.build`` returns the notebook, pack / program block and today block to inject.
+                      ``turncontext.build`` returns the notebook, pack / program block and today block to inject;
+                      nothing at all in the engine's own one-shots (``agent.MODEL_STEP_ENV`` in their environment).
 pre_tool_call         ``tools.refusal`` (a write in an off-record turn), then the guard.
 
 Every callback fails open for capture (a bug must never drop a message) and the guard fails open too (a bug must
@@ -17,7 +18,7 @@ import logging
 import os
 from datetime import datetime, timezone
 
-from .. import audio, channel, guard, images, inbound, tools, turncontext
+from .. import agent, audio, channel, guard, images, inbound, tools, turncontext
 from . import commands, runtime
 
 log = logging.getLogger("journal.hermes")
@@ -103,6 +104,8 @@ def on_dispatch(event=None, **_kw):
 
 
 def on_llm_call(user_message=None, platform=None, session_id=None, turn_id=None, **_kw):
+    if os.environ.get(agent.MODEL_STEP_ENV):  # the engine's own one-shot (an opener, a reflection …): not a turn of
+        return None  # his, and it sees only the query the engine wrote (no notebook, no today block)
     try:
         cfg = runtime.load_config()
     except Exception:  # nothing below can run without the state dir; the message itself is unaffected

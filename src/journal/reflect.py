@@ -10,14 +10,17 @@ week``; the weekly ritual's Sunday): due when that entry is annotated, or at
 annotated or transcribed. Which practice closes a period is ``library.closer``: a fork that renames the
 evening ritual keeps the reflection as long as it says ``closes: day``.
 
-The model (one-shot, no tools, like annotations) sees only the period's entry files (the user's words,
-annotations, the companion's notes), plus, for a week, that week's day reflections, and the latest
-earlier analysis so it can say what moved. The private notebook is not an input; ``FOLLOW-UP:`` lines
-go to it, as with annotations. Every quote must appear in the inputs (``validate.check_reflection``);
-a bad answer writes nothing and is retried on later ticks, ``ATTEMPTS`` times, then alerted once. A
-weak model therefore yields no reflection rather than a bad one. A model that cannot be reached at all
-is different: that is an outage, which defers the reflection without using an attempt (``outage``:
-retried at most every 30 minutes for up to 7 days, one alert once it has lasted 6 hours).
+The model (a one-shot) is given the period's entry files (the user's words, annotations, the companion's notes),
+plus, for a week, that week's day reflections, and what came before (``continuity``): her last few analyses
+(``EARLIER``), what he wrote back to each in the chat, and the open notebook threads the engine filed from a journal
+file (``notebook.on_record``; never one she added in chat, and the journal's hook adds nothing to an engine one-shot:
+``agent.MODEL_STEP_ENV``). Its one tool is ``journal_search`` (``tools.READ_TOOLSET``), over his words in every
+entry; no chat transcript or context pack is given to it. ``FOLLOW-UP:`` lines go to the notebook, as with
+annotations. A quoted passage that is not in the inputs nor in his words anywhere in the journal loses its quotation
+marks before the file is written (``validate.unquote``) and is logged; the reflection is kept. An answer that is not a reflection at all (empty, too
+long, not prose) writes nothing and is retried on later ticks, ``ATTEMPTS`` times, then alerted once. A model that
+cannot be reached at all is different: that is an outage, which defers the reflection without using an attempt
+(``outage``: retried at most every 30 minutes for up to 7 days, one alert once it has lasted 6 hours).
 
 Unanswered prompts leave no trace in the journal: the files hold only what was answered (the opener is
 in each entry's own file). Records live in the ledger under ``reflections``.
@@ -28,7 +31,8 @@ import re
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
-from . import agent, channel, compose, entries, ledger, library, mirror, notebook, outage, prompts, schedule, validate
+from . import agent, channel, compose, entries, ledger, library, mirror, notebook, outage, prompts, schedule, search, \
+    validate
 from .ports import ChannelError
 from .config import Config
 
@@ -36,6 +40,14 @@ ATTEMPTS = 3
 SEND_ATTEMPTS = 6
 INPUT_CAP = 12000  # characters per entry file handed to the model
 BUDGET = 300
+EARLIER = {"reflection": (3, 7), "week": (2, 21)}
+# (how many of her earlier analyses of the same kind a reflection reads, and within how many days back. Three days
+# show a run of days, a habit forming or a thread dropped, without outweighing the day's own entries; two weeks show
+# a trend without turning the review into a history. A day reflection also reads the latest week review of the days
+# before it, for the week's frame. Each is a few hundred words, so the whole stays near one long entry.)
+EARLIER_CAP = 4000  # characters of each earlier analysis's body
+REPLY_CAP = 600     # characters of each reply of his to one of them
+REPLIES = 3         # replies of his shown per analysis (the first ones)
 
 
 def enabled(cfg: Config, kind: str) -> bool:
@@ -254,14 +266,91 @@ def _his_corpus(inputs: str) -> str:
 
 
 def _earlier(cfg: Config, kind: str, end: date) -> list[Path]:
-    """The latest earlier analysis of the same kind (within two periods), to say what moved."""
-    step = 1 if kind == "reflection" else 7
-    for back in range(1, 3):
-        d = end - timedelta(days=step * back)
-        found = entries.analyses_on(cfg.root, d.isoformat(), kind)
+    """Her earlier analyses a reflection reads (``EARLIER``), oldest first: the last few of the same kind before
+    ``end`` (the newest of each day), and for a day reflection the latest week review of the six days before."""
+    count, days = EARLIER[kind]
+    out: list[Path] = []
+    for back in range(1, days + 1):
+        found = entries.analyses_on(cfg.root, (end - timedelta(days=back)).isoformat(), kind)
         if found:
-            return found[-1:]
-    return []
+            out.append(found[-1])
+            if len(out) >= count:
+                break
+    if kind == "reflection":
+        week = latest(cfg, "week", end - timedelta(days=1), 6)
+        if week is not None:
+            out.append(week)
+    return sorted(out, key=lambda p: p.name)
+
+
+# One of his conversation blocks that replies to a message of the journal's: its key line, the folded quote of the
+# message (``conversations.his_block``), then his words up to the next key line or section.
+_HIS_REPLY = re.compile(r"^%% journal his:[^%\n]* %%\n> \[!info\][-+]? ↩ replying to\n((?:>[^\n]*\n)+)\n?(.*?)"
+                        r"(?=^%% journal|^## |\Z)", re.M | re.S)
+
+
+def _replies_to(cfg: Config, rec: dict | None, path: Path, upto: date) -> list[str]:
+    """What he wrote back in the chat to the sent analysis ``path`` (its ledger record ``rec``), found through the
+    entries dated from it to ``upto``: his blocks whose quoted message is that analysis (``conversations``' own test,
+    ``answers_ours``). Each as ``[<entry>] <his words>``, cut at ``REPLY_CAP``; at most ``REPLIES``."""
+    from .conversations import QUOTE_WORDS
+    from .sweep import words
+    tg = (rec or {}).get("telegram") or {}
+    if not tg.get("message_id"):
+        return []
+    try:
+        title, _ = _label(cfg, rec["kind"], date.fromisoformat(rec["local_date"]))
+        sent = words(compose.reflection_html(title, body_of(path.read_text(encoding="utf-8")), cfg.names))
+        first = date.fromisoformat(rec["local_date"])
+    except (KeyError, ValueError, OSError):
+        return []
+    out: list[str] = []
+    d = first
+    while d <= upto and len(out) < REPLIES:
+        for p in entries.entries_on(cfg.root, d.isoformat()):
+            for m in _HIS_REPLY.finditer(p.read_text(encoding="utf-8", errors="replace")):
+                q = words("\n".join(l[1:] for l in m.group(1).splitlines()))  # (a cut quote's "…" is no word)
+                text = " ".join(entries.ENGINE_MARK.sub("", m.group(2)).split())
+                if len(q.split()) >= QUOTE_WORDS and q in sent and text:
+                    cut = text if len(text) <= REPLY_CAP else text[:REPLY_CAP].rsplit(" ", 1)[0] + " …"
+                    out.append(f"[{p.stem}] {cut}")
+        d += timedelta(days=1)
+    return out[:REPLIES]
+
+
+def _carried(body: str) -> str:
+    """The question an analysis left him with (its "To carry forward" part), or ""."""
+    m = re.search(r"\*\*To carry forward\*\*\s*[—:-]*\s*(.+)", body, re.S)
+    return " ".join(m.group(1).split()) if m else ""
+
+
+def continuity(cfg: Config, kind: str, end: date, data: dict) -> str:
+    """What a reflection reads of what came before ``end``: her earlier analyses (``_earlier``) with the question each
+    left him and what he wrote back to it, then her open notebook threads that came from the journal
+    (``notebook.on_record``). Her words are labelled hers and his replies his. "" when there is nothing."""
+    who = cfg.names.user or "the user"
+    his = cfg.names.possessive
+    parts = []
+    for p in _earlier(cfg, kind, end):
+        k = "week" if p.name[11:].startswith("week") else "reflection"
+        what = "week review" if k == "week" else "day reflection"
+        body = body_of(p.read_text(encoding="utf-8", errors="replace"))
+        if len(body) > EARLIER_CAP:
+            body = body[:EARLIER_CAP].rsplit(" ", 1)[0] + " …"
+        rec = next((r for r in data.get("reflections") or [] if Path(r.get("path") or "").name == p.name), None)
+        replies = _replies_to(cfg, rec, p, end)
+        asked = _carried(body)
+        said = ("\n".join(f"- {r}" for r in replies) if replies
+                else f"- (none in the chat; {cfg.names.subject} may have taken it up in an entry)")
+        parts.append(f"### {k}:{p.stem} (your {what}, {date.fromisoformat(p.name[:10]).strftime('%a %-d %b')})\n{body}"
+                     + (f"\n\nYou asked {cfg.names.object}: {asked}" if asked else "")
+                     + f"\n\nWhat {who} wrote back to it in the chat ({his} words):\n{said}")
+    items = notebook.on_record(cfg)
+    if items:
+        lines = [f"- {it['text']} [from {it['source']}] — noted {str(it.get('created_at') or '')[:10]}"
+                 + (f" (bring up after {it['bring_up_after']})" if it.get("bring_up_after") else "") for it in items]
+        parts.append("### Open threads in your notebook (from the journal; your words)\n" + "\n".join(lines))
+    return "\n\n".join(parts)
 
 
 _LEGACY_CALLOUT = ("> [!note]- Today's prompts", "> [!note]- This week's prompts")
@@ -334,29 +423,32 @@ def write_one(cfg: Config, kind: str, end: date, trigger: str, now: datetime,
     """Try once to write one analysis. Returns (alert message or None, whether the model was unreachable).
 
     An unreachable model defers the analysis without using an attempt; a bad answer uses one."""
+    from .tools import READ_TOOLSET
     rid = record_id(kind, end.isoformat())
     days = _period(kind, end)
     mine = [p for p in _his_entries(cfg, days)]
     dailies = [p for d in days for p in entries.analyses_on(cfg.root, d.isoformat(), "reflection")] \
         if kind == "week" else []
-    earlier = _earlier(cfg, kind, end)
     inputs = _input_block(cfg, mine) + ("\n\n" + _input_block(cfg, dailies, "reflection") if dailies else "")
-    earlier_text = _input_block(cfg, earlier, kind)
+    before = continuity(cfg, kind, end, ledger.snapshot(cfg.ledger_path))
     title, period = _label(cfg, kind, end)
     try:
-        raw = agent.ask(cfg, prompts.reflection_request(cfg, kind, period, inputs, earlier_text), BUDGET,
-                        toolsets="none")
+        raw = agent.ask(cfg, prompts.reflection_request(cfg, kind, period, inputs, before), BUDGET,
+                        toolsets=READ_TOOLSET)
     except agent.AgentUnavailable as e:
         return _outage(cfg, rid, kind, end, now, str(e), log), True
     text, followups = notebook.split_followups(raw or "")
-    ok, reason = (validate.check_reflection(kind, text, _his_corpus(inputs) + "\n" + earlier_text) if raw
-                  else (False, "agent failed"))
+    unquoted: list[str] = []
+    if raw:  # a passage not in the inputs, nor in his words anywhere in the journal (search), loses its quotes
+        text, unquoted = validate.unquote(text, _his_corpus(inputs) + "\n" + before,
+                                          lambda: search.his_words_everywhere(cfg))
+    ok, reason = (validate.check_reflection(kind, text, "", misquotes=False) if raw else (False, "agent failed"))
     path = None
     if ok:
         path = _target(cfg, kind, end)
         entries.write_file(path, render(cfg, kind, end, text, mine + dailies, now.astimezone(cfg.tz)))
         for f in followups:
-            notebook.add(cfg, f, source=path.stem)
+            notebook.add(cfg, f, source=path.stem, origin="reflection")
     with ledger.locked(cfg.ledger_path) as data:
         recs = data.setdefault("reflections", [])
         rec = find(data, rid)
@@ -368,11 +460,15 @@ def write_one(cfg: Config, kind: str, end: date, trigger: str, now: datetime,
         if ok:
             rec.update(written_at=now.isoformat(), path=str(path), trigger=trigger)
             rec.pop("error", None)
+            if unquoted:
+                rec["unquoted"] = unquoted
         else:
             rec["error"] = reason[:300]
         attempts = rec["attempts"]
     if ok:
-        log.append(f"wrote {path.name} ({trigger})" + (f" (+{len(followups)} notebook)" if followups else ""))
+        log.append(f"wrote {path.name} ({trigger})" + (f" (+{len(followups)} notebook)" if followups else "")
+                   + (f" ({len(unquoted)} quote{'s' if len(unquoted) != 1 else ''} not found, unquoted)"
+                      if unquoted else ""))
         return None, False
     log.append(f"{rid}: reflection attempt {attempts}/{ATTEMPTS} failed ({reason})")
     if attempts >= ATTEMPTS:

@@ -554,7 +554,7 @@ def annotate(cfg: Config, now: datetime, log: list[str]) -> None:
                 entries.write_annotations(path, text, cfg.names)
             for f in followups:  # the annotations are written: a notebook failure must not hold back completion
                 try:
-                    notebook.add(cfg, f, source=path.stem)
+                    notebook.add(cfg, f, source=path.stem, origin="annotation")
                 except Exception as e:  # noqa: BLE001
                     log.append(f"{p['id']}: follow-up not saved to the notebook ({type(e).__name__}: {e})")
             log.append(f"annotated {p['id']}" + (f" (+{len(followups)} notebook)" if followups else ""))

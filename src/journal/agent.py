@@ -16,6 +16,10 @@ Anything that looks like the agent's failure text is never returned as an answer
 one-shot chat in the configured profile (``journal.hermes.companion``), and with ``agent.command`` any other command
 (``CommandCompanion``: an argv list; ``{query_file}``, ``{budget}`` and ``{toolsets}`` are filled in).
 ``agent.enabled: false`` turns model steps off entirely.
+
+Every run carries ``JOURNAL_MODEL_STEP=1`` in its environment: the journal's own hook in that process
+(``hermes.hooks.on_llm_call``) then adds nothing to the turn, so a model step sees only the query the engine wrote
+(the context pack an opener is given already holds what it should; the notebook and the today block are for her chat).
 """
 from __future__ import annotations
 
@@ -28,6 +32,7 @@ from .config import Config
 from .ports import CompanionUnavailable
 
 DETAIL_CAP = 200
+MODEL_STEP_ENV = "JOURNAL_MODEL_STEP"  # set in every run's environment: the engine's own model step, not a turn of his
 _answered = False  # a model answered in this process (one tick): it is reachable again
 
 
@@ -126,8 +131,8 @@ class CommandCompanion:
             qpath = Path(fh.name)
         try:
             argv = self.argv(qpath, budget, toolsets, image) if image else self.argv(qpath, budget, toolsets)
-            out = subprocess.run(argv, capture_output=True, text=True,
-                                 timeout=budget + 60, cwd=str(cfg.state_dir), env=cfg.hermes_env())
+            out = subprocess.run(argv, capture_output=True, text=True, timeout=budget + 60, cwd=str(cfg.state_dir),
+                                 env={**cfg.hermes_env(), MODEL_STEP_ENV: "1"})
         except subprocess.TimeoutExpired as e:
             raise AgentUnavailable(f"timed out after {e.timeout:.0f}s") from e
         except OSError as e:

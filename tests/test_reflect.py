@@ -102,7 +102,7 @@ class DayReflectionTest(Base):
         self.assertNotIn("how was the night?", body)
         self.assertTrue(body.rstrip().endswith("on your terms?"))
         query, toolsets = self.asked[0]
-        self.assertEqual(toolsets, "none")
+        self.assertEqual(toolsets, "journal_read")  # journal_search, and nothing that writes (test_continuity)
         self.assertIn("rain all day, walked anyway", query)
         self.assertIn("- He walked in the rain.", query)
         self.assertNotIn("[!question]", query)  # the question bank is not an input
@@ -141,20 +141,21 @@ class DayReflectionTest(Base):
         self.assertEqual(self.reflect(datetime(2026, 10, 15, 4, 5, tzinfo=IST)), ([], []))
         self.assertEqual(self.asked, [])
 
-    def test_invented_quote_writes_nothing_retries_then_alerts(self):
+    def test_a_bad_answer_writes_nothing_retries_then_alerts(self):
         sent = self.day()
         self.answer_prompt("evening", "2026-10-14", "rain all day, walked anyway", sent + timedelta(minutes=10), "11")
-        self.answer = GOOD.replace("rain all day, walked anyway", "I miss the lake house")
+        self.answer = '{"opener": "not a reflection at all, but JSON from a confused model, long enough to count"}'
         for n in (1, 2):
             alerts, log = self.reflect(datetime(2026, 10, 14, 23, 45, tzinfo=IST))
             self.assertEqual(alerts, [])
-            self.assertIn(f"attempt {n}/3 failed (quote not in the entries: 'I miss the lake house')", log[0])
+            self.assertIn(f"attempt {n}/3 failed (not prose)", log[0])
         alerts, _ = self.reflect(datetime(2026, 10, 14, 23, 50, tzinfo=IST))
         self.assertEqual(len(alerts), 1)
         self.assertIn("2026-10-14-reflection was not written after 3 attempts", alerts[0])
         self.assertEqual(self.reflect(datetime(2026, 10, 15, 4, 5, tzinfo=IST)), ([], []))  # alerted once, then quiet
         self.assertFalse(list(self.cfg.root.glob("*-reflection*.md")))
         self.assertEqual(self.bot.calls, [])
+        # (an invented quote no longer costs the reflection: it loses its marks; test_continuity)
 
     def test_failed_agent_degrades_to_no_reflection(self):
         sent = self.day()

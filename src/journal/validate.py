@@ -171,8 +171,10 @@ def asked(practice: Practice | str, data: dict) -> list[dict]:
 
 # ── reflections ──────────────────────────────────────────────────────────────
 # A reflection is free Markdown, so grounding is checked on what it quotes: every passage in double
-# quotes (straight or curly) and every blockquote line must appear in the supplied inputs. One
-# misquote rejects the whole reflection; the caller writes nothing and tries again later.
+# quotes (straight or curly) and every blockquote line must appear in the supplied inputs. For a day
+# reflection or week review, ``unquote`` takes a passage that isn't there out of quotation (its marks
+# go, or the blockquote line), so nothing invented is presented as his words and the rest is kept; a
+# program's synthesis (``insights``) and the other checks below still reject the whole text on one.
 
 REFLECTION_LIMITS = {"reflection": 3500, "week": 6000, "insights": 5000}  # insights: a program's synthesis
 _QUOTED = re.compile(r"“([^”]{4,})”|\"([^\"\n]{4,})\"")
@@ -191,19 +193,67 @@ def quotes(text: str) -> list[str]:
     return out
 
 
+def _missing(q: str, haystack: str) -> str | None:
+    """The first fragment of quoted passage ``q`` not in ``haystack`` (already ``_plain``), or None."""
+    for part in _ELLIPSIS.split(q):  # "I … think": each fragment must be there
+        frag = _plain(part).strip(" .,;:!?'\"-")
+        if len(frag) >= 3 and frag not in haystack:
+            return part.strip()[:60]
+    return None
+
+
 def _misquote(text: str, corpus: str) -> str | None:
     """The first quoted passage of ``text`` that is not in ``corpus`` (None: every quote is real)."""
     haystack = _plain(corpus)
     for q in quotes(text):
-        for part in _ELLIPSIS.split(q):  # "I … think": each fragment must be there
-            frag = _plain(part).strip(" .,;:!?'\"-")
-            if len(frag) >= 3 and frag not in haystack:
-                return part.strip()[:60]
+        bad = _missing(q, haystack)
+        if bad is not None:
+            return bad
     return None
 
 
-def check_reflection(kind: str, text: str | None, corpus: str) -> tuple[bool, str]:
-    """(ok, reason) for a model-written day reflection or week review against its inputs."""
+def unquote(text: str, corpus: str, wider=None) -> tuple[str, list[str]]:
+    """``text`` with every quoted passage (``quotes``) that is not in ``corpus`` taken out of quotation: a blockquote
+    line goes, and a passage in double quotes keeps its words without the marks, so it reads as the writer's own
+    paraphrase and never as his words. ``wider`` (a callable returning more text, read at most once and only when a
+    passage is missing from ``corpus``) is where a passage may also be found: his words anywhere in the journal, for
+    what a reflection reached through ``journal_search``. A pair of straight quotes whose inside starts or ends with a
+    space is two quotes mispaired, not a quotation, and is left as it is. Returns (text, the passages changed, each
+    cut to 60 characters)."""
+    hay = [_plain(corpus), None]
+
+    def found(q: str) -> bool:
+        if _missing(q, hay[0]) is None:
+            return True
+        if wider is None:
+            return False
+        if hay[1] is None:
+            hay[1] = _plain(wider() or "")
+        return _missing(q, hay[1]) is None
+
+    changed: list[str] = []
+    lines = []
+    for line in (text or "").splitlines(keepends=True):
+        q = line.lstrip("> ").strip() if line.startswith(">") else ""
+        if q and not found(q):
+            changed.append(q[:60])
+            continue
+        lines.append(line)
+
+    def one(m: re.Match) -> str:
+        q = m.group(1) or m.group(2)
+        if m.group(2) is not None and q != q.strip():
+            return m.group(0)
+        if found(q):
+            return m.group(0)
+        changed.append(q.strip()[:60])
+        return q
+    return _QUOTED.sub(one, "".join(lines)), changed
+
+
+def check_reflection(kind: str, text: str | None, corpus: str, misquotes: bool = True) -> tuple[bool, str]:
+    """(ok, reason) for a model-written day reflection or week review against its inputs (``misquotes=False``: the
+    quotes were already taken care of by ``unquote``)."""
     text = (text or "").strip()
     if len(text) < 80:
         return False, "empty or too short"
@@ -212,7 +262,7 @@ def check_reflection(kind: str, text: str | None, corpus: str) -> tuple[bool, st
     limit = REFLECTION_LIMITS[kind]
     if len(text) > limit:
         return False, f"too long ({len(text)} > {limit})"
-    bad = _misquote(text, corpus)
+    bad = _misquote(text, corpus) if misquotes else None
     if bad is not None:
         return False, f"quote not in the entries: {bad!r}"
     return True, "ok"
