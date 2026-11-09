@@ -157,12 +157,13 @@ class NotesTest(WriteCase):
         self.assertEqual((self.cfg.root / "2026-10-15-evening.webm").read_bytes(), b"OggS-web-recording")
         self.assertEqual(self.prompt("2026-10-15-evening")["captures"][0]["audio"], "2026-10-15-evening.webm")
 
-    def test_a_practice_turned_off_is_409_and_nothing_is_written(self):
+    def test_a_practice_turned_off_still_takes_his_words(self):
+        """The owner, 2026-11-09 (decision 4): ``enabled: false`` is "not scheduled" only."""
         (self.cfg.practices_dir / "quiet.md").write_text(
             "---\nkind: practice\nid: quiet\ntitle: Quiet\nenabled: false\n---\n- One?\n", encoding="utf-8")
+        got = self.ok("POST", "/api/v1/entries", {"practice": "quiet", "text": "x"}, want=201)
+        self.assertEqual(got["stem"], "2026-10-15-quiet")
         before = (checksum(self.cfg.root), (self.cfg.state_dir / "ledger.json").read_bytes())
-        self.assertEqual(self.refused("POST", "/api/v1/entries", {"practice": "quiet", "text": "x"}, want=409)["error"],
-                         "disabled")
         self.refused("POST", "/api/v1/entries", {"practice": "fix-life", "text": "x"}, want=404)   # a program
         self.assertEqual((checksum(self.cfg.root), (self.cfg.state_dir / "ledger.json").read_bytes()), before)
 
@@ -282,7 +283,8 @@ class WriteNowTest(WriteCase):
             "---\nkind: practice\nid: quiet\ntitle: Quiet\nenabled: false\n---\n- One?\n", encoding="utf-8")
         self.refused("GET", "/api/v1/library/nope/open", want=404, headers={})
         self.refused("GET", "/api/v1/library/fix-life/open", want=404, headers={})   # a program
-        self.assertEqual(self.refused("GET", "/api/v1/library/quiet/open", want=409, headers={})["error"], "disabled")
+        # (turned off is "not scheduled" only: it opens, decision 4 of 2026-11-09)
+        self.assertEqual(self.ok("GET", "/api/v1/library/quiet/open", headers={})["practice"], "quiet")
 
 
 class UploadsTest(WriteCase):
@@ -855,8 +857,8 @@ class LibraryWriteTest(WriteCase):
         self.refused("POST", "/api/v1/library/..%2Fx/send", want=404)
         off = self.NEW.replace("---\n## Body", "enabled: false\n---\n## Body")
         self.ok("PUT", "/api/v1/library/stretching", {"raw": off})
-        self.assertEqual(self.refused("POST", "/api/v1/library/stretching/send", want=409)["error"], "disabled")
-        self.assertEqual(self.spawned, [["send", "gratitude"]])
+        self.ok("POST", "/api/v1/library/stretching/send", want=202)   # turned off is "not scheduled" only (decision 4)
+        self.assertEqual(self.spawned, [["send", "gratitude"], ["send", "stretching"]])
 
     def test_a_spawn_that_cannot_start_is_503(self):
         def boom(cfg, args):

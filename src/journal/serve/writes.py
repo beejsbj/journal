@@ -192,7 +192,7 @@ def _engine_entry(req: Request) -> Path:
 
 
 REFUSED = {"off-the-record": 422, "reserved-line": 422, "placeholder": 422, "empty": 400, "bad-time": 400,
-           "not-a-practice": 404, "disabled": 409}   # ``actions.Refused.code`` → the status a write answers
+           "not-a-practice": 404}   # ``actions.Refused.code`` → the status a write answers
 
 
 def _refused(e: actions.Refused) -> HTTPError:
@@ -725,8 +725,7 @@ def library_send(req: Request):
     pid, current = _practice_or_404(req)
     if current is None:
         raise HTTPError(404, "not-found", "no practice by that id")
-    if not current.enabled:
-        raise HTTPError(409, "disabled", "this practice is turned off (enabled: false)")
+    # (``enabled: false`` is "not scheduled" only: a practice turned off is still sent when asked; the owner, 2026-11-09)
     if not req.cfg.has_channel:   # (``journal send`` would log that nothing was sent; say it here instead)
         raise HTTPError(409, "no-chat", "this journal has no chat (channel.platform: none), so nothing is sent to "
                                         "one: use Write now")

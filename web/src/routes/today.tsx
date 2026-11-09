@@ -91,8 +91,8 @@ function PracticeCard({ row, today, library, slot, writing: startWriting = false
   const [onItsWay, setOnItsWay] = useState(false);
   const send = useAction();
   useLive(["ledger-changed"], () => setOnItsWay(false));
-  const canWrite = p?.enabled ?? true;
-  const canSend = (row.state === "upcoming" || row.state === "due" || row.state === "missed") && (p?.enabled ?? true)
+  // (a practice turned off is not scheduled, nothing more: it is still written and sent from here; the owner, 2026-11-09)
+  const canSend = (row.state === "upcoming" || row.state === "due" || row.state === "missed")
     && today.chat !== false;   // (a journal with no chat has nothing to send to)
   const title = p?.title ?? row.id;
   const his = today.voices?.his ?? "You";
@@ -132,13 +132,11 @@ function PracticeCard({ row, today, library, slot, writing: startWriting = false
           <span class="words">{entry.first_line}</span>
         </a>
       )}
-      {(canWrite || canSend || onItsWay || entry) && !replying && (
+      {!replying && (
         <div class="actions">
-          {canWrite && (
-            <button type="button" class="button primary" onClick={() => setReplying(true)}>
-              Write now
-            </button>
-          )}
+          <button type="button" class="button primary" onClick={() => setReplying(true)}>
+            Write now
+          </button>
           {canSend && (
             <button
               type="button"

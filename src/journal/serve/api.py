@@ -581,9 +581,7 @@ def library_open(req: Request):
     questions, or the prompt the chat has, and the slot words saved now would fill). A view: nothing is written."""
     try:
         return actions.view(req.cfg, req.params["id"], now=req.now)
-    except actions.Refused as e:
-        if e.code == "disabled":
-            raise HTTPError(409, "disabled", str(e).replace(": nothing was saved", "")) from None
+    except actions.Refused:
         raise HTTPError(404, "not-found", "no practice by that id") from None
 
 

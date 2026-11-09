@@ -412,7 +412,7 @@ def _template(v: dict | None, stem: str | None) -> str:
     return "\n".join(lines) + "\n"
 
 
-ARGUMENT_CODES = ("not-a-practice", "disabled", "bad-time", "not-an-entry", "not-engine-entry", "program-entry")
+ARGUMENT_CODES = ("not-a-practice", "bad-time", "not-an-entry", "not-engine-entry", "program-entry")
 
 
 def write_command(args, cfg: jconfig.Config) -> int:
@@ -909,8 +909,7 @@ def run(args, cfg_loader=None, hermes_checks=None) -> int:
         except RuntimeError as e:  # the packaged built-ins are unreadable: an install fault
             print(f"journal: {e}", file=sys.stderr)
             return 1
-        if not practice.enabled:
-            return _err(f"{practice.id!r} is turned off (enabled: false in {practice.path})")
+        # (``enabled: false`` is "not scheduled" only: ``journal send`` still sends it; the owner, 2026-11-09)
     if cmd == "open":
         return open_command(args, cfg)
     if cmd == "write":
