@@ -62,19 +62,26 @@ Which slot words go to, and which slot `/start` delivers, comes from one functio
 at)`). `at` is the time on his words (the web app lets him backdate them). As in WP10, states are read at the
 server's clock, and a delivered prompt is answered only when it was sent at or before `at`. The steps, in order:
 
+A practice can be done at any time (the owner, 2026-11-09: "I can select a specific practice and just do it
+anytime"). Doing it fills the slot it belongs to when one fits, and otherwise makes an extra entry of that practice.
+It never falls back to a loose `/j` note.
+
 1. A slot of that practice that is **due or open** now, today's or yesterday's, newest first, whose time is at or
    before `at`. An evening answer at 00:30 takes last night's slot.
 2. Else today's newest slot that is **missed and unanswered**, whose time is at or before `at`. The chat's fold
    already says "missed — reply anytime".
-3. Else the newest **answered** record of that practice whose window still covers `at`: the words are appended to it,
-   as a reply after a `/start` re-send is today. A second write after answering a slot therefore stays with that
-   slot rather than using up the next one.
-4. Else the **next slot later the same local day** that has no record: answering early *(choice D)*. A slot that has
-   already been delivered is not taken here, since WP10 refuses a prompt sent after `at`.
-5. A practice with no schedule uses slot 1 of the day, made or appended to, as `/start` does today.
-6. Else a `/j` note of its own, as today.
+3. Else the **next slot later the same local day** that has no record: doing it early fills that slot, and its
+   scheduled send is skipped. A slot that has already been delivered is not taken here, since WP10 refuses a prompt
+   sent after `at`.
+4. Else **an extra entry of that practice** for `at`'s day: slot 1's id when the practice has no schedule and that
+   id is free, otherwise the next free number after the scheduled slots (`<date>-<id>-<n>`, the numbering
+   `capture.entry_stem` already uses for a second entry).
 
-Words dated before yesterday go straight to step 6: `serve/writes._at` accepts `at` up to 31 days back, and filling
+Adding more words to an entry already written goes through that entry (the web app's *Add* on an entry, `POST
+…/blocks`; `journal write --entry <stem>` on the CLI), not through the practice. Choosing a practice therefore always
+starts something: a slot or a fresh entry.
+
+Words dated before yesterday go straight to step 4. `serve/writes._at` accepts `at` up to 31 days back, and filling
 an old slot would turn an old miss into an answer in the week strip and in the opener's missed count. When `answer`
 writes into the record a failed send left, it fills in what that record lacks: the plain opener, the question
 snapshot and the stem.
@@ -135,8 +142,10 @@ snapshot and the stem.
    replies today. Fix: captures that carry `via` are not legacy chat captures.
 11. **PRIV2 stays as it is.** A scheduled ritual sent during a bare `/x` window still ends it (the owner kept that
     on 2026-10-20). This design does not touch it.
-12. **Nudging without a chat** is a later channel: a send-only push (ntfy, Web Push) fits the `Channel` port with
-    `Caps()` and needs nothing from this design *(choice B)*.
+12. **A nudge is not a delivery.** A push notification (below) tells him a practice is due. It writes no prompt
+    record and nothing in `sent.jsonl`, `send-times.json` or the thread stamps, so it is never a chat boundary and
+    never ends a `/x` window. That is why push is not a `Channel`: a channel's send makes a delivered record, which
+    the chat-side readers treat as a boundary.
 
 ## What each face gets
 
@@ -150,29 +159,56 @@ snapshot and the stem.
 
 The writes sit in one engine module (`journal/actions.py`): `answer` and `note`, with the refusals of rule 7, and
 `deliver`, which is the spawn. Serve, the CLI and MCP call it instead of `capture.capture_web`. `/start` and
-`journal send` take their slot from `slots.resolve` too, which changes one thing in the chat: `/start water` at 15:00
-delivers the 12:00 slot rather than always slot 1. MCP keeps importing `serve.api` and `serve.document` for its reads
+`journal send` take their slot from `slots.resolve` too, which changes two things in the chat. `/start water` at 15:00
+delivers the 12:00 slot rather than always slot 1. And `/start morning` after the morning is answered starts an
+extra entry, where today it re-sends and appends to the same one. MCP keeps importing `serve.api` and `serve.document` for its reads
 until a reading module exists; that is a later package.
 
-## Choices for the owner
+## Decided (the owner, 2026-11-09)
 
-- **A. The off-chat opener.** Plain (recommended: no wait, no model, serve's rules intact); or the companion's,
-  through a spawned process, which keeps him waiting up to `opener_budget_seconds` before he can write.
-- **B. Nudging on a no-chat install.** None until a push channel exists (recommended: a separate package), or build
-  the push channel together with this one.
-- **C. MCP and the chat.** MCP shows and answers only (recommended: a model acting for him does not post into his
-  chat), or it can also deliver, with the `/x` hold it has today. Either way, `journal_save` with a practice now
-  fills that day's slot: a client that saves words as the morning practice uses up the morning prompt.
-- **D. How early he can answer.** Any time earlier the same local day (recommended: simple, matches "I'll do my
-  evening now"); or only within a lead time before the slot (say two hours), with anything earlier a `/j` note.
-- **E. An install with no chat configured.** Keep needing an explicit `channel.platform: none` (recommended: a live
-  install that loses its chat id should alert, not go quiet); or treat an empty chat id as `none`, with only a
-  doctor warning.
+- **A. The off-chat opener is the plain one.** No model and no wait, so serve's rules stay intact (rule 5).
+- **B. Push notifications are in scope:** Web Push to the installed PWA (*Push notifications*, below; package
+  OPEN-PUSH).
+- **C. MCP shows and answers practices and never posts into the chat.** Saving words to a practice through MCP fills
+  that practice's slot like any other face (`slots.resolve`).
+- **D. A practice can be done at any time.** It fills the slot it belongs to, or makes an extra entry of that practice
+  (`slots.resolve`, step 4). There is no lead-time limit and no `/j` fallback.
+- **E. A no-chat install says so explicitly** with `channel.platform: none`. An empty chat id on another platform
+  still fails and alerts, so a live install that loses its chat id is noticed.
+
+## Push notifications
+
+Web Push to the PWA, so a practice can reach him with no chat at all. It works on a phone once the PWA is installed:
+on iOS that means added to the home screen, iOS 16.4 or later, with permission asked from a tap.
+
+- **Serve sends them, not the tick.** The tick runs in the companion's Python (the cron stub uses `sys.executable`),
+  and Web Push needs elliptic-curve and AES-GCM cryptography that the standard library does not have. `journal
+  serve` is installed on its own (`uv tool install`), already serves the PWA, and runs on every install that has a
+  web app to open, so it owns push. The core stays stdlib, and push needs no gateway restart.
+- **Dependency.** An optional extra, `journal[push]` = `cryptography`, like `journal[mcp]`. A small module implements
+  RFC 8291 (`aes128gcm` payload encryption) and RFC 8292 (VAPID), tested against the RFCs' vectors. That beats
+  `pywebpush`, which adds `requests`, `http-ece` and `py-vapid` on top. Without the extra, Settings says push is
+  unavailable and why.
+- **Keys and subscriptions.** The VAPID key pair is generated on the first start and kept in `serve-push.json`
+  (0600, beside `serve-auth.json`). Subscriptions come from the PWA: `POST /api/v1/push/subscriptions` with the
+  browser's endpoint and keys, and `DELETE` to stop. They are stored in the same file, one per device. A push
+  service answering 404 or 410 removes that subscription.
+- **When.** A background thread in serve looks at the slot states once a minute. Each slot that turns *due* is
+  pushed once (`push-sent.json` keeps the slot ids, pruned with the ledger). The setting `push.when` decides when:
+  `no-chat` (the default) pushes only when `channel.platform` is `none`, and `always` pushes alongside the chat too.
+  Program phases and interrupts are pushed once OPEN-PROGRAMS lands.
+- **What a push says.** The practice's title and "due now", and nothing else: never his words, never an opener,
+  never anything read from an entry. The payload is encrypted end to end, but the browser vendor's push service
+  (Apple, Google or Mozilla) still sees the endpoint, the time and the size. Tapping the notification opens Today
+  with that practice ready to write (`/today?write=<id>`).
+- **Fences.** The push thread reads the ledger, the library and the config, which is what serve already reads. It
+  reads no chat, calls no model and never takes `tick.lock`. Its outbound calls go to the push services only. The
+  route walk (`test_serve_privacy.py`) gets the new routes.
 
 ## How it would be built
 
-Each step is one package and one PR. All but the web build touch gateway-loaded modules, so each one goes out in a
-restart window ([DEPLOY.md](../DEPLOY.md)).
+Each step is one package and one PR. OPEN-CORE, OPEN-FACES and OPEN-PROGRAMS touch gateway-loaded modules, so each
+goes out in a restart window ([DEPLOY.md](../DEPLOY.md)). OPEN-PUSH is serve side only.
 
 1. **OPEN-CORE.** Add the slot-state read module and `slots.resolve`. Add the new done rule, the pre-send check and
    the attach-only delivery (rules 1–3), and `channel.platform: none` with its quiet paths (rule 6). Add
@@ -183,7 +219,11 @@ restart window ([DEPLOY.md](../DEPLOY.md)).
 2. **OPEN-FACES.** Serve: an answer route over `actions.answer`, and *Write now* on Today (the web build goes
    through CI). MCP: `journal_start` returns the practice, and `journal_save` goes through `actions`. CLI:
    `journal open` and `journal write`.
-3. **OPEN-PROGRAMS.** Programs with no chat: a phase becomes current with no delivery, and interrupts can be
+3. **OPEN-PUSH.** The `journal[push]` extra and its RFC 8291/8292 module; keys and subscription routes; the
+   serve thread and `push.when`; the PWA's subscribe in Settings, the service worker's `push` and
+   `notificationclick` handlers, and `/today?write=`. Serve side only: `uv tool install` with the extra, and a
+   restart of the serve unit.
+4. **OPEN-PROGRAMS.** Programs with no chat: a phase becomes current with no delivery, and interrupts can be
    answered on a face. The constraints the review found:
    - `send_due` today means "not delivered"; it must come to mean "owed a delivery".
    - `serve/writes._phase_target` must stop reading `send_due` as "not delivered".
@@ -233,7 +273,12 @@ Not affected: entry files and their format, the ledger's locking, `/j` notes, bl
 - **Faces fill the slot.** Words from the web app, the CLI and MCP go into the slot's entry, not a `/j` note, for
   each step of `slots.resolve`: 00:30 evening, a missed morning at 20:00, a second write staying with its slot on a
   multi-slot practice, early, unscheduled, and the record a failed send left (filled in, then off the
-  *undelivered* list). Backdated words before a delivered prompt, and words dated before yesterday, are `/j` notes.
+  *undelivered* list). Backdated words before a delivered prompt never answer it.
+- **Any time:** choosing an answered practice again makes an extra entry (`-<n>`), never a `/j` note; words dated
+  before yesterday make an extra entry on that day and fill no old slot.
+- **Push:** RFC 8291/8292 test vectors; a slot is pushed once; a 410 drops the subscription; `push.when: no-chat`
+  pushes nothing while a chat is configured; a push writes nothing to the ledger, `sent.jsonl`, `send-times.json` or
+  the thread stamps (rule 12); the payload carries the title only.
 - **The lost race:** a scheduled send that goes out after a face answered keeps the sent opener on the record;
   the next tick folds it to "answered"; the sweep still matches a quote of the sent text.
 - **The conversation writer** does not file a chat message into an entry because it repeats words written on a
@@ -263,7 +308,7 @@ Not affected: entry files and their format, the ledger's locking, `/j` notes, bl
 - **CHANNELS (a), one channel at a time:** becomes *none or one*. #9's home channel is the same slot.
 - **MCP — `journal_start` sends practices only:** replaced by *returns the practice to answer* (choice C).
 - **WP10, backdated words:** kept inside `slots.resolve`: states at the server's clock, no delivered prompt sent
-  after `at`. New: words dated before yesterday are a `/j` note, never a slot.
+  after `at`. New: words dated before yesterday make an extra entry on that day, never fill a slot.
 - **PRIV2:** unchanged (rule 11).
 - **PRACTICES.md decision 9** (the companion never advances a program): unchanged.
 
