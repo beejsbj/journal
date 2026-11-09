@@ -16,6 +16,28 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## NOTEBOOK-NEWEST — the companion sees her newest notes, and a repeated note is not added (2026-11-09; `notebook.py`, `tools.py`, `tick.py`, `reflect.py`; gateway restart needed; no config or state change)
+
+**What changes.** The notebook block in the companion's chat turn (and in the opener pack) listed the 15 oldest open
+items, so at the cap of 40 it hid every recent note and showed the ones about to be pruned. It now lists the items
+that are due (`bring_up_after` reached; oldest due first), then the rest newest first, still with "(+N more)". Adding
+an item whose text equals an open one's (case, spacing and trailing punctuation ignored) adds nothing: the
+`journal_notebook` result carries `"duplicate": true` and the open item, and the annotation and reflection passes log
+it and count only what they added. State files are unchanged in shape; open items already stored are read as before.
+
+**Side and restart.** `notebook.py` and `tools.py` are imported by the gateway (`journal.hermes` loads both through
+`tools`, `turncontext` and `context`; check with the import probe in *What needs what*), and the chat turn's block
+and the tool's add are the gateway's own paths, so **a gateway restart is needed**; until it the companion keeps the
+old order and the old add. The tick (`tick.py`, `reflect.py`, `context.py`) is a fresh process and runs the new code
+from the next tick after the pin moves. Serve side: untouched (serve never reads the notebook).
+
+1. Install the CLI at `<sha>`, move the plugin pin (`hermes -p <profile> plugins install beejsbj/journal --force
+   --ref <sha>`), then `hermes gateway restart` in the next window. Nothing is sent.
+2. First check, without sending: `journal doctor` is as before. In the companion's next chat turn the notebook block
+   starts with any due item and then the newest; asking her to note something already open answers "duplicate".
+3. Rollback: the plugin pin and the CLI at the previous sha, and a gateway restart. No state needs undoing: nothing
+   written under the new rules differs from what the old code would have written.
+
 ## SCRUB-PERSONAL — the repo holds nothing specific to a deployment (2026-10-28; docs, tests and comments, one doctor row; no gateway restart needed; no config or state change)
 
 **What changes.** Docs, tests and fixtures are generic; the deployment overlay left the repo

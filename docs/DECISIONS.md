@@ -3031,3 +3031,12 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   situational session interrupts a program's open phase, the program does not resend that phase by itself;
   `/start <word>` brings it back. Manual by design. Closes the open point in ONE-PROGRAM-RUN, review fixes (6) ("whether
   the engine should re-send it on its own").
+- **NOTEBOOK-NEWEST (2026-11-09) — the notebook block shows due items, then the newest; a repeated item is not added.**
+  `notebook.render` took the first `INJECT` (15) items by age, so at the cap (`MAX_OPEN`, 40) the companion saw the
+  oldest, which are also the next to be pruned, and none of the recent notes, reminders the owner asked for among
+  them. Now: items whose `bring_up_after` has come (oldest due first), then the rest newest first; the "(+N more)"
+  tail stays. `notebook.add` compares an item's text, case folded, whitespace collapsed and trailing punctuation
+  stripped, with the open items', and a match adds nothing: the open item comes back marked `duplicate`, the tool
+  result says so, and the annotation and reflection passes count only what they added. The matching ignores
+  `bring_up_after`, so a repeat with a different date does not move the open item's date. **Not done, on purpose:**
+  notebook items are still not fed into the annotation or reflection prompts (a separate privacy decision).

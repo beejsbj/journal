@@ -355,8 +355,7 @@ def write_one(cfg: Config, kind: str, end: date, trigger: str, now: datetime,
     if ok:
         path = _target(cfg, kind, end)
         entries.write_file(path, render(cfg, kind, end, text, mine + dailies, now.astimezone(cfg.tz)))
-        for f in followups:
-            notebook.add(cfg, f, source=path.stem)
+        followups = [f for f in followups if not notebook.add(cfg, f, source=path.stem).get("duplicate")]
     with ledger.locked(cfg.ledger_path) as data:
         recs = data.setdefault("reflections", [])
         rec = find(data, rid)

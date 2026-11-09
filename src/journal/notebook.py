@@ -8,7 +8,9 @@ file at once, and open items untouched for STALE_DAYS are archived as stale (nev
 from __future__ import annotations
 
 import json
+import re
 import secrets
+import string
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -33,8 +35,15 @@ def _archive(cfg: Config, items: list[dict]) -> None:
             fh.write(json.dumps(it, ensure_ascii=False) + "\n")
 
 
+def _same(text: str) -> str:
+    """``text`` as the duplicate check compares it: case folded, whitespace collapsed, trailing punctuation gone."""
+    return re.sub(r"\s+", " ", text).casefold().rstrip(string.punctuation + "…").rstrip()
+
+
 def add(cfg: Config, text: str, source: str = "", bring_up_after: str | None = None,
         now: datetime | None = None) -> dict:
+    """Add an open item. A text the same as an open item's (``_same``) adds nothing: the open item comes back with
+    ``"duplicate": True``, so a caller can say so."""
     text = (text or "").strip()
     if not text:
         raise ValueError("empty notebook item")
@@ -45,7 +54,12 @@ def add(cfg: Config, text: str, source: str = "", bring_up_after: str | None = N
             "touched_at": now.isoformat(), "bring_up_after": bring_up_after, "status": "open"}
     path, _ = _paths(cfg)
     with ledger.locked(path) as data:
-        data.setdefault("items", []).append(item)
+        items = data.setdefault("items", [])
+        same = _same(item["text"])
+        dup = next((i for i in items if _same(i.get("text", "")) == same), None)
+        if dup is not None:
+            return {**dup, "duplicate": True}
+        items.append(item)
         data.pop("prompts", None)
     return item
 
@@ -100,15 +114,16 @@ def sweep(cfg: Config, now: datetime | None = None) -> int:
 
 
 def render(cfg: Config, today: str, limit: int = INJECT) -> str:
-    """Compact block of open items for the companion's context; due items first."""
+    """Compact block of open items for the companion's context: the due ones first (oldest due first), then the
+    rest newest first, so what is cut at ``limit`` is the oldest, the next to go stale, never a recent note."""
     items = open_items(cfg)
     if not items:
         return ""
-    def key(i):
-        due = i.get("bring_up_after")
-        return (0 if due and due <= today else 1, i["created_at"])
+    is_due = lambda i: bool(i.get("bring_up_after")) and i["bring_up_after"] <= today  # noqa: E731
+    first = sorted(filter(is_due, items), key=lambda i: (i["bring_up_after"], i["created_at"]))
+    rest = sorted((i for i in items if not is_due(i)), key=lambda i: i["created_at"], reverse=True)
     lines = []
-    for it in sorted(items, key=key)[:limit]:
+    for it in (first + rest)[:limit]:
         due = it.get("bring_up_after")
         tag = f" (bring up after {due})" if due else ""
         src = f" [from {it['source']}]" if it.get("source") else ""

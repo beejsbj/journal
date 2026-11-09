@@ -552,12 +552,16 @@ def annotate(cfg: Config, now: datetime, log: list[str]) -> None:
         if ok:
             with ledger.locked(cfg.ledger_path):  # the hook and the conversation writer append under this lock
                 entries.write_annotations(path, text, cfg.names)
+            added = 0
             for f in followups:  # the annotations are written: a notebook failure must not hold back completion
                 try:
-                    notebook.add(cfg, f, source=path.stem)
+                    if notebook.add(cfg, f, source=path.stem).get("duplicate"):
+                        log.append(f"{p['id']}: follow-up already in the notebook, not added")
+                    else:
+                        added += 1
                 except Exception as e:  # noqa: BLE001
                     log.append(f"{p['id']}: follow-up not saved to the notebook ({type(e).__name__}: {e})")
-            log.append(f"annotated {p['id']}" + (f" (+{len(followups)} notebook)" if followups else ""))
+            log.append(f"annotated {p['id']}" + (f" (+{added} notebook)" if added else ""))
         with ledger.locked(cfg.ledger_path) as data:
             q = ledger.find(data, p["id"])
             if q is not None:

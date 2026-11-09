@@ -7,7 +7,7 @@ from pathlib import Path
 
 from helpers import add_prompt, make_cfg
 
-from journal import capture, entries, ledger, notebook
+from journal import capture, entries, ledger, notebook, tools
 
 
 class PerEntryTest(unittest.TestCase):
@@ -272,6 +272,62 @@ class NotebookTest(unittest.TestCase):
         text, follow = notebook.split_followups("- He felt tired.\n- FOLLOW-UP: ask what 'lazy' meant\nFOLLOW-UP: sleep?")
         self.assertEqual(text, "- He felt tired.")
         self.assertEqual(follow, ["ask what 'lazy' meant", "sleep?"])
+
+    def test_a_full_notebook_shows_due_items_then_the_newest(self):
+        base = datetime(2026, 10, 1, 9, 0, tzinfo=timezone.utc)
+        for n in range(notebook.MAX_OPEN):  # thread 00 is the oldest, thread 39 the newest
+            notebook.add(self.cfg, f"thread {n:02d}", now=base + timedelta(hours=n))
+        old_due = notebook.add(self.cfg, "old reminder", bring_up_after="2026-10-10", now=base - timedelta(days=3))
+        future = notebook.add(self.cfg, "later reminder", bring_up_after="2026-12-01", now=base + timedelta(days=9))
+        block = notebook.render(self.cfg, "2026-10-14")
+        lines = [l for l in block.splitlines() if l.startswith("- ")]
+        self.assertEqual(len(lines), notebook.INJECT)
+        self.assertIn(old_due["id"], lines[0])  # due, though it is the oldest
+        self.assertIn(future["id"], lines[1])  # not due, but the newest
+        self.assertIn("thread 39", lines[2])
+        self.assertIn(f"thread {notebook.MAX_OPEN - (notebook.INJECT - 2):02d}", lines[-1])
+        self.assertNotIn("thread 00", block)  # the oldest is what the cap cuts
+        self.assertTrue(block.endswith(f"(+{notebook.MAX_OPEN + 2 - notebook.INJECT} more)"))
+
+    def test_due_items_come_oldest_due_first_and_are_not_all_there_is(self):
+        now = datetime(2026, 10, 14, 9, 0, tzinfo=timezone.utc)
+        notebook.add(self.cfg, "due on the 13th", bring_up_after="2026-10-13", now=now)
+        notebook.add(self.cfg, "due on the 11th", bring_up_after="2026-10-11", now=now + timedelta(hours=1))
+        notebook.add(self.cfg, "no date, first", now=now)
+        notebook.add(self.cfg, "no date, second", now=now + timedelta(hours=2))
+        block = notebook.render(self.cfg, "2026-10-14")
+        order = [block.index(t) for t in ("due on the 11th", "due on the 13th", "no date, second", "no date, first")]
+        self.assertEqual(order, sorted(order))
+        self.assertNotIn("more)", block)
+
+    def test_an_item_the_same_as_an_open_one_is_not_added(self):
+        now = datetime(2026, 10, 14, 9, 0, tzinfo=timezone.utc)
+        first = notebook.add(self.cfg, "Ask how the call went", "a", now=now)
+        self.assertNotIn("duplicate", first)
+        for again in ("ask how the CALL went.", "  Ask   how the call\nwent?! ", "Ask how the call went…"):
+            dup = notebook.add(self.cfg, again, "b", now=now + timedelta(hours=1))
+            self.assertTrue(dup["duplicate"], again)
+            self.assertEqual(dup["id"], first["id"])
+        other = notebook.add(self.cfg, "Ask how the call went with Sam", now=now)
+        self.assertNotIn("duplicate", other)
+        self.assertEqual(len(notebook.open_items(self.cfg)), 2)
+
+    def test_a_resolved_item_may_be_added_again(self):
+        now = datetime(2026, 10, 14, 9, 0, tzinfo=timezone.utc)
+        a = notebook.add(self.cfg, "check the garden", now=now)
+        notebook.resolve(self.cfg, a["id"], "done", now=now)
+        again = notebook.add(self.cfg, "Check the garden.", now=now)
+        self.assertNotIn("duplicate", again)
+        self.assertEqual(len(notebook.open_items(self.cfg)), 1)
+
+    def test_the_tool_says_when_an_add_was_a_duplicate(self):
+        add = {"action": "add", "text": "ask about the lake"}
+        first = json.loads(tools._notebook(self.cfg, add))
+        again = json.loads(tools._notebook(self.cfg, {**add, "text": "Ask about the lake."}))
+        self.assertTrue(first["success"] and "duplicate" not in first)
+        self.assertTrue(again["success"] and again["duplicate"])
+        self.assertEqual(again["item"]["id"], first["item"]["id"])
+        self.assertEqual(len(notebook.open_items(self.cfg)), 1)
 
 
 if __name__ == "__main__":
