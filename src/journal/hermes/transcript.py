@@ -75,7 +75,9 @@ _HANDLED = re.compile(r"(?:^|\n\n)\[Journal (?:reply|note) — ")  # the hook's 
 _SKIP_PREFIXES = ("[PRIOR CONTEXT", "[CONTEXT COMPACTION", "[Cron delivery:", "[IMPORTANT:",
                   "[Your active task list", "[The user sent a document", "[The user sent an image",
                   "[The user sent a video", "[System note:", mirror.PREFIX)  # the journal's own sends, mirrored into the chat: hers, never his words
-_GATEWAY_NOTE = re.compile(r"^\[Note: [^\]\n]*\]\n\n")  # e.g. "[Note: model was just switched …]" before his words
+# The gateway's note in front of the first message after a /model switch (gateway/slash_commands_model.py); a first line
+# of his own that opens "[Note: " is his.
+_GATEWAY_NOTE = re.compile(r"^\[Note: model was just switched [^\]\n]*\]\n\n")
 _VOICE = re.compile(r'^"(.*)"(?:\n\n(.*))?$', re.S)
 # A message steered into a running turn is stored inside Hermes' out-of-band marker (agent/prompt_builder.py
 # STEER_MARKER_OPEN / _CLOSE), around the origin note and his words.
@@ -143,16 +145,21 @@ _GROUP = re.compile(r"^\[Observed Telegram group context - context only, not req
 _INTERRUPTED = re.compile(
     r"^\[System note: (?:A new message has arrived\. The conversation history contains pending tool outputs from an "
     r"interrupted turn\. IGNORE those pending results\. Address the user's NEW message below FIRST\. Do NOT re-execute "
-    r"old tool calls from the history\.|The previous turn was interrupted by a gateway (?:restart|shutdown|interruption); "
-    r"the gateway is now back online\.[^\]]*)\]\n\n")
-# What was injected into a turn, when it is stored after his words: a block that ends the text (``trailing``, last
-# first). The engine's fenced context; the same cut short by Hermes (tools/hook_output_spill.py: a header, then a head
-# and a tail of it, either of which may be empty: taken off only when it holds the engine's fence); recalled memory
-# (agent/memory_manager.py). Anywhere else, such a mark is ``leftover``.
+    r"old tool calls from the history\.|The previous turn was interrupted by a gateway "
+    r"(?:restart|shutdown|interruption); the gateway is now back online\.[^\]]*)\]\n\n")
+# Hermes' timestamp in front of a message, one or more (gateway/message_timestamps.py _TIMESTAMP_PREFIX_RE: with
+# gateway.message_timestamps.enabled the model sees it, and a picture's row keeps it, in front of the reply quote).
+_TIMESTAMP = re.compile(r"^\[(?:[A-Z][a-z]{2} \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?: [A-Za-z0-9_+\-/:]+)?"
+                        r"|\d{4}-\d{2}-\d{2}T[^\]]+)\]\s*")
+# What was injected into a turn, if it is ever stored after his words with no picture: a block at a line start that
+# ends the text (``trailing``, last first: Hermes joins an injection to a message with a blank line, and the parts of
+# a list with a line break). The engine's fenced context; the same cut short by Hermes (tools/hook_output_spill.py:
+# a header, then a head and a tail of it, either of which may be empty: taken off only when it holds the engine's
+# fence); recalled memory (agent/memory_manager.py). Anywhere else, such a mark is ``leftover``.
 _SPILL = r"\[[^\]\n]* output truncated — [^\n]*\]\n"
-_END_FENCE = re.compile(rf"(?:\A|\n\n){re.escape(OPEN)}(?:(?!{re.escape(OPEN)}).)*?{re.escape(CLOSE)}\s*\Z", re.S)
-_END_SPILL = re.compile(rf"(?:\A|\n\n){_SPILL}(?:(?!\n\n{_SPILL}).)*\Z", re.S)
-_END_MEMORY = re.compile(r"(?:\A|\n\n)<memory-context>(?:(?!<memory-context>).)*?</memory-context>\s*\Z", re.S | re.I)
+_END_FENCE = re.compile(rf"(?:\A|\n){re.escape(OPEN)}(?:(?!{re.escape(OPEN)}).)*?{re.escape(CLOSE)}\s*\Z", re.S)
+_END_SPILL = re.compile(rf"(?:\A|\n){_SPILL}(?:(?!\n{_SPILL}).)*\Z", re.S)
+_END_MEMORY = re.compile(r"(?:\A|\n)<memory-context>(?:(?!<memory-context>).)*?</memory-context>\s*\Z", re.S | re.I)
 # What still marks something added, in what is left of his message: the row is then not read as his words.
 _LEFTOVER = (
     ("the engine's context fence", re.compile(f"{re.escape(OPEN)}|{re.escape(CLOSE)}")),
@@ -184,20 +191,30 @@ def decode(content: str | None) -> tuple[str, bool]:
                      if isinstance(p, dict) and (p.get("type") == "text" or p.get("type") in _PICTURE_PARTS)), True
 
 
-def native(text: str) -> tuple[str, list[str]]:
-    """(his part, the pictures' files) of a turn with pictures attached natively: the text before the pictures'
-    notes, Hermes' stand-in read as no caption. Unchanged with no files when ``text`` is not such a turn, or when its
-    picture lines and placeholders do not agree in number (``leftover`` then finds them)."""
+def native(text: str) -> tuple[str, list[str], bool]:
+    """(his part, the pictures' local files, cut) of a turn with pictures attached natively: the text before the
+    pictures' notes, Hermes' stand-in read as no caption. Unchanged, with ``cut`` False, when ``text`` is not such a
+    turn, or when its picture lines and placeholders do not agree in number (``leftover`` then finds them)."""
     runs = list(_NATIVE.finditer(text))  # (the last: a caption of his shaped like one stays his)
     m = runs[-1] if runs else None
     if not m or len(m.group(1).splitlines()) != len(m.group(2).split()):
-        return text, []
+        return text, [], False
     head = text[:m.start()]
-    return ("" if head.strip() == NATIVE_STAND_IN else head), [p.strip() for p in _ATTACHED_AT.findall(m.group(1))]
+    pictures = [p.strip() for p in _ATTACHED_AT.findall(m.group(1))]
+    return ("" if head.strip() == NATIVE_STAND_IN else head), pictures, True
+
+
+def timestamps(text: str) -> str:
+    """``text`` without Hermes' timestamps in front (``_TIMESTAMP``)."""
+    while m := _TIMESTAMP.match(text):
+        text = text[m.end():]
+    return text
 
 
 def trailing(text: str) -> str:
-    """``text`` without the injected blocks that end it (``_END_FENCE``, ``_END_SPILL``, ``_END_MEMORY``)."""
+    """``text`` without the injected blocks that end it (``_END_FENCE``, ``_END_SPILL``, ``_END_MEMORY``). Not for
+    what is left of a native picture's row: everything injected came after its placeholders, so a block at the end of
+    the caption is his, and ``leftover``."""
     while True:
         for rx in (_END_FENCE, _END_SPILL, _END_MEMORY):
             m = rx.search(text)
@@ -224,11 +241,11 @@ def read(content: str | None, platform_message_id: str | None) -> dict:
 
     ``kind`` is "his" (his words), "handled" (it carries the hook's journal note: already saved), "mirror"
     (the journal's own send), "system" (a Hermes or gateway row, not his words) or "empty". The text is
-    his words alone: no gateway origin note, no ``[Note: …]`` or other gateway note in front, no reply quote (kept in
+    his words alone: no gateway origin note, no gateway note or timestamp in front, no reply quote (kept in
     ``quote``), nothing after a native picture's placeholders, no injected block at the end. ``images``: the files of
-    pictures attached natively (a captionless one is "empty"). ``withheld``: what still marked something added in
-    the words left (``leftover``), or a stored list that could not be read; the row is then "system" (or still
-    "handled")."""
+    pictures attached natively (a captionless one is "empty"); ``native``: the row is such a picture's.
+    ``withheld``: what still marked something added in the words left (``leftover``), a platform note in front of a
+    native picture, or a stored list that could not be read; the row is then "system" (or still "handled")."""
     text, readable = decode(content)
     out = {"message_id": str(platform_message_id) if platform_message_id else None, "quote": None,
            "text": "", "source": "text", "audio_path": None, "kind": "empty"}
@@ -252,14 +269,17 @@ def read(content: str | None, platform_message_id: str | None) -> dict:
         except json.JSONDecodeError:
             pass
         text = text[m.end():]
-    text = _GATEWAY_NOTE.sub("", text, count=1)
+    text = timestamps(_GATEWAY_NOTE.sub("", text, count=1))
     m = _REPLY.match(text)
     if m:
         out["quote"], text = m.group(1), text[m.end():]
-    text, pictures = native(text)
+    text, pictures, cut = native(text)
     if pictures:
         out["images"] = pictures
-    text = trailing(text)
+    if cut:
+        out["native"] = True
+    else:
+        text = trailing(text)
     if not text.strip():
         return out
     why = leftover(text)  # (in his words only: a reply quote of hers is not his message)
@@ -272,7 +292,11 @@ def read(content: str | None, platform_message_id: str | None) -> dict:
         out["kind"], out["text"], out["withheld"] = "system", text.strip(), why
         return out
     if text.startswith(_SKIP_PREFIXES):
+        # a picture of his under a platform note this reader does not know: withheld, so the privacy pass still reads
+        # all of it (a /x after the note counts); any other such row is the platform's
         out["kind"], out["text"] = "system", text.strip()
+        if cut:
+            out["withheld"] = "a platform note in front of his picture"
         return out
     source, audio_path = "text", None
     a = _AUDIO_PATH.match(text)
@@ -328,15 +352,18 @@ def caption(text: str) -> str:
 
 def clean_user_text(text: str) -> str:
     """His words alone, loosely: no gateway origin note, no quoted message he replied to, no journal hook note
-    (the last two hold the companion's own text), no gateway note in front, nothing after a native picture's
-    placeholders, no injected block at the end (``read``; a withheld row's ``loose`` is empty instead)."""
+    (the last two hold the companion's own text), no gateway note or timestamp in front, nothing after a native
+    picture's placeholders, no injected block at the end (as ``read`` peels them; a withheld row's ``loose`` is empty
+    instead)."""
     text = _NOISE.sub("", text or "")
-    for envelope in (_GROUP, _SKILLS_RELOAD, _INTERRUPTED):
+    # the envelopes in ``read``'s order: the notes in front, then the timestamp, then the reply quote
+    for envelope in (_GROUP, _SKILLS_RELOAD, _INTERRUPTED, _GATEWAY_NOTE):
         text = envelope.sub("", text.lstrip(), count=1)
-    text = _REPLY_QUOTE.sub("", text.lstrip())  # the quoted message is hers, not his words
+    text = _REPLY_QUOTE.sub("", timestamps(text.lstrip()))  # the quoted message is hers, not his words
     text = _JOURNAL_NOTE_ANYWHERE.sub("\n\n", text)
     text = _JOURNAL_NOTE.sub("", text.lstrip())  # an older note with another ending
-    return trailing(native(text)[0]).strip()
+    text, _, cut = native(text)
+    return (text if cut else trailing(text)).strip()
 
 
 def _like(text: str | None, prefixes) -> bool:
@@ -410,6 +437,8 @@ def to_row(raw: Mapping) -> Row | None:
         meta["withheld"] = withheld
     if msg.get("images"):
         meta["images"] = msg["images"]
+    if msg.get("native"):
+        meta["native"] = True
     if msg.get("file_name"):
         meta["file_name"] = msg["file_name"]
     return Row(int(raw["id"]), at, "user", kind, msg["text"], msg["message_id"], msg["quote"], msg["source"],

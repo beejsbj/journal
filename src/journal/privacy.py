@@ -103,9 +103,10 @@ def _said(row: Row) -> str | None:
     """What of the row is his typed words: the text of his message, or the caption after an image or document
     placeholder (Hermes stores those as a ``system`` row, the placeholder being its own); None for any other row.
     A row withheld from his words (``Row.meta["withheld"]``) is read whole here, so an opt-out in it still counts;
-    not a delivery or a platform frame withheld so, which is no message of his."""
-    if row.kind == "his" or (row.kind == "system" and row.meta.get("withheld") and not row.meta.get("delivery")
-                             and not row.meta.get("frame")):
+    not a delivery or a platform frame withheld so, which is no message of his, unless it carries a picture he sent
+    (``Row.meta["native"]``)."""
+    if row.kind == "his" or (row.kind == "system" and row.meta.get("withheld")
+                             and (row.meta.get("native") or not (row.meta.get("delivery") or row.meta.get("frame")))):
         return row.text
     return (row.meta.get("caption") or None) if row.kind == "system" else None
 
