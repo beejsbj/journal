@@ -659,8 +659,11 @@ def _open_phase(req: Request, run: dict) -> dict | None:
     except (IndexError, KeyError, ValueError):   # the definition was edited under a run in progress
         return None
     prompt = ledger.find(ledger.snapshot(req.cfg.ledger_path), ph["prompt_id"]) if ph.get("prompt_id") else None
-    delivered = bool(prompt) and not ph.get("send_due")   # a re-send owed (a /back, a jump) leaves the old prompt there
+    # ``delivered``: the phase is current for this visit (opened: in the chat, or made current with no delivery);
+    # until then a /back or a jump leaves the old prompt there. ``in_chat``: its message is in the chat as well.
+    delivered = bool(prompt) and programs.phase_opened(ph)
     out.update(sent_text=(prompt or {}).get("phase_text"), delivered=delivered,
+               in_chat=delivered and bool(prompt.get("message_id")) and not ph.get("send_due"),
                open=delivered and capture.open_phase(prompt) and run.get("status") == "active",
                answered=bool(ledger.answers(prompt)), skipped=bool(ph.get("skipped")),
                phases_total=len(session.phases))

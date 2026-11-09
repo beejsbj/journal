@@ -77,8 +77,11 @@ class RunsReadTest(ProgramCase):
         self.assertEqual(rows[0]["program_progress"], {})
 
     def test_a_phase_that_is_owed_a_send_is_not_open(self):
+        # (OPEN-PROGRAMS: a phase owed only its *delivery* is current and open on the web; one a transition has not
+        # yet made current, which is what owing a send meant before, is not)
         run = self.run_file()
         run["sessions"]["1"]["phases"]["1"]["send_due"] = True
+        run["sessions"]["1"]["phases"]["1"].pop("opened_at")
         programs._save(self.cfg, run)
         ph = self.get_json(f"/api/v1/runs/{self.rid}")["phase"]
         self.assertEqual((ph["delivered"], ph["open"]), (False, False))

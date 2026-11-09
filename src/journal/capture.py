@@ -323,7 +323,7 @@ class PhaseClosed(Exception):
 
 def add_web_block(cfg: Config, stem: str, text: str, now: datetime, *, media: str | None = None, ext: str = ".ogg",
                   meta: dict | None = None, client_id: str | None = None, phase_prompt: str | None = None,
-                  key_of: Callable[[Path], str | None] | None = None) -> dict:
+                  interrupt_prompt: str | None = None, key_of: Callable[[Path], str | None] | None = None) -> dict:
     """Append a block of his words to the engine entry ``stem`` (the caller has checked it is the engine's own
     file). Through the entry's ledger prompt when it still has one, so the tick sees the reply (annotations wait on
     the first one); otherwise straight into the file. Nothing already in the file is touched. A repeated
@@ -335,6 +335,10 @@ def add_web_block(cfg: Config, stem: str, text: str, now: datetime, *, media: st
     (checked here under the ledger lock, where ``programs`` closes it; the caller has checked ``stem`` is the run's
     session entry, and the answer goes where ``entry_stem`` says); otherwise
     ``PhaseClosed`` and nothing is written. Moving the run on is the caller's: the settle or ``/next``.
+
+    ``interrupt_prompt``: the ledger id of a session's interrupt that has opened (``programs._open_interrupts``, at
+    its time, delivered to the chat or not). The block is his answer to it, keyed ``%% journal interrupt:N %%`` as a
+    reply to it in the chat is; it moves nothing. ``PhaseClosed`` when it has not opened.
 
     ``key_of(path)`` names the block just written (the web document's key for it); it is called under the lock and
     its answer kept with the capture, so a retry returns the first block's key even after others were added."""
@@ -353,6 +357,11 @@ def add_web_block(cfg: Config, stem: str, text: str, now: datetime, *, media: st
             prompt = ledger.find(data, phase_prompt)
             if prompt is None or not open_phase(prompt):
                 raise PhaseClosed(phase_prompt)
+            return _web_record(cfg, data, prompt, WEB_RULE, text, now, client_id, media, ext, meta, key_of)
+        if interrupt_prompt is not None:
+            prompt = ledger.find(data, interrupt_prompt)
+            if prompt is None or not prompt.get("interrupt"):
+                raise PhaseClosed(interrupt_prompt)
             return _web_record(cfg, data, prompt, WEB_RULE, text, now, client_id, media, ext, meta, key_of)
         prompt = prompt_of_entry(data, stem)
         if prompt is not None:
