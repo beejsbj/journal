@@ -3031,3 +3031,13 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   situational session interrupts a program's open phase, the program does not resend that phase by itself;
   `/start <word>` brings it back. Manual by design. Closes the open point in ONE-PROGRAM-RUN, review fixes (6) ("whether
   the engine should re-send it on its own").
+- **X-SCOPE (the owner, 2026-11-09) — `/x` keeps a message out of the journal, not out of the agent.** An audit of
+  the live chat found an off-the-record turn in which the companion wrote to her own memory and to a task inbox:
+  the tool guard refuses only the journal's writes (`journal_add_note`, notebook writes, `journal_set_location`).
+  Asked whether `/x` should mean "not stored anywhere" (refuse every write tool in the turn, so "/x remind me to…"
+  stops working) or "not in the journal", the owner chose the journal. README's guarantee now says so: nothing marked
+  `/x` is saved in the journal, read back into the journal's context or quoted; tools that are not the journal's are
+  not refused. Consequence for later packages: the companion's memory may hold what was said off the record, so no
+  journal step that writes a permanent file (openers, annotations, reflections, week reviews) may read her memory.
+  This raises the weight of the open WEB-DESIGN point above (whether the one-shot model call can reach her memory):
+  it is no longer hypothetical, and closing it means showing that call cannot load her memory, or narrowing it.
