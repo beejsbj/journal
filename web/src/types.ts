@@ -88,6 +88,7 @@ export const Today = obj({
   weather: nullable(str),
   week: arr(WeekDay),
   voices: opt(Voices),   // absent from an older server: the prompt is then labelled without her name
+  chat: opt(bool),   // false on a journal with no chat (channel.platform: none): nothing to Send to chat
   location_source: opt(nullable(str)),   // "openstreetmap" while OSM named the place: the header credits it
 });
 export type Today = Infer<typeof Today>;

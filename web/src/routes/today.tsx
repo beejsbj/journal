@@ -1,5 +1,5 @@
 import { useLocation } from "preact-iso";
-import { useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { api } from "../api";
 import { Composer } from "../components/Composer";
 import { HeldRunCard, RunCard, holdsQuestions } from "../components/RunCard";
@@ -79,8 +79,8 @@ function WriteNow({ id, title, voices, showPrompt, draftKey, onSaved, onClose }:
  * whatever its state (answered: the words start the next slot that fits, or an extra entry; the server says where),
  * send it to the chat, open the entry.
  */
-function PracticeCard({ row, today, library, slot, writing: startWriting = false }: {
-  row: PracticeRow; today: Today; library: LibraryItem[]; slot: number; writing?: boolean;
+function PracticeCard({ row, today, library, slot, writing: startWriting = false, onWritten }: {
+  row: PracticeRow; today: Today; library: LibraryItem[]; slot: number; writing?: boolean; onWritten?: () => void;
 }) {
   const p = library.find((x) => x.id === row.id);
   // by the row's own entry: a practice with two slots has two rows with one id, and an id prefix names the first slot's entry
@@ -91,7 +91,8 @@ function PracticeCard({ row, today, library, slot, writing: startWriting = false
   const send = useAction();
   useLive(["ledger-changed"], () => setOnItsWay(false));
   const canWrite = p?.enabled ?? true;
-  const canSend = (row.state === "upcoming" || row.state === "due" || row.state === "missed") && (p?.enabled ?? true);
+  const canSend = (row.state === "upcoming" || row.state === "due" || row.state === "missed") && (p?.enabled ?? true)
+    && today.chat !== false;   // (a journal with no chat has nothing to send to)
   const title = p?.title ?? row.id;
   const his = today.voices?.his ?? "You";
   const [words, when] = rowState(row);
@@ -171,7 +172,10 @@ function PracticeCard({ row, today, library, slot, writing: startWriting = false
           voices={today.voices}
           showPrompt={!row.prompt}
           draftKey={`reply:${row.id}:${slot}`}
-          onSaved={setSaved}
+          onSaved={(c) => {
+            setSaved(c);
+            onWritten?.();
+          }}
           onClose={() => setReplying(false)}
         />
       )}
@@ -196,7 +200,7 @@ function dueToday(runs: Run[], day: string): { key: string; time: string; text: 
  * `/today?write=<id>` for a practice with no row today (one with no schedule, or not on this weekday): the practice
  * alone, open to write, as Write now opens it on a row.
  */
-function WriteCard({ id, today, library }: { id: string; today: Today; library: LibraryItem[] }) {
+function WriteCard({ id, today, library, onWritten }: { id: string; today: Today; library: LibraryItem[]; onWritten: () => void }) {
   const p = library.find((x) => x.id === id);
   const [saved, setSaved] = useState<Created | null>(null);
   const [open, setOpen] = useState(true);
@@ -216,7 +220,11 @@ function WriteCard({ id, today, library }: { id: string; today: Today; library: 
       )}
       {open && !saved && (
         <WriteNow id={id} title={title} voices={today.voices} showPrompt draftKey={`reply:${id}:write`}
-                  onSaved={setSaved} onClose={() => setOpen(false)} />
+                  onSaved={(c) => {
+                    setSaved(c);
+                    onWritten();
+                  }}
+                  onClose={() => setOpen(false)} />
       )}
     </li>
   );
@@ -231,7 +239,15 @@ export function writeTarget(rows: PracticeRow[], id: string | undefined): number
 
 export function TodayRoute() {
   useTitle("Today");
-  const write = useLocation().query.write || undefined;
+  // ?write=<id> is used once: it opens Write now on the first read, and leaves the address, so neither a later visit
+  // nor the reload after his save (which brings the entry he wrote as a row of its own) opens it again
+  const query = useLocation().query;
+  const [write] = useState<string | undefined>(() => query.write || undefined);
+  const [written, setWritten] = useState(false);
+  const alone = useRef<boolean | null>(null);   // whether ?write opened the practice alone, decided on the first read
+  useEffect(() => {
+    if (write) window.history.replaceState(window.history.state, "", window.location.pathname);
+  }, []);
   const [res, reload] = useResource(async (signal) => {
     const [today, library, runs] = await Promise.all([
       api.today(signal),
@@ -259,8 +275,9 @@ export function TodayRoute() {
         const held = (runs ?? []).filter((r) => r.status === "completed" && holdsQuestions(r));
         const interrupts = dueToday((runs ?? []).filter(holdsQuestions), today.date);
         const nothing = rows.length === 0 && !today.program && live.length === 0 && held.length === 0 && today.entries.length === 0;
-        const target = writeTarget(rows.map(({ r }) => r), write);
-        const writeAlone = write !== undefined && target < 0;
+        const target = written ? -1 : writeTarget(rows.map(({ r }) => r), write);
+        if (alone.current === null && write !== undefined) alone.current = target < 0;
+        const writeAlone = write !== undefined && alone.current === true;
         return (
           <div class="page today">
             <header class="page-head today-head">
@@ -279,10 +296,10 @@ export function TodayRoute() {
               <section class="practices" aria-labelledby="practices-h">
                 <h2 id="practices-h">Practices</h2>
                 <ul class="cards">
-                  {writeAlone && write && <WriteCard id={write} today={today} library={library} />}
+                  {writeAlone && write && <WriteCard id={write} today={today} library={library} onWritten={() => setWritten(true)} />}
                   {rows.map(({ r, slot }, i) => (
                     <PracticeCard key={`${r.id}#${slot}`} row={r} today={today} library={library} slot={slot}
-                                  writing={i === target} />
+                                  writing={i === target} onWritten={() => setWritten(true)} />
                   ))}
                 </ul>
               </section>

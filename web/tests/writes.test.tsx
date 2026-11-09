@@ -391,6 +391,54 @@ describe("Today", () => {
     expect(card.querySelector(".prompt .opener")?.textContent).toBe("Quiet.");
   });
 
+  it("after a save from ?write, the reload does not open Write now again, and the address loses ?write", async () => {
+    const listeners: Record<string, () => void> = {};
+    class FakeSource {
+      static CLOSED = 2;
+      readyState = 1;
+      onopen: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      addEventListener(name: string, fn: () => void) {
+        listeners[name] = fn;
+      }
+      close() {}
+    }
+    vi.stubGlobal("EventSource", FakeSource);
+    visit("/today?write=quiet");
+    let saved = false;
+    const answeredRow = { id: "quiet", state: "answered", sent: "09:13", answered: "09:13", stem: "2026-10-15-quiet" };
+    stubApi({
+      ...reads,
+      "GET /api/v1/today": () => (saved ? { ...fixtures.today, practices: { rows: [...fixtures.today.practices.rows, answeredRow], open: [] } } : fixtures.today),
+      "GET /api/v1/library/quiet/open": view("quiet", "Starts an extra entry of this practice (2026-10-15-quiet).", "Quiet."),
+      "POST /api/v1/entries": () => {
+        saved = true;
+        return { stem: "2026-10-15-quiet", path: "x", rule: "web", slot: "2026-10-15-quiet" };
+      },
+    });
+    const host = mount(<App />);
+    const card = await until(() => must(host.querySelector("li.practice.write-only")));
+    expect(window.location.search).toBe("");   // used once: a later visit or remount does not open it again
+    await until(() => must(card.querySelector("textarea")));
+    await type(card.querySelector("textarea"), "Quiet words.");
+    await click(byText(card, "button", "Save"));
+    await until(() => must(host.querySelector("li.practice.write-only .saved")));
+    await until(() => expect(listeners["ledger-changed"]).toBeDefined());
+    listeners["ledger-changed"]?.();
+    await until(() => must(host.querySelector("li.practice.answered")));
+    expect(host.querySelectorAll(".write-now")).toHaveLength(0);
+    expect(host.querySelector("li.practice.write-only .saved")).not.toBeNull();   // what he saved still says so
+  });
+
+  it("offers no Send to chat on a journal with no chat", async () => {
+    visit("/");
+    stubApi({ ...reads, "GET /api/v1/today": { ...fixtures.today, chat: false } });
+    const host = mount(<App />);
+    await until(() => must(host.querySelector("li.practice")));
+    expect(byText(host, "button", "Send to chat")).toBeUndefined();
+    expect(byText(host, "button", "Write now")).toBeDefined();
+  });
+
   it("sends a practice now (spawned), says it is on its way, and clears on the ledger event", async () => {
     visit("/");
     const { writes } = stubApi({ ...reads, "POST /api/v1/library/gratitude/send": json({ spawned: true, log: "/x" }, 202) });
