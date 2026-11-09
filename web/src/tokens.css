@@ -1,15 +1,18 @@
-/* One token sheet, light and dark: the only place a colour, a face, a size or a duration is chosen. app.css consumes
-   these.
+/* journal · design tokens (WEB-UX; the round-02 sheet, design/rounds/02-combined). The only place a colour, a face, a
+   size, a space, a radius, a shadow or a duration is chosen. Components read roles (--pane, --text, --her…), never a
+   hex. design/DESIGN.md says what each role is for; /design shows them all.
 
-   The identity is "Margin × Letters". The page is his: a book page, his words set in Newsreader roman at full ink, the
-   hours hung in the margin, rules and space instead of boxes. Her words are a letter: typed in Courier Prime, in her
-   ink, under a "From" line that runs out as a dashed fold. Her ink is the only hue on the page and it is hers alone;
-   his actions are in his ink. The figures are typed (times in Courier Prime) or set in Fraunces' soft numerals (the days
-   of the week, the counts).
+   Light is Folio's warm paper on a desk; dark is Night Room's cool room. Her ink (--her) is the only hue on the page
+   and it is hers alone: his actions are the lamp (--lamp). Status has no hue.
+
+   The theme: the device's scheme by default (prefers-color-scheme), or the reader's choice on this device (theme.ts:
+   <html data-theme="light|dark">, kept under `journal:theme`). The dark roles are therefore written twice, once under
+   the media query (no choice made) and once under [data-theme="dark"]; web/tests/ink.test.tsx holds the two copies
+   equal, and every text role and ink at AA on every ground, light and dark.
 
    Faces (SIL OFL 1.1, served from this origin and precached, so every device and every offline read shows the same
-   page; the licences are web/public/fonts/OFL-*.txt). Fontsource's latin subsets; Fraunces cut to its ten figures and
-   the Newsreader italic pinned at 400 by tools/web_fonts.py. */
+   page; licences beside them in web/public/fonts/OFL-*.txt; sources in tools/web_fonts.py): Newsreader for his words
+   and the book's own voice, IBM Plex Mono for hers and only hers, Instrument Sans for the interface. */
 
 @font-face {
   font-family: "Newsreader";
@@ -36,137 +39,249 @@
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
-  font-family: "Courier Prime";
+  font-family: "IBM Plex Mono";
   font-style: normal;
   font-display: swap;
   font-weight: 400;
-  src: url("/fonts/courier-prime-latin-400-normal.woff2") format("woff2");
+  src: url("/fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2");
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
-  font-family: "Courier Prime";
-  font-style: normal;
+  font-family: "IBM Plex Mono";
+  font-style: italic;
   font-display: swap;
-  font-weight: 700;
-  src: url("/fonts/courier-prime-latin-700-normal.woff2") format("woff2");
+  font-weight: 400;
+  src: url("/fonts/ibm-plex-mono-latin-400-italic.woff2") format("woff2");
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
-/* the figures only: any other character in a `--figure` run falls through to the reading face */
 @font-face {
-  font-family: "Fraunces Figures";
+  font-family: "IBM Plex Mono";
   font-style: normal;
   font-display: swap;
-  font-weight: 300 700;
-  src: url("/fonts/fraunces-digits-normal.woff2") format("woff2");
-  unicode-range: U+0030-0039;
+  font-weight: 500;
+  src: url("/fonts/ibm-plex-mono-latin-500-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
+
+/* her ink is registered, so a new ink flows across the page (html transitions it over --d-ink) */
+@property --her { syntax: "<color>"; inherits: true; initial-value: #28367f; }
 
 :root {
-  color-scheme: light dark;
+  /* ---- type: three families, one job each ---- */
+  --f-his: "Newsreader", "Iowan Old Style", Charter, Georgia, serif;           /* his words; the book's titles, italic heads, hours */
+  --f-her: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;         /* her words, and only hers: typed letters */
+  --f-ui: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif; /* the interface */
+  --f-code: ui-monospace, "SF Mono", Menlo, Consolas, monospace;               /* a definition file, a key: never her face */
 
-  /* paper and his ink */
-  --bg: #f4efe4;
-  --surface: #faf6ee;
-  --sunk: #ebe4d5;
-  --ink: #1b1813;
-  --ink-2: #4f463b;
-  --ink-3: #6e6457;           /* 5.0:1 on the paper */
-  --rule: #d8cdb9;
-  --rule-2: #e5dccb;
+  /* ---- type scale (rem at 16) ---- */
+  --t-micro: 0.75rem;     /* 12  margin source, counts, calendar heads */
+  --t-small: 0.8125rem;   /* 13  meta, hints, labels about her */
+  --t-ui: 0.9375rem;      /* 15  interface body, nav, rows */
+  --t-her: 0.9063rem;     /* 14.5 her letters and notes */
+  --t-her-lg: 1.0625rem;  /* 17  the question she asked */
+  --t-read: 1.25rem;      /* 20  his words, reading */
+  --t-write: 1.5rem;      /* 24  his words, writing (he writes larger than he reads) */
+  --t-h3: 1.25rem;        /* 20  book heads, italic */
+  --t-h2: 1.75rem;        /* 28  section titles */
+  --t-h1: 2.75rem;        /* 44  page titles */
+  --t-display: 4rem;      /* 64  the settings title, the insights week */
+  --t-numeral: 5.5rem;    /* 88  Almanac's large numerals */
+  --lh-read: 1.62;
+  --lh-her: 1.72;
+  --lh-write: 1.66;
+  --lh-ui: 1.5;
+  --lh-tight: 1.15;
 
-  /* her ink: her words and nothing else. Blue-black is the default; the reader may choose another below (Settings). */
-  --accent: #28367f;
+  /* ---- space (4 px base) and layout measures ---- */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --s7: 48px;
+  --s8: 64px;
+  --s9: 96px;
+  --tap: 44px;             /* the smallest target, everywhere */
+  --gutter: 56px;          /* page padding, desktop (20 on a phone) */
+  --measure: 35rem;        /* his column */
+  --margin-l: 72px;        /* the hours */
+  --margin-r: 200px;       /* her notes */
+  --rail: 228px;
+  --rail-compact: 68px;
+  --side-list: 280px;      /* the titled sidebar beside an entry */
+  --side-rail: 92px;       /* the dates-and-dots sidebar */
+  --bar-h: 78px;           /* the phone's tab bar with its float (66 + 12), above the home indicator */
 
-  /* his actions are in his own ink */
-  --act: var(--ink);
-  --act-ink: var(--bg);
-  --act-press: var(--ink-2);
+  /* ---- radius ---- */
+  --r-xs: 6px;
+  --r-s: 8px;
+  --r-m: 12px;             /* buttons, rows, menus */
+  --r-l: 18px;             /* panes */
+  --r-xl: 26px;            /* sheets, the dock */
+  --r-letter: 14px;        /* her letter */
+  --r-pill: 999px;         /* primary buttons, steppers, the toast, the save bar */
 
-  /* status: only what must stand out does; an unanswered prompt is not a failure and has no colour */
-  --warn: #8a5410;
-  --bad: #8a3b2c;
-  --good: var(--ink);
-  --bad-wash: color-mix(in srgb, var(--bad) 7%, var(--bg));
+  /* ---- layers ---- */
+  --z-sticky: 5;
+  --z-bar: 20;             /* the tab bar, the rail */
+  --z-save: 40;            /* the save bar */
+  --z-pop: 60;             /* menus, tooltips */
+  --z-sheet: 80;
+  --z-toast: 90;
 
-  /* type: his words in the book's roman; hers and every figure typed; the engine in a quiet grotesque */
-  --serif: "Newsreader", "Iowan Old Style", Charter, Georgia, serif;
-  --sans: "Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --type: "Courier Prime", "Courier New", ui-monospace, monospace;
-  --figure: "Fraunces Figures", "Newsreader", Georgia, serif;
-  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-
-  --text-xs: 0.75rem;     /* 12: tags, typed labels */
-  --text-sm: 0.875rem;    /* 14: meta, hints, labels */
-  --text-md: 1rem;        /* 16: interface body, her words */
-  --text-lg: 1.25rem;     /* 20: his words */
-  --text-xl: 1.5rem;      /* 24: titles in the serif */
-  --text-2xl: 2.25rem;    /* 36: page titles on a phone */
-  --text-3xl: 3rem;       /* 48: page titles on a wide screen */
-  --leading-tight: 1.15;
-  --leading: 1.5;
-  --leading-read: 1.66;
-
-  /* space: a 4 px base */
-  --s1: 0.25rem;
-  --s2: 0.5rem;
-  --s3: 0.75rem;
-  --s4: 1rem;
-  --s5: 1.5rem;
-  --s6: 2rem;
-  --s7: 3rem;
-
-  --radius-s: 3px;
-  --radius: 4px;
-  --radius-l: 10px;
-
-  /* the page: his column, the margin his hours hang in, and on a wide screen the column her notes sit in */
-  --measure: 38rem;
-  --gutter: 6.5rem;
-  --note: 21rem;
-  --page: calc(var(--gutter) + var(--measure) + 4rem);
-  --spread: calc(var(--gutter) + var(--measure) + var(--note) + 8rem);
-  --nav-h: 4rem;
-  --tap: 2.75rem;
-
-  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --dur: 160ms;
-  --lift: 0 1px 2px rgb(40 30 10 / 0.05), 0 8px 28px rgb(40 30 10 / 0.12);
+  /* ---- motion ---- */
+  --d-1: 120ms;   /* press, hover */
+  --d-2: 200ms;   /* colour, small fades */
+  --d-3: 340ms;   /* chevrons, knobs */
+  --d-4: 480ms;   /* push, recede */
+  --d-bloom: 640ms; /* the write room opening */
+  --d-ink: 700ms; /* her ink flowing to a new colour */
+  --stagger: 28ms;
+  --e-out: cubic-bezier(0.16, 1, 0.3, 1);        /* arrivals */
+  --e-inout: cubic-bezier(0.65, 0, 0.35, 1);     /* both ends matter */
+  --e-paper: cubic-bezier(0.3, 0.75, 0.12, 1);   /* anything paper */
+  /* damped springs baked to linear(): k260 c27 (controls) and k170 c21 (panes, disclosures, sheets) */
+  --spring: linear(0, 0.031, 0.107, 0.207, 0.316, 0.426, 0.529, 0.622, 0.703, 0.772, 0.829, 0.875, 0.912, 0.94, 0.962, 0.978, 0.99, 0.997, 1.003, 1.006, 1.007, 1.008, 1.008, 1.008, 1.007, 1.006, 1.005, 1.004, 1.003, 1.003, 1.002, 1.002, 1);
+  --spring-dur: 533ms;
+  --spring-soft: linear(0, 0.03, 0.103, 0.201, 0.309, 0.419, 0.523, 0.618, 0.701, 0.773, 0.832, 0.88, 0.919, 0.948, 0.971, 0.987, 0.998, 1.006, 1.011, 1.013, 1.014, 1.014, 1.013, 1.012, 1.01, 1.009, 1.007, 1.006, 1.004, 1.003, 1.003, 1.002, 1);
+  --spring-soft-dur: 642ms;
 }
 
+/* ---- colour roles · light: Folio's paper and desk ---- */
+:root, [data-theme="light"] {
+  --room: #eee7d9;        /* the desk: behind the panes, the rail */
+  --pane: #fbf8f1;        /* the page */
+  --raised: #f5f0e5;      /* hover, the player, cards on the page */
+  --raised-2: #efe8da;
+  --sunk: #ece5d6;        /* inset fields, segmented tracks */
+  --letter: #fffcf6;      /* the base of her letters */
+  --write-room: #fbf8f1;  /* the writing room's ground */
+  --text: #1d1a15;        /* his words, his actions */
+  --text-2: #4c443a;
+  --text-3: #6d6356;      /* >= 4.5:1 on every light ground, the desk included */
+  --hair: #e9e2d3;        /* rules */
+  --hair-2: #dcd2bf;      /* outlines, stronger rules */
+  --lamp: #1d1a15;        /* his primary action: ink on paper by day */
+  --on-lamp: #fbf8f1;
+  --nav-on: var(--pane);
+  --frost: rgb(251 248 241 / 0.84);
+  --scrim: rgb(40 30 15 / 0.24);
+  --glow: rgb(255 204 128 / 0.3);        /* lamp light at the head of a page */
+  --glow-room: rgb(255 198 120 / 0.3);   /* behind the writing column */
+  --glow-desk: rgb(255 214 150 / 0.22);  /* the desk, top left */
+  --ink-glow-k: 0%;
+  --recede: 0.94;
+  --focus-dim: 0.3;
+  --elev-tab: 0 1px 0 rgb(70 50 20 / 0.04), 0 1px 3px rgb(70 50 20 / 0.08);
+  --elev-1: 0 0 0 1px rgb(70 50 20 / 0.05), 0 1px 2px rgb(70 50 20 / 0.05), 0 16px 48px -16px rgb(70 50 20 / 0.2);
+  --elev-2: 0 0 0 1px rgb(70 50 20 / 0.05), 0 2px 4px rgb(70 50 20 / 0.05), 0 30px 64px -24px rgb(70 50 20 / 0.3);
+  --elev-pop: 0 0 0 1px rgb(70 50 20 / 0.07), 0 4px 10px rgb(40 30 10 / 0.07), 0 22px 54px -10px rgb(40 30 10 / 0.26);
+  --elev-letter: 0 1px 2px rgb(70 50 20 / 0.05), 0 10px 26px -16px rgb(70 50 20 / 0.28);
+  color-scheme: light;
+}
+
+/* ---- colour roles · dark: Night Room. Written twice (see the top): keep the two copies the same ---- */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #161513;
-    --surface: #1e1c19;
-    --sunk: #23201c;
-    --ink: #ece4d6;
-    --ink-2: #b8ad9b;
-    --ink-3: #958a79;
-    --rule: #38332b;
-    --rule-2: #2a2622;
-    --accent: #b6c0ff;
-    --warn: #e0a85a;
-    --bad: #e0a090;
-    --bad-wash: color-mix(in srgb, var(--bad) 9%, var(--bg));
-    --lift: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 32px rgb(0 0 0 / 0.45);
+  :root:not([data-theme="light"]) {
+    --room: #0a0d12;
+    --pane: #141921;
+    --raised: #1a2029;
+    --raised-2: #222935;
+    --sunk: #0f131a;
+    --letter: #1a2029;
+    --write-room: #0a0d12;
+    --text: #ebe8e1;
+    --text-2: #a9afba;
+    --text-3: #8a91a0;
+    --hair: rgb(196 210 235 / 0.075);
+    --hair-2: rgb(196 210 235 / 0.13);
+    --lamp: #f1ede4;
+    --on-lamp: #12161d;
+    --nav-on: var(--raised);
+    --frost: rgb(20 25 33 / 0.74);
+    --scrim: rgb(5 7 10 / 0.55);
+    --glow: rgb(255 238 206 / 0.055);
+    --glow-room: rgb(255 238 206 / 0.075);
+    --glow-desk: rgb(160 180 230 / 0.045);
+    --ink-glow-k: 38%;
+    --recede: 0.7;
+    --focus-dim: 0.22;
+    --elev-tab: inset 0 1px 0 rgb(255 255 255 / 0.03);
+    --elev-1: inset 0 1px 0 rgb(255 255 255 / 0.035), 0 12px 32px -16px rgb(0 0 0 / 0.7);
+    --elev-2: inset 0 1px 0 rgb(255 255 255 / 0.045), 0 30px 70px -24px rgb(0 0 0 / 0.8), 0 2px 10px rgb(0 0 0 / 0.35);
+    --elev-pop: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 20px 50px -12px rgb(0 0 0 / 0.75), 0 0 0 1px var(--hair-2);
+    --elev-letter: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 14px 30px -18px rgb(0 0 0 / 0.8);
+    color-scheme: dark;
   }
 }
-
-/* Her inks (Settings, "Ink"; web/src/ink.ts keeps the choice on this device). Each is set on <html data-ink> for the
-   page, and on any element that shows an ink of its own (the swatches). Every ink holds AA for body text on the paper
-   and the surface, light and dark (web/tests/ink.test.tsx), and so does --her-soft, the quieter grade of it. */
-[data-ink="blue-black"] { --accent: #28367f; }
-[data-ink="brown"] { --accent: #7a4519; }
-[data-ink="violet"] { --accent: #4b2a8a; }
-[data-ink="green"] { --accent: #1b5642; }
-@media (prefers-color-scheme: dark) {
-  [data-ink="blue-black"] { --accent: #b6c0ff; }
-  [data-ink="brown"] { --accent: #dcab78; }
-  [data-ink="violet"] { --accent: #d2b4ff; }
-  [data-ink="green"] { --accent: #8fd3b4; }
+[data-theme="dark"] {
+  --room: #0a0d12;
+  --pane: #141921;
+  --raised: #1a2029;
+  --raised-2: #222935;
+  --sunk: #0f131a;
+  --letter: #1a2029;
+  --write-room: #0a0d12;
+  --text: #ebe8e1;
+  --text-2: #a9afba;
+  --text-3: #8a91a0;
+  --hair: rgb(196 210 235 / 0.075);
+  --hair-2: rgb(196 210 235 / 0.13);
+  --lamp: #f1ede4;
+  --on-lamp: #12161d;
+  --nav-on: var(--raised);
+  --frost: rgb(20 25 33 / 0.74);
+  --scrim: rgb(5 7 10 / 0.55);
+  --glow: rgb(255 238 206 / 0.055);
+  --glow-room: rgb(255 238 206 / 0.075);
+  --glow-desk: rgb(160 180 230 / 0.045);
+  --ink-glow-k: 38%;
+  --recede: 0.7;
+  --focus-dim: 0.22;
+  --elev-tab: inset 0 1px 0 rgb(255 255 255 / 0.03);
+  --elev-1: inset 0 1px 0 rgb(255 255 255 / 0.035), 0 12px 32px -16px rgb(0 0 0 / 0.7);
+  --elev-2: inset 0 1px 0 rgb(255 255 255 / 0.045), 0 30px 70px -24px rgb(0 0 0 / 0.8), 0 2px 10px rgb(0 0 0 / 0.35);
+  --elev-pop: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 20px 50px -12px rgb(0 0 0 / 0.75), 0 0 0 1px var(--hair-2);
+  --elev-letter: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 14px 30px -18px rgb(0 0 0 / 0.8);
+  color-scheme: dark;
 }
 
-/* What is made from her ink, wherever an ink is set, so a swatch carries its own fold and grade */
-:root, [data-ink] {
-  --her-soft: color-mix(in srgb, var(--accent) 86%, var(--bg));
-  --edge: color-mix(in srgb, var(--accent) 42%, var(--bg));
+/* ---- her four inks (Folio's set; settings and ink.ts offer them). Set on <html data-ink>, and on any element that
+   shows an ink of its own (a swatch carries data-ink, and data-theme too when it shows the other scheme) ---- */
+[data-ink="blue-black"] { --her: #28367f; }
+[data-ink="brown"] { --her: #7a4519; }
+[data-ink="violet"] { --her: #4b2a8a; }
+[data-ink="green"] { --her: #1b5642; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"])[data-ink="blue-black"], :root:not([data-theme="light"]) [data-ink="blue-black"] { --her: #b6c0ff; }
+  :root:not([data-theme="light"])[data-ink="brown"], :root:not([data-theme="light"]) [data-ink="brown"] { --her: #dcab78; }
+  :root:not([data-theme="light"])[data-ink="violet"], :root:not([data-theme="light"]) [data-ink="violet"] { --her: #d2b4ff; }
+  :root:not([data-theme="light"])[data-ink="green"], :root:not([data-theme="light"]) [data-ink="green"] { --her: #8fd3b4; }
+}
+[data-theme="dark"][data-ink="blue-black"], [data-theme="dark"] [data-ink="blue-black"] { --her: #b6c0ff; }
+[data-theme="dark"][data-ink="brown"], [data-theme="dark"] [data-ink="brown"] { --her: #dcab78; }
+[data-theme="dark"][data-ink="violet"], [data-theme="dark"] [data-ink="violet"] { --her: #d2b4ff; }
+[data-theme="dark"][data-ink="green"], [data-theme="dark"] [data-ink="green"] { --her: #8fd3b4; }
+
+/* ---- made from her ink, wherever an ink or a theme is set, so a swatch carries its own grades ---- */
+:root, [data-ink], [data-theme] {
+  --her-soft: color-mix(in oklab, var(--her) 82%, var(--pane));      /* her labels and times */
+  --her-edge: color-mix(in oklab, var(--her) 34%, var(--pane));      /* the letter's crease, rules in her letters */
+  --her-line: color-mix(in oklab, var(--her) 50%, transparent);      /* the rule beside her margin note */
+  --her-hair: color-mix(in srgb, var(--her) 10%, transparent);       /* the letter's edge */
+  --her-wash: color-mix(in srgb, var(--her) 3%, var(--letter));      /* her letter's ground */
+  --her-wash-2: color-mix(in srgb, var(--her) 8%, var(--letter));
+  --her-glow: color-mix(in oklab, var(--her) var(--ink-glow-k), transparent); /* a halo at night, none by day */
+}
+html { transition: --her var(--d-ink) var(--e-inout); }
+
+/* ---- reduced motion: every duration becomes instant (base.css stops the rest) ---- */
+@media (prefers-reduced-motion: reduce) {
+  :root { --d-1: 1ms; --d-2: 1ms; --d-3: 1ms; --d-4: 1ms; --d-bloom: 1ms; --d-ink: 1ms; --spring-dur: 1ms; --spring-soft-dur: 1ms; --stagger: 0ms; }
+}
+
+/* ---- phone ---- */
+@media (max-width: 760px) {
+  :root { --gutter: 20px; --t-h1: 2.3rem; }
 }

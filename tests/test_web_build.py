@@ -96,11 +96,11 @@ class CommittedBuildTest(unittest.TestCase):
         for icon in manifest["icons"]:
             self.assertFalse(icon["src"].startswith(("/", "http")), icon["src"])    # relative to the manifest
             self.assertTrue((STATIC / icon["src"]).is_file(), icon["src"])
-        # the installed app's colours are the page's (tokens.css, the light sheet)
+        # the installed app's colours are the page's (tokens.css, the light sheet's --pane)
         tokens = (WEB / "src" / "tokens.css").read_text(encoding="utf-8")
-        bg = re.search(r"--bg:\s*(#[0-9a-fA-F]{6});", tokens).group(1).lower()
-        self.assertEqual((manifest["theme_color"], manifest["background_color"]), (bg, bg))
-        self.assertIn(f'content="{bg}" media="(prefers-color-scheme: light)"', html)
+        pane = re.search(r"--pane:\s*(#[0-9a-fA-F]{6});", tokens).group(1).lower()
+        self.assertEqual((manifest["theme_color"], manifest["background_color"]), (pane, pane))
+        self.assertIn(f'content="{pane}" media="(prefers-color-scheme: light)"', html)
 
     def test_the_service_worker_is_a_classic_script_that_precaches_the_shell_and_holds_the_rules(self):
         sw = (STATIC / "sw.js").read_text(encoding="utf-8")
