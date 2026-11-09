@@ -22,6 +22,17 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
 
 ## Raised by packages (open, not decided)
 
+- **X-MEMORY (2026-11-09) — the journal's own model calls load the companion's memory, so `/x` can reach a
+  permanent file.** Every model step (openers, annotations, day reflections, week reviews, program reflections and
+  insights, outage replies) runs `hermes chat --oneshot` in her profile (`hermes/companion.py`). Hermes loads her
+  built-in memory (`MEMORY.md`, `USER.md`) into that call's prompt unless `--ignore-rules` is passed, and
+  `--toolsets none` removes tools, not memory. Since X-SCOPE lets her memory hold what was said off the record,
+  an annotation or reflection written into an entry may carry it in other words; the quote check only catches a
+  literal quote. This widens WEB-DESIGN below (which asked the same of openers alone). To close, one of: run the
+  journal's permanent-writing calls without her memory (`--ignore-rules` drops her persona file too, so the journal
+  would supply her voice itself, or a narrower Hermes switch is found); or refuse her memory tool in an
+  off-the-record turn (Hermes' background memory review would still need checking); or both. The owner decides.
+
 - **OPEN-PROMPTS — a practice can be done without a chat message (design agreed, building; issues #13, #14).**
   Today a practice's prompt exists only once the chat has delivered it (`message_id`), so the web app, the CLI and
   MCP cannot do a practice by themselves, and a web-only install counts every scheduled prompt as a failed send. The
@@ -3040,7 +3051,6 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   not refused, and a connected source does not know where its data came from: with `sources.tududi` on, a task
   made from an `/x` turn can come back through the context pack (and an opener written from it), the Today
   block, `today-cache.json` and the web app. The guarantee is about what the journal captures, not about
-  what may re-enter as source data. Consequence for later packages: the companion's memory may hold what was said off the record, so no
-  journal step that writes a permanent file (openers, annotations, reflections, week reviews) may read her memory.
-  This raises the weight of the open WEB-DESIGN point above (whether the one-shot model call can reach her memory):
-  it is no longer hypothetical, and closing it means showing that call cannot load her memory, or narrowing it.
+  what may re-enter as source data. Consequence: her memory may hold what was said off
+  the record (Hermes writes it from her memory tool and from its own background review), and that memory is not
+  the journal's to filter. See X-MEMORY, raised above.
