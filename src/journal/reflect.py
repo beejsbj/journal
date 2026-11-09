@@ -11,16 +11,22 @@ annotated or transcribed. Which practice closes a period is ``library.closer``: 
 evening ritual keeps the reflection as long as it says ``closes: day``.
 
 The model (a one-shot) is given the period's entry files (the user's words, annotations, the companion's notes),
-plus, for a week, that week's day reflections, and what came before (``continuity``): her last few analyses
-(``EARLIER``), what he wrote back to each in the chat, and the open notebook threads the engine filed from a journal
-file (``notebook.on_record``; never one she added in chat, and the journal's hook adds nothing to an engine one-shot:
-``agent.MODEL_STEP_ENV``). Its one tool is ``journal_search`` (``tools.READ_TOOLSET``), over his words in every
-entry; no chat transcript or context pack is given to it. ``FOLLOW-UP:`` lines go to the notebook, as with
-annotations. A quoted passage that is not in the inputs nor in his words anywhere in the journal loses its quotation
-marks before the file is written (``validate.unquote``) and is logged; the reflection is kept. An answer that is not a reflection at all (empty, too
-long, not prose) writes nothing and is retried on later ticks, ``ATTEMPTS`` times, then alerted once. A model that
-cannot be reached at all is different: that is an outage, which defers the reflection without using an attempt
-(``outage``: retried at most every 30 minutes for up to 7 days, one alert once it has lasted 6 hours).
+plus, for a week, that week's day reflections, and what came before (``continuity``): the opening and the closing
+question of her last few analyses (``EARLIER``), what he wrote back to each in the chat, and the open notebook threads
+the engine filed from a journal file (``notebook.on_record``; never one she added in chat, and the journal's hook adds
+nothing to an engine one-shot: ``agent.MODEL_STEP_ENV``). Its one tool is ``journal_search`` (``tools.READ_TOOLSET``),
+over his words in every entry; no chat transcript or context pack is given to it. ``FOLLOW-UP:`` lines go to the
+notebook, as with annotations.
+
+Every quoted passage must be his words, found in one file (or one reply of his) with its "…" fragments in order:
+the period's entries, his replies, or his words anywhere in the journal (``validate.unfound``); her own words, old or
+new, never count. A bad answer (a quote that is not his, or no reflection at all: empty, too long, not prose) writes
+nothing and is retried on later ticks, ``ATTEMPTS`` times, then alerted once; on the last attempt a reflection whose
+only fault is such quotes is written with the sentences that hold them dropped (``validate.strike``), and that is
+logged, so a stubborn misquote costs a sentence, not the reflection. A model that cannot be reached at all is
+different: that is an outage, which defers the reflection without using an attempt (``outage``: retried at most
+every 30 minutes for up to 7 days, one alert once it has lasted 6 hours). A run that times out while the model has
+answered another step in this tick is a long run, not an outage: it uses an attempt.
 
 Unanswered prompts leave no trace in the journal: the files hold only what was answered (the opener is
 in each entry's own file). Records live in the ledger under ``reflections``.
@@ -39,13 +45,15 @@ from .config import Config
 ATTEMPTS = 3
 SEND_ATTEMPTS = 6
 INPUT_CAP = 12000  # characters per entry file handed to the model
-BUDGET = 300
+BUDGET = 480  # seconds: it may search his entries first (annotations 180, openers 240); the tick waits that long at most
 EARLIER = {"reflection": (3, 7), "week": (2, 21)}
 # (how many of her earlier analyses of the same kind a reflection reads, and within how many days back. Three days
 # show a run of days, a habit forming or a thread dropped, without outweighing the day's own entries; two weeks show
 # a trend without turning the review into a history. A day reflection also reads the latest week review of the days
-# before it, for the week's frame. Each is a few hundred words, so the whole stays near one long entry.)
-EARLIER_CAP = 4000  # characters of each earlier analysis's body
+# before it, for the week's frame.)
+EARLIER_CAP = 600  # characters of an earlier analysis's opening paragraph, and of its closing question
+# (only those two of each, not the whole: her full earlier prose, often longer than the day's entries, invites her to
+# echo herself; the opening says where she stood, the question what she asked, and his reply what came of it)
 REPLY_CAP = 600     # characters of each reply of his to one of them
 REPLIES = 3         # replies of his shown per analysis (the first ones)
 
@@ -257,14 +265,6 @@ def _input_block(cfg: Config, paths: list[Path], label: str = "journal") -> str:
     return "\n\n".join(out)
 
 
-_HER_LINE = re.compile(r"^\[[^\]\n]*'s chat reply, [^\]\n]*: her words, not [^\]\n]*\][^\n]*\n?", re.M)
-
-
-def _his_corpus(inputs: str) -> str:
-    """What a reflection may quote as his: the inputs without her labelled chat replies."""
-    return _HER_LINE.sub("", inputs)
-
-
 def _earlier(cfg: Config, kind: str, end: date) -> list[Path]:
     """Her earlier analyses a reflection reads (``EARLIER``), oldest first: the last few of the same kind before
     ``end`` (the newest of each day), and for a day reflection the latest week review of the six days before."""
@@ -289,11 +289,13 @@ _HIS_REPLY = re.compile(r"^%% journal his:[^%\n]* %%\n> \[!info\][-+]? ↩ reply
                         r"(?=^%% journal|^## |\Z)", re.M | re.S)
 
 
-def _replies_to(cfg: Config, rec: dict | None, path: Path, upto: date) -> list[str]:
-    """What he wrote back in the chat to the sent analysis ``path`` (its ledger record ``rec``), found through the
-    entries dated from it to ``upto``: his blocks whose quoted message is that analysis (``conversations``' own test,
-    ``answers_ours``). Each as ``[<entry>] <his words>``, cut at ``REPLY_CAP``; at most ``REPLIES``."""
-    from .conversations import QUOTE_WORDS
+def _replies_to(cfg: Config, rec: dict | None, path: Path, upto: date, data: dict) -> list[str]:
+    """What he wrote back in the chat to the sent analysis ``path`` (its ledger record ``rec``), as ``[<entry>] <his
+    words>``, cut at ``REPLY_CAP``, at most ``REPLIES``, oldest first. Two ways in, as the conversation writer files
+    them: a reply that started a note of its own is that note's words, its capture marked with the analysis's id
+    (``conversations._Writer.new_note``: ``answers``); a reply inside a thread already filed elsewhere is one of his
+    blocks whose quoted message is that analysis (``conversations``' own test, ``answers_ours``)."""
+    from .conversations import QUOTE_WORDS, in_root
     from .sweep import words
     tg = (rec or {}).get("telegram") or {}
     if not tg.get("message_id"):
@@ -304,18 +306,38 @@ def _replies_to(cfg: Config, rec: dict | None, path: Path, upto: date) -> list[s
         first = date.fromisoformat(rec["local_date"])
     except (KeyError, ValueError, OSError):
         return []
-    out: list[str] = []
+    found: list[tuple[str, str]] = []  # (when, line)
+
+    def add(at: str, stem: str, text: str) -> None:
+        text = " ".join(entries.ENGINE_MARK.sub("", text).split())
+        if text and not any(text[:80] in line for _, line in found):
+            cut = text if len(text) <= REPLY_CAP else text[:REPLY_CAP].rsplit(" ", 1)[0] + " …"
+            found.append((at, f"[{stem}] {cut}"))
+
+    for p in data.get("prompts") or []:
+        at = next((c.get("at") or "" for c in p.get("captures") or [] if c.get("answers") == rec.get("id")), None)
+        note = Path(in_root(cfg, p.get("entry_path")) or "")
+        if at is not None and note.is_file():
+            add(at, note.stem, entries.his_words(note.read_text(encoding="utf-8", errors="replace")))
     d = first
-    while d <= upto and len(out) < REPLIES:
+    while d <= upto:
         for p in entries.entries_on(cfg.root, d.isoformat()):
             for m in _HIS_REPLY.finditer(p.read_text(encoding="utf-8", errors="replace")):
                 q = words("\n".join(l[1:] for l in m.group(1).splitlines()))  # (a cut quote's "…" is no word)
-                text = " ".join(entries.ENGINE_MARK.sub("", m.group(2)).split())
-                if len(q.split()) >= QUOTE_WORDS and q in sent and text:
-                    cut = text if len(text) <= REPLY_CAP else text[:REPLY_CAP].rsplit(" ", 1)[0] + " …"
-                    out.append(f"[{p.stem}] {cut}")
+                if len(q.split()) >= QUOTE_WORDS and q in sent:
+                    add(d.isoformat(), p.stem, m.group(2))
         d += timedelta(days=1)
-    return out[:REPLIES]
+    return [line for _, line in sorted(found, key=lambda f: f[0])][:REPLIES]
+
+
+def _cut(text: str) -> str:
+    text = " ".join(text.split())
+    return text if len(text) <= EARLIER_CAP else text[:EARLIER_CAP].rsplit(" ", 1)[0] + " …"
+
+
+def _opening(body: str) -> str:
+    """An analysis's first paragraph (where she stood), cut at ``EARLIER_CAP``."""
+    return _cut(next((b for b in re.split(r"\n\s*\n", body) if b.strip()), ""))
 
 
 def _carried(body: str) -> str:
@@ -324,33 +346,36 @@ def _carried(body: str) -> str:
     return " ".join(m.group(1).split()) if m else ""
 
 
-def continuity(cfg: Config, kind: str, end: date, data: dict) -> str:
-    """What a reflection reads of what came before ``end``: her earlier analyses (``_earlier``) with the question each
-    left him and what he wrote back to it, then her open notebook threads that came from the journal
-    (``notebook.on_record``). Her words are labelled hers and his replies his. "" when there is nothing."""
+def continuity(cfg: Config, kind: str, end: date, data: dict) -> tuple[str, list[str]]:
+    """What a reflection reads of what came before ``end``, and his words in it: for each earlier analysis
+    (``_earlier``), its opening paragraph and the question it left him (``EARLIER_CAP`` each), then what he wrote back
+    to it (``_replies_to``); then her open notebook threads that came from the journal (``notebook.on_record``). Her
+    words are labelled hers and his replies his. Returns (the text, "" when there is nothing; his replies, for the
+    quote check)."""
     who = cfg.names.user or "the user"
     his = cfg.names.possessive
-    parts = []
+    parts: list[str] = []
+    replies_all: list[str] = []
     for p in _earlier(cfg, kind, end):
         k = "week" if p.name[11:].startswith("week") else "reflection"
         what = "week review" if k == "week" else "day reflection"
         body = body_of(p.read_text(encoding="utf-8", errors="replace"))
-        if len(body) > EARLIER_CAP:
-            body = body[:EARLIER_CAP].rsplit(" ", 1)[0] + " …"
         rec = next((r for r in data.get("reflections") or [] if Path(r.get("path") or "").name == p.name), None)
-        replies = _replies_to(cfg, rec, p, end)
+        replies = _replies_to(cfg, rec, p, end, data)
+        replies_all += [r.split("] ", 1)[1] for r in replies]
         asked = _carried(body)
         said = ("\n".join(f"- {r}" for r in replies) if replies
                 else f"- (none in the chat; {cfg.names.subject} may have taken it up in an entry)")
-        parts.append(f"### {k}:{p.stem} (your {what}, {date.fromisoformat(p.name[:10]).strftime('%a %-d %b')})\n{body}"
-                     + (f"\n\nYou asked {cfg.names.object}: {asked}" if asked else "")
+        when = date.fromisoformat(p.name[:10]).strftime("%a %-d %b")
+        parts.append(f"### {k}:{p.stem} (your {what}, {when})\nYou began: {_opening(body)}"
+                     + (f"\nYou asked {cfg.names.object}: {_cut(asked)}" if asked else "")
                      + f"\n\nWhat {who} wrote back to it in the chat ({his} words):\n{said}")
     items = notebook.on_record(cfg)
     if items:
         lines = [f"- {it['text']} [from {it['source']}] — noted {str(it.get('created_at') or '')[:10]}"
                  + (f" (bring up after {it['bring_up_after']})" if it.get("bring_up_after") else "") for it in items]
         parts.append("### Open threads in your notebook (from the journal; your words)\n" + "\n".join(lines))
-    return "\n\n".join(parts)
+    return "\n\n".join(parts), replies_all
 
 
 _LEGACY_CALLOUT = ("> [!note]- Today's prompts", "> [!note]- This week's prompts")
@@ -430,19 +455,32 @@ def write_one(cfg: Config, kind: str, end: date, trigger: str, now: datetime,
     dailies = [p for d in days for p in entries.analyses_on(cfg.root, d.isoformat(), "reflection")] \
         if kind == "week" else []
     inputs = _input_block(cfg, mine) + ("\n\n" + _input_block(cfg, dailies, "reflection") if dailies else "")
-    before = continuity(cfg, kind, end, ledger.snapshot(cfg.ledger_path))
+    data = ledger.snapshot(cfg.ledger_path)
+    before, his_replies = continuity(cfg, kind, end, data)
+    last = (find(data, rid) or {}).get("attempts", 0) + 1 >= ATTEMPTS  # this attempt is the last one
     title, period = _label(cfg, kind, end)
+    timed_out = ""
     try:
         raw = agent.ask(cfg, prompts.reflection_request(cfg, kind, period, inputs, before), BUDGET,
                         toolsets=READ_TOOLSET)
     except agent.AgentUnavailable as e:
-        return _outage(cfg, rid, kind, end, now, str(e), log), True
+        if not (str(e).startswith("timed out") and agent.answered_this_run()):
+            return _outage(cfg, rid, kind, end, now, str(e), log), True
+        raw, timed_out = None, str(e)  # a long run, not an outage: the model answered another step in this tick
     text, followups = notebook.split_followups(raw or "")
-    unquoted: list[str] = []
-    if raw:  # a passage not in the inputs, nor in his words anywhere in the journal (search), loses its quotes
-        text, unquoted = validate.unquote(text, _his_corpus(inputs) + "\n" + before,
-                                          lambda: search.his_words_everywhere(cfg))
-    ok, reason = (validate.check_reflection(kind, text, "", misquotes=False) if raw else (False, "agent failed"))
+    struck: list[str] = []
+    strays = 0
+    ok, reason = False, timed_out or "agent failed"
+    if raw:
+        text, strays = validate.drop_stray_marks(text)
+        ok, reason = validate.check_reflection(kind, text, "", misquotes=False)
+        bad = validate.unfound(text, [entries.his_text(p) for p in mine] + his_replies,
+                               lambda: search.his_texts(cfg)) if ok else []
+        if bad and not last:
+            ok, reason = False, f"quote not in his words: {bad[0][2][:60]!r}"
+        elif bad:  # the last attempt: drop the sentences that hold them rather than lose the reflection
+            text, struck = validate.strike(text, bad), [q[:60] for _, _, q in bad]
+            ok, reason = validate.check_reflection(kind, text, "", misquotes=False)
     path = None
     if ok:
         path = _target(cfg, kind, end)
@@ -460,15 +498,16 @@ def write_one(cfg: Config, kind: str, end: date, trigger: str, now: datetime,
         if ok:
             rec.update(written_at=now.isoformat(), path=str(path), trigger=trigger)
             rec.pop("error", None)
-            if unquoted:
-                rec["unquoted"] = unquoted
+            if struck:
+                rec["struck"] = struck
         else:
             rec["error"] = reason[:300]
         attempts = rec["attempts"]
     if ok:
         log.append(f"wrote {path.name} ({trigger})" + (f" (+{len(followups)} notebook)" if followups else "")
-                   + (f" ({len(unquoted)} quote{'s' if len(unquoted) != 1 else ''} not found, unquoted)"
-                      if unquoted else ""))
+                   + (f" (last attempt: {len(struck)} sentence{'s' if len(struck) != 1 else ''} with a quote not "
+                      "in his words dropped)" if struck else "")
+                   + (f" ({strays} stray quote mark{'s' if strays != 1 else ''} dropped)" if strays else ""))
         return None, False
     log.append(f"{rid}: reflection attempt {attempts}/{ATTEMPTS} failed ({reason})")
     if attempts >= ATTEMPTS:

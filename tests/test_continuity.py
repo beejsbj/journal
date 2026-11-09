@@ -1,7 +1,8 @@
 """Continuity for day reflections and week reviews (DECISIONS.md, CONTINUITY): what she reads of what came before (her
 last few analyses, what he wrote back to each, the notebook threads the engine filed from the journal), the one tool
-she is given (``journal_search``: ``test_search.py``), quotes that keep the reflection, one voice across the requests,
-and the engine's own model steps getting nothing from the journal's hook."""
+she is given (``journal_search``: ``test_search.py``), only his words in quotation marks (retried, and on the last
+attempt the sentence goes, not the reflection), one voice across the requests, and the engine's own model steps
+getting nothing from the journal's hook."""
 import json
 import os
 import tempfile
@@ -10,10 +11,14 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
+import test_conversations
 from helpers import CHAT, add_prompt, make_cfg
 from test_reflect import GOOD, IST, Base
 
-from journal import agent, capture, conversations, entries, ledger, notebook, prompts, reflect, tools, validate
+from journal import (agent, capture, conversations, entries, ledger, notebook, prompts, reflect, sweep, tools,
+                     validate)
+
+tc_m = test_conversations.m
 
 
 class Earlier(Base):
@@ -151,90 +156,232 @@ class ContinuityTest(Earlier):
         self.assertIn("## Before the week", query)
 
 
-class QuotesKeepTheReflectionTest(Earlier):
-    def test_an_invented_quote_loses_its_marks_and_the_reflection_is_kept(self):
+class QuotesTest(Earlier):
+    """Only his words in quotation marks: a quote that is not his is a bad answer and retried; on the last attempt the
+    sentence that holds it goes, so a stubborn misquote costs a sentence, not the reflection."""
+
+    def tick(self, minute):
+        return self.reflect(datetime(2026, 10, 14, 23, minute, tzinfo=IST))
+
+    def test_an_invented_quote_is_retried_then_its_sentence_dropped_on_the_last_attempt(self):
         self.evening()
         self.answer = GOOD.replace("rain all day, walked anyway", "I miss the lake house")
-        _, log = self.query()
-        self.assertIn("wrote 2026-10-14-reflection.md (annotated) (+1 notebook) (1 quote not found, unquoted)", log)
+        for n, minute in ((1, 45), (2, 50)):
+            alerts, log = self.tick(minute)
+            self.assertEqual(alerts, [])
+            self.assertIn(f"2026-10-14-reflection: reflection attempt {n}/3 failed (quote not in his words: "
+                          "'I miss the lake house')", log)
+            self.assertFalse((self.cfg.root / "2026-10-14-reflection.md").exists())
+        alerts, log = self.tick(55)
+        self.assertEqual(alerts, [])
+        self.assertIn("wrote 2026-10-14-reflection.md (annotated) (+1 notebook) (last attempt: 1 sentence with a quote "
+                      "not in his words dropped)", log)
         body = (self.cfg.root / "2026-10-14-reflection.md").read_text()
-        self.assertIn("You wrote I miss the lake house and", body)
-        self.assertNotIn('"I miss the lake house"', body)
-        self.assertIn("“the soup was good … the bus can wait”", body)  # a real quote keeps its marks
-        self.assertEqual(self.rec("2026-10-14-reflection")["unquoted"], ["I miss the lake house"])
+        self.assertNotIn("lake house", body)
+        self.assertIn("**Patterns and tensions** — That reads as patience held lightly (inference).", body)
+        self.assertIn("**What stood out** — The rain, and a walk in it anyway.", body)
+        self.assertEqual(self.rec("2026-10-14-reflection")["struck"], ["I miss the lake house"])
         self.assertEqual(len(self.bot.calls), 1)
-        self.assertNotIn("I miss the lake house\"", self.bot.calls[0][1]["text"])
+        self.assertNotIn("lake house", self.bot.calls[0][1]["text"])
 
     def test_his_words_reached_through_search_keep_their_marks(self):
+        add_prompt(self.cfg, kind="evening", local_date="2026-09-20",
+                   sent=datetime(2026, 9, 20, 17, 31, tzinfo=timezone.utc), message_id="3")
+        capture.capture(self.cfg, CHAT, "3", "the harbour at dusk, every time, like a door",
+                        datetime(2026, 9, 20, 18, 0, tzinfo=timezone.utc), "text", "1003")
+        self.evening()
+        self.answer = GOOD.replace("“the soup was good … the bus can wait”", '"the harbour at dusk … like a door"')
+        _, log = self.tick(45)
+        self.assertIn("wrote 2026-10-14-reflection.md (annotated) (+1 notebook)", log)
+        body = (self.cfg.root / "2026-10-14-reflection.md").read_text()
+        self.assertIn('"the harbour at dusk … like a door"', body)  # his words, in an entry weeks ago
+        self.assertNotIn("struck", self.rec("2026-10-14-reflection"))
+
+    def test_her_words_never_count_as_his(self):
         old = add_prompt(self.cfg, kind="evening", local_date="2026-09-20",
                          sent=datetime(2026, 9, 20, 17, 31, tzinfo=timezone.utc), message_id="3")
-        capture.capture(self.cfg, CHAT, "3", "the harbour at dusk, every time, like a door", datetime(2026, 9, 20, 18, 0,
-                        tzinfo=timezone.utc), "text", "1003")
+        capture.capture(self.cfg, CHAT, "3", "the harbour again", datetime(2026, 9, 20, 18, 0, tzinfo=timezone.utc),
+                        "text", "1003")
         entries.write_annotations(self.cfg.root / f"{old['id']}.md", "- He lingered by the water.", self.cfg.names)
+        self.analysis("reflection", "2026-10-13", "**What I notice** — circling a decision you have already made.\n\n"
+                                                  "**To carry forward** — What would being there look like?")
+        notebook.add(self.cfg, "ask whether the move settled", source="2026-10-13-reflection", origin="reflection")
         self.evening()
-        self.answer = GOOD.replace("“the soup was good … the bus can wait”",
-                                   "\"the harbour at dusk\" and \"He lingered by the water\"")
-        _, log = self.query()
-        body = (self.cfg.root / "2026-10-14-reflection.md").read_text()
-        self.assertIn('"the harbour at dusk"', body)               # his words, in an entry weeks ago
-        self.assertIn("and He lingered by the water.", body)       # her old annotation is not his words
-        self.assertEqual(self.rec("2026-10-14-reflection")["unquoted"], ["He lingered by the water"])
+        for quote in ("He lingered by the water",                    # her old annotation
+                      "circling a decision you have already made",   # her own earlier reflection, in her inputs
+                      "What would being there look like?",           # her question, quoted back
+                      "ask whether the move settled",                # her notebook thread
+                      "He walked in the rain"):                      # today's annotation, in the entry she reads
+            with self.subTest(quote):
+                with ledger.locked(self.cfg.ledger_path) as data:
+                    data["reflections"] = [r for r in data.get("reflections") or [] if r["id"] != "2026-10-14-reflection"]
+                self.answer = GOOD.replace("rain all day, walked anyway", quote)
+                _, log = self.tick(45)
+                self.assertTrue(any("failed (quote not in his words:" in l for l in log), log)
+                self.assertFalse((self.cfg.root / "2026-10-14-reflection.md").exists())
 
-    def test_her_earlier_words_may_be_quoted_as_hers(self):
-        self.analysis("reflection", "2026-10-13", "**To carry forward** — What would being there look like?")
+    def test_a_quote_stitched_from_several_entries_is_not_his(self):
+        add_prompt(self.cfg, kind="evening", local_date="2026-09-20",
+                   sent=datetime(2026, 9, 20, 17, 31, tzinfo=timezone.utc), message_id="3")
+        capture.capture(self.cfg, CHAT, "3", "I want to sleep early for once",
+                        datetime(2026, 9, 20, 18, 0, tzinfo=timezone.utc), "text", "1003")
         self.evening()
-        self.answer = GOOD + '\nYesterday I asked "What would being there look like?" and you answered with rain.'
-        self.query()
-        self.assertNotIn("unquoted", self.rec("2026-10-14-reflection"))
+        self.answer = GOOD.replace("rain all day, walked anyway", "I want … to quit … the bus can wait")
+        _, log = self.tick(45)
+        self.assertTrue(any("failed (quote not in his words: 'I want … to quit … the bus can wait')" in l
+                            for l in log), log)
 
-    def test_a_blockquote_line_that_is_not_his_goes(self):
+    def test_a_blockquote_line_that_is_not_his_goes_on_the_last_attempt(self):
         self.evening()
         self.answer = GOOD.replace("**To carry forward**", "> I never said this\n\n**To carry forward**")
-        self.query()
+        self.tick(45)
+        self.tick(50)
+        _, log = self.tick(55)
         body = (self.cfg.root / "2026-10-14-reflection.md").read_text()
         self.assertNotIn("I never said this", body)
+        self.assertIn("**To carry forward** — What would being there look like, on your terms?", body)
+
+    def test_a_stray_quote_mark_is_dropped(self):
+        self.evening()
+        self.answer = GOOD.replace("That reads as", "You said “so much. That reads as")
+        _, log = self.tick(45)
+        self.assertIn("wrote 2026-10-14-reflection.md (annotated) (+1 notebook) (1 stray quote mark dropped)", log)
+        self.assertIn("You said so much. That reads as", (self.cfg.root / "2026-10-14-reflection.md").read_text())
 
     def test_an_answer_that_is_no_reflection_still_writes_nothing(self):
         self.evening()
         self.answer = "too short"
-        _, log = self.query()
+        _, log = self.tick(45)
         self.assertIn("2026-10-14-reflection: reflection attempt 1/3 failed (empty or too short)", log)
         self.assertFalse((self.cfg.root / "2026-10-14-reflection.md").exists())
 
 
-class UnquoteTest(unittest.TestCase):
-    def test_what_is_found_keeps_its_marks(self):
-        text = 'You wrote "rain all day, walked anyway" and “I miss the lake house”.\n> I never rest\n> rain all day\n'
-        out, changed = validate.unquote(text, "rain all day, walked anyway")
-        self.assertEqual(out, 'You wrote "rain all day, walked anyway" and I miss the lake house.\n> rain all day\n')
-        self.assertEqual(changed, ["I never rest", "I miss the lake house"])
+class LongRunTest(Earlier):
+    def setUp(self):
+        super().setUp()
+        self.evening()
 
-    def test_the_wider_corpus_is_read_once_and_only_when_needed(self):
+    def ask(self, cfg, query, budget, toolsets=None):
+        self.asked.append((query, toolsets, budget))
+        raise agent.AgentUnavailable(f"timed out after {budget + 60}s")
+
+    def test_a_timeout_after_the_model_answered_this_tick_uses_an_attempt(self):
+        with mock.patch.object(agent, "answered_this_run", return_value=True):
+            alerts, log = self.reflect(datetime(2026, 10, 14, 23, 45, tzinfo=IST))
+        self.assertEqual(self.asked[0][2], reflect.BUDGET)
+        self.assertIn("2026-10-14-reflection: reflection attempt 1/3 failed (timed out after 540s)", log)
+        rec = self.rec("2026-10-14-reflection")
+        self.assertEqual(rec["attempts"], 1)
+        self.assertNotIn("deferred_since", rec)
+
+    def test_a_timeout_with_no_other_answer_is_still_an_outage(self):
+        with mock.patch.object(agent, "answered_this_run", return_value=False):
+            _, log = self.reflect(datetime(2026, 10, 14, 23, 45, tzinfo=IST))
+        self.assertIn("2026-10-14-reflection: reflection deferred, model unreachable (timed out after 540s)", log)
+        rec = self.rec("2026-10-14-reflection")
+        self.assertNotIn("attempts", rec)
+        self.assertIn("deferred_since", rec)
+
+
+class QuoteCheckTest(unittest.TestCase):
+    DOCS = ["rain all day, walked anyway. the soup was good. But idk. the bus can wait",
+            "I want to sleep. the window was open"]
+
+    def bad(self, text, docs=None, wider=None):
+        return [q for _, _, q in validate.unfound(text, self.DOCS if docs is None else docs, wider)]
+
+    def test_straight_quotes_pair_left_to_right_whatever_their_length(self):
+        self.assertEqual(self.bad('You said "No" and then "I never loved any of it" last night.'),
+                         ["I never loved any of it"])
+        self.assertEqual(self.bad('You wrote " I never loved any of it " on Tuesday.'), ["I never loved any of it"])
+        self.assertEqual(self.bad('"she told me "I never loved any of it" and left"'), ["she told me", "and left"])
+        self.assertEqual(self.bad('You wrote "rain all day, walked anyway" and “the soup was good … the bus can wait”.'),
+                         [])
+        # the other checks read the same pairs: the catch-up's and a program's quote checks see the misquote too
+        self.assertFalse(validate.check_catchup('You said "No" and then "I never loved any of it" last night.',
+                                                "No, and then I left. I loved some of it")[0])
+
+    def test_a_stray_mark_is_dropped(self):
+        self.assertEqual(validate.drop_stray_marks('You said “I never rest, and "then" more " left.'),
+                         ('You said I never rest, and "then" more  left.', 2))
+
+    def test_fragments_must_be_in_one_document_in_order(self):
+        self.assertEqual(self.bad("“the soup … the bus”"), [])
+        self.assertEqual(self.bad("“the bus … the soup”"), ["the bus … the soup"])        # out of order
+        self.assertEqual(self.bad("“I want … the bus can wait”"), ["I want … the bus can wait"])  # two documents
+
+    def test_the_wider_documents_are_read_once_and_only_when_needed(self):
         calls = []
 
         def wider():
             calls.append(1)
-            return "I miss the lake house. I never rest."
-        self.assertEqual(validate.unquote('"rain all day"', "rain all day", wider), ('"rain all day"', []))
+            return ["I miss the lake house. I never rest."]
+        self.assertEqual(self.bad('"rain all day"', wider=wider), [])
         self.assertEqual(calls, [])
-        text = '“I miss the lake house” and "I never rest" and "made up words"'
-        self.assertEqual(validate.unquote(text, "", wider),
-                         ('“I miss the lake house” and "I never rest" and made up words', ["made up words"]))
+        self.assertEqual(self.bad('“I miss the lake house” and "I never rest" and "made up words"', wider=wider),
+                         ["made up words"])
         self.assertEqual(calls, [1])
 
-    def test_mispaired_straight_quotes_are_left_alone(self):
-        text = 'He said "ok" and "fine" today.'
-        self.assertEqual(validate.unquote(text, ""), (text, []))
-
-    def test_fragments_around_an_ellipsis_must_each_be_there(self):
-        self.assertEqual(validate.unquote("“the soup … the bus”", "the soup was good. the bus can wait")[1], [])
-        self.assertEqual(validate.unquote("“the soup … the train”", "the soup was good. the bus")[1],
-                         ["the soup … the train"])
+    def test_strike_drops_the_sentence_with_its_attribution(self):
+        text = ('**What I notice** — Fine day. You wrote, "I am done pretending…" and it showed. Then rain.\n'
+                '- As you put it, *"a slow kind of drowning"*. The walk helped.\n'
+                '> I never rest\n'
+                'End.')
+        out = validate.strike(text, validate.unfound(text, self.DOCS))
+        self.assertEqual(out, "**What I notice** — Fine day. Then rain.\n- The walk helped.\nEnd.")
 
     def test_the_other_checks_still_reject_a_misquote(self):
         text = "x" * 80 + '\nYou said "I am exhausted"'
         self.assertFalse(validate.check_reflection("insights", text, "nothing")[0])
         self.assertTrue(validate.check_reflection("reflection", text, "nothing", misquotes=False)[0])
+
+
+class ReplyThroughConversationsTest(test_conversations.Base):
+    """His reply to a sent reflection, filed by the conversation writer as it really is (a note of its own), reaches
+    the next reflection as his reply."""
+
+    def run_both(self, mode):
+        self.cfg.capture = {"mode": mode}
+        refl = self.cfg.root / "2026-10-15-reflection.md"
+        entries.write_file(refl, reflect.render(self.cfg, "reflection", date(2026, 10, 15),
+                                                "**What I notice** — You circled the bank all day and never named the "
+                                                "call itself.\n\n**To carry forward** — What is the call asking of you?",
+                                                [], tc_m(300)))
+        with ledger.locked(self.cfg.ledger_path) as data:
+            data.setdefault("reflections", []).append(
+                {"id": "2026-10-15-reflection", "kind": "reflection", "local_date": "2026-10-15", "path": str(refl),
+                 "written_at": tc_m(300).isoformat(), "telegram": {"message_id": "711", "sent_at": tc_m(310).isoformat()}})
+        self.his('[Replying to: "Iris\'s reflection — Thu 15 Oct 2026 What I notice — You circled the bank all day '
+                 'and never named the call itself."]\n\nthat\'s fair. I was avoiding the call, not the bank',
+                 tc_m(600), "700")
+        self.hers("What makes the call the hard part?", tc_m(601))
+        self.his("my dad used to make those calls", tc_m(603), "701")
+        log = []
+        sweep.run(self.cfg, tc_m(620), log)
+        conversations.run(self.cfg, tc_m(620), log)
+        data = ledger.snapshot(self.cfg.ledger_path)
+        note = ledger.find(data, "2026-10-16-j")
+        self.assertEqual(note["captures"][0]["answers"], "2026-10-15-reflection")
+        before, his = reflect.continuity(self.cfg, "reflection", date(2026, 10, 16), data)
+        self.assertIn("You asked him: What is the call asking of you?", before)
+        self.assertIn("What Theo wrote back to it in the chat (his words):\n- [2026-10-16-j] ", before)
+        self.assertIn("I was avoiding the call, not the bank", before)
+        self.assertIn("my dad used to make those calls", before)  # the thread that followed, his lines only
+        self.assertNotIn("What makes the call the hard part?", before)  # her chat reply is not his
+        self.assertNotIn("(none in the chat", before)
+        self.assertTrue(any("I was avoiding the call, not the bank" in h for h in his))
+
+    def test_under_capture_everything(self):
+        self.run_both("everything")
+
+    def test_under_capture_arm(self):
+        self.run_both("arm")
+
+    def test_a_plain_message_is_no_reply(self):
+        self.his("just thinking about the bank today, nothing else", tc_m(600), "700")
+        conversations.run(self.cfg, tc_m(620), [])
+        note = ledger.find(ledger.snapshot(self.cfg.ledger_path), "2026-10-16-j")
+        self.assertNotIn("answers", note["captures"][0])
 
 
 class VoiceTest(unittest.TestCase):
@@ -265,7 +412,13 @@ class VoiceTest(unittest.TestCase):
                      f"at most\n{prompts.QUOTES_ASKED}", "don't string his quotes together", "read past it"):
             self.assertIn(part, text)
         self.assertNotIn("is thrown away", text)
+        self.assertNotIn("loses its quotation marks", text)  # the model is not told how a misquote is handled
+        self.assertIn("words go in quotation marks; your own, earlier or now, you say in your own way", text)
         self.assertIn("## Before the day (your own words, except his replies, which are marked as his)\nBEFORE", text)
+
+    def test_the_annotation_is_about_him_in_the_third_person_and_her_reading_in_the_first(self):
+        self.assertIn("about him in the third person; your reading stays yours, in the first person",
+                      prompts.annotation_request(self.cfg, "w", None))
 
     def test_a_transcript_guess_only_where_annotations_stay_in_the_file(self):
         self.assertIn("don't comment on the transcription", prompts.annotation_request(self.cfg, "w", None))

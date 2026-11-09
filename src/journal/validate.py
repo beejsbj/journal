@@ -171,24 +171,52 @@ def asked(practice: Practice | str, data: dict) -> list[dict]:
 
 # ── reflections ──────────────────────────────────────────────────────────────
 # A reflection is free Markdown, so grounding is checked on what it quotes: every passage in double
-# quotes (straight or curly) and every blockquote line must appear in the supplied inputs. For a day
-# reflection or week review, ``unquote`` takes a passage that isn't there out of quotation (its marks
-# go, or the blockquote line), so nothing invented is presented as his words and the rest is kept; a
-# program's synthesis (``insights``) and the other checks below still reject the whole text on one.
+# quotes (straight or curly) and every blockquote line must appear in the supplied inputs. A program's
+# synthesis (``insights``), the catch-up and a program's construction and bridge reject the whole text
+# on one that doesn't. A day reflection or week review is checked against his words alone, file by
+# file (``unfound``): one that fails is a bad answer and is retried, and only on its last attempt does
+# ``strike`` drop the sentences holding such quotes so the reflection is not lost (``reflect.write_one``).
 
 REFLECTION_LIMITS = {"reflection": 3500, "week": 6000, "insights": 5000}  # insights: a program's synthesis
-_QUOTED = re.compile(r"“([^”]{4,})”|\"([^\"\n]{4,})\"")
-_TYPO = str.maketrans({"’": "'", "‘": "'", "“": '"', "”": '"', "—": "-", "–": "-", " ": " "})
+QUOTE_MIN = 4  # characters inside a pair of quotes (stripped) before it is checked: "No" or "ok" is no passage
+_CURLY = re.compile(r"“([^“”]*)”")
+_TYPO = str.maketrans({"’": "'", "‘": "'", "“": '"', "”": '"', "—": "-", "–": "-", " ": " "})
 _ELLIPSIS = re.compile(r"\s*(?:\.\.\.|…|\[\.\.\.\]|\[…\])\s*")
+_SENT_END = re.compile(r"[.!?…]+[\"”’')\]*_]*(?=\s|$)")
+_LEAD = re.compile(r"[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?(?:(?:\*\*[^*\n]+\*\*|__[^_\n]+__)[ \t]*[—–:-]?[ \t]*)?")
 
 
 def _plain(s: str) -> str:
     return _norm((s or "").translate(_TYPO))
 
 
+def _quotations(text: str) -> tuple[list[tuple[int, int, str]], list[int]]:
+    """Every pair of double quotes in ``text`` as (start, end, inside), and where the marks that pair with nothing
+    are. Curly pairs first (they may span lines); then the straight marks outside them, paired left to right on each
+    line at any length, so a short quote ("No") never shifts the pairs after it. A line's odd straight mark, and a
+    curly mark with no partner, pair with nothing."""
+    text = text or ""
+    pairs = [(m.start(), m.end(), m.group(1)) for m in _CURLY.finditer(text)]
+
+    def inside(i: int) -> bool:
+        return any(a <= i < b for a, b, _ in pairs)
+    stray = [i for i, c in enumerate(text) if c in "“”" and not inside(i)]
+    straight = []
+    pos = 0
+    for line in text.splitlines(keepends=True):
+        marks = [pos + i for i, c in enumerate(line) if c == '"' and not inside(pos + i)]
+        straight += [(a, b + 1, text[a + 1:b]) for a, b in zip(marks[::2], marks[1::2])]
+        if len(marks) % 2:
+            stray.append(marks[-1])
+        pos += len(line)
+    return sorted(pairs + straight), sorted(stray)
+
+
 def quotes(text: str) -> list[str]:
-    """Passages a reflection presents as quoted: double-quoted spans and blockquote lines."""
-    out = [a or b for a, b in _QUOTED.findall(text or "")]
+    """Passages a reflection presents as quoted: what is inside each pair of double quotes (``_quotations``; at
+    least ``QUOTE_MIN`` characters) and each blockquote line."""
+    pairs, _ = _quotations(text)
+    out = [inner.strip() for _, _, inner in pairs if len(inner.strip()) >= QUOTE_MIN]
     out += [l.lstrip("> ").strip() for l in (text or "").splitlines() if l.startswith(">") and l.lstrip("> ").strip()]
     return out
 
@@ -212,48 +240,124 @@ def _misquote(text: str, corpus: str) -> str | None:
     return None
 
 
-def unquote(text: str, corpus: str, wider=None) -> tuple[str, list[str]]:
-    """``text`` with every quoted passage (``quotes``) that is not in ``corpus`` taken out of quotation: a blockquote
-    line goes, and a passage in double quotes keeps its words without the marks, so it reads as the writer's own
-    paraphrase and never as his words. ``wider`` (a callable returning more text, read at most once and only when a
-    passage is missing from ``corpus``) is where a passage may also be found: his words anywhere in the journal, for
-    what a reflection reached through ``journal_search``. A pair of straight quotes whose inside starts or ends with a
-    space is two quotes mispaired, not a quotation, and is left as it is. Returns (text, the passages changed, each
-    cut to 60 characters)."""
-    hay = [_plain(corpus), None]
+def drop_stray_marks(text: str) -> tuple[str, int]:
+    """``text`` without the quote marks that pair with nothing (``_quotations``), and how many there were: a mark
+    with no partner cannot be checked, so it never stands."""
+    _, stray = _quotations(text)
+    for i in reversed(stray):
+        text = text[:i] + text[i + 1:]
+    return text, len(stray)
+
+
+def _fragments(q: str) -> list[str]:
+    return [f for f in (_plain(part).strip(" .,;:!?'\"-") for part in _ELLIPSIS.split(q)) if len(f) >= 3]
+
+
+def _in_one(frags: list[str], docs: list[str]) -> bool:
+    """Whether one of ``docs`` (already ``_plain``) holds every fragment, in order."""
+    for doc in docs:
+        at = 0
+        for f in frags:
+            j = doc.find(f, at)
+            if j < 0:
+                break
+            at = j + len(f)
+        else:
+            return True
+    return False
+
+
+def unfound(text: str, docs: list[str], wider=None) -> list[tuple[int, int, str]]:
+    """The quoted passages of ``text`` that are not his words, as (start, end, passage): each pair of quotes with at
+    least ``QUOTE_MIN`` characters inside, and each blockquote line (its span the whole line), that no single one of
+    ``docs`` holds with its fragments around "…" in order. ``wider`` (a callable returning more documents, called at
+    most once and only when a passage is missing from ``docs``) is his words in every file of the journal, for what a
+    reflection reached through ``journal_search``: a quote stitched from several files is not his."""
+    plain = [_plain(d) for d in docs if d]
+    more: list[str] | None = None
 
     def found(q: str) -> bool:
-        if _missing(q, hay[0]) is None:
+        nonlocal more
+        frags = _fragments(q)
+        if not frags or _in_one(frags, plain):
             return True
         if wider is None:
             return False
-        if hay[1] is None:
-            hay[1] = _plain(wider() or "")
-        return _missing(q, hay[1]) is None
+        if more is None:
+            more = [_plain(d) for d in (wider() or []) if d]
+        return _in_one(frags, more)
 
-    changed: list[str] = []
-    lines = []
-    for line in (text or "").splitlines(keepends=True):
+    text = text or ""
+    pairs, _ = _quotations(text)
+    out = [(a, b, inner.strip()) for a, b, inner in pairs if len(inner.strip()) >= QUOTE_MIN and not found(inner)]
+    pos = 0
+    for line in text.splitlines(keepends=True):
         q = line.lstrip("> ").strip() if line.startswith(">") else ""
         if q and not found(q):
-            changed.append(q[:60])
-            continue
-        lines.append(line)
+            out.append((pos, pos + len(line), q))
+        pos += len(line)
+    return sorted(out)
 
-    def one(m: re.Match) -> str:
-        q = m.group(1) or m.group(2)
-        if m.group(2) is not None and q != q.strip():
-            return m.group(0)
-        if found(q):
-            return m.group(0)
-        changed.append(q.strip()[:60])
-        return q
-    return _QUOTED.sub(one, "".join(lines)), changed
+
+def _ends(text: str, lo: int, hi: int, pairs: list[tuple[int, int, str]]) -> list[int]:
+    """Where sentences end in ``text[lo:hi]``: after a full stop (with its closing marks) that is not inside a
+    quotation and is followed by the line's end or a new sentence (a capital, a quote mark, emphasis)."""
+    out = []
+    for m in _SENT_END.finditer(text, lo, hi):
+        if any(a <= m.start() < b for a, b, _ in pairs):
+            continue
+        rest = text[m.end():].lstrip(" \t")
+        if not rest or rest[0] in "\n\"“*_(" or rest[0].isupper():
+            out.append(m.end())
+    return out
+
+
+def _sentence(text: str, a: int, b: int, inner: str, pairs: list[tuple[int, int, str]]) -> tuple[int, int]:
+    """The span of the sentence holding the quote at ``text[a:b]``: from the last sentence end before it (or the line's
+    start, after a list marker and a bold lead-in such as ``**What I notice** —``) to the end of the sentence it is
+    in (the quote's own end when it closes on a full stop and a new sentence, or the line's end, follows). Full stops
+    inside other quotations of the sentence are not its end (``_ends``)."""
+    ls = text.rfind("\n", 0, a) + 1
+    le = text.find("\n", b)
+    le = len(text) if le < 0 else le
+    start = ls
+    lead = _LEAD.match(text, ls)
+    if lead and lead.end() <= a:
+        start = lead.end()
+    start = max([start, *_ends(text, start, a, pairs)])
+    rest = text[b:le].lstrip(" \t*_")
+    if inner.rstrip()[-1:] in (".", "!", "?", "…") and (not rest or rest[0].isupper()):
+        return start, b
+    after = _ends(text, b, le, pairs)
+    return start, after[0] if after else le
+
+
+def strike(text: str, problems: list[tuple[int, int, str]]) -> str:
+    """``text`` without what ``unfound`` found: a blockquote line goes whole, any other quote goes with the sentence
+    that holds it, its lead-in ("you wrote", "as you put it") included, so no words that are not his stay attributed
+    to him, quoted or reported. A bold lead-in at the head of a line stays."""
+    pairs, _ = _quotations(text)
+    spans = []
+    for a, b, inner in problems:
+        line_start = a == 0 or text[a - 1] == "\n"
+        spans.append((a, b) if text[a:a + 1] == ">" and line_start else _sentence(text, a, b, inner, pairs))
+    merged: list[list[int]] = []
+    for a, b in sorted(spans):
+        if merged and a <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], b)
+        else:
+            merged.append([a, b])
+    for a, b in reversed(merged):
+        text = text[:a] + text[b:]
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    text = re.sub(r"[ \t]+([.,;:!?])", r"\1", text)
+    text = "\n".join(l.rstrip() for l in text.splitlines())
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
 def check_reflection(kind: str, text: str | None, corpus: str, misquotes: bool = True) -> tuple[bool, str]:
     """(ok, reason) for a model-written day reflection or week review against its inputs (``misquotes=False``: the
-    quotes were already taken care of by ``unquote``)."""
+    quotes were checked already, by ``unfound``)."""
     text = (text or "").strip()
     if len(text) < 80:
         return False, "empty or too short"

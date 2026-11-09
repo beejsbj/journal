@@ -104,8 +104,8 @@ def on_dispatch(event=None, **_kw):
 
 
 def on_llm_call(user_message=None, platform=None, session_id=None, turn_id=None, **_kw):
-    if os.environ.get(agent.MODEL_STEP_ENV):  # the engine's own one-shot (an opener, a reflection …): not a turn of
-        return None  # his, and it sees only the query the engine wrote (no notebook, no today block)
+    if os.environ.get(agent.MODEL_STEP_ENV) == "1":  # the engine's own one-shot (an opener, a reflection …): not
+        return None  # a turn of his, and it sees only the query the engine wrote (no notebook, no today block)
     try:
         cfg = runtime.load_config()
     except Exception:  # nothing below can run without the state dir; the message itself is unaffected

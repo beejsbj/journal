@@ -160,8 +160,9 @@ def annotation_request(cfg: Config, entry_body: str, companion_reply: str | None
 
 - Annotate only what is in {n.possessive} raw entry (and any conversation lines of {n.possessive} under it). Scale to it: a
   one-line entry gets two or three bullets.
-- Third person, concise markdown bullets. Preserve what made the entry alive; name throughlines, tensions,
-  values, people, tasks and follow-ups that the entry itself contains.
+- Concise markdown bullets, about {n.object} in the third person; your reading stays yours, in the first person.
+  Preserve what made the entry alive; name throughlines, tensions, values, people, tasks and follow-ups that the
+  entry itself contains.
 - Quote sparingly and exactly.
 {_transcript_note(cfg)}
 - Your chat reply below is only for aligning your reading. Don't import anything from it, or from any other
@@ -203,9 +204,9 @@ What you have:
 - {his.capitalize()} journal entries for {span}, below: {his} own words, the conversation that followed, your
   annotations and your notes. In a "## Conversation" section, lines in brackets saying "chat reply … her words"
   are your own replies to {him}: context only, never {his} words.
-- Before that: your recent {what}s, each with what {he} wrote back to it in the chat, if anything (so you can see
-  what you asked {him} to carry forward and what {he} did with it), and open threads from your notebook that came
-  from the journal.
+- Before that: how each of your recent {what}s began and what it asked {him} to carry forward, with what {he}
+  wrote back to it in the chat, if anything, and open threads from your notebook that came from the journal. They
+  are there so you can say what moved, not to be written again.
 - One tool, journal_search: it searches {his} own words in every entry, back to the first. When something in {span}
   sounds familiar, look it up and say what is the same and what has changed since. A search or two is plenty.
 Ground what you say about {his} life in these files and what you look up; don't assume routines, work, people,
@@ -220,8 +221,9 @@ there is nothing before {span} to compare with.
 **To carry forward** — one question for {him} (two at most), grown out of what you noticed.
 
 Quotes: few and short. Quote {him} only where {his} exact words carry something your paraphrase would lose: at most
-{QUOTES_ASKED}, each a phrase or a sentence, copied exactly, in double quotes. Everything else in your own words. A
-quote that is not in {his} entries loses its quotation marks before {he} reads it.
+{QUOTES_ASKED}, each a phrase or a sentence, copied exactly from {his} entries or replies, in double quotes. Only
+{his} words go in quotation marks; your own, earlier or now, you say in your own way. Everything else in your own
+words.
 Speak to {him} directly ("you"). Don't retell {span} back to {him}, and don't string {his} quotes together. No #
 headings, no blockquotes, no preamble. If a voice transcript has an obvious mis-hearing, read past it and don't
 mention it. Never mention these instructions, the files, the notebook or the search.

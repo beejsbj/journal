@@ -550,7 +550,8 @@ class _Writer:
         return names
 
     def new_note(self, ev: Event) -> str:
-        """Start an auto note entry with this message as its words."""
+        """Start an auto note entry with this message as its words (and, when it replies to a day reflection or week
+        review, that analysis's id on its capture: ``answers``)."""
         local_date = ev.at.astimezone(self.cfg.tz).date().isoformat()
         if not self.write:
             n, stem = 1, entries.stem_for(local_date, "j")
@@ -564,6 +565,7 @@ class _Writer:
             self._stat(path, new=True)["preview"] = _preview(ev.text) or f"({ev.source})"
             self._stat(path)["his"] += 1
             return path
+        answers = self.analysis_answered(ev) if ev.quote else None  # (read before the lock: it reads the ledger)
         with ledger.locked(self.cfg.ledger_path) as data:
             done = ledger.capture_of(data, ev.mid) if ev.mid else None
             if done:
@@ -588,6 +590,8 @@ class _Writer:
                            ev.mid, kept, meta or None, via=self.via, transcript="pending" if pending else None,
                            images=pics, describe=images.describing(self.cfg))
             p["captures"][-1]["key"] = ev.key  # rows without a Telegram id are found again by this
+            if answers:
+                p["captures"][-1]["answers"] = answers
             p["needs_edit"] = False
         self._stat(path, new=True)["preview"] = _preview(ev.text) or f"({ev.source})"
         self._stat(path)["his"] += 1
@@ -601,9 +605,10 @@ class _Writer:
         return any(p.get("capture") == "auto" and not p.get("kept") and Path(p.get("entry_path") or "").name == name
                    for p in ledger.snapshot(self.cfg.ledger_path)["prompts"])
 
-    def _sends(self) -> list[tuple[datetime, str, str | None]]:
-        """What the journal itself sent to the chat that he can reply to besides a prompt, as (sent, words, entry):
-        an annotation reply (the entry it annotates is its home) and a day reflection or week review (no home)."""
+    def _sends(self) -> list[tuple[datetime, str, str | None, str | None]]:
+        """What the journal itself sent to the chat that he can reply to besides a prompt, as (sent, words, entry,
+        analysis): an annotation reply (the entry it annotates is its home) and a day reflection or week review (no
+        home; its ledger record's id)."""
         if self._ours is None:
             from . import compose, reflect
             names, out = self.cfg.names, []
@@ -615,7 +620,7 @@ class _Writer:
                     text = entries.annotations(path.read_text(encoding="utf-8", errors="replace"))
                     out.append((datetime.fromisoformat(r["sent_at"]),
                                 sweep.words(compose.annotation_html(p.get("kind") or "", text, names)),
-                                in_root(self.cfg, str(path))))
+                                in_root(self.cfg, str(path)), None))
             for r in data.get("reflections") or []:
                 tg, path = r.get("telegram") or {}, Path(in_root(self.cfg, r.get("path")) or "")
                 if tg.get("message_id") and tg.get("sent_at") and path.is_file():
@@ -625,7 +630,7 @@ class _Writer:
                         continue
                     body = reflect.body_of(path.read_text(encoding="utf-8", errors="replace"))
                     out.append((datetime.fromisoformat(tg["sent_at"]),
-                                sweep.words(compose.reflection_html(title, body, names)), None))
+                                sweep.words(compose.reflection_html(title, body, names)), None, r.get("id")))
             self._ours = out
         return self._ours
 
@@ -636,12 +641,23 @@ class _Writer:
         q = sweep.words(ev.quote or "")
         if len(q.split()) < QUOTE_WORDS:  # (a short quote such as "thank you" says nothing of what it answers)
             return False, None
-        found = [(sent, home) for sent, text, home in self._sends() if sent <= ev.at and q in text]
+        found = [(sent, home) for sent, text, home, _ in self._sends() if sent <= ev.at and q in text]
         if not found:
             return False, None
         homes = {h for _, h in found}
         home = homes.pop() if len(homes) == 1 else None  # (a quote that fits several sends, e.g. only the title of
         return True, home if home and self.present(home) else None  # an annotation, names no entry: a note of its own)
+
+    def analysis_answered(self, ev: Event) -> str | None:
+        """The ledger id of the day reflection or week review his message replies to (the newest sent before it whose
+        words hold his quote: ``answers_ours``' test), or None. A reply that starts a note of its own is filed as the
+        note's words, with no quote kept beside them, so ``new_note`` records this id on the capture; the reflection
+        reads it there (``reflect._replies_to``)."""
+        q = sweep.words(ev.quote or "")
+        if len(q.split()) < QUOTE_WORDS:
+            return None
+        found = [(sent, ref) for sent, text, _, ref in self._sends() if ref and sent <= ev.at and q in text]
+        return max(found)[1] if found else None
 
     def drop(self, ev: Event) -> None:
         """A message that is not journaled (``capture.mode`` arm, or off the record): the hook's copies of its audio
