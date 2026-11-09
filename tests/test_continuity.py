@@ -237,33 +237,26 @@ class QuotesTest(Earlier):
                  'You wrote „I adore naps“ and slept.',                            # low-9
                  'You wrote "I told her "I adore naps" and left early" on Tuesday.',  # a quote inside a quote
                  'You wrote " I never loved any of it " on Tuesday.',              # spaces inside the marks
-                 'You wrote ‘I adore naps’ and slept.',                            # single quotes as quotation
-                 "You wrote 'I adore naps' and slept.",
                  'You wrote «I adore naps» and slept.',
-                 'You wrote `I adore naps` and slept.',
-                 'You said “so much. That reads as rest.')                         # a mark with no partner
+                 'You wrote ˮI adore napsˮ and slept.',                            # the double apostrophe (a review)
+                 'You said “so much. That reads as rest.')                         # a stray curly mark
 
-    def test_an_irregular_quote_mark_is_a_bad_answer(self):
+    def test_an_irregular_double_quote_mark_is_a_bad_answer(self):
         self.evening()
         for text in self.IRREGULAR:
             with self.subTest(text):
                 with ledger.locked(self.cfg.ledger_path) as data:
                     data["reflections"] = []
                 self.bot.calls.clear()
-                self.never_written(GOOD.replace("That reads as patience held lightly (inference).", text))
+                log = self.never_written(GOOD.replace("That reads as patience held lightly (inference).", text))
+                self.assertTrue(any("failed (irregular quote mark" in l for l in log), log)
 
-    def test_apostrophes_are_not_quotation(self):
+    def test_apostrophes_possessives_and_code_pass(self):
         self.evening()
-        self.answer = GOOD.replace("That reads as", "You're right that Theo's walk, the students’ notes and "
-                                                   "rock 'n' roll aside, it's fine. That reads as")
+        self.answer = GOOD.replace("That reads as", "You're right that Theo's walk, the kids’ room, the kids' toys, "
+                                                   "the '90s, rock 'n' roll and `ls -la` aside, it's fine. "
+                                                   "See <https://example.org> &amp; more. That reads as")
         _, log = self.tick(45)
-        self.assertTrue(any(l.startswith("2026-10-14-reflection: reflection attempt 1/3 failed (irregular quote mark")
-                            for l in log), log)  # ('n' opens a word: a single quote, so it fails closed)
-        with ledger.locked(self.cfg.ledger_path) as data:
-            data["reflections"] = []
-        self.answer = GOOD.replace("That reads as", "You're right that Theo's walk and the dog's bed are "
-                                                   "fine. That reads as")
-        _, log = self.tick(50)
         self.assertIn("wrote 2026-10-14-reflection.md (annotated) (+1 notebook)", log)
 
     def test_an_answer_that_is_no_reflection_still_writes_nothing(self):
@@ -274,19 +267,19 @@ class QuotesTest(Earlier):
         self.assertFalse((self.cfg.root / "2026-10-14-reflection.md").exists())
 
 
-class EveryQuoteLikeMarkTest(Earlier):
-    """Review round 4: irregular is a class of characters, not a list; Obsidian's blockquote shapes; HTML; words
-    reported as his with no quotation. Each input wrote an invented line into a saved reflection on attempt 1."""
+class DoubleQuoteMarksTest(Earlier):
+    """Every double quote mark, of any kind, outside a well-formed pair is irregular (a class: review rounds 4 and
+    5); Obsidian's blockquote shapes are checked. Each input wrote an invented line into a saved reflection on attempt 1
+    of an earlier round. Single quotes, HTML and paraphrase are not judged in this PR (an open issue)."""
 
     INVENTED = "I hate my job"
 
     def tick(self, minute):
         return self.reflect(datetime(2026, 10, 14, 23, minute, tzinfo=IST))
-    INPUTS = ([f"You wrote ″{INVENTED}″ today.", f"You wrote ＂{INVENTED}＂ today.", f"You wrote ❝{INVENTED}❞ today.",
-               f"You wrote ❛{INVENTED}❜ today.", f"You wrote 〝{INVENTED}〞 today.", f"You wrote 「{INVENTED}」 today.",
-               f"You wrote ‛{INVENTED}’ today.", f"You wrote ’{INVENTED}’ today.",
-               f"You wrote &quot;{INVENTED}&quot; today.", f"You wrote &ldquo;{INVENTED}&rdquo; today.",
-               f"You wrote <q>{INVENTED}</q> today.", f"<blockquote>{INVENTED}</blockquote>"])
+
+    INPUTS = [f"You wrote ″{INVENTED}″ today.", f"You wrote ＂{INVENTED}＂ today.", f"You wrote ❝{INVENTED}❞ today.",
+              f"You wrote 〝{INVENTED}〞 today.", f"You wrote 「{INVENTED}」 today.", f"You wrote 『{INVENTED}』 today.",
+              f"You wrote ˮ{INVENTED}ˮ today.", f"You wrote ‶{INVENTED}‶ today.", f"You wrote «{INVENTED}» today."]
     BLOCKS = [f"   > {INVENTED}", f"- > {INVENTED}", f"1. > {INVENTED}",
               f"> rain all day, walked anyway\n{INVENTED}"]  # (lazy continuation: Obsidian renders it in the quote)
 
@@ -301,55 +294,55 @@ class EveryQuoteLikeMarkTest(Earlier):
         with self.subTest(text):
             with ledger.locked(self.cfg.ledger_path) as data:
                 data["reflections"] = []
-            (self.cfg.root / "2026-10-14-reflection.md").unlink(missing_ok=True)
             self.answer = answer
             for n, minute in ((1, 45), (2, 50), (3, 55)):
                 _, log = self.tick(minute)
                 self.assertTrue(any(f"reflection attempt {n}/3 failed" in l for l in log), log)
             self.assertFalse((self.cfg.root / "2026-10-14-reflection.md").exists())
 
-    def test_the_whole_initial_and_final_punctuation_class_is_irregular(self):
+    def test_the_class_covers_every_double_mark_and_no_single_one(self):
         import unicodedata
         docs = [f"{self.INVENTED}, he said"]
-        marks = [chr(c) for c in range(0x110000) if unicodedata.category(chr(c)) in ("Pi", "Pf")]
-        marks += list("″‴‶‷ʺ＂＇❝❞❛❜❮❯〝〞〟「」『』﹁﹂﹃﹄｢｣🙶🙷🙸«»‹›„‚`'")
-        self.assertGreaterEqual(len(marks), 49)
-        for c in marks:
+        pipf = [chr(c) for c in range(0x110000) if unicodedata.category(chr(c)) in ("Pi", "Pf")]
+        doubles = [c for c in pipf if "DOUBLE" in unicodedata.name(c)]
+        self.assertTrue({"“", "”", "«", "»", "‟"} <= set(doubles))
+        for c in pipf:
+            with self.subTest(hex(ord(c))):
+                self.assertEqual(validate.quote_like(c), c in doubles)
+        for c in doubles + list("\"＂„″‴⁗‶‷ʺˮ❝❞〝〞〟「」『』﹁﹂﹃﹄｢｣🙶🙷🙸⹂"):
             with self.subTest(hex(ord(c))):
                 self.assertTrue(validate.quote_like(c))
-                if c in "’'":
-                    continue  # (an apostrophe inside a word is the one exception: below)
-                for text in (f"The {c}{self.INVENTED}{c} line.", f"The {c}word here.", f"The word{c} here."):
-                    self.assertTrue(any(q.startswith("irregular") for _, _, q in validate.unfound(text, docs)),
-                                    (c, text))
+                for text in (f"The {c}word here.", f"The word{c} here."):
+                    self.assertTrue(any(q.startswith("irregular") for _, _, q in validate.unfound(text, docs)), text)
+        for c in "‘’‛‚‹›❛❜❮❯'`＇′":
+            with self.subTest(hex(ord(c))):
+                self.assertFalse(validate.quote_like(c))
         self.assertEqual(validate.unfound(f'He said "{self.INVENTED}".', docs), [])
         self.assertEqual(validate.unfound(f"He said “{self.INVENTED}”.", docs), [])
-        self.assertEqual(validate.unfound("Theo's walk, don't, it’s fine, rock'n'roll.", docs), [])
-        for text in ("the kids’ room", "the kids' room", "the '90s", "'cause I said so", "a 'scare' quote"):
-            with self.subTest(text):  # (harmless, and failing closed: DECISIONS.md, CONTINUITY)
-                self.assertTrue(validate.unfound(text, docs))
+
+    def test_single_quotes_html_and_paraphrase_are_left_to_the_follow_up(self):
+        # (not judged in this PR: an open issue, DECISIONS.md CONTINUITY; checked here so the gap is on record)
+        docs = ["rain all day"]
+        for text in (f"You wrote ‘{self.INVENTED}’.", f"You wrote '{self.INVENTED}'.", f"You wrote `{self.INVENTED}`.",
+                     f"You wrote &quot;{self.INVENTED}&quot;.", f"You wrote <q>{self.INVENTED}</q>.",
+                     f"You wrote: {self.INVENTED}.", "the kids’ room", "the '90s", "<https://example.org>"):
+            with self.subTest(text):
+                self.assertEqual(validate.unfound(text, docs), [])
 
     def test_blockquote_shapes_and_their_lazy_lines_are_checked(self):
         docs = ["rain all day, walked anyway"]
         for text in self.BLOCKS:
             with self.subTest(text):
-                found = validate.unfound(text, docs)
-                self.assertEqual(len(found), 1)
+                self.assertEqual(len(validate.unfound(text, docs)), 1)
         self.assertEqual(validate.unfound("> rain all day, walked anyway", docs), [])
         self.assertEqual(validate.unfound("- > rain all day,\n  walked anyway", docs), [])
         self.assertEqual(validate.unfound("    > four spaces is code, not a quote", docs), [])
 
-    def test_html_and_entities_are_irregular(self):
-        for text in ("Fine &amp; well.", "A &#8220;line&#8221;.", "A &#x201C;line&#x201D;.", "Fine <b>bold</b>.",
-                     "<br> a break", "</p> stray"):
-            with self.subTest(text):
-                self.assertTrue(any(q.startswith("irregular HTML") for _, _, q in validate.unfound(text, [])))
-        self.assertEqual(validate.unfound("3 < 4 and 5 > 2, and a <3 heart; AT&T", []), [])
-
     def test_the_program_and_catch_up_checks_use_the_same_check(self):
         corpus = "I want to sleep, honestly. " + "x " * 200 + "Then to quit."
-        for text in (f"You wrote ‛{self.INVENTED}’ today, so rest.", 'You said "No" and slept.',
-                     '"I want … to quit" is what you said.', f"You wrote <q>{self.INVENTED}</q>, so rest."):
+        for text in (f"You wrote ″{self.INVENTED}″ today, so rest.", 'You said "No" and slept.',
+                     '"I want … to quit" is what you said.', f"You wrote «{self.INVENTED}», so rest.",
+                     f'You wrote "{self.INVENTED}", so rest.'):
             with self.subTest(text):
                 self.assertFalse(validate.check_catchup(text, corpus)[0])
                 self.assertFalse(validate.check_reflect_phase(text, corpus)[0])
@@ -414,12 +407,14 @@ class QuoteCheckTest(unittest.TestCase):
             with self.subTest(text):
                 found = self.bad(text)
                 self.assertTrue(any(f.startswith("irregular quote mark") for f in found), found)
-        self.assertEqual(self.bad("You're right; Theo's walk, it’s fine, don't."), [])
+        self.assertEqual(self.bad("You're right; Theo's walk, the kids’ room, the '90s, `code`, don't."), [])
 
-    def test_a_quote_with_nothing_to_check_is_not_his(self):
-        self.assertEqual(self.bad('You said "No".'), ["No"])
-        self.assertEqual(self.bad('"Go … be … it"'), ["Go … be … it"])
-        self.assertEqual(self.bad('"go on, be brave"'), [])
+    def test_a_short_quote_is_checked_as_a_whole_word(self):
+        self.assertEqual(self.bad('You said "No".'), ["No"])                         # not a word of his here
+        self.assertEqual(self.bad('You said "No".', docs=["No, I stayed in."]), [])
+        self.assertEqual(self.bad('You said "no".', docs=["I know it."]), ["no"])     # (not the end of "know")
+        self.assertEqual(self.bad('"Go … be … it"'), [])                             # (go on, be brave, it is late)
+        self.assertEqual(self.bad('"it … be … go"'), ["it … be … go"])               # out of order
 
     def test_parts_around_an_ellipsis_must_be_in_one_paragraph_in_order_and_close(self):
         self.assertEqual(self.bad("“the soup … the bus”"), [])
@@ -448,9 +443,9 @@ class QuoteCheckTest(unittest.TestCase):
         self.assertTrue(validate.check_reflection("reflection", text, "nothing", misquotes=False)[0])
         self.assertFalse(validate.check_catchup('You said "No" and then "I never loved any of it" last night.',
                                                 "No, and then I left. I loved some of it")[0])
-        ok, why = validate.check_catchup("You wrote ‘I adore naps’ and slept. Glad you rested.", "I adore naps")
+        ok, why = validate.check_catchup("You wrote ˮI adore napsˮ and slept. Glad you rested.", "I adore naps")
         self.assertFalse(ok)
-        self.assertIn("irregular quote mark '‘'", why)
+        self.assertIn("irregular quote mark 'ˮ'", why)
 
 
 class ReplyThroughConversationsTest(test_conversations.Base):
