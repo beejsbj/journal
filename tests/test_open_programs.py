@@ -507,3 +507,20 @@ class WebInterruptTest(WebCase):
         with mock.patch.object(sqlite3, "connect", refuse), mock.patch.object(privacy, "view", refuse):
             self.block({"text": "my answer", "interrupt": 1}, 201)
             self.assertTrue(self.run_one(self.rid)["scheduled"])
+
+
+class ChatScheduleNoteTest(ti.Base):
+    def test_a_face_settled_schedule_phase_says_nothing_in_the_chat_during_a_window(self):
+        """A face's answer now settles while the chat is off the record; the engine's notes about it wait too."""
+        rid = self.reach_schedule_phase()
+        stem = programs.entry_stem(self.cfg, self.the_run(), 10)
+        self.now += timedelta(minutes=1)
+        capture.add_web_block(self.cfg, stem, "2026-11-02 07:00", self.now, phase_prompt=f"{rid}-s10-p3")
+        before = len(self.bot.sends())
+        self.now += timedelta(minutes=3)
+        with mock.patch.object(programs, "_off_the_record", return_value=True):
+            self.assertTrue(programs.settle(self.cfg, rid, self.now, self.log))
+        self.assertEqual(self.where(), (10, 4))
+        self.assertEqual(len(self.items()), 8)  # the interrupts are timed …
+        self.assertEqual(len(self.bot.sends()), before)  # … and neither the note nor phase 4 went to the chat
+        self.assertTrue(any("note held back" in line for line in self.log))

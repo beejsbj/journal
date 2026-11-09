@@ -5,8 +5,11 @@ entry and status, and each phase's send and transitions. It never holds his word
 entry per session (``YYYY-MM-DD-<program>-sNN.md``, dated the day the session started; a situational run writes
 ``YYYY-MM-DD-<id>.md``), each block of his words under a hidden ``%% journal phase:N %%`` key.
 
-**A phase send is a ledger prompt** (``<run>-sNN-pM``, ``collapse_hours: 3``), delivered by ``tick.send_prompt``, so
-capture, the sweep, folding, threading, the mirror and annotation are the existing code paths. The phase that is
+**A phase is a ledger prompt** (``<run>-sNN-pM``, ``collapse_hours: 3``). It becomes current by being *opened*
+(``_open``: the record written with ``message_id: None``, ``sent_at`` the moment it became current, ``phase_open``),
+so a face can answer it with no chat at all (OPEN-PROGRAMS); with a chat it is then delivered by
+``tick.send_prompt``, so capture, the sweep, folding, threading, the mirror and annotation are the existing code
+paths. ``send_due`` on the run's phase means "owed a delivery"; ``phase_opened`` says whether it is current. The phase that is
 open (``phase_open`` on its record) takes every message while it is visible and the newest prompt in the chat, not
 only the first (``capture.open_phase``, ``capture.superseded``); a break closes it.
 
@@ -15,7 +18,8 @@ one at a time under the tick's lock: in the tick's ``step``, or in a spawned ``j
 takes the lock first (``locked``). They are idempotent: an advance is keyed ``<run>:<session>:<phase>:<last capture
 id>`` (``cmd<visit>`` for a command), and a key the phase has already used is a no-op, so a sweep re-capture, a
 redelivered update, a lost-then-retried spawn or the tick racing a spawn all collapse to one send. A transition
-writes the run file *before* it sends (``send_due``); if the process dies in between, the next ``step`` sends.
+writes the run file *before* it opens and sends (``send_due``); if the process dies in between, the next ``step``
+opens and sends.
 
 **Advance** (Decision 1): ``advance: settle`` (fix-life) moves on once the newest capture on the open phase is
 ``programs.settle_minutes`` (2) old; the hook spawns ``journal program settle <run>`` on each capture, and the
@@ -25,7 +29,8 @@ tick's ``step`` catches a lost spawn. ``advance: next`` waits for ``/next``. ``/
 phase, the settle looks for a reply that is ``YYYY-MM-DD HH:MM`` or ``HH:MM`` (``parse_confirmation``), times the
 phase's interrupt lines from it (``confirm_schedule``) and moves on; anything else is kept as his words, asked about
 once more, and schedules nothing. The interrupts live in ``run["scheduled"]`` as wall-clock times, the tick's ``step``
-sends them (``send_interrupts``: ledger prompts a reply answers, under the interrupt's key in the session's entry) and
+opens them at their time and sends them (``send_interrupts``: ledger prompts a chat reply or a face's block answers,
+under the interrupt's key in the session's entry) and
 a synthesis, when the program asks for one, is appended to the insights document there too (``synthesize``).
 
 **No model needed.** A ``reflect`` phase asks the model for its construction (validated: quotes only from his
@@ -1155,8 +1160,13 @@ def _plain_of(markup: str) -> str:
     return html.unescape(re.sub(r"<[^>]+>", "", markup))
 
 
-def _say(cfg: Config, prog: Program, markup: str, log: list[str], now: datetime) -> bool:
-    """A short note from the engine (not a prompt: nothing answers it). Best effort; True when it was delivered."""
+def _say(cfg: Config, prog: Program, markup: str, log: list[str], now: datetime, auto: bool = False) -> bool:
+    """A short note from the engine (not a prompt: nothing answers it). Best effort; True when it was delivered.
+    ``auto``: said on the engine's own move (a settle), which a face's answer can make while a bare ``/x`` holds the
+    chat off the record: the note is then held back, as the phase that follows is."""
+    if auto and cfg.has_channel and _off_the_record(cfg, now):
+        log.append(f"{prog.id}: note held back: off the record (or the privacy pass cannot say)")
+        return False
     return _say_about(cfg, prog.id, markup, log, now)
 
 
@@ -1226,7 +1236,7 @@ def plan_interrupts(cfg: Config, prog: Program, run: dict, s: int, p: int, day: 
 
 
 def confirm_schedule(cfg: Config, prog: Program, run: dict, s: int, p: int, now: datetime,
-                     log: list[str]) -> tuple[str, str]:
+                     log: list[str], auto: bool = False) -> tuple[str, str]:
     """Look for his confirmation in the open schedule phase and, when there is one, schedule the interrupts from it
     (replacing the ones of this session that have not been sent yet). Returns ``("scheduled", "")``, ``("none", "")``
     (no reply of this visit is a day and time), ``("past", why)`` (it is one, but every interrupt would be over) or
@@ -1271,7 +1281,7 @@ def confirm_schedule(cfg: Config, prog: Program, run: dict, s: int, p: int, now:
             at = schedule.wall_clock(cfg, i["local"])
             rows.append((i["offset"], at.strftime("%H:%M" if at.date() == first.date() else "%a %H:%M"), i["text"]))
         if _say(cfg, prog, compose.schedule_confirmed_html(rows, _day_name(first, now.astimezone(cfg.tz)), gone),
-                log, now):
+                log, now, auto=auto):
             ph["schedule_told"] = True
             _save(cfg, run)
     return "scheduled", ""
@@ -1281,7 +1291,7 @@ def _confirmed(cfg: Config, prog: Program, run: dict, s: int, p: int, now: datet
                explicit: bool) -> bool:
     """The schedule phase is being left. True: go on (the interrupts are timed, or he said ``/next`` and gets none).
     False: stay on the phase; the settle found no usable confirmation and has asked once."""
-    outcome, why = confirm_schedule(cfg, prog, run, s, p, now, log)
+    outcome, why = confirm_schedule(cfg, prog, run, s, p, now, log, auto=not explicit)
     if outcome == "scheduled":
         return True
     if explicit:  # /next or the web app's button: his own act, with nothing new to schedule
@@ -1305,7 +1315,7 @@ def _confirmed(cfg: Config, prog: Program, run: dict, s: int, p: int, now: datet
                     outcome, "I couldn't find a day and wake time in that. ")
         phase = prog.session(s).phase(p)
         if _say(cfg, prog, f"<i>{html.escape(lead, quote=False)}{html.escape(confirm_request(cfg, phase, now), quote=False)}</i>",
-                log, now):
+                log, now, auto=True):
             ph["confirm_asked"] = _iso(now)
             _save(cfg, run)
             log.append(f"{run['id']}: session {s} phase {p} waits for a day and wake time ({outcome})")
