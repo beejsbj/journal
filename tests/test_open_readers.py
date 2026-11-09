@@ -188,5 +188,38 @@ class EngineOnlyTest(unittest.TestCase):
             self.assertFalse((pkg / "serve").exists() or (pkg / "hermes").exists() or (pkg / "mcp").exists())
 
 
+class ServeRowsTest(unittest.TestCase):
+    """CodeRabbit on #27: only a missing ``journal.serve`` package is "not part of this install"; a broken one (a
+    module of it, or a dependency of it, that cannot be imported) is a failing row, not an "ok"."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.cfg = make_cfg(Path(self.tmp.name), names=NEUTRAL)
+
+    def rows(self, missing: str):
+        """``serve_rows`` with ``from .serve import …`` failing as if ``missing`` could not be imported."""
+        import builtins
+        from unittest import mock
+        real = builtins.__import__
+
+        def fake(name, globals=None, locals=None, fromlist=(), level=0):
+            if level == 1 and name == "serve":
+                raise ModuleNotFoundError(f"No module named {missing!r}", name=missing)
+            return real(name, globals, locals, fromlist, level)
+        with mock.patch.object(builtins, "__import__", fake):
+            return {n: (s, d) for n, s, d in status.serve_rows(self.cfg, token=False)}
+
+    def test_serve_not_installed_is_one_ok_row(self):
+        self.assertEqual(self.rows("journal.serve")["serve"], ("ok", "journal serve is not part of this install"))
+
+    def test_a_broken_serve_install_fails(self):
+        for missing in ("journal.serve.auth", "a_dependency_of_serve"):
+            with self.subTest(missing):
+                state, detail = self.rows(missing)["serve"]
+                self.assertEqual(state, "fail")
+                self.assertIn(missing, detail)
+
+
 if __name__ == "__main__":
     unittest.main()

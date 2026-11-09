@@ -905,7 +905,7 @@ def run(args, cfg_loader=None, hermes_checks=None) -> int:
     if cmd == "send":
         from . import library
         try:
-            practice = library.load(cfg).get(args.ritual)
+            library.load(cfg).get(args.ritual)
         except library.UnknownDefinition:
             return _err(f"no practice {args.ritual!r} (known: {', '.join(library.load(cfg).practices)})")
         except RuntimeError as e:  # the packaged built-ins are unreadable: an install fault

@@ -481,8 +481,11 @@ def serve_rows(cfg: Config, token: bool = True) -> list[tuple[str, str, str]]:
     install without ``journal serve`` (the engine alone) has one row saying so."""
     try:
         from .serve import auth, static
-    except ImportError:
-        return [("serve", "ok", "journal serve is not part of this install"), version_row(cfg)]
+    except ImportError as e:
+        if isinstance(e, ModuleNotFoundError) and e.name == f"{__package__}.serve":
+            return [("serve", "ok", "journal serve is not part of this install"), version_row(cfg)]
+        # (serve is here but does not import: a broken install, never "not part of it")
+        return [("serve", "fail", f"journal serve does not import: {type(e).__name__}: {e}"), version_row(cfg)]
     rows = []
     if token:
         tok, where = auth.resolve_token(cfg)

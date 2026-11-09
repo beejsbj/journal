@@ -3333,23 +3333,40 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   3. **No chat: annotation replies and reflection sends are skipped, not left pending.** With `channel.platform:
      none`, each that would have been sent is marked `skipped: "no chat"` (`annotation_reply` and the reflection's
      `telegram` record, with `skipped_at`), so a chat configured later never sends it, as OPEN-PROGRAMS does for a
-     summary (`summary_unsent: "no chat"`). A reply is marked only when `telegram.annotation_replies` is on (only
-     then would it have been sent). `status` lists no skipped reply as pending and reads a skipped reflection
-     "written, not sent: no chat". Instead the companion is told: `standing.collect` gains `no_chat`, the count of
-     annotations and reflections marked skipped since the newest prompt delivered to the chat (all of them while none
-     has been), and the pack's *Where things stand* and the today block's standing lines carry one line, e.g. "While
-     there was no chat: 12 annotations and 3 reflections were written; they are in the entries, never sent to the
-     chat." Counts only, never their words; the line goes once a prompt is delivered again. MCP's `journal_today`
+     summary (`summary_unsent: "no chat"`). A reply is marked whatever `telegram.annotation_replies` says, so
+     turning replies on with a chat later sends no backlog. `status` lists no skipped reply as pending and reads a
+     skipped reflection "written, not sent: no chat". Instead the companion is told: `standing.collect` gains
+     `no_chat`, the count of annotations and reflections written (by `annotated_at` / `written_at`) after the last
+     prompt delivered before the newest skip, and the pack's *Where things stand* and the today block's standing
+     lines carry one line, e.g. "While there was no chat: 12 annotations and 3 reflections were written; they are in
+     the entries, never sent to the chat." Counts only, never their words. A reply still owed from before the chat
+     was set to none is skipped too but not counted (it was written with a chat). Once the chat delivers again the
+     line stays a day (`standing.NO_CHAT_SHOWN`), so a plain opener's delivery does not take it away before an
+     opener's pack or the first thread's today block has carried it. MCP's `journal_today`
      does not get it: its today text does not take standing (`today.collect` without `with_standing`), so nothing
      there changed. Tests: `NoChannelTest` in `tests/test_open_core.py` (nothing pending or sent after a chat is set;
      the line in standing, the pack and the today lines, with no word of the annotation or reflection).
+     **Left open for the owner** (review of these changes): read to the letter, decision 1 also covers a practice
+     that closes the day. At 00:30, `/start evening` delivers tonight's evening (the 15th's, early): the tick's
+     23:00 send on the 15th is then done, words he writes at 00:35 answer that message (step 1, it is open), and
+     once they are annotated the 15th's day reflection is written from them at about 01:05 and not again. `main`
+     did the same (it sent the calendar date's evening), and the owner's example was a morning. If an evening
+     `/start` before `day_ends_at` should re-send or fill last night's instead, `_by_calendar` would keep step 1's
+     yesterday (a due or open slot) or leave `closes: day` practices on the journal day: a one-line rule change.
   4. **`enabled: false` means "not scheduled" only.** Every face can still open, write and deliver a disabled
      practice (the web app, `journal open`/`journal write`, MCP, `/start` and `journal send`); the schedule never
      sends it. Applied on OPEN-FACES (#28): `actions` no longer refuses one (the `disabled` code is gone, with serve's
      `409 disabled` on `POST /entries`, `GET /library/{id}/open` and `POST /library/{id}/send`, and the CLI's), and
      `commands.start` and `journal send` take it; the PWA keeps *Write now* and *Send to chat* on its Today card and
      Library page. A turned-off practice has no slot (`slots.scheduled_on` is empty for it), so words or a send make
-     an extra entry of the day (`<date>-<id>`, then `-2` …), and the Today rows show it only once it has a record.
+     an extra entry of the day (`<date>-<id>` first, then the next number past its schedule's slots: a two-slot
+     practice's second is `-3`), and the Today rows show it only once it has a record. **Kept, from the review of
+     these changes:** `library.closer` still takes enabled practices only, so a turned-off evening does not close
+     the day (`test_the_day_closes_on_a_renamed_evening_in_a_fork` pins that: turning it off is how a fork hands
+     `closes: day` to another practice; written on a face, its day reflection waits for the 04:00 fallback); and
+     `/start`'s menu and the skill's *Kinds* list name enabled practices only (what is offered; one turned off is
+     still taken when named). The PWA's comment in `today.tsx` that still says "turned off or unknown" waits for
+     the next web change (a comment alone would cost a CI build).
      A program turned off is still refused (the decision names practices). The tests that pinned the refusal now pin
      the opposite: `test_open_faces.py` (`…turned_off_is_not_scheduled_but_every_face…`), `test_serve_writes.py`,
      `test_mcp.py`, `test_practices_engine.py` (`…not_due_and_still_starts`), `test_cli.py`, and the web's
