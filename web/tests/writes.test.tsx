@@ -333,7 +333,7 @@ describe("Today", () => {
     visit("/");
     const { writes } = stubApi({ ...reads, "POST /api/v1/library/gratitude/send": json({ spawned: true, log: "/x" }, 202) });
     const host = mount(<App />);
-    const card = await until(() => must(host.querySelector("li.practice.upcoming")));
+    const card = await until(() => must([...host.querySelectorAll("li.practice.upcoming")].find((li) => /gratitude/i.test(li.textContent ?? ""))));
     await click(byText(card, "button", "Send now"));
     await until(() => expect(card.textContent).toContain("On its way"));
     expect(writes()[0]?.path).toBe("/api/v1/library/gratitude/send");
@@ -343,7 +343,7 @@ describe("Today", () => {
     visit("/");
     stubApi({ ...reads, "POST /api/v1/library/gratitude/send": json({ error: "engine-unavailable", detail: "cannot start it: OSError" }, 503) });
     const host = mount(<App />);
-    const card = await until(() => must(host.querySelector("li.practice.upcoming")));
+    const card = await until(() => must([...host.querySelectorAll("li.practice.upcoming")].find((li) => /gratitude/i.test(li.textContent ?? ""))));
     await click(byText(card, "button", "Send now"));
     await until(() => expect(card.querySelector(".error-line")?.textContent).toContain("cannot start"));
   });

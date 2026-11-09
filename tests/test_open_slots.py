@@ -295,6 +295,42 @@ class ResolveTest(SlotCase):
         got = self.resolve("evening", at(23, 10), delivery=True)
         self.assertEqual((got.id, got.step), ("2026-10-14-evening", 1))
 
+    def test_a_delivery_before_day_ends_at_takes_todays_calendar_date(self):
+        """The owner, 2026-11-09 (decision 1): /start morning at 03:30 delivers today's morning (step 3, its 06:00
+        slot), not yesterday's missed one; words written at 03:30 still belong to the journal day before."""
+        got = self.resolve("morning", at(3, 30), delivery=True)
+        self.assertEqual((got.id, got.local_date, got.step), ("2026-10-14-morning", "2026-10-14", 3))
+        got = self.resolve("morning", at(3, 30))
+        self.assertEqual((got.id, got.step), ("2026-10-13-morning", 2))
+
+    def test_a_delivery_before_day_ends_at_leaves_last_nights_slot_alone(self):
+        """Decision 1, read to the letter: at 00:30 last night's dusk is still open, yet /start dusk takes today's
+        date (tonight's 21:00 slot, early), while words at 00:30 answer last night's."""
+        self.delivered("2026-10-14-dusk", "dusk", "2026-10-14", at(23))
+        got = self.resolve("dusk", at(0, 30, day=THU), delivery=True)
+        self.assertEqual((got.id, got.step), ("2026-10-15-dusk", 3))
+        got = self.resolve("dusk", at(0, 30, day=THU))
+        self.assertEqual((got.id, got.step), ("2026-10-14-dusk", 1))
+
+    def test_a_delivery_before_day_ends_at_takes_todays_slot_due_or_missed_before_then(self):
+        """Today's own slots before the hour still count for a delivery: the 00:30 night slot, due at 00:45, is the
+        one /start night delivers; at 03:30, missed, it is the one re-sent; an unscheduled practice's extra is dated
+        today."""
+        self._night()
+        got = self.resolve("night", at(0, 45, day=THU), delivery=True)
+        self.assertEqual((got.id, got.step), ("2026-10-15-night", 1))
+        got = self.resolve("night", at(3, 30, day=THU), delivery=True)
+        self.assertEqual((got.id, got.step), ("2026-10-15-night", 2))
+        got = self.resolve("walk", at(3, 30, day=THU), delivery=True)
+        self.assertEqual((got.id, got.local_date, got.step), ("2026-10-15-walk", "2026-10-15", 4))
+
+    def test_a_delivery_after_day_ends_at_resolves_as_before(self):
+        got = self.resolve("morning", at(4, 0), delivery=True)
+        self.assertEqual((got.id, got.step), ("2026-10-14-morning", 3))
+        self.delivered("2026-10-14-dusk", "dusk", "2026-10-14", at(21))
+        got = self.resolve("dusk", at(22), delivery=True)
+        self.assertEqual((got.id, got.step), ("2026-10-14-dusk", 1))
+
     def test_an_unknown_practice_raises(self):
         with self.assertRaises(Exception):
             self.resolve("nope", at(10))

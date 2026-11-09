@@ -75,8 +75,9 @@ def status(cfg: Config, now: datetime | None = None, *, web: bool = False) -> di
                 and _annotations_pending(p.get("entry_path")):
             pending_ann.append(p["id"])
         r = p.get("annotation_reply") or {}
-        if p.get("annotated_at") and not r.get("message_id") and cfg.telegram.get("annotation_replies", True) \
-                and cfg.has_channel:  # (no chat: no reply is ever attempted, so none is pending)
+        if p.get("annotated_at") and not r.get("message_id") and not r.get("skipped") \
+                and cfg.telegram.get("annotation_replies", True) \
+                and cfg.has_channel:  # (no chat: no reply is ever attempted, so none is pending; skipped: never)
             pending_reply.append({"id": p["id"], "attempts": r.get("attempts", 0), "error": r.get("error")})
         if p.get("send_attempts") and not p.get("message_id") and not p.get("captures") and cfg.has_channel:
             # (a failed send he has since answered on a face is owed nothing: OPEN-PROMPTS)
@@ -182,7 +183,7 @@ def _reflections(cfg: Config, data: dict) -> dict:
         tg = r.get("telegram") or {}
         rows.append({"id": r.get("id"), "written": bool(r.get("written_at")), "trigger": r.get("trigger"),
                      "attempts": r.get("attempts", 0), "error": r.get("error"),
-                     "sent": bool(tg.get("message_id")), "send_error": tg.get("error")})
+                     "sent": bool(tg.get("message_id")), "send_error": tg.get("skipped") or tg.get("error")})
     on = {k: (cfg.reflections.get(k) or {}).get("enabled", True) is not False for k in ("day", "week")}
     return {"day_enabled": on["day"], "week_enabled": on["week"], "recent": rows}
 

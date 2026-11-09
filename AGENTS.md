@@ -73,7 +73,7 @@ them onto it).
 - **The chat transcript**: Hermes' sessions database, opened read-only, and only by `hermes/transcript.py`.
 - **Config**: defaults → JSON file → Hermes plugin settings, with `$JOURNAL_*` environment overrides for one run
   (`JOURNAL_CONFIG`, `JOURNAL_STATE_DIR`, `JOURNAL_PRACTICES_DIR`, `JOURNAL_SERVE_BIND`, …) (`config.py`; README
-  *Configure*). `windows.day_ends_at` (default `04:00`) sets the journal day: words before it belong to the day before.
+  *Configure*). `windows.day_ends_at` (default `04:00`) sets the journal day: words before it belong to the day before (a deliberate send then takes today's date).
 
 ## Contracts
 
