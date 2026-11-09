@@ -16,6 +16,37 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## CONTINUITY — reflections read what came before, `journal_search`, quotes that keep the reflection, one voice (2026-11-09; tick and hook side; **gateway restart needed**; no config change; two new optional state fields)
+
+**What changes.** The day reflection and week review read her last few analyses with what he wrote back to them and
+the notebook threads the engine filed from the journal; their one-shot runs with `-t journal_read`, the new read-only
+`journal_search` tool (his words in the journal's files). A quote not found loses its marks instead of costing the
+reflection. One voice description goes into the opener, annotation, reflection and week requests. The engine's own
+one-shots carry `JOURNAL_MODEL_STEP=1`, and the journal's `pre_llm_call` hook adds nothing to them (it used to append
+the whole notebook). Annotation and reflection follow-ups gain `origin` in `notebook.json`; a reflection's ledger
+record may gain `unquoted`. Both fields are ignored by older code.
+
+**Side and restart.** The tick is a fresh process (reflections, prompts, the annotation follow-up's `origin`): new
+code from the next tick after the plugin pin moves. Each one-shot `hermes chat` is a fresh process too, so it
+registers `journal_read` and skips the hook from the same moment. The gateway has imported `tools.py`,
+`hermes/tools.py`, `hermes/hooks.py`, `notebook.py`, `entries.py`, `context.py`, `prompts.py`, `plugin.yaml` and the
+skill, so **restart the gateway** for her chat to have `journal_search` and the skill's line about it. Ride a restart
+window, at least an hour from a ritual.
+
+1. Install the CLI at `<sha>`, move the plugin pin (`hermes -p <profile> plugins install beejsbj/journal --force
+   --ref <sha>`), then `hermes -p <profile> gateway restart` in a window; restart `journal-serve` so doctor's version
+   rows agree. Nothing is sent.
+2. First checks, without sending: `journal doctor` as before. If the profile saved a toolset list for the journal's
+   platform (`platform_toolsets.<platform>` in its `config.yaml`), add `journal_read` to it, or her chat will not
+   have the tool; the reflection's one-shot names the toolset itself and does not depend on that list. In her next
+   chat turn the tool list includes `journal_search`.
+3. After the next reflection: the file reads **What I notice** / **What moved** / **To carry forward**; the tick log
+   says `wrote <date>-reflection.md (…)`, with `(N quotes not found, unquoted)` when that happened, and the ledger's
+   reflection record lists them under `unquoted`. The reflection's run is longer when it searches (its budget is
+   unchanged, 300 s).
+4. Rollback: the CLI and the plugin pin at the previous sha, and a gateway restart. The new state fields are
+   ignored by the old code; nothing needs undoing.
+
 ## SCRUB-PERSONAL — the repo holds nothing specific to a deployment (2026-10-28; docs, tests and comments, one doctor row; no gateway restart needed; no config or state change)
 
 **What changes.** Docs, tests and fixtures are generic; the deployment overlay left the repo

@@ -3031,3 +3031,67 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   situational session interrupts a program's open phase, the program does not resend that phase by itself;
   `/start <word>` brings it back. Manual by design. Closes the open point in ONE-PROGRAM-RUN, review fixes (6) ("whether
   the engine should re-send it on its own").
+- **CONTINUITY (2026-11-09) — reflections read what came before, can search his entries, keep their text when a quote
+  is wrong, and share one voice.** The owner found the day reflections and week reviews were not a continuous
+  partner: they quoted him at length and said little of their own. The writer saw one period's files plus a single
+  earlier analysis, had no tools, and lost the whole reflection on one misquote, so the safe answer was to stitch his
+  quotes together and hedge. The owner asked for this work on 2026-11-09 and had already turned per-entry annotation
+  replies off in his deployment, so the reflection is now the one analytical message of the day.
+  - **Inputs (`reflect.continuity`).** Her last three day reflections within seven days plus the latest week review
+    of the six days before (a week review: the last two reviews within three weeks), oldest first, each body cut at
+    4,000 characters. Three days show a run (a habit forming, a thread dropped) without outweighing the day's own
+    entries; two weeks show a trend without turning a review into a history; the whole stays near the size of one
+    long entry. For each: the question it left him (its **To carry forward** part) and what he wrote back to it in
+    the chat, found through the entries (his conversation blocks whose quoted message is that sent analysis: the same
+    test as `conversations.answers_ours`, six words at least; three replies, 600 characters each). "No reply in the
+    chat" is said as such, since he may have taken it up in an entry instead.
+  - **The notebook into permanent files (a new path).** Only a thread the engine filed from a journal file reaches a
+    reflection (`notebook.on_record`): an annotation's or a reflection's `FOLLOW-UP:` line, which now carries
+    `origin` (`annotation`, `reflection`), with a `source` that names a file still in the journal folder. A thread
+    she adds in chat (`journal_notebook`) is **excluded, not passed through `privacy.py`**: the pass judges chat rows,
+    and an item is her paraphrase, written in a turn whose context may hold what was said off the record earlier in
+    the conversation, so no check can tell which of its words came from where. Exclusion fails closed. The tool has
+    no `origin` parameter, so a model cannot claim one; items written before this package have none and count as
+    hers from chat (they age out within `STALE_DAYS`, 21 days). Her chat turns and the opener pack keep the whole
+    notebook as before (Decision 2).
+  - **Found on the way: the journal's hook gave every one-shot the whole notebook.** Hermes fires `pre_llm_call` in
+    `hermes chat --oneshot` too (platform `cli`), and `turncontext.build` adds the notebook on every turn, so each
+    engine model step (opener, annotation, reflection, catch-up, a program's construction) got every open item,
+    chat ones included, appended to its query; `reflect.py` said the notebook was not an input, which did not hold
+    under Hermes. Every run `agent.CommandCompanion` starts now carries `JOURNAL_MODEL_STEP=1`, and
+    `hermes.hooks.on_llm_call` adds nothing to such a turn: a model step gets only what the engine wrote. The opener
+    loses only a duplicate (its pack holds the notebook); the other steps lose an input they were never meant to
+    have. Her own Hermes memory is outside this package (X-MEMORY, PR #21): the one-shots load it as before.
+  - **Search: a read-only tool, not a retrieval step.** `journal_search` (`search.py`, stdlib) searches his words in
+    the journal's dated files (`entries.his_text`, moved there from `context.py`: an entry's words section and his
+    conversation lines, a dated file of his own whole; never her annotations, notes, folded replies or analyses). It
+    never opens the chat transcript, a pack, the notebook or her memory, and writes nothing, so it is allowed in an
+    off-record turn like any read. It is registered in a toolset of its own, `journal_read` (`tools.READ_TOOLSET`):
+    Hermes resolves a plugin toolset by name, so the reflection's one-shot runs with `-t journal_read` and has that
+    tool and nothing that writes; plugin toolsets are on by default for a platform whose toolsets were never saved, so
+    she has it in chat too (a profile with a saved list adds `journal_read` there). Chosen over a deterministic
+    keyword step because the model knows what is worth looking up (a person, a phrase, "the last time"), where code
+    would guess from word counts. Not added to MCP: `journal_entries` already searches his words there.
+  - **Quotes keep the reflection (`validate.unquote`).** A passage in double quotes that is in none of the inputs,
+    nor in his words anywhere in the journal (what search can reach, read only when needed), loses its marks; a
+    blockquote line that is not found goes; a straight-quote pair whose inside starts or ends with a space (two
+    quotes mispaired) is left alone. The ledger record keeps the passages changed (`unquoted`) and the log counts
+    them. **Not a weakening:** the promise is that nothing presented as his words is invented; the mechanism was
+    "no reflection", now it is "no quotation marks around words not found", and her old annotations and analyses
+    never count as his words. README's Guarantees gains the row, which was implicit. The other checks (a program's
+    synthesis, construction and bridge, the catch-up) still reject the whole text; an answer that is not a reflection
+    at all (empty, too long, not prose) still writes nothing and is retried. Tests changed on purpose:
+    `test_reflect.py`'s invented-quote test (now a not-prose answer; the unquoting is `test_continuity.py`) and
+    `test_outage.py`'s bad answer (a misquote is no longer one).
+  - **One voice (`prompts.voice`).** One description of how she writes, carried by the opener, annotation, day
+    reflection and week review requests; each keeps its own form. It asks for her own reading in the first person,
+    positions taken, doubt said once in plain words, and names the stock hedges as things not to write; "mark
+    inference as inference" is gone from the four. The reflection asks for **What I notice**, **What moved** and
+    **To carry forward** (the today block and the web app read only the last), at most three short quotes, no
+    retelling, and the search. The four `opener_request` goldens were regenerated for the voice line; no built-in
+    practice file changed.
+  - **Transcription guesses** belong in the entry file, never in a chat message: an annotation may note an obvious
+    mis-hearing once only when annotations stay in the file (`telegram.annotation_replies: false`); otherwise, and
+    always in a reflection, she reads past it.
+  - **Open:** whether to add a deterministic "echoes" step (older entries sharing the day's rarer words) if she
+    seldom searches; `journal_search` in MCP; the reflection's run budget (300 s) now that it can make tool calls.
