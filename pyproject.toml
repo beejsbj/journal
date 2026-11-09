@@ -15,6 +15,8 @@ dependencies = []
 hermes = ["pyyaml>=6,<7"]
 # Only needed for `journal mcp` (the journal's tools for an MCP client); the core stays stdlib-only.
 mcp = ["mcp>=2,<3"]
+# Only needed for Web Push from `journal serve` (elliptic curves and AES-GCM, journal/serve/webpush.py).
+push = ["cryptography>=42"]
 
 [project.scripts]
 journal = "journal.cli:main"
