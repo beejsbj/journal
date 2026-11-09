@@ -57,14 +57,15 @@ function WriteNow({ id, title, voices, showPrompt, draftKey, onSaved, onClose }:
       {view.state === "ready" && showPrompt && <PromptMessage prompt={view.data.prompt} hers={voices?.hers} />}
       {view.state === "ready" && <p class="fills">{view.data.fills}</p>}
       {view.state === "error" && <ErrorLine error={view.error} />}
-      <Composer
+      {/* (a practice the view cannot open, turned off or unknown, takes no words here either) */}
+      {view.state !== "error" && <Composer
         draftKey={draftKey}
         label={`Write ${title}`}
         placeholder="In your own words"
         submitLabel="Save"
         onSubmit={async (words) => onSaved(await api.createEntry({ practice: id, ...words }))}
         onDone={onClose}
-      />
+      />}
       <button type="button" class="link" onClick={onClose}>
         Not now
       </button>
@@ -230,11 +231,17 @@ function WriteCard({ id, today, library, onWritten }: { id: string; today: Today
   );
 }
 
-/** The row `?write=<id>` opens: that practice's first row still to be answered, else its first row. */
+/**
+ * The row `?write=<id>` opens: the one the words will fill, in the order the engine's slot rule takes them
+ * (`slots.resolve`): the newest due or open slot, else the newest missed one, else the next one still to come, else
+ * the first (an answered practice: the words start an extra entry, the server says so). -1: no row of that practice.
+ */
 export function writeTarget(rows: PracticeRow[], id: string | undefined): number {
   if (!id) return -1;
-  const open = rows.findIndex((r) => r.id === id && r.state !== "answered");
-  return open >= 0 ? open : rows.findIndex((r) => r.id === id);
+  const mine = rows.map((r, i) => ({ r, i })).filter(({ r }) => r.id === id);
+  const last = (states: string[]) => mine.filter(({ r }) => states.includes(r.state)).pop()?.i;
+  const first = (states: string[]) => mine.find(({ r }) => states.includes(r.state))?.i;
+  return last(["due", "open"]) ?? last(["missed"]) ?? first(["upcoming"]) ?? mine[0]?.i ?? -1;
 }
 
 export function TodayRoute() {

@@ -3,6 +3,8 @@ import { App } from "../src/app";
 import { loadDraft } from "../src/drafts";
 import { closeEvents } from "../src/events";
 import { json, fixtures, byText, choose, click, mount, must, storedText, stubApi, tick, type, until } from "./helpers";
+import { writeTarget } from "../src/routes/today";
+import type { PracticeRow } from "../src/types";
 
 // Everything that writes: the composer and the recorder, the entry's meta sheet, Today's buttons, the run screen,
 // the program cards, settings and the "+" sheet. The server is a stub that records what it was sent.
@@ -428,6 +430,24 @@ describe("Today", () => {
     await until(() => must(host.querySelector("li.practice.answered")));
     expect(host.querySelectorAll(".write-now")).toHaveLength(0);
     expect(host.querySelector("li.practice.write-only .saved")).not.toBeNull();   // what he saved still says so
+  });
+
+  it("?write opens the card the words will fill: due or open first, then missed, then the next to come", () => {
+    const r = (state: string, at: string) => ({ id: "water", state, at }) as PracticeRow;
+    expect(writeTarget([r("missed", "09:00"), r("open", "15:00"), r("upcoming", "21:00")], "water")).toBe(1);
+    expect(writeTarget([r("missed", "09:00"), r("missed", "12:00"), r("upcoming", "21:00")], "water")).toBe(1);
+    expect(writeTarget([r("answered", "09:00"), r("upcoming", "15:00"), r("upcoming", "21:00")], "water")).toBe(1);
+    expect(writeTarget([r("answered", "09:00")], "water")).toBe(0);
+    expect(writeTarget([r("answered", "09:00")], "other")).toBe(-1);
+  });
+
+  it("opens no composer for a practice the view cannot open (turned off, unknown, a note)", async () => {
+    visit("/today?write=quiet");
+    stubApi({ ...reads, "GET /api/v1/library/quiet/open": json({ error: "disabled", detail: "Quiet is turned off" }, 409) });
+    const host = mount(<App />);
+    const card = await until(() => must(host.querySelector("li.practice.write-only")));
+    await until(() => expect(card.querySelector(".error-line")?.textContent).toContain("turned off"));
+    expect(card.querySelector("textarea")).toBeNull();
   });
 
   it("offers no Send to chat on a journal with no chat", async () => {
