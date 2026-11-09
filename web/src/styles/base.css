@@ -66,6 +66,9 @@ legend { padding: 0; }
   box-shadow: 0 0 10px var(--her-glow);
 }
 
+/* the mark's dot is her ring, in her ink (icons.tsx, Mark) */
+.mark-ring { stroke: var(--her); }
+
 /* ---- the book's own voice: titles, heads, kickers, hints ---- */
 .display {
   font: 340 var(--t-h1) / 1.04 var(--f-his); letter-spacing: -0.018em; font-optical-sizing: auto; margin: 0;

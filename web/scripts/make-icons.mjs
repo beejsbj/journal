@@ -1,8 +1,9 @@
 /**
  * Make the PNG icons from the SVG mark: `npm run icons` (needs `@resvg/resvg-js`, a dev dependency). The PNGs are
  * committed beside the mark (`public/icons/`), so the build never needs this and a CI run does not rasterise anything;
- * run it when the mark changes. The mark's colours are the paper (`--bg`), his ink (`--ink`) and the default ink of hers
- * (`--accent`, blue-black) of `tokens.css`: an installed icon cannot follow the ink a device chose.
+ * run it when the mark changes. The mark is the "margin j" (design/DESIGN.md, "The mark"); its colours are the paper
+ * (`--pane`), his ink (`--text`) and the default ink of hers (`--her`, blue-black) of `tokens.css`: an installed icon
+ * cannot follow the ink a device chose.
  *
  * - `icon-192.png`, `icon-512.png`: the mark as it is (the browser rounds or masks them as it likes).
  * - `icon-maskable-512.png`: the mark scaled into the middle 72% (Android masks to a circle at worst; the safe
