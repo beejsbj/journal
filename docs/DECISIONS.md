@@ -3168,10 +3168,10 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     (the old code skipped that model call while held); a delivery that waited builds the phase again, as the old
     owed send did.
   - **Nothing owed for what he has answered.** An automatic delivery (the tick's step, a settle) of a phase answered
-    on a face since it was opened is not made (`send_due` cleared, logged); an interrupt answered on a face before its
-    delivery is not sent (item `answered`). His own `/next` or `/skip` on a phase that is current, unanswered and
-    owed to the chat still delivers it rather than moving on (`test_an_owed_send_that_keeps_failing…` pins that); on
-    a no-chat install nothing is ever owed, so Next moves on. A delivery given up on (`SEND_ATTEMPTS`, alerted once)
+    since it was opened is not made (`send_due` cleared, logged); an interrupt answered on a face before its
+    delivery is not sent (item `answered`). His own `/next` or `/skip` in the chat on a phase that is current,
+    unanswered and owed to the chat still delivers it rather than moving on (`test_an_owed_send_that_keeps_failing…`
+    pins that); given on a face, or on a no-chat install where nothing is ever owed, Next moves on (review round 1). A delivery given up on (`SEND_ATTEMPTS`, alerted once)
     is not tried again by the step, as before, and the phase still settles on a face's answer.
   - **Interrupts open at their time on every install** (`_open_interrupts`, from `send_interrupts`): each due one,
     the older ones a late tick records as missed included, gets its ledger record with no `message_id`. With no chat
@@ -3203,3 +3203,21 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   - **Rollback** (DEPLOY.md): old code reads an opened, undelivered phase with no send owed (no chat) as delivered and
     never sends it; `journal program start <id>` sends the open phase again. Old code reads an interrupt item `open`
     or `answered` as not pending and never sends it.
+  - **Review round 1** (an independent Opus pass, read-only, with probes in temporary copies): no blocker, no leak of
+    words said off the record; opening a phase or an interrupt is never a chat boundary. Fixed, each test-first:
+    (major) Next or Skip in the web app on a phase whose chat send was held sent it and ended his `/x` window: a
+    `journal program …` without `--notify` (the web app's spawn, a shell) now runs `programs.on_a_face()`, so the chat
+    send it causes is held as an automatic one is, and Next or Skip there moves on from a phase still owed to the chat
+    (in the chat, `--notify`, `/next` still delivers what was owed: `--notify` is given only by the chat's commands);
+    a session finished on a face or by a settle inside a window held its summary in no way (now held, uncounted, and
+    sent by the step once the window closes); a phase whose message the chat already had (`/back`, `/start`) took his
+    next chat message again before it was re-sent (now `face_open`: current on the faces only until the re-send, as
+    before this package); a delivery that waited rebuilt a reflect phase and sent a different construction from the
+    one the web app showed (now the record keeps `construction` and `bridge`, reused without a model call); a phase
+    owed when the chat was set to `none` kept being attempted (nothing is owed with no chat); a web answer to an
+    interrupt `missed` in the chat was left out of the insights, and one answered on the web was cancelled by an
+    abandon (now `answered`); a second confirmation could reuse an opened interrupt's id (`_batch`). Nits fixed: the
+    docstrings of `serve/api._open_phase`, `serve/writes._phase_target`, `capture.open_phase`, DEPLOY's rollback
+    wording, `describe`'s line. **Kept:** `_answered_this_visit` counts any capture since the phase was opened, a
+    direct reply to an older message of it included (the reviewer suggested faces only): a reply in the chat is an
+    answer to the phase, and re-sending a phase he has just answered is what the rule avoids.

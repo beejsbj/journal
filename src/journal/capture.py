@@ -43,8 +43,8 @@ def window(cfg: Config, prompt: dict) -> timedelta:
 
 def open_phase(prompt: dict, at: datetime | None = None) -> bool:
     """A program phase that is (``at``: was, at that moment) the open phase of its run: it takes more than one
-    message. ``programs`` sets ``phase_open`` when the phase is sent and clears it when the run moves on or goes on a
-    break, keeping the spans in between (``open_spans``) for the sweep, which asks about a message's own time."""
+    message. ``programs`` sets ``phase_open`` when the phase becomes current (``programs._open``; a record the chat
+    already has, when it is sent again) and clears it when the run moves on or goes on a break, keeping the spans in between (``open_spans``) for the sweep, which asks about a message's own time."""
     if not prompt.get("program"):
         return False
     if at is not None and prompt.get("open_spans") is not None:  # when it was open, send to close (programs._span)

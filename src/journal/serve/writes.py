@@ -214,7 +214,8 @@ def _phase_target(req: Request, stem: str, body: dict) -> tuple[dict, str, str] 
     A program session's entry does not exist before its first answer, so the run (not the file) says what ``stem``
     is: some run's session has it as its entry. (If a file of his already sits at that name, the engine files the
     answer under the next free one, ``capture.entry_stem``, and the reply says which; his file is never written.) A block must name the phase it answers, and that phase must be the
-    run's open one, delivered, with the run active: the rule a Telegram message follows, made explicit because a
+    run's open one, current for this visit (``programs.phase_opened``: delivered to the chat or not), with the run
+    active: the rule a Telegram message follows, made explicit because a
     browser cannot rely on "the newest prompt in the chat". 409 ``phase-not-open`` otherwise."""
     from .. import programs
     found = None

@@ -38,16 +38,15 @@ is opened and sent by the next tick's step.
    <profile> plugins install beejsbj/journal --force --ref <sha>`), `hermes gateway restart`, `systemctl --user restart
    journal-serve`. Nothing is sent by the deploy.
 2. First checks, without sending: `journal doctor` (no new failure); `journal program status` reads every run as
-   before (a phase owed to the chat says `, not in the chat yet`); the web app's run page shows the open phase with
+   before (a phase owed to the chat says `, still to be sent to the chat`); the web app's run page shows the open phase with
    its answer box. A run in progress: its next phase goes out as before when he answers in the chat (the tick's log
    says `sent <run>-sNN-pM`). With no chat: a run started in the web app shows its first phase there, and the tick's
    log names no send.
 3. Rollback: the CLI and the plugin pin at the previous sha, `hermes gateway restart`, `systemctl --user restart
    journal-serve`. Old code reads an opened phase with no send owed as delivered: on a chat install every opened
-   phase was also delivered, answered on the web, or is still owed (`send_due`, which old code sends), so nothing is
-   lost; on a no-chat
-   install (which old code cannot run anyway, see OPEN-CORE) or for a phase made current while its delivery was held,
-   deliver it with `journal program start <program>` (it sends the open phase again). An interrupt item `open` (no
+   phase was also delivered, answered on the web, or is still owed (`send_due`, which old code sends, held ones
+   included), so nothing is lost. On a no-chat install (which old code cannot run anyway, see OPEN-CORE), deliver
+   the open phase with `journal program start <program>` (it sends the open phase again) once a chat is set. An interrupt item `open` (no
    chat) or `answered` is not pending to old code and is never sent; its record and any answer stay in the ledger and
    the entry.
 
