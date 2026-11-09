@@ -176,6 +176,22 @@ class ResolveTest(SlotCase):
         got = self.resolve("water", at(11, 30))
         self.assertEqual((got.id, got.step), ("2026-10-14-water-2", 3))
 
+    def test_step_3_takes_a_later_slot_whose_only_record_is_a_failed_send(self):
+        """Words dated before a slot whose send failed (no delivery, no captures) fill that slot early, as a slot
+        with no record would be filled, rather than making an extra entry."""
+        self.delivered("2026-10-14-water", "water", "2026-10-14", at(9), captures=[{"at": at(9, 5).isoformat()}])
+        self.add(id="2026-10-14-water-2", kind="water", local_date="2026-10-14", chat_id=CHAT,
+                 scheduled=at(15).isoformat(), send_attempts=1, send_error="Bad Gateway")
+        got = self.resolve("water", at(14), now=at(15, 30))
+        self.assertEqual((got.id, got.step, got.record["send_attempts"]), ("2026-10-14-water-2", 3, 1))
+
+    def test_after_an_answer_choosing_the_practice_again_fills_the_next_slot_that_fits(self):
+        self.delivered("2026-10-14-water", "water", "2026-10-14", at(9), captures=[{"at": at(9, 5).isoformat()}])
+        got = self.resolve("water", at(10))
+        self.assertEqual((got.id, got.step, got.record), ("2026-10-14-water-2", 3, None))
+        got = self.resolve("water", at(10), delivery=True)
+        self.assertEqual((got.id, got.step), ("2026-10-14-water-2", 3))
+
     def test_step_3_never_takes_a_slot_already_delivered(self):
         self.delivered("2026-10-14-dusk", "dusk", "2026-10-14", at(21))
         got = self.resolve("dusk", at(20), now=at(21, 30))   # backdated before the delivery

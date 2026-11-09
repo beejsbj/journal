@@ -29,7 +29,8 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   neither is a state derived from the schedule, a practice can be done any time on any face, `channel.platform:
   none` means no delivery by intent, and Web Push from `journal serve` nudges the PWA. Nothing a face writes, and no
   push, is a chat boundary, so neither can end a `/x` window. The owner took choices A–E on 2026-11-09 (recorded
-  there). To close: packages OPEN-CORE, OPEN-FACES, OPEN-PUSH and OPEN-PROGRAMS land.
+  there). To close: packages OPEN-CORE, OPEN-FACES, OPEN-PUSH and OPEN-PROGRAMS land. *OPEN-CORE built*: see
+  "OPEN-CORE" under *Taken*, which records where it read the doc.
 
 - **SCRUB-PERSONAL — the source adapters and `brain:` (open, the owner's).** The built-in context sources (tududi,
   chat-scrobbler, listenbrainz, storyteller, audiobookshelf, grimmory) are optional features, but together they
@@ -3031,3 +3032,59 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   situational session interrupts a program's open phase, the program does not resend that phase by itself;
   `/start <word>` brings it back. Manual by design. Closes the open point in ONE-PROGRAM-RUN, review fixes (6) ("whether
   the engine should re-send it on its own").
+- **OPEN-CORE (2026-11-09) — slot states, slot resolution, the engine's write of his words, attach-only delivery and
+  `channel.platform: none`** (docs/OPEN-PROMPTS.md, package 1; issue #17). What the package built, and what it
+  decided where the doc left room:
+  - **One module, `slots.py`.** `slots.day` gives every slot of a date in its state (upcoming, due, open, answered,
+    missed) from the schedule and the ledger; `slots.resolve(cfg, practice, at, *, now, data, delivery)` is the four
+    steps of the doc; `slots.history` serves the web history. **A slot's window before anything was delivered** is
+    the one a delivery at the slot's time would have had: the practice's `collapse_hours`, else
+    `windows.collapse_hours` (not `grace_hours`, which stays the tick's sending window only). So a slot never sent on
+    a chat install reads *due* for that window, then *missed*.
+  - **`windows.day_ends_at`** (default `04:00`) is the doc's `day_ends_at`, under `windows` beside the other times; an
+    unusable value is 04:00 and doctor names it.
+  - **Step 4, "slot 1's id when the practice has no schedule"** is read as *when no slot of the practice falls on that
+    day*: `/start weekly` on a Wednesday is still `<date>-weekly` (the goldens freeze exactly that send, and a weekday
+    slot's id is never used on another day), and the next free number after the scheduled slots otherwise. A number
+    is free when neither a ledger record nor an entry file has it (a record pruned after 120 days leaves its file).
+  - **A deliberate delivery uses `resolve` with `delivery=True`**: `at` is now, so the "sent at or before `at`" check
+    is left out (it is true by construction, and a check against a send time from another clock would turn a re-send
+    into an extra entry). `scheduled` on a deliberate send's record is still the moment it was asked for, as before.
+  - **`actions.answer` / `actions.note`** hold the three refusals (`Refused.code`: `off-the-record`, `reserved-line`,
+    `placeholder`, plus `empty` and `not-a-practice`), take the ledger lock once for the record and the capture, and
+    write through `capture._web_record` (the web app's path), so rule, source and via are the face's (`web`, `cli`,
+    `mcp`). A face-made record: `message_id: None`, `sent_at` and `opened_at` the time of his words,
+    `opened_at_local`, `opened_via`, the plain opener (`opener_source: plain:<face>`), the question snapshot and the
+    practice's record fields. Its entry header reads `_Written 05:40 IST in the web app · opener: plain:web_`. The
+    faces still call `capture.capture_web` until OPEN-FACES moves them; nothing here is reachable from a face yet.
+  - **Attach-only delivery** happens only in the race of rule 3 (a scheduled send that goes out after he answered on
+    a face): the record keeps its fields and gains `message_id`, `sent_at`, `sent_at_local`, `chat_id`, `platform`,
+    `sent_opener` (and `sent_opener_source`), `sent_html`, `sent_plain_text` and `needs_edit`. The issue's
+    "deliberate send: the record's own opener, failure not alerting" has no path of its own: `resolve` never gives a
+    deliberate send an answered record, so a deliberate send never attaches. What remains of it: **a failed send
+    onto a record that has captures counts no attempt and raises no alert** (it is logged): nothing is owed.
+  - **The web app as built reads four states** (`web/src/types.ts`), so `GET /today` serves a *due* row as
+    *upcoming* (with its `at`, and Send now) until OPEN-FACES teaches the PWA *due*; `today.collect`, the block and
+    MCP's today text have *due*. A row now also appears for a past slot with no record (*missed*, or *due*), where it
+    was absent before; `tests/fixtures/api/today.json` changes by that row.
+  - **The web history (`week_strip`, `insights/weeks`) counts slots** (`slots.history`): a slot delivered to the chat
+    or answered on any face, as before plus the face. A slot with neither counts (as missed, or waiting while due)
+    **only on a no-chat install**, where the due slot is the prompt; on a chat install a slot the chat never got (the
+    tick was down) was never before him and stays out of his history, as it always did (the doc's map says "slot
+    states" here; this keeps the chat install's history as the tests pin it, and is the same line `standing` draws:
+    slots he saw). A derived slot counts only from its practice's first record in the ledger on, so a newly added
+    practice, or the days before the ledger kept anything, read as nothing rather than as a row of misses; a no-chat
+    install's history therefore starts at his first answer of each practice.
+  - **`standing.unanswered`** counts delivered prompts and face-made records (`opened_via`); a backfilled record and
+    a failed send's record are not counted (as before). `her_messages` stays delivered-only.
+  - **`channel.platform: none`** is `Config.has_channel` false: `send_due` returns before writing anything (a
+    `journal send` logs one line, exit 0), and annotation replies, reflection sends, program summaries and their
+    retries, program notes and `cli._notify` attempt nothing; status shows no *undelivered* or reply rows; doctor's
+    channel row is ok. `Config.channel()` with `none` is `NoChannel` (a send that slipped through fails loudly).
+    **Left open:** an annotation or reflection written while there was no chat stays unsent; if a chat is configured
+    later, the tick sends the backlog (annotation replies and reflections have no age limit).
+  - **Rule 9 and 10** as the doc says: no alignment text when the first capture has no `platform_message_id`; a
+    capture with `via` is not a legacy chat capture for `conversations._Saved`.
+  - **Engine alone:** `agent.is_failure_text` holds Hermes' failure copy itself (the adapter re-exports it), and
+    `status.serve_rows` answers one row when `serve/` is not installed; a test runs `today`, `status`, `doctor` and
+    `tick` from a copy of the package without `hermes/`, `serve/` and `mcp/`.

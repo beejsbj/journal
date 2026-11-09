@@ -20,6 +20,7 @@ WATER = """---
 kind: practice
 id: water
 title: Water
+emoji: 💧
 schedule.1.time: 09:00
 schedule.2.time: 15:00
 collapse_hours: 2
@@ -155,6 +156,17 @@ class AnswerTest(Base):
         self.assertEqual(p["questions"][0]["text"], "Did you drink enough?")
         self.assertEqual(status.status(self.cfg, at(9, 31))["undelivered"], [])
 
+    def test_words_dated_before_a_slot_whose_send_failed_fill_it_early(self):
+        self.answer("water", "a glass", at(9, 30))
+        with mock.patch.object(telegram, "send_html", side_effect=telegram.TelegramError("Bad Gateway")):
+            self.send(at(15, 1))
+        info = self.answer("water", "another, before three", at(14, 45), now=at(15, 10))
+        p = self.prompt("2026-10-14-water-2")
+        self.assertEqual((info["slot"], info["step"], p["opened_via"], p["send_attempts"]),
+                         ("2026-10-14-water-2", 3, "web", 1))
+        self.assertIsNone(self.prompt("2026-10-14-water-3"))
+        self.assertEqual(status.status(self.cfg, at(15, 11))["undelivered"], [])
+
     def test_a_retried_client_id_writes_once(self):
         first = self.answer("water", "once", at(10), client_id="c-1")
         again = self.answer("water", "once", at(10), client_id="c-1")
@@ -246,6 +258,14 @@ class ScheduleTest(Base):
         extra = self.prompt("2026-10-14-morning-2")
         self.assertEqual((extra["message_id"], extra["stem"]), ("701", "2026-10-14-morning-2"))
 
+    def test_start_after_an_answer_delivers_the_next_slot_that_fits_and_the_tick_skips_it(self):
+        self.answer("water", "a glass", at(9, 30))
+        self.send(at(10), only="water")
+        p = self.prompt("2026-10-14-water-2")
+        self.assertEqual((p["message_id"], p["stem"]), ("701", "2026-10-14-water-2"))
+        self.send(at(15, 1))
+        self.assertEqual(len(self.bot.texts()), 1)   # the 15:00 slot went out at 10:00
+
     def test_start_takes_the_slot_that_is_due_not_always_slot_one(self):
         self.send(at(15, 30), only="water")
         self.assertIsNotNone(self.prompt("2026-10-14-water-2"))
@@ -316,9 +336,10 @@ class NoChannelTest(Base):
         self.assertEqual(self.prompts(), [])
         self.assertEqual(self.bot.calls, [])
         self.assertFalse((self.cfg.state_dir / "sent.jsonl").exists())
-        states = {s.id: s.state for s in slots.day(self.cfg, "2026-10-14", at(10))}
-        self.assertEqual((states["2026-10-14-morning"], states["2026-10-14-water"], states["2026-10-14-evening"]),
-                         ("missed", "due", "upcoming"))
+        # (the built-ins' window is windows.collapse_hours, six hours; water's own is two)
+        states = {s.id: s.state for s in slots.day(self.cfg, "2026-10-14", at(15, 30))}
+        self.assertEqual((states["2026-10-14-morning"], states["2026-10-14-water"], states["2026-10-14-water-2"],
+                          states["2026-10-14-evening"]), ("missed", "missed", "due", "upcoming"))
 
     def test_a_deliberate_send_sends_nothing(self):
         log = self.send(at(10), only="morning")
