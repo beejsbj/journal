@@ -21,14 +21,16 @@ What the database cannot tell: a text message folded into a running turn is stor
 reply pointer, so for those only rule 2 can apply. The audio of a voice note is not linked to its
 row, so a swept voice note is recorded as its transcript without the embedded recording (unless the
 row names the cached file). A picture Hermes attached natively is named in its row: it is kept beside the entry
-while Hermes' cache still holds it. Such a row sent with no caption is stored at the time its turn ran, which
-for a queued message is later than he sent it; the cached file's time is when it arrived (``arrival``).
+while Hermes' picture cache still holds it (a path anywhere else is not copied; a picture that is not kept is said
+in the log, and his caption is still saved). Such a row sent with no caption is stored at the time its turn ran,
+which for a queued message is later than he sent it; the cached file's time is when it arrived (``arrival``).
 
 A row the transcript withheld from his words (``Row.meta["withheld"]``: it still carried something added to his
-message) is never captured; the sweep says so in its log, which files it under the tick's errors.
+message) is never captured; the sweep logs it under ``WITHHELD``, which the tick files under its errors.
 """
 from __future__ import annotations
 
+import contextlib
 import html
 import json
 import os
@@ -42,6 +44,7 @@ from .config import Config
 from .ports import Row
 
 STATE = "sweep.json"
+WITHHELD = "sweep: withheld"  # opens the log line of a withheld row: the tick files it in errors.jsonl
 STATUSES = ("", "answered ✓", "missed — reply anytime", "sent again below")
 PHASE_STATUSES = ("answered ✓", "open — reply anytime", "sent again below")  # what a folded phase header can end in
 
@@ -68,11 +71,30 @@ def message(row: Row) -> dict | None:
             "audio_path": row.audio_path, **({"images": pictures} if pictures else {})}
 
 
+def picture_caches(cfg: Config, db=None) -> list[Path]:
+    """Hermes' picture cache of the profile, resolved: ``cache/images`` or the older ``image_cache`` in its home
+    (gateway/platforms/base.py ``get_image_cache_dir``). The home is the profile's, or the directory of the sessions
+    database the chat is read from (``db``, else ``hermes.state_db``)."""
+    db = db if db is not None else cfg.state_db
+    homes = [h for h in (cfg.hermes_home, Path(db).parent if db else None) if h is not None]
+    return [(Path(h) / sub).resolve() for h in homes for sub in ("cache/images", "image_cache")]
+
+
+def in_cache(path: str, caches) -> Path | None:
+    """The picture's file, resolved, when it lies in one of Hermes' picture caches; None for a path anywhere else
+    (a row can name any path: a picture is only ever copied from the cache Hermes wrote it to)."""
+    try:
+        found = Path(path).resolve()
+    except (OSError, RuntimeError, ValueError):
+        return None
+    return found if any(found.is_relative_to(c) for c in caches) else None
+
+
 def arrival(row: Row, pictures, since: datetime) -> datetime:
     """When a message with pictures came in. Hermes stores a picture sent with no caption at the time its turn ran,
     for a message queued behind a stuck turn long after he sent it; the gateway wrote each picture to its cache as
     it arrived (a new file every time), so the earliest file time after ``since`` and before the row's own time
-    is when he sent it."""
+    is when he sent it. ``pictures``: files in Hermes' cache only (``in_cache``)."""
     at = row.at
     for path in pictures or ():
         try:
@@ -84,19 +106,45 @@ def arrival(row: Row, pictures, since: datetime) -> datetime:
     return at
 
 
-def keep_pictures(cfg: Config, paths, entry_path: str) -> list[str]:
-    """Copy the pictures a row names beside the entry (``images.keep``), each still in Hermes' cache under a picture's
-    own suffix; one that is gone, too large or cannot be copied is left out (his caption is still saved)."""
-    kept = []
+def keep_pictures(cfg: Config, paths, entry_path: str, caches) -> tuple[list[str], list[str]]:
+    """(kept, why not): each picture a row names, copied beside the entry (``images.keep``) when it is a picture
+    file in Hermes' picture cache; one outside it, gone from it, too large or that cannot be copied is left out, with
+    the reason (fixed words, never a path; his caption is still saved)."""
+    kept, missed = [], []
     for path in paths or ():
-        ext = os.path.splitext(path)[1].lower()
-        if not images.media_type(path) or not os.path.isfile(path):
-            continue
-        try:
-            kept.append(images.keep(cfg, path, entry_path, ext))
-        except (OSError, ValueError, images.ImageTooLarge):
-            continue
-    return kept
+        found = in_cache(path, caches)
+        if found is None:
+            missed.append("not in Hermes' picture cache")
+        elif not images.media_type(found.name):
+            missed.append("not a picture kind that is kept")
+        elif not found.is_file():
+            missed.append("gone from Hermes' picture cache")
+        else:
+            try:
+                kept.append(images.keep(cfg, str(found), entry_path, found.suffix.lower()))
+            except images.ImageTooLarge:
+                missed.append("over images.max_mb")
+            except (OSError, ValueError) as e:
+                missed.append(f"the copy failed: {type(e).__name__}")
+    return kept, missed
+
+
+def _record(cfg: Config, pictures: list[str], *args, **kw) -> dict | None:
+    """``capture.record``; the pictures already copied for it are removed again when nothing was recorded."""
+    try:
+        info = capture.record(cfg, *args, images=pictures, **kw)
+    except BaseException:
+        _drop(cfg, pictures)
+        raise
+    if not info:
+        _drop(cfg, pictures)
+    return info
+
+
+def _drop(cfg: Config, names: list[str]) -> None:
+    for name in names:
+        with contextlib.suppress(OSError):
+            os.unlink(os.path.join(str(cfg.root), name))
 
 
 def parse(content: str, platform_message_id: str | None) -> dict | None:
@@ -226,12 +274,21 @@ def journaled_between(cfg: Config, data: dict, start: datetime, end: datetime) -
     return False
 
 
-def reconcile(cfg: Config, msg: dict, at: datetime) -> dict | None:
+def reconcile(cfg: Config, msg: dict, at: datetime, log: list[str] | None = None, caches=None) -> dict | None:
     """Capture one stored message if the hook would have. Returns capture info or None. Its pictures, if any, are
-    kept beside the entry and embedded above his caption, as the hook does."""
+    kept beside the entry and embedded above his caption, as the hook does; one that is not kept is said in ``log``.
+    ``caches``: Hermes' picture caches (``picture_caches``)."""
     text = msg["text"]
     pictures = msg.get("images") or ()
     describe = images.describing(cfg)
+    caches = picture_caches(cfg) if caches is None else caches
+
+    def keep(entry_path: str) -> list[str]:
+        kept, missed = keep_pictures(cfg, pictures, entry_path, caches)
+        if log is not None:
+            log.extend(f"sweep: a picture of message {msg['message_id']} was not kept ({why})" for why in missed)
+        return kept
+
     after_j = capture.strip_command(text)
     if text.lstrip().startswith("/") and after_j is None:
         return None  # another slash command
@@ -242,12 +299,12 @@ def reconcile(cfg: Config, msg: dict, at: datetime) -> dict | None:
             if not after_j.strip() and not pictures:
                 return None
             p = capture.new_note_prompt(data, cfg, at)
-            pics = keep_pictures(cfg, pictures, p["stem"] + ".md")
+            pics = keep(p["stem"] + ".md")
             if not after_j.strip() and not pics:
                 data["prompts"].remove(p)  # nothing to save after all
                 return None
-            info = capture.record(cfg, p, "/j", after_j, at, "photo" if pics else msg["source"], msg["message_id"],
-                                  via="sweep", images=pics, describe=describe)
+            info = _record(cfg, pics, p, "/j", after_j, at, "photo" if pics else msg["source"], msg["message_id"],
+                           via="sweep", describe=describe)
             p["needs_edit"] = False
             return info
         prompt = by_quote(cfg, data, msg["quote"], at) if msg["quote"] else None
@@ -264,13 +321,13 @@ def reconcile(cfg: Config, msg: dict, at: datetime) -> dict | None:
                                   os.path.splitext(msg["audio_path"])[1].lower() or ".ogg")
             except OSError:
                 kept = None
-        pics = keep_pictures(cfg, pictures, stem + ".md")
+        pics = keep(stem + ".md")
         words_ = text or (audio.NOT_TRANSCRIBED if msg["source"] == "audio" else "")
         if not words_ and not pics:
             return None
-        info = capture.record(cfg, prompt, rule, words_, at, "photo" if pics else msg["source"], msg["message_id"],
-                              kept, via="sweep", transcript="pending" if kept and msg["source"] == "audio" else None,
-                              data=data, images=pics, describe=describe)
+        info = _record(cfg, pics, prompt, rule, words_, at, "photo" if pics else msg["source"], msg["message_id"],
+                       kept, via="sweep", transcript="pending" if kept and msg["source"] == "audio" else None,
+                       data=data, describe=describe)
         if prompt.get("kind") == "j":
             prompt["needs_edit"] = False
         return info
@@ -347,20 +404,21 @@ def run(cfg: Config, now: datetime, log: list[str], db: Path | None = None) -> i
         log.append(f"sweep skipped: the privacy pass could not run ({getattr(pv, 'why', '')})")
         return 0  # (the watermark stays: these rows are swept once it can)
     off = conversations.snapshot(cfg)
+    caches = picture_caches(cfg, chat.source)
     try:
         for row in found:
             if row.meta.get("withheld"):  # (the reason is the adapter's fixed label, never his words)
-                log.append(f"sweep: row {row.id} (message {row.platform_message_id or '-'}) still carries "
-                           f"{row.meta['withheld']} once unwrapped; failed closed, not read as his words")
+                log.append(f"{WITHHELD} row {row.id} (message {row.platform_message_id or '-'}): what is left of it "
+                           f"still carries {row.meta['withheld']}, so it is not read as his words")
             msg = message(row)
             if msg and msg["message_id"]:
-                at = arrival(row, msg.get("images"), after)
+                at = arrival(row, [p for p in msg.get("images") or () if in_cache(p, caches)], after)
                 # (a /j inside a bare-/x window is public by the pass's own rule, so this asks every row: a /j
                 # merged with a /x message on a later line is off the record, as the hook and the writer take it)
                 if conversations.row_is_off(cfg, pv, row, off) or (at != row.at and pv.at(at)):
                     last = max(last, row.id)
                     continue  # off the record (/x), also by when it arrived: never captured
-                info = reconcile(cfg, msg, at)
+                info = reconcile(cfg, msg, at, log, caches)
                 if info:
                     captured += 1
                     log.append(f"swept message {msg['message_id']} into {Path(info['path']).name} ({info['rule']})")
