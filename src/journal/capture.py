@@ -228,7 +228,8 @@ def by_face(c: dict | None) -> bool:
     """A capture of words saved on a face (the web app, the CLI, MCP: its ``via``), not of a chat message. Rules 9 and
     10 of OPEN-PROMPTS set these apart; a chat capture without a platform message id, or one the sweep or the
     conversation writer made, is not one."""
-    return isinstance(c, dict) and c.get("via") in entries.FACES
+    via = c.get("via") if isinstance(c, dict) else None
+    return isinstance(via, str) and via in entries.FACES  # (a damaged record never raises)
 
 
 WEB_VIA = "web"    # ``captures[].via``: where the web app's captures came from, whatever their source

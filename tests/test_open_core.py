@@ -376,6 +376,12 @@ class ChatCapturesUnchangedTest(Base):
             capture.record(self.cfg, p, "next-message", self.WORDS, at(9, 5).astimezone(timezone.utc), "text", None,
                            via=via, data=data)
 
+    def test_a_damaged_via_is_no_face_and_never_raises(self):
+        """Review round 2: a damaged record never raises."""
+        for c in ({"via": ["web"]}, {"via": None}, {"via": 3}, None, "web"):
+            self.assertFalse(capture.by_face(c))
+        self.assertTrue(capture.by_face({"via": "cli"}))
+
     def test_a_chat_capture_with_no_message_id_is_still_aligned_with_her_reply(self):
         self._chat_capture()
         reads = []
