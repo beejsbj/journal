@@ -37,7 +37,7 @@ class Recorder:
     def __init__(self, answers=None):
         self.calls, self.answers = [], answers or {}
 
-    def __call__(self, subscription, payload, *, vapid_private, subject, ttl=3600, timeout=10):
+    def __call__(self, subscription, payload, *, vapid_private, subject, **kwargs):
         self.calls.append((subscription["endpoint"], json.loads(payload)))
         return self.answers.get(subscription["endpoint"], webpush.Result("sent", 201))
 
@@ -216,6 +216,100 @@ class WhatAPushSaysTest(PushCase):
         self.assertNotIn("SECRET", json.dumps(sent.calls))
 
 
+class OnceTest(PushCase):
+    """Review round 1, findings 1-3: a slot is claimed in the marker before anything is sent, so a marker that
+    cannot be written sends nothing, two passes at once send once, and a lasting refusal is not retried each minute."""
+
+    def test_a_marker_that_cannot_be_written_sends_nothing(self):
+        send = Recorder()
+        real = push.ledger.locked_state
+
+        def refuse(path):
+            if Path(path).name == push.SENT:
+                raise OSError(28, "No space left on device")
+            return real(path)
+        with mock.patch.object(push.ledger, "locked_state", side_effect=refuse):
+            for _ in range(3):
+                with self.assertRaises(OSError):
+                    push.run_once(self.cfg, (MORNING + timedelta(minutes=1)).astimezone(timezone.utc), send=send)
+        self.assertEqual(send.calls, [])
+
+    def test_two_passes_at_once_push_once(self):
+        gate = threading.Event()
+        calls = []
+
+        def slow(subscription, payload, **k):
+            calls.append(subscription["endpoint"])
+            gate.wait(2)
+            return webpush.Result("sent", 201)
+        now = (MORNING + timedelta(minutes=1)).astimezone(timezone.utc)
+        threads = [threading.Thread(target=push.run_once, args=(self.cfg, now), kwargs={"send": slow}) for _ in range(2)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(0.3)
+        gate.set()
+        for t in threads:
+            t.join(5)
+        self.assertEqual(calls, [PHONE["endpoint"]])
+
+    def test_a_refusal_is_not_retried_every_minute(self):
+        """A 403 (a key the push service does not take) or another 4xx will not pass by retrying."""
+        for code in (400, 401, 403, 413):
+            with self.subTest(code):
+                (self.cfg.state_dir / push.SENT).unlink(missing_ok=True)
+                lines = []
+                send = Recorder({PHONE["endpoint"]: webpush.Result("failed", code, "refused")})
+                now = (MORNING + timedelta(minutes=1)).astimezone(timezone.utc)
+                self.assertEqual(push.run_once(self.cfg, now, send=send, log=lines.append), [])
+                self.assertEqual(push.run_once(self.cfg, now + timedelta(minutes=1), send=send, log=lines.append), [])
+                self.assertEqual(len(send.calls), 1)
+                self.assertEqual(len(lines), 1, lines)
+                self.assertEqual(len(push.subscriptions(self.cfg)), 1)   # kept: a refusal is not "gone"
+
+    def test_a_service_that_is_down_is_tried_again(self):
+        for code in (429, 500, 503, None):
+            with self.subTest(code):
+                (self.cfg.state_dir / push.SENT).unlink(missing_ok=True)
+                send = Recorder({PHONE["endpoint"]: webpush.Result("failed", code, "later")})
+                now = (MORNING + timedelta(minutes=1)).astimezone(timezone.utc)
+                push.run_once(self.cfg, now, send=send)
+                push.run_once(self.cfg, now + timedelta(minutes=1), send=send)
+                self.assertEqual(len(send.calls), 2)
+
+
+class WhatServicesSeeTest(PushCase):
+    def test_the_subject_is_the_softwares_never_the_site(self):
+        self.cfg.serve["host"] = "journal.private.example"
+        seen = []
+
+        def send(subscription, payload, **k):
+            seen.append(k)
+            return webpush.Result("sent", 201)
+        self.run_at(MORNING + timedelta(minutes=1), send)
+        self.assertEqual(seen[0]["subject"], push.SUBJECT)
+        self.assertNotIn("private.example", json.dumps(seen))
+
+    def test_the_payload_is_padded_so_its_size_says_nothing(self):
+        seen = []
+
+        def send(subscription, payload, **k):
+            seen.append(k)
+            return webpush.Result("sent", 201)
+        self.run_at(MORNING + timedelta(minutes=1), send)
+        self.assertEqual(seen[0]["pad_to"], push.PAD_TO)
+        self.assertEqual(seen[0]["urgency"], "high")
+
+    def test_the_push_service_keeps_it_until_the_grace_ends(self):
+        seen = []
+
+        def send(subscription, payload, **k):
+            seen.append(k)
+            return webpush.Result("sent", 201)
+        self.run_at(MORNING + timedelta(minutes=30), send)
+        self.assertEqual(seen[0]["ttl"], int((timedelta(hours=self.cfg.grace_hours) - timedelta(minutes=30)).total_seconds()))
+
+
 class SubscriptionsAnswerTest(PushCase):
     def test_gone_drops_the_subscription(self):
         (self.cfg.state_dir / push.STATE).write_text(json.dumps(
@@ -294,6 +388,9 @@ class SubscribeTest(PushCase):
             {"endpoint": PHONE["endpoint"], "keys": {"p256dh": P256DH, "auth": "AAAA"}},
             {"endpoint": PHONE["endpoint"]},
             {"endpoint": PHONE["endpoint"] + "x" * 2048, "keys": PHONE["keys"]},
+            {"endpoint": PHONE["endpoint"] + "\nInjected: 1", "keys": PHONE["keys"]},       # review round 1, 7
+            {"endpoint": PHONE["endpoint"] + " x", "keys": PHONE["keys"]},
+            {"endpoint": PHONE["endpoint"] + "\u00e9", "keys": PHONE["keys"]},
         ]
         for body in bad:
             with self.subTest(body=body):

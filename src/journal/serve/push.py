@@ -47,6 +47,8 @@ MAX_ENDPOINT = 2000           # characters of an endpoint URL
 LOCK_WAIT = 5.0
 SUBJECT = "https://github.com/beejsbj/journal"   # the default VAPID contact: the software's, never his site's name
 BODY = "due now"
+PAD_TO = 256                  # bytes every payload is padded to: its size does not tell one practice's title from another
+URGENCY = "high"              # a nudge is timely: a phone saving power gets it at once (RFC 8030 5.3)
 # The push services the browsers use (Chrome and its kin, Firefox, Safari, Edge): an exact host, or ".suffix" for any
 # host under it. A subscription elsewhere is refused, so serve never posts to an address a request named.
 SERVICES = ("fcm.googleapis.com", "android.googleapis.com", "updates.push.services.mozilla.com", ".push.apple.com",
@@ -129,6 +131,8 @@ def _checked(body) -> dict:
     except ValueError:
         raise Invalid("endpoint is not a URL") from None
     host = (parts.hostname or "").lower()
+    if any(not 0x21 <= ord(c) <= 0x7e for c in endpoint):
+        raise Invalid("endpoint must be a URL of printable ASCII, with no spaces")
     if parts.scheme != "https" or parts.username or parts.password or port not in (None, 443) or not _service(host):
         raise Invalid("endpoint must be an https URL of a browser's push service (Google, Mozilla, Apple, Microsoft)")
     if not isinstance(given, dict):
@@ -222,11 +226,47 @@ def payload(cfg: Config, slot: slots.Slot) -> bytes:
     return json.dumps({"title": title, "body": BODY, "practice": slot.practice}, ensure_ascii=False).encode("utf-8")
 
 
+def _retriable(result: webpush.Result) -> bool:
+    """A failure that may pass by itself (the network, a 429, a 5xx), as against a refusal (another 4xx: a key or a
+    payload the push service will not take), which retrying every minute would only repeat."""
+    return result.code is None or result.code == 429 or result.code >= 500
+
+
+def _claim(cfg: Config, ids: list[str], now: datetime) -> list[str]:
+    """Mark ``ids`` pushed in ``push-sent.json`` before anything is sent, and return those no other pass had: so a
+    marker that cannot be written sends nothing (``OSError`` propagates), and two passes at once send once. The
+    marker's old entries are pruned here."""
+    cutoff = now - timedelta(days=KEEP_DAYS)
+    with ledger.locked_state(cfg.state_dir / SENT) as marker:
+        kept = {}
+        for sid, at in (marker.get("slots") or {}).items():
+            try:
+                if datetime.fromisoformat(at) >= cutoff:
+                    kept[sid] = at
+            except (TypeError, ValueError):
+                continue
+        mine = [sid for sid in ids if sid not in kept]
+        for sid in mine:
+            kept[sid] = now.isoformat(timespec="seconds")
+        marker["slots"] = kept
+    return mine
+
+
+def _release(cfg: Config, ids: list[str]) -> None:
+    with ledger.locked_state(cfg.state_dir / SENT) as marker:
+        slots_ = marker.get("slots") or {}
+        for sid in ids:
+            slots_.pop(sid, None)
+        marker["slots"] = slots_
+
+
 def run_once(cfg: Config, now: datetime, *, send: Callable | None = None,
              log: Callable[[str], None] | None = None) -> list[str]:
-    """One pass: push each slot ``due`` to every subscription; returns the slot ids pushed. A slot counts as pushed
-    when at least one device took it; when every device failed it is tried again at the next pass (within its
-    grace). A subscription a push service says is gone is removed. ``send`` is ``webpush.send`` (tests record)."""
+    """One pass: push each slot ``due`` to every subscription; returns the slot ids pushed. Each slot is claimed in
+    the marker before it is sent (``_claim``). A slot counts as pushed when at least one device took it; when no
+    device took it and one failed in a way that may pass (``_retriable``), the claim is released and the next pass
+    tries again (within its grace); a refusal is not retried. A subscription a push service says is gone is removed.
+    ``send`` is ``webpush.send`` (tests record)."""
     log = log or (lambda line: None)
     if not active(cfg):
         return []
@@ -239,41 +279,42 @@ def run_once(cfg: Config, now: datetime, *, send: Callable | None = None,
     if vapid is None or not subs:
         return []
     found = due(cfg, now)
-    pushed, gone = [], set()
+    if not found:
+        return []
+    mine = set(_claim(cfg, [s.id for s in found], now))
+    pushed, again, gone = [], [], set()
     for slot in found:
+        if slot.id not in mine:
+            continue
         body = payload(cfg, slot)
         ttl = max(60, int((slot.at + timedelta(hours=cfg.grace_hours) - now).total_seconds()))
+        took = retry = False
         for sub in subs:
             if sub["endpoint"] in gone:
                 continue
             try:
-                result = send(sub, body, vapid_private=vapid["private"], subject=subject(cfg), ttl=ttl)
+                result = send(sub, body, vapid_private=vapid["private"], subject=subject(cfg), ttl=ttl,
+                              urgency=URGENCY, pad_to=PAD_TO)
             except Exception as e:  # noqa: BLE001 - a bad key or a damaged subscription fails this device only
                 result = webpush.Result("failed", None, type(e).__name__)
             if result.status == "sent":
-                if slot.id not in pushed:
-                    pushed.append(slot.id)
+                took = True
             elif result.status == "gone":
                 gone.add(sub["endpoint"])
             else:
+                retry = retry or _retriable(result)
                 log(f"journal serve: push of {slot.id} failed for one device "
-                    f"({result.code or ''} {result.detail}".rstrip() + ")")
+                    f"({result.code or ''} {result.detail}".rstrip() + ")"
+                    + ("; tried again next minute" if _retriable(result) else "; not tried again"))
+        if took:
+            pushed.append(slot.id)
+        elif retry:
+            again.append(slot.id)
+    if again:
+        _release(cfg, again)
     if gone:
         _drop(cfg, gone)
         log(f"journal serve: {len(gone)} push subscription(s) gone; removed")
-    if pushed:
-        cutoff = now - timedelta(days=KEEP_DAYS)
-        with ledger.locked_state(cfg.state_dir / SENT) as marker:
-            kept = {}
-            for sid, at in (marker.get("slots") or {}).items():
-                try:
-                    if datetime.fromisoformat(at) >= cutoff:
-                        kept[sid] = at
-                except (TypeError, ValueError):
-                    continue
-            for sid in pushed:
-                kept[sid] = now.isoformat(timespec="seconds")
-            marker["slots"] = kept
     return pushed
 
 

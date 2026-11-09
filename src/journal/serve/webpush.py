@@ -80,9 +80,11 @@ def _hmac(key: bytes, data: bytes) -> bytes:
 
 
 def encrypt(payload: bytes, p256dh: str, auth: str, *, sender_private: str | None = None,
-            salt: bytes | None = None) -> bytes:
+            salt: bytes | None = None, pad_to: int = 0) -> bytes:
     """The ``aes128gcm`` body (RFC 8291, RFC 8188) of ``payload`` for a subscription's ``p256dh`` and ``auth`` keys:
-    one record, no padding. The sender key and salt are fresh for every message unless given (a test vector)."""
+    one record, padded with zeros after the delimiter to ``pad_to`` bytes of payload (none by default), so bodies of
+    one pad are one size whatever they say. The sender key and salt are fresh for every message unless given (a test
+    vector)."""
     ec, AESGCM = _crypto()
     ua_public = unb64u(p256dh)
     auth_secret = unb64u(auth)
@@ -90,8 +92,9 @@ def encrypt(payload: bytes, p256dh: str, auth: str, *, sender_private: str | Non
         raise ValueError("p256dh must be an uncompressed P-256 point (65 bytes)")
     if len(auth_secret) != 16:
         raise ValueError("auth must be 16 bytes")
-    if len(payload) > RECORD_SIZE - _HEADER - _TAG - 1:
-        raise ValueError(f"a push payload is at most {RECORD_SIZE - _HEADER - _TAG - 1} bytes")
+    padding = max(0, pad_to - len(payload))
+    if len(payload) + padding > RECORD_SIZE - _HEADER - _TAG - 1:
+        raise ValueError(f"a push payload is at most {RECORD_SIZE - _HEADER - _TAG - 1} bytes, padding included")
     salt = os.urandom(16) if salt is None else salt
     if len(salt) != 16:
         raise ValueError("the salt is 16 bytes")
@@ -104,7 +107,7 @@ def encrypt(payload: bytes, p256dh: str, auth: str, *, sender_private: str | Non
     prk = _hmac(salt, ikm)
     cek = _hmac(prk, b"Content-Encoding: aes128gcm\x00\x01")[:16]
     nonce = _hmac(prk, b"Content-Encoding: nonce\x00\x01")[:12]
-    ciphertext = AESGCM(cek).encrypt(nonce, payload + b"\x02", None)
+    ciphertext = AESGCM(cek).encrypt(nonce, payload + b"\x02" + bytes(padding), None)
     return salt + RECORD_SIZE.to_bytes(4, "big") + bytes([len(as_public)]) + as_public + ciphertext
 
 
@@ -170,15 +173,17 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def send(subscription: dict, payload: bytes, *, vapid_private: str, subject: str, ttl: int = 3600,
-         timeout: float = 10) -> Result:
+         timeout: float = 10, urgency: str = "normal", pad_to: int = 0) -> Result:
     """POST one push (RFC 8030) to a browser subscription (``PushSubscription.toJSON()``: ``endpoint`` and
-    ``keys.p256dh``, ``keys.auth``): ``payload`` encrypted for it, signed with the VAPID key, kept by the push service
-    for at most ``ttl`` seconds while the device is away."""
+    ``keys.p256dh``, ``keys.auth``): ``payload`` encrypted for it (padded to ``pad_to``), signed with the VAPID key,
+    kept by the push service for at most ``ttl`` seconds while the device is away, with ``urgency`` (RFC 8030 5.3:
+    ``high`` is delivered at once to a device saving power)."""
     endpoint = subscription["endpoint"]
     keys = subscription["keys"]
-    body = encrypt(payload, keys["p256dh"], keys["auth"])
+    body = encrypt(payload, keys["p256dh"], keys["auth"], pad_to=pad_to)
     headers = {"Authorization": vapid_authorization(endpoint, vapid_private, subject),
-               "Content-Encoding": "aes128gcm", "Content-Type": "application/octet-stream", "TTL": str(int(ttl))}
+               "Content-Encoding": "aes128gcm", "Content-Type": "application/octet-stream", "TTL": str(int(ttl)),
+               "Urgency": urgency}
     request = urllib.request.Request(endpoint, data=body, headers=headers, method="POST")
     try:
         with urllib.request.build_opener(_NoRedirect).open(request, timeout=timeout) as response:

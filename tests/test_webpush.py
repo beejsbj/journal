@@ -180,6 +180,53 @@ class PushService:
         self.server.server_close()
 
 
+UA_PRIVATE = "q1dXpw3UpT5VOmu_cf_v6ih07Aems3njxI-JWgLcM94"   # RFC 8291 Appendix A, the receiver's private key
+
+
+def decrypt(body: bytes, ua_private: str = UA_PRIVATE, auth: str = RFC8291["auth"]) -> bytes:
+    """What the browser does with an ``aes128gcm`` body (RFC 8291, RFC 8188): the plaintext with its padding."""
+    import hashlib
+    import hmac
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    salt, idlen = body[:16], body[20]
+    as_public, ciphertext = body[21:21 + idlen], body[21 + idlen:]
+    key = ec.derive_private_key(int.from_bytes(b64d(ua_private), "big"), ec.SECP256R1())
+    secret = key.exchange(ec.ECDH(), ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), as_public))
+    h = lambda k, d: hmac.new(k, d, hashlib.sha256).digest()  # noqa: E731
+    ua_public = b64d(RFC8291["ua_public"])
+    ikm = h(h(b64d(auth), secret), b"WebPush: info\x00" + ua_public + as_public + b"\x01")
+    prk = h(salt, ikm)
+    cek, nonce = h(prk, b"Content-Encoding: aes128gcm\x00\x01")[:16], h(prk, b"Content-Encoding: nonce\x00\x01")[:12]
+    return AESGCM(cek).decrypt(nonce, ciphertext, None)
+
+
+@unittest.skipUnless(HAS_CRYPTO, "cryptography (journal[push]) is not installed")
+class PaddingTest(unittest.TestCase):
+    """Review round 1, finding 8: padded to a fixed size, two titles of different lengths make bodies of one size."""
+
+    def test_padded_bodies_are_one_size_and_decrypt_to_the_payload(self):
+        short = webpush.encrypt(b'{"title":"Evening"}', RFC8291["ua_public"], RFC8291["auth"], pad_to=256)
+        longer = webpush.encrypt(b'{"title":"Morning journal, longer"}', RFC8291["ua_public"], RFC8291["auth"],
+                                 pad_to=256)
+        self.assertEqual(len(short), len(longer))
+        self.assertEqual(len(short), 86 + 256 + 1 + 16)
+        plain = decrypt(short)
+        self.assertEqual(plain[:20], b'{"title":"Evening"}\x02')
+        self.assertEqual(set(plain[20:]), {0})
+
+    def test_without_padding_the_rfc_body_is_unchanged(self):
+        body = webpush.encrypt(RFC8291["plaintext"], RFC8291["ua_public"], RFC8291["auth"],
+                               sender_private=RFC8291["as_private"], salt=b64d(RFC8291["salt"]))
+        self.assertEqual(body, b64d(RFC8291["body"]))
+        self.assertEqual(decrypt(body), RFC8291["plaintext"] + b"\x02")
+
+    def test_a_payload_longer_than_the_pad_is_not_cut(self):
+        payload = b"x" * 300
+        self.assertEqual(decrypt(webpush.encrypt(payload, RFC8291["ua_public"], RFC8291["auth"], pad_to=256)),
+                         payload + b"\x02")
+
+
 @unittest.skipUnless(HAS_CRYPTO, "cryptography (journal[push]) is not installed")
 class SendTest(unittest.TestCase):
     def setUp(self):
@@ -203,11 +250,22 @@ class SendTest(unittest.TestCase):
         self.assertEqual(path, "/p/abc")
         self.assertEqual(headers["Content-Encoding"], "aes128gcm")
         self.assertEqual(headers["TTL"], "600")
+        self.assertEqual(headers["Urgency"], "normal")
         self.assertEqual(len(body), 86 + len(payload) + 1 + 16)
         self.assertNotIn(b"Water", body)
         params = VapidTest.parse(headers["Authorization"])
         self.assertEqual(params["k"], self.vapid["public"])
         self.assertEqual(verified_claims(params["t"], params["k"])["aud"], service.url)
+
+    def test_urgency_and_padding_are_passed_on(self):
+        sub = {"endpoint": "", "keys": {"p256dh": RFC8291["ua_public"], "auth": RFC8291["auth"]}}
+        with PushService(201) as service:
+            sub["endpoint"] = service.url + "/p/abc"
+            webpush.send(sub, b"{}", vapid_private=self.vapid["private"], subject="mailto:push@example.com",
+                         urgency="high", pad_to=256, timeout=5)
+        [(_path, headers, body)] = service.received
+        self.assertEqual(headers["Urgency"], "high")
+        self.assertEqual(len(body), 86 + 256 + 1 + 16)
 
     def test_404_and_410_mean_the_subscription_is_gone(self):
         for code in (404, 410):
