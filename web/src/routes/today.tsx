@@ -1,3 +1,4 @@
+import { useLocation } from "preact-iso";
 import { useState } from "preact/hooks";
 import { api } from "../api";
 import { Composer } from "../components/Composer";
@@ -11,7 +12,7 @@ import { dayPart, longDay } from "../format";
 import { useAction, useResource } from "../hooks";
 import { kindLabel, kindOfStem } from "../labels";
 import { useTitle } from "../title";
-import type { Created, LibraryItem, PracticeRow, Run, Today } from "../types";
+import type { Created, LibraryItem, PracticeRow, Run, Today, Voices } from "../types";
 
 /**
  * The row's state in words, as the line under its title says it: quietly, in the page's own voice, and the time those
@@ -22,6 +23,8 @@ export function rowState(r: PracticeRow): [string, string | null] {
   switch (r.state) {
     case "upcoming":
       return r.at ? ["at", r.at] : ["later today", null];
+    case "due":
+      return r.at ? ["due since", r.at] : ["due now", null];
     case "open":
       return r.sent ? ["waiting since", r.sent] : ["waiting for you", null];
     case "answered":
@@ -39,22 +42,56 @@ export function rowTime(r: PracticeRow): string {
 const NO_TIME = "99:99";
 
 /**
+ * Write now: the practice opened as a view (`GET /library/{id}/open`), her opener and the questions (unless the card
+ * already shows the prompt), the line that says which slot the words fill, and the composer. Nothing is written until
+ * he saves: the words then go through the engine's one slot rule (an open prompt, a due or missed slot, the next one
+ * later today, else an extra entry of the practice), never a `/j` note.
+ */
+function WriteNow({ id, title, voices, showPrompt, draftKey, onSaved, onClose }: {
+  id: string; title: string; voices: Voices | undefined; showPrompt: boolean; draftKey: string;
+  onSaved: (c: Created) => void; onClose: () => void;
+}) {
+  const [view] = useResource((signal) => api.openPractice(id, signal), [id]);
+  return (
+    <div class="inline-composer write-now">
+      {view.state === "ready" && showPrompt && <PromptMessage prompt={view.data.prompt} hers={voices?.hers} />}
+      {view.state === "ready" && <p class="fills">{view.data.fills}</p>}
+      {view.state === "error" && <ErrorLine error={view.error} />}
+      <Composer
+        draftKey={draftKey}
+        label={`Write ${title}`}
+        placeholder="In your own words"
+        submitLabel="Save"
+        onSubmit={async (words) => onSaved(await api.createEntry({ practice: id, ...words }))}
+        onDone={onClose}
+      />
+      <button type="button" class="link" onClick={onClose}>
+        Not now
+      </button>
+    </div>
+  );
+}
+
+/**
  * One prompt of the day. Once it is sent the card carries the whole message, her opener and every question, in her
  * voice, whatever its state: answered, still open or missed (only Telegram folds a finished prompt). Under it, in
- * his serif, the first line of his reply when there is one. Then what can be done: reply (a new entry, or a `/j`
- * note when the prompt is no longer open: the server says which with `rule`), send it now, open the entry.
+ * his serif, the first line of his reply when there is one. Then what can be done: Write now on every practice,
+ * whatever its state (answered: the words start the next slot that fits, or an extra entry; the server says where),
+ * send it to the chat, open the entry.
  */
-function PracticeCard({ row, today, library, slot }: { row: PracticeRow; today: Today; library: LibraryItem[]; slot: number }) {
+function PracticeCard({ row, today, library, slot, writing: startWriting = false }: {
+  row: PracticeRow; today: Today; library: LibraryItem[]; slot: number; writing?: boolean;
+}) {
   const p = library.find((x) => x.id === row.id);
   // by the row's own entry: a practice with two slots has two rows with one id, and an id prefix names the first slot's entry
   const entry = row.stem ? today.entries.find((e) => e.stem === row.stem) : undefined;
-  const [replying, setReplying] = useState(false);
+  const [replying, setReplying] = useState(startWriting);
   const [saved, setSaved] = useState<Created | null>(null);
   const [onItsWay, setOnItsWay] = useState(false);
   const send = useAction();
   useLive(["ledger-changed"], () => setOnItsWay(false));
-  const canReply = row.state === "open" || row.state === "missed";
-  const canSend = (row.state === "upcoming" || row.state === "missed") && (p?.enabled ?? true);
+  const canWrite = p?.enabled ?? true;
+  const canSend = (row.state === "upcoming" || row.state === "due" || row.state === "missed") && (p?.enabled ?? true);
   const title = p?.title ?? row.id;
   const his = today.voices?.his ?? "You";
   const [words, when] = rowState(row);
@@ -93,11 +130,11 @@ function PracticeCard({ row, today, library, slot }: { row: PracticeRow; today: 
           <span class="words">{entry.first_line}</span>
         </a>
       )}
-      {(canReply || canSend || onItsWay || entry) && !replying && (
+      {(canWrite || canSend || onItsWay || entry) && !replying && (
         <div class="actions">
-          {canReply && !saved && (
+          {canWrite && (
             <button type="button" class="button primary" onClick={() => setReplying(true)}>
-              Reply
+              Write now
             </button>
           )}
           {canSend && (
@@ -110,7 +147,7 @@ function PracticeCard({ row, today, library, slot }: { row: PracticeRow; today: 
                 if (done) setOnItsWay(true);
               }}
             >
-              {onItsWay ? "On its way…" : "Send now"}
+              {onItsWay ? "On its way…" : "Send to chat"}
             </button>
           )}
           {entry && (
@@ -128,19 +165,15 @@ function PracticeCard({ row, today, library, slot }: { row: PracticeRow; today: 
         </p>
       )}
       {replying && (
-        <div class="inline-composer">
-          <Composer
-            draftKey={`reply:${row.id}:${slot}`}
-            label={`Reply to ${title}`}
-            placeholder="Reply in your own words"
-            submitLabel="Reply"
-            onSubmit={async (words) => setSaved(await api.createEntry({ practice: row.id, ...words }))}
-            onDone={() => setReplying(false)}
-          />
-          <button type="button" class="link" onClick={() => setReplying(false)}>
-            Not now
-          </button>
-        </div>
+        <WriteNow
+          id={row.id}
+          title={title}
+          voices={today.voices}
+          showPrompt={!row.prompt}
+          draftKey={`reply:${row.id}:${slot}`}
+          onSaved={setSaved}
+          onClose={() => setReplying(false)}
+        />
       )}
     </li>
   );
@@ -159,8 +192,46 @@ function dueToday(runs: Run[], day: string): { key: string; time: string; text: 
   return out.sort((a, b) => a.time.localeCompare(b.time));
 }
 
+/**
+ * `/today?write=<id>` for a practice with no row today (one with no schedule, or not on this weekday): the practice
+ * alone, open to write, as Write now opens it on a row.
+ */
+function WriteCard({ id, today, library }: { id: string; today: Today; library: LibraryItem[] }) {
+  const p = library.find((x) => x.id === id);
+  const [saved, setSaved] = useState<Created | null>(null);
+  const [open, setOpen] = useState(true);
+  const title = p?.title ?? id;
+  return (
+    <li class="card practice write-only">
+      <header class="practice-head">
+        {p?.emoji && <span class="emoji" aria-hidden="true">{p.emoji}</span>}
+        <div class="practice-title">
+          <h3>{title}</h3>
+        </div>
+      </header>
+      {saved && (
+        <p class="saved">
+          Saved. <a href={`/entries/${saved.stem}`}>Open the entry</a>
+        </p>
+      )}
+      {open && !saved && (
+        <WriteNow id={id} title={title} voices={today.voices} showPrompt draftKey={`reply:${id}:write`}
+                  onSaved={setSaved} onClose={() => setOpen(false)} />
+      )}
+    </li>
+  );
+}
+
+/** The row `?write=<id>` opens: that practice's first row still to be answered, else its first row. */
+export function writeTarget(rows: PracticeRow[], id: string | undefined): number {
+  if (!id) return -1;
+  const open = rows.findIndex((r) => r.id === id && r.state !== "answered");
+  return open >= 0 ? open : rows.findIndex((r) => r.id === id);
+}
+
 export function TodayRoute() {
   useTitle("Today");
+  const write = useLocation().query.write || undefined;
   const [res, reload] = useResource(async (signal) => {
     const [today, library, runs] = await Promise.all([
       api.today(signal),
@@ -188,6 +259,8 @@ export function TodayRoute() {
         const held = (runs ?? []).filter((r) => r.status === "completed" && holdsQuestions(r));
         const interrupts = dueToday((runs ?? []).filter(holdsQuestions), today.date);
         const nothing = rows.length === 0 && !today.program && live.length === 0 && held.length === 0 && today.entries.length === 0;
+        const target = writeTarget(rows.map(({ r }) => r), write);
+        const writeAlone = write !== undefined && target < 0;
         return (
           <div class="page today">
             <header class="page-head today-head">
@@ -201,13 +274,15 @@ export function TodayRoute() {
               {today.location && today.location_source === OSM && <OsmCredit />}
             </header>
             <WeekStrip week={today.week} today={today.date} />
-            {nothing && <Empty>Nothing scheduled today.</Empty>}
-            {rows.length > 0 && (
+            {nothing && !writeAlone && <Empty>Nothing scheduled today.</Empty>}
+            {(rows.length > 0 || writeAlone) && (
               <section class="practices" aria-labelledby="practices-h">
                 <h2 id="practices-h">Practices</h2>
                 <ul class="cards">
-                  {rows.map(({ r, slot }) => (
-                    <PracticeCard key={`${r.id}#${slot}`} row={r} today={today} library={library} slot={slot} />
+                  {writeAlone && write && <WriteCard id={write} today={today} library={library} />}
+                  {rows.map(({ r, slot }, i) => (
+                    <PracticeCard key={`${r.id}#${slot}`} row={r} today={today} library={library} slot={slot}
+                                  writing={i === target} />
                   ))}
                 </ul>
               </section>

@@ -174,6 +174,11 @@ function PracticeActions({ one, reload }: { one: LibraryOne; reload: () => void 
   return (
     <div class="actions detail-actions">
       {d.enabled && (
+        <a class="button" href={`/today?write=${encodeURIComponent(d.id)}`}>
+          Write now
+        </a>
+      )}
+      {d.enabled && (
         <button
           type="button"
           class="button"
@@ -183,7 +188,7 @@ function PracticeActions({ one, reload }: { one: LibraryOne; reload: () => void 
             if (done) setOnItsWay(true);
           }}
         >
-          {onItsWay ? "On its way…" : "Send now"}
+          {onItsWay ? "On its way…" : "Send to chat"}
         </button>
       )}
       <a class="button primary" href={`/library/${d.id}/edit`}>

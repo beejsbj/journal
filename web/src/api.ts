@@ -9,7 +9,7 @@ import { OFFLINE_WRITE, isOnline, keptAt, noteRead } from "./offline";
 import { ShapeError, arr, obj, str, type Json, type Parser } from "./schema";
 import {
   Block202, BlockEdited, BlockRemoved, Created, DoctorRow, EntryDoc, EntryPage, Health, LibraryDefault, LibraryItem, LibraryOne, MetaWritten, Reflection, Run,
-  Located, RunOne, Session, Settings, SettingsWritten, Spawned, Status, Today, UploadMade, Validation, Week,
+  Located, PracticeView, RunOne, Session, Settings, SettingsWritten, Spawned, Status, Today, UploadMade, Validation, Week,
   type RunAction,
 } from "./types";
 
@@ -173,6 +173,8 @@ export const api = {
   status: (signal?: AbortSignal) => get("/status", Status, signal),
   doctor: (signal?: AbortSignal) => get("/doctor", arr(DoctorRow), signal),
   health: (signal?: AbortSignal) => get("/healthz", Health, signal),
+  /** A practice as Write now shows it, and the slot words saved now would fill. Opening it writes nothing. */
+  openPractice: (id: string, signal?: AbortSignal) => get(`/library/${enc(id)}/open`, PracticeView, signal),
   runs: (signal?: AbortSignal) => get("/runs", arr(Run), signal),
   run: (id: string, signal?: AbortSignal) => get(`/runs/${enc(id)}`, RunOne, signal),
   runInsights: (id: string, signal?: AbortSignal) => get(`/runs/${enc(id)}/insights`, obj({ stem: str, body: str }), signal),
