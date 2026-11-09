@@ -1,0 +1,7 @@
+/* MarginNote (ui/MarginNote.tsx) */
+.margin-note { padding-top: 6px; }
+.margin-note-lab { display: flex; align-items: center; gap: 7px; margin: 0 0 7px; font: 500 12px / 1 var(--f-ui); color: var(--her-soft); }
+.margin-note-lab .her-mark { width: 5px; height: 5px; }
+.margin-note-body { padding-left: 12px; border-left: 1px solid var(--her-line); font-size: 13px; line-height: 1.6; }
+.margin-note-body p { margin: 0 0 0.6em; }
+.margin-note-body > :last-child { margin-bottom: 0; }

@@ -1,0 +1,29 @@
+/* Stepper and DefaultHint (ui/Stepper.tsx) */
+.num-stepper { display: inline-flex; flex: none; align-items: center; border-radius: var(--r-pill); box-shadow: inset 0 0 0 1px var(--hair-2); }
+.num-stepper[aria-disabled="true"] { opacity: 0.55; }
+.num-stepper > button {
+  display: grid; place-items: center; width: var(--tap); height: var(--tap); padding: 0; border: 0; border-radius: var(--r-pill);
+  background: none; color: var(--text-2); cursor: pointer; transition: background var(--d-1), color var(--d-1), transform var(--d-1) var(--e-out);
+}
+.num-stepper > button:hover:not(:disabled) { background: var(--raised); color: var(--text); }
+.num-stepper > button:active:not(:disabled) { transform: scale(0.92); }
+.num-stepper > button:disabled { opacity: 0.3; cursor: default; }
+.num-stepper > button > svg { width: 16px; height: 16px; }
+.num-stepper-value {
+  min-width: 78px; padding: 0 2px; text-align: center; border-radius: var(--r-xs);
+  font: 500 14.5px / 1 var(--f-ui); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden;
+}
+.num-stepper-value > span { display: inline-block; }
+.num-stepper-value small { margin-left: 3px; font-size: 13px; font-weight: 400; color: var(--text-3); }
+.nudge-up { animation: nudge-up var(--d-3) var(--e-out); }
+.nudge-down { animation: nudge-down var(--d-3) var(--e-out); }
+@keyframes nudge-up { from { transform: translateY(5px); opacity: 0.3; } }
+@keyframes nudge-down { from { transform: translateY(-5px); opacity: 0.3; } }
+
+.default-hint { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--s2); color: var(--text-3); }
+.default-hint em { font: italic 400 14px / 1.4 var(--f-his); }
+.default-hint .link { font-size: 12.5px; font-weight: 500; }
+
+@media (max-width: 760px) {
+  .num-stepper-value { min-width: 64px; }
+}

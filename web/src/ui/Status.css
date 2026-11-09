@@ -1,0 +1,28 @@
+/* Skeleton, ErrorLine, Empty (ui/Status.tsx) */
+.skeletons { display: grid; gap: var(--s3); margin-top: var(--s5); }
+.skeleton {
+  height: 4.5rem; border-radius: var(--r-m);
+  background: linear-gradient(90deg, var(--raised), var(--raised-2), var(--raised)); background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite, fade-in 400ms var(--e-out) both;
+  animation-delay: 0s, calc(var(--i, 0) * 60ms);
+}
+.skeletons.line .skeleton { height: 1.1rem; border-radius: var(--r-xs); }
+.skeletons.line .skeleton:last-child { width: 62%; }
+.skeletons.block .skeleton { height: 9rem; border-radius: var(--r-l); }
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+.error-line {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s4); margin: var(--s4) 0; padding: var(--s3) var(--s4);
+  border-radius: var(--r-m); background: var(--raised); box-shadow: inset 0 0 0 1px var(--hair-2);
+  font: 400 var(--t-small) / 1.5 var(--f-ui); color: var(--text);
+}
+.error-line > p { flex: 1 1 16rem; margin: 0; padding-left: 18px; position: relative; }
+.error-line > p::before {
+  content: ""; position: absolute; left: 0; top: 0.55em; width: 7px; height: 7px; border-radius: 50%; background: var(--text);
+  box-shadow: 0 0 0 2px var(--raised), 0 0 0 3px var(--text);
+}
+.error-line p + p { margin-top: var(--s2); }
+.error-line ul { padding-left: 1.2rem; }
+
+.empty { margin: 0; padding: var(--s6) 0; font: italic 400 1.1875rem / 1.5 var(--f-his); color: var(--text-3); }
+.empty a { color: var(--text-2); }
