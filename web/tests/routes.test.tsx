@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { render } from "preact";
 import { App } from "../src/app";
 import { useLocation } from "preact-iso";
 import { EntriesRoute, groupByWeek } from "../src/routes/entries";
@@ -174,7 +175,8 @@ describe("Entries", () => {
     const host = mount(<App />);
     await until(() => must(host.querySelector(".entry-row")));
     expect(host.querySelector(".week-head")?.textContent).toBe("Week of 12 Oct");
-    expect([...host.querySelectorAll(".day h3")].map((h) => h.textContent)).toEqual(["Thu 15 Oct", "Wed 14 Oct"]);
+    // WEB-UX: a day is its numeral and its weekday in the left column (Almanac), not "Thu 15 Oct" in capitals
+    expect([...host.querySelectorAll(".day h3")].map((h) => h.textContent)).toEqual(["15 Thu", "14 Wed"]);
     const evening = must(host.querySelector('a[href="/entries/2026-10-14-evening"]'));
     expect(evening.querySelector(".title")?.textContent).toBe("Evening journal");
     expect(evening.querySelector(".first-line")?.textContent).toBe("First words, about the lighthouse.");
@@ -224,18 +226,43 @@ describe("Entries", () => {
 });
 
 describe("Entry", () => {
-  it("renders the document, then the analysis tab", async () => {
+  // WEB-UX (round 02, accepted; DECISIONS.md WEB-UX-ENTRY-TABS): no Entry/Analysis tabs. Her readings unfold at the end
+  // of the entry as disclosures, with the same data and the same empty text.
+  it("renders the document, then her readings unfold at the end", async () => {
     visit("/entries/2026-10-14-evening");
     stubFetch(base);
     const host = mount(<App />);
     await until(() => must(host.querySelector(".document")));
-    expect(host.querySelector("h1")?.textContent).toBe("Evening journal");
-    must(host.querySelector<HTMLElement>("#tab-analysis")).click();
-    await until(() => must(host.querySelector(".analysis")));
-    expect(host.querySelector(".analysis")?.textContent).toContain("Ada's annotations");
-    expect(host.querySelector(".analysis")?.textContent).toContain("A note of hers.");
-    await until(() => must(host.querySelector(".refl-title")));
-    expect(host.querySelector(".analysis")?.textContent).toContain("To carry forward");
+    expect(host.querySelector("h1")?.textContent).toBe("Wednesday 14 October 2026");
+    expect(host.querySelector(".entry-kicker")?.textContent).toBe("Evening journal");
+    expect(host.querySelector('[role="tablist"], [role="tab"]')).toBeNull();
+    const readings = must(host.querySelector(".readings.analysis"));
+    expect(readings.compareDocumentPosition(must(host.querySelector(".document"))) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+    const noticed = must(readings.querySelector<HTMLElement>("#reading-analysis"));
+    const head = must(noticed.querySelector<HTMLElement>(".disclosure-head"));
+    expect(head.getAttribute("aria-expanded")).toBe("false");
+    expect(noticed.querySelector(".disclosure-body")?.hasAttribute("inert")).toBe(true);   // closed: out of reach
+    head.click();
+    await until(() => expect(head.getAttribute("aria-expanded")).toBe("true"));
+    expect(noticed.querySelector(".disclosure-body")?.hasAttribute("inert")).toBe(false);
+    expect(noticed.textContent).toContain("Ada's annotations");
+    expect(noticed.textContent).toContain("A note of hers.");
+    // her reflection is read when its fold first opens
+    const reflection = must(readings.querySelector<HTMLElement>("#reading-reflection"));
+    expect(reflection.querySelector(".refl-title")).toBeNull();
+    must(reflection.querySelector<HTMLElement>(".disclosure-head")).click();
+    await until(() => must(reflection.querySelector(".refl-title")));
+    expect(reflection.textContent).toContain("To carry forward");
+    expect(reflection.querySelector('a[href="/insights#2026-10-14-reflection"]')?.textContent).toBe("In Insights");
+  });
+
+  it("says nothing is there yet when she has not read it", async () => {
+    visit("/entries/2026-10-14-evening");
+    stubFetch({ ...base, "/api/v1/entries/2026-10-14-evening": { ...fixtures.entryEvening, analysis: { annotations: null, notes: [], reflection: null } } });
+    const host = mount(<App />);
+    const readings = await until(() => must(host.querySelector(".readings")));
+    expect(readings.querySelector(".empty")?.textContent).toBe("Nothing here yet: Ada adds notes after the entry settles.");
+    expect(readings.querySelector(".disclosure")).toBeNull();
   });
 
   it("says not an engine entry on a 404", async () => {
@@ -244,6 +271,107 @@ describe("Entry", () => {
     const host = mount(<App />);
     await until(() => must(host.querySelector(".empty")));
     expect(host.querySelector(".empty")?.textContent).toContain("Not an engine entry");
+  });
+});
+
+describe("Entries: the month and the sentence", () => {
+  it("marks the days he wrote on, and a day chosen on the calendar filters the list (?day=, replaced)", async () => {
+    visit("/entries");
+    const f = stubFetch({ ...base, "/api/v1/days": fixtures.days });
+    const host = mount(<App />);
+    await until(() => must(host.querySelector(".entry-row")));
+    // the month of the newest entry, read from /days under the list's other filters
+    const day = await until(() => must(host.querySelector<HTMLElement>('.entries-calendar button[data-day="2026-10-14"]')));
+    expect(f.calls.some((c) => c.startsWith("/api/v1/days?") && c.includes("from=2026-10-01") && c.includes("to=2026-10-31"))).toBe(true);
+    expect([...host.querySelectorAll(".entries-calendar button[data-day]")].map((b) => b.getAttribute("data-day"))).toEqual(["2026-10-14", "2026-10-15"]);
+    const depth = history.length;
+    day.click();
+    await until(() => expect(window.location.search).toBe("?day=2026-10-14"));
+    expect(history.length).toBe(depth);   // a filter replaces the address, it is not a step back
+    await until(() => expect(f.calls.some((c) => c.startsWith("/api/v1/entries?") && c.includes("from=2026-10-14") && c.includes("to=2026-10-14"))).toBe(true));
+    expect(host.querySelector(".active-filter")?.textContent).toContain("Wed 14 Oct");
+    const chosen = must(host.querySelector<HTMLElement>('.entries-calendar button[data-day="2026-10-14"]'));
+    expect(chosen.getAttribute("aria-pressed")).toBe("true");
+    chosen.click();   // the chosen day again lets it go
+    await until(() => expect(window.location.search).toBe(""));
+  });
+
+  it("chooses a practice from the sentence's menu, as ?kind=", async () => {
+    visit("/entries");
+    stubFetch(base);
+    const host = mount(<App />);
+    const trigger = await until(() => must([...host.querySelectorAll<HTMLElement>('.filter-sentence [aria-haspopup="menu"]')].find((b) => b.textContent === "any practice")));
+    expect(host.querySelector(".filter-sentence")?.textContent).toBe("Showing every entry from any practice, newest first.");
+    expect(host.querySelector(".chip, .filter-chips")).toBeNull();   // no pill row any more
+    trigger.click();
+    const item = await until(() => must([...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')].find((b) => b.textContent === "Evening journal")));
+    item.click();
+    await until(() => expect(window.location.search).toBe("?kind=evening"));
+    await until(() => expect(host.querySelector(".filter-sentence")?.textContent).toContain("from Evening journal"));
+  });
+});
+
+describe("Entry beside its list (a wide screen)", () => {
+  const wide = () =>
+    vi.stubGlobal("matchMedia", (q: string) => ({ matches: q === "(min-width: 761px)", media: q, addEventListener() {}, removeEventListener() {} }));
+
+  it("lays the titled list beside the entry by default: the date and the time in the left column, the open one marked", async () => {
+    wide();
+    visit("/entries/2026-10-14-evening");
+    stubFetch(base);
+    const host = mount(<App />);
+    await until(() => must(host.querySelector(".entry-pane .document")));
+    const shell = must(host.querySelector(".shell"));
+    expect(shell.getAttribute("data-stage")).toBe("panes");
+    expect(shell.getAttribute("data-rail")).toBe("compact");
+    const side = must(host.querySelector(".side-pane.list"));
+    const row = await until(() => must(side.querySelector<HTMLElement>('a.side-row[href="/entries/2026-10-14-evening"]')));
+    expect(row.getAttribute("aria-current")).toBe("page");
+    expect(row.querySelector(".side-when .side-date")?.textContent).toBe("14 Wed");
+    expect(row.querySelector(".side-when time")?.textContent).toBe("23:12");   // under the date, not at the row's end
+    expect(row.lastElementChild?.classList.contains("marks")).toBe(true);     // nothing at the right but the marks
+    // newer and older walk the list beside it
+    const older = must([...host.querySelectorAll<HTMLButtonElement>(".entry-bar button")].find((b) => b.getAttribute("aria-label") === "Older entry"));
+    expect(older.disabled).toBe(true);   // the oldest in the list
+    must([...host.querySelectorAll<HTMLButtonElement>(".entry-bar button")].find((b) => b.getAttribute("aria-label") === "Newer entry")).click();
+    await until(() => expect(window.location.pathname).toBe("/entries/2026-10-15-fix-life-s01"));
+  });
+
+  it("keeps the reader's choice on this device: dates and dots, or the entry alone", async () => {
+    wide();
+    visit("/entries/2026-10-14-evening");
+    stubFetch(base);
+    const host = mount(<App />);
+    await until(() => must(host.querySelector(".side-pane.list")));
+    const choose = (name: string) => must(host.querySelector<HTMLElement>(`.entry-bar [role="radio"][aria-label="${name}"]`)).click();
+    choose("Dates and dots beside the entry");
+    const rail = await until(() => must(host.querySelector(".side-pane.rail")));
+    expect(localStorage.getItem("journal:sidebar")).toBe("rail");
+    const dot = await until(() => must(rail.querySelector('a.dot[aria-current="page"]')));
+    expect(dot.getAttribute("aria-label")).toBe("Evening journal, Wed 14 Oct, 23:12");
+    choose("The entry alone");
+    await until(() => expect(host.querySelector(".side-pane")).toBeNull());
+    expect(localStorage.getItem("journal:sidebar")).toBe("hidden");
+    expect(host.querySelector(".entry-pane .document")).not.toBeNull();
+    // the next time an entry opens, it opens as he left it
+    render(null, host);
+    const again = mount(<App />);
+    await until(() => must(again.querySelector(".entry-pane .document")));
+    expect(again.querySelector(".side-pane")).toBeNull();
+    must(again.querySelector<HTMLElement>('.entry-bar [role="radio"][aria-label="Titles beside the entry"]')).click();
+    await until(() => must(again.querySelector(".side-pane.list")));
+    expect(localStorage.getItem("journal:sidebar")).toBeNull();   // the default is no choice kept
+  });
+
+  it("on a phone has no sidebar: the entry alone, and a way back to the list", async () => {
+    visit("/entries/2026-10-14-evening");
+    stubFetch(base);
+    const host = mount(<App />);
+    await until(() => must(host.querySelector(".document")));
+    expect(host.querySelector(".side-pane")).toBeNull();
+    const back = must(host.querySelector<HTMLAnchorElement>("a.entry-back"));
+    expect(back.getAttribute("href")).toMatch(/^\/entries(\?|$)/);   // the list he came from, with its filters
+    expect(back.dataset.vt).toBe("pop");
   });
 });
 
