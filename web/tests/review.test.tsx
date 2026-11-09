@@ -275,10 +275,9 @@ describe("Today links", () => {
     stubFetch({ ...base, "/api/v1/today": data });
     const host = mount(<App />);
     await until(() => expect(host.querySelectorAll("a.open-entry")).toHaveLength(2));
-    expect([...host.querySelectorAll("a.open-entry")].map((a) => a.getAttribute("href"))).toEqual([
-      "/entries/2026-10-15-evening",
-      "/entries/2026-10-15-evening-2",
-    ]);
+    // (WEB-UX: the open slot waits at the top of the page, the answered one under "Earlier today")
+    expect(host.querySelector("li.practice.answered a.open-entry")?.getAttribute("href")).toBe("/entries/2026-10-15-evening");
+    expect(host.querySelector("li.practice.open a.open-entry")?.getAttribute("href")).toBe("/entries/2026-10-15-evening-2");
     expect(host.querySelector(".carry a")?.getAttribute("href")).toBe("/insights#2026-10-14-reflection-2");
   });
 });
