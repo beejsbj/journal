@@ -610,9 +610,11 @@ now", nothing else, and a tap opens Today with that practice ready to write (`/t
 `no-chat` (the default) only one with no chat (`channel.platform: none`), `always` a chat install too, beside the chat
 message. A push is not a delivery: it writes no prompt record and nothing in `sent.jsonl`, `send-times.json` or the
 thread stamps, so it never starts a thread or ends a `/x` window. The payload is encrypted end to end (RFC 8291,
-signed with VAPID, RFC 8292), but the browser maker's push service (Apple, Google, Mozilla or Microsoft) sees that a
-notification went to the device, when, and its size, plus the VAPID contact (`push.subject`; by default the project's
-URL, never your site's name). The key pair and the subscriptions are `state_dir/serve-push.json` (0600), the slots
+signed with VAPID, RFC 8292, and padded to one size), but the browser maker's push service (Apple, Google, Mozilla or
+Microsoft) sees that a notification went to the device and when, the server's address, its VAPID public key (one key
+for all your devices) and the VAPID contact (`push.subject`; by default the project's URL, never your site's name).
+When you turn notifications on, the browser itself registers this site with its push service, so the vendor may
+learn the site's address that way, whatever `push.subject` says; weigh that before turning them on. The key pair and the subscriptions are `state_dir/serve-push.json` (0600), the slots
 already pushed `push-sent.json`; a push service that says a subscription is gone (404 or 410) removes it, and serve
 posts only to the browsers' push services. Without the extra, Settings says push is unavailable and why, and
 `journal doctor`'s `serve push` row says the same (with it: the keys, the devices subscribed, `push.when`).

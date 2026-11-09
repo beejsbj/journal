@@ -3296,3 +3296,18 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     follow-up: once a phase can be current with no delivery, the pass should push it as it does a slot.
   - **Tests changed.** None of the existing tests; `tests/test_serve_privacy.py` gains the push routes' samples and a
     pass, under the same refusal of `sqlite3.connect` and the privacy pass.
+  - **Review round 1** (an independent Opus pass over the branch): no blocker and no privacy leak (a push writes only
+    its own two files, reads no chat, calls no model, never takes `tick.lock`; the payload never reads a record; the
+    routes and a pass run with `sqlite3.connect` and the privacy pass refused). Fixed, each in a commit naming it: a
+    marker that could not be written re-sent the push every minute for the whole grace, and two passes at once (a
+    second serve on the same state dir) sent twice (now the slot is claimed in `push-sent.json` before anything is
+    sent, and released only when no device took it and the failure may pass); a lasting refusal (a 403) was retried
+    every minute (now only no answer, a 429 or a 5xx is; another 4xx is logged once); an endpoint with spaces or
+    control characters was kept and failed for ever (refused now); a payload's size told one title from another
+    (padded to 256 bytes); Settings could say "On" for a device the server had refused (the browser's subscription is
+    ended then); a replacing notification was silent (`renotify`); a subscription the browser rotated stopped pushes
+    until Settings was opened (`pushsubscriptionchange`); Settings read "Off" while it was still checking, said nothing
+    when the server had no key, and left a replaced subscription counted. From its suspicions: `Urgency: high` (a phone
+    saving power gets the nudge at once), the tap focuses before it navigates, and the docs now say what the push
+    service learns besides the payload's size: the server's address, the one VAPID key, and, since the browser
+    registers the site when it subscribes, possibly the site's address whatever `push.subject` says.
