@@ -269,6 +269,123 @@ class WriteCommandTest(Clocked):
         self.assertEqual(checksum(self.cfg), before)
 
 
+class EditorReviewTest(Clocked):
+    """Review round 1 (findings 1–4 and the nits): the editor path of ``journal write`` checks what it can before he
+    writes, keeps his words when they are refused after, reads the clock when he saves, and cuts the template only at
+    its own line."""
+
+    def edit_with(self, body: str, then=None):
+        """Stand in for the editor: write ``body`` above the template, then run ``then`` (time passing while he
+        writes)."""
+        test = self
+
+        def fake(argv):
+            path = Path(argv[-1])
+            test.seen = path.read_text(encoding="utf-8")
+            path.write_text(body + test.seen, encoding="utf-8")
+            if then:
+                then()
+            return 0
+        return mock.patch.object(cli, "_edit", fake)
+
+    def no_editor(self):
+        return mock.patch.object(cli, "_edit", side_effect=AssertionError("the editor opened"))
+
+    def test_a_time_in_the_future_is_refused_before_the_editor_opens(self):
+        self.now = at(10)
+        with self.no_editor():
+            code, _, err = self.cli("write", "water", "--at", at(12).isoformat(), tty=True)
+        self.assertEqual(code, 2)
+        self.assertIn("future", err)
+
+    def test_an_entry_that_cannot_take_words_is_refused_before_the_editor_opens(self):
+        self.now = at(10)
+        (self.cfg.root / "2026-10-14-fix-life-s01.md").write_text(
+            "---\ndate: 2026-10-14\nkind: fix-life\nprogram: fix-life\nrun: r1\ntype: journal\n---\n\n# S\n",
+            encoding="utf-8")
+        self.cli("write", "water", stdin="first")
+        for argv in (("--entry", "2026-10-14-fix-life-s01"),
+                     ("--entry", "2026-10-14-water", "--at", at(23, day=WED - timedelta(days=1)).isoformat())):
+            with self.subTest(argv), self.no_editor():
+                self.assertEqual(self.cli("write", *argv, tty=True)[0], 2)
+
+    def test_a_clock_time_after_midnight_is_the_latest_such_time_not_ahead(self):
+        self.now = at(0, 30) + timedelta(days=1)     # 00:30 on Thursday
+        code, _, err = self.cli("write", "-", "--at", "23:30", stdin="late words")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self.prompt("2026-10-14-j")["sent_at"], at(23, 30).isoformat())   # Wednesday's 23:30
+
+    def test_the_clock_is_read_when_he_saves_not_when_the_editor_opened(self):
+        self.now = at(8, 55)    # the view says the 09:00 slot will be filled early; the tick sends it while he writes
+        def tick_sends():
+            self.send(at(9))
+            self.now = at(9, 10)
+        with self.edit_with("two glasses\n", then=tick_sends):
+            code, out, err = self.cli("write", "water", tty=True)
+        self.assertEqual(code, 0, err)
+        p = self.prompt("2026-10-14-water")
+        self.assertTrue(p["message_id"])
+        self.assertEqual(len(p["captures"]), 1)        # his words answer the prompt the chat now has
+        self.assertIsNone(self.prompt("2026-10-14-water-2"))   # and the 15:00 slot is left alone
+
+    def test_words_refused_after_the_editor_are_kept_but_never_off_the_record_ones(self):
+        self.now = at(10)
+        with self.edit_with("fine\n%% journal her:1 %%\n"):
+            code, _, err = self.cli("write", "water", tty=True)
+        self.assertEqual(code, 1)
+        kept = Path(err.split("kept in ")[1].split()[0].rstrip("."))
+        self.assertIn("%% journal her:1 %%", kept.read_text(encoding="utf-8"))
+        kept.unlink()
+        with self.edit_with("/x private\n"):
+            code, _, err = self.cli("write", "water", tty=True)
+        self.assertEqual(code, 1)
+        self.assertNotIn("kept in", err)
+        self.assertFalse(self.prompts())
+
+    def test_without_the_scissors_line_the_template_is_still_left_out(self):
+        self.now = at(10)
+        test = self
+
+        def drop_scissors(argv):
+            path = Path(argv[-1])
+            body = path.read_text(encoding="utf-8").replace(cli.SCISSORS + "\n", "")
+            path.write_text("my words\n" + body, encoding="utf-8")
+            return 0
+        with mock.patch.object(cli, "_edit", drop_scissors):
+            code, _, err = self.cli("write", "water", tty=True)
+        self.assertEqual(code, 0, err)
+        body = (self.cfg.root / "2026-10-14-water.md").read_text(encoding="utf-8")
+        self.assertIn("my words", body)
+        self.assertNotIn("Write above this line", body)
+        self.assertNotIn("Water, Sam 💧 One line.\n\n#", body)
+
+    def test_scissors_inside_a_line_of_his_is_his_words(self):
+        self.now = at(10)
+        with self.edit_with(f"he quoted {cli.SCISSORS} once\nand more\n"):
+            code, _, err = self.cli("write", "water", tty=True)
+        self.assertEqual(code, 0, err)
+        self.assertIn("and more", (self.cfg.root / "2026-10-14-water.md").read_text(encoding="utf-8"))
+
+    def test_a_time_out_of_range_is_an_argument_error_not_a_traceback(self):
+        self.now = at(10)
+        code, _, err = self.cli("write", "water", "--at", "0001-01-01T03:00", stdin="x")
+        self.assertEqual(code, 2)
+        self.assertNotIn("Traceback", err)
+        self.assertFalse(self.prompts())
+
+    def test_nits(self):
+        self.now = at(10)
+        with self.edit_with("a note\n"):
+            self.assertEqual(self.cli("write", tty=True)[0], 0)
+        self.assertNotIn("None", self.seen)
+        self.assertEqual(self.cli("write", "j", stdin="a j is a note")[0], 0)   # as serve and MCP take j
+        self.assertEqual([p["kind"] for p in self.prompts()], ["j", "j"])
+        with mock.patch.object(cli, "_edit", side_effect=FileNotFoundError("vi")):
+            code, _, err = self.cli("write", "water", tty=True)
+        self.assertEqual(code, 1)
+        self.assertIn("nothing was saved", err)
+
+
 if __name__ == "__main__":
     import unittest
     unittest.main()

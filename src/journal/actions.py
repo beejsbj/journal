@@ -79,14 +79,19 @@ def _not_empty(text: str, media: str | None) -> None:
         raise Refused("empty", "there are no words to save: nothing was saved")
 
 
-def _when(at: datetime | None, now: datetime) -> datetime:
-    """The time on his words: ``at`` (with its offset, not in the future), else now."""
+def when(cfg: Config, at: datetime | None, now: datetime) -> datetime:
+    """The time on his words: ``at`` (with its offset, not in the future, and one the journal's day arithmetic can
+    place: not at the edge of the calendar), else now. A face may check it before he writes (``journal write``)."""
     if at is None:
         return now
     if at.tzinfo is None or at.utcoffset() is None:
         raise Refused("bad-time", "the time on these words has no offset, so it cannot be placed: nothing was saved")
     if at > now + FUTURE_SLACK:
         raise Refused("bad-time", "the time on these words is in the future: nothing was saved")
+    try:
+        slots.journal_day(cfg, at) - timedelta(days=2)   # (what ``resolve`` reckons with)
+    except (OverflowError, ValueError):
+        raise Refused("bad-time", "the time on these words is out of range: nothing was saved") from None
     return at
 
 
@@ -144,7 +149,7 @@ def answer(cfg: Config, practice, text: str | None, at: datetime | None = None, 
     via = _via(via)
     words = _words(cfg, text)
     now = now or datetime.now(timezone.utc)
-    at = _when(at, now)
+    at = when(cfg, at, now)
     p = _practice(cfg, practice)
     with ledger.locked(cfg.ledger_path) as data:
         done = ledger.capture_of_client(data, client_id)
@@ -166,7 +171,7 @@ def note(cfg: Config, text: str | None, at: datetime | None = None, *, via: str,
     via = _via(via)
     words = _words(cfg, text)
     now = now or datetime.now(timezone.utc)
-    at = _when(at, now)
+    at = when(cfg, at, now)
     with ledger.locked(cfg.ledger_path) as data:
         done = ledger.capture_of_client(data, client_id)
         if done:
@@ -187,7 +192,16 @@ def add(cfg: Config, stem: str, text: str | None, at: datetime | None = None, *,
     words = _words(cfg, text)
     _not_empty(words, media)   # (a retry of a block is answered by ``add_web_block``; only the CLI adds this way)
     now = now or datetime.now(timezone.utc)
-    at = _when(at, now)
+    at = when(cfg, at, now)
+    entry_for(cfg, stem, at)
+    info = capture.add_web_block(cfg, stem, words, at, media=media, ext=ext, meta=meta, client_id=client_id,
+                                 key_of=key_of, via=via)
+    return {**info, "stem": stem}
+
+
+def entry_for(cfg: Config, stem: str, at: datetime) -> Path:
+    """The entry ``add`` writes ``stem``'s words into, or ``Refused``: only an entry the engine wrote, not a program
+    session's, and not for words dated before the entry's day. A face may check it before he writes."""
     if entries.entry_file(cfg.root, stem) is None:
         raise Refused("not-an-entry", f"no journal entry {stem!r}: nothing was saved")
     path = entries.engine_file(cfg.root, stem)
@@ -200,9 +214,7 @@ def add(cfg: Config, stem: str, text: str | None, at: datetime | None = None, *,
                                        "chat or the web app: nothing was saved")
     if at.astimezone(cfg.tz).date().isoformat() < stem[:10]:
         raise Refused("bad-time", "the time on these words is before the day of this entry: nothing was saved")
-    info = capture.add_web_block(cfg, stem, words, at, media=media, ext=ext, meta=meta, client_id=client_id,
-                                 key_of=key_of, via=via)
-    return {**info, "stem": stem}
+    return path
 
 
 # ── opening a practice: a view ───────────────────────────────────────────────

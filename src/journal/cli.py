@@ -37,7 +37,7 @@ import json
 import os
 import sqlite3
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from . import __version__
@@ -312,7 +312,8 @@ def _shown_practice(v: dict) -> list[str]:
 
 
 def _at_arg(cfg: jconfig.Config, raw: str | None, now: datetime) -> datetime | None:
-    """``--at``: an ISO time (one without an offset is in the journal's time zone), or ``HH:MM`` today."""
+    """``--at``: an ISO time (one without an offset is in the journal's time zone), or ``HH:MM``: the latest such
+    time that is not ahead of now (at 00:30, ``23:30`` is last night's)."""
     if raw is None:
         return None
     try:
@@ -323,67 +324,92 @@ def _at_arg(cfg: jconfig.Config, raw: str | None, now: datetime) -> datetime | N
             when = now.astimezone(cfg.tz).replace(hour=hh, minute=mm, second=0, microsecond=0)
         except ValueError:
             raise ValueError(f"--at must be an ISO time or HH:MM (got {raw!r})") from None
+        if when > now:
+            when -= timedelta(days=1)
     return when if when.tzinfo is not None else when.replace(tzinfo=cfg.tz)
 
 
-def _from_editor(template: str) -> str | None:
-    """His words from ``$VISUAL`` / ``$EDITOR`` (else ``vi``), as git commit asks for a message: the file opens with
-    ``template`` below a scissors line, and everything from that line down is left out. Nothing else is taken
-    out (a line of his starting with ``#`` is a heading, not a comment). None when the editor failed."""
-    import shlex
+TEMPLATE_HEAD = "# Write above this line; everything from it down is left out."
+
+
+def _edit(argv: list[str]) -> int:
+    """Run the editor on a file and wait for it (its exit status)."""
     import subprocess
+    return subprocess.run(argv).returncode
+
+
+def _from_editor(template: str) -> tuple[str | None, Path]:
+    """His words from ``$VISUAL`` / ``$EDITOR`` (else ``vi``), as git commit asks for a message: the file opens with
+    ``template`` below a scissors line, and everything from that line down is left out; were the scissors line
+    removed, from the template's first line down. Only a whole line counts, and nothing else is taken out (a line of
+    his starting with ``#`` is a heading, not a comment). Returns (the words, or None when the editor failed, and the
+    file, which the caller removes once the words are saved or are not to be kept)."""
+    import shlex
     import tempfile
     editor = os.environ.get("VISUAL") or os.environ.get("EDITOR") or "vi"
-    fd, name = tempfile.mkstemp(prefix="journal-", suffix=".md")
+    fd, name = tempfile.mkstemp(prefix="journal-", suffix=".md")   # (0600: his words, until they are saved)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(f"\n{SCISSORS}\n{template}")
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(f"\n{SCISSORS}\n{template}")
-        if subprocess.run([*shlex.split(editor), name]).returncode != 0:
-            return None
-        text = Path(name).read_text(encoding="utf-8")
-    finally:
-        os.unlink(name)
-    cut = text.find(SCISSORS)
-    return (text[:cut] if cut >= 0 else text).strip("\n")
+        if _edit([*shlex.split(editor), name]) != 0:
+            return None, Path(name)
+    except OSError:
+        return None, Path(name)
+    lines = Path(name).read_text(encoding="utf-8").split("\n")
+    for mark in (SCISSORS, TEMPLATE_HEAD):
+        if mark in lines:
+            lines = lines[:lines.index(mark)]
+            break
+    return "\n".join(lines).strip("\n"), Path(name)
 
 
 def _template(v: dict | None, stem: str | None) -> str:
-    lines = ["# Write above this line; everything from it down is left out.", "#"]
-    lines += [f"# {x}" if x else "#" for x in (_shown_practice(v) if v else [f"Adding to {stem}."])]
+    lines = [TEMPLATE_HEAD, "#"]
+    shown = _shown_practice(v) if v else [f"Adding to {stem}."] if stem else ["A note of its own (/j)."]
+    lines += [f"# {x}" if x else "#" for x in shown]
     return "\n".join(lines) + "\n"
+
+
+ARGUMENT_CODES = ("not-a-practice", "disabled", "bad-time", "not-an-entry", "not-engine-entry", "program-entry")
 
 
 def write_command(args, cfg: jconfig.Config) -> int:
     """``journal write [<id>] [-] [--entry STEM] [--at TIME]``: his words through ``actions`` (``answer`` for a
     practice, ``add`` for an entry, ``note`` otherwise), with the refusals every face has. The words come from stdin
-    when it is piped or ``-`` is given, else from the editor. Exit 0 saved, 1 nothing saved (refused, empty, the
-    editor failed), 2 an argument the journal cannot use."""
+    when it is piped or ``-`` is given, else from the editor. What can be checked before he writes is (the practice,
+    the entry, the time), so the editor never opens for words that cannot be saved; words from the editor refused
+    after it (a marker line, the placeholder) are kept in its file, which the message names, unless they are off
+    the record. The clock is read when he saves. Exit 0 saved, 1 nothing saved (refused, empty, the editor failed),
+    2 an argument the journal cannot use."""
     from . import actions, entries
     practice, stdin = args.practice, args.dash == "-"
     if practice == "-":
         practice, stdin = None, True
+    if practice in entries.FREEFORM_IDS:   # (``j``: a note, as serve and MCP take it)
+        practice = None
     if practice and args.entry:
         return _err("name a practice or --entry, not both")
     now = datetime.now(timezone.utc)
-    try:
-        at = _at_arg(cfg, args.at, now)
-    except ValueError as e:
-        return _err(str(e))
     v = None
     try:
+        at = _at_arg(cfg, args.at, now)
+        actions.when(cfg, at, now)
         if practice:
             v = actions.view(cfg, practice, now=now)
-        elif args.entry and entries.engine_file(cfg.root, args.entry) is None:
-            raise actions.Refused("not-an-entry", f"no journal entry {args.entry!r} the journal wrote")
-    except actions.Refused as e:
+        elif args.entry:
+            actions.entry_for(cfg, args.entry, at or now)
+    except ValueError as e:   # (``actions.Refused`` is one)
         return _err(str(e).replace(": nothing was saved", ""))
+    kept = None
     if stdin or not sys.stdin.isatty():
         text = sys.stdin.read()
     else:
-        text = _from_editor(_template(v, args.entry))
+        text, kept = _from_editor(_template(v, args.entry))
         if text is None:
+            kept.unlink(missing_ok=True)
             print("journal: the editor did not finish: nothing was saved", file=sys.stderr)
             return 1
+    now = datetime.now(timezone.utc)   # he saves now, perhaps minutes after the editor opened
     try:
         if practice:
             info = actions.answer(cfg, practice, text, at, via="cli", now=now)
@@ -392,9 +418,13 @@ def write_command(args, cfg: jconfig.Config) -> int:
         else:
             info = actions.note(cfg, text, at, via="cli", now=now)
     except actions.Refused as e:
-        print(f"journal: {e}", file=sys.stderr)
-        return 2 if e.code in ("not-a-practice", "bad-time", "not-an-entry", "not-engine-entry", "program-entry") \
-            else 1
+        keep = kept is not None and e.code not in ("off-the-record", "empty")
+        if kept is not None and not keep:
+            kept.unlink(missing_ok=True)
+        print(f"journal: {e}" + (f"; your words are kept in {kept}" if keep else ""), file=sys.stderr)
+        return 2 if e.code in ARGUMENT_CODES else 1
+    if kept is not None:
+        kept.unlink(missing_ok=True)
     # (the slot the view named, said again: words saved in another one, a race with a tick, are only named by path)
     said = f" {v['fills']}" if v and info.get("slot") == v["slot"]["id"] else ""
     print(f"Saved in {info['path']}.{said}")
