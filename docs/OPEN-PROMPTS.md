@@ -130,6 +130,10 @@ snapshot and the stem.
    annotation replies, reflection sends, program summaries (`programs._send_summary`, `_retry_summary`), the
    program notes `programs._say_about` and `cli._notify`, and the `status` rows built on them
    (`pending_annotation_replies`, `undelivered`). With a channel configured, all of it behaves exactly as today.
+   An annotation reply or a reflection that would have been sent is marked skipped, `no chat`, so a chat configured
+   later never sends it, as a program's summary is (`summary_unsent: "no chat"`); instead `standing` tells the
+   companion how many were written while there was no chat since the last delivered prompt, in counts, never their
+   words (the owner, 2026-11-09).
 7. **Privacy.** Saving words on a face writes nothing to `sent.jsonl`, `send-times.json` or the thread stamps
    (`today.note_send`, `last_send`), so it never ends a bare `/x` window or starts a thread. `conversations._send_times`
    and `privacy.send_times` keep their own reading (delivered records and every `sent.jsonl` line) and do not move

@@ -106,7 +106,7 @@ Minimal config:
 | `windows.grace_hours` | `2` | How late a scheduled prompt may still go out (e.g. after downtime). |
 | `windows.opener_budget_seconds` | `240` | Model time for the opener. |
 | `windows.annotate_after_minutes` | `20` | Wait after the first reply before annotating. |
-| `windows.day_ends_at` | `04:00` | Words written before this time belong to the day before (the journal day): a practice answered at 00:30 fills last night's slot, not tonight's. |
+| `windows.day_ends_at` | `04:00` | Words written before this time belong to the day before (the journal day): a practice answered at 00:30 fills last night's slot, not tonight's. A deliberate send (`/start <id>`, `journal send <id>`, Send to chat) before it takes today's date: `/start morning` at 03:30 delivers today's morning, and its 06:00 send is then done. |
 | `channel.platform` | `telegram` | The platform the journal's chat is on: any Hermes gateway platform (`telegram`, `discord`, `slack`, `signal`, `whatsapp`, `matrix`, `mattermost` …). See *Another platform* below. `none`: a journal with no chat at all (see *No chat* below). |
 | `channel.chat_id` | `""` (on Telegram: `telegram.chat_id`) | The chat prompts go to and replies are captured from, as Hermes names it. |
 | `channel.user_ids` | `[]` | Your own ids on that platform. Set, only your messages in the chat are journaled (anyone else's pass through untouched) and only your sessions are read; empty, everything in the chat is yours, as in a direct-message chat. |
@@ -190,7 +190,9 @@ its slot (`actions.answer`; the web app, the CLI and MCP move onto it in OPEN-FA
 written into the files. An empty `chat_id` on any other platform is not this: it still fails and alerts, so an install
 that loses its chat id is noticed. Program phases and interrupts still need a chat until OPEN-PROGRAMS: on a no-chat
 install a program run's phase fails and alerts, so don't start one there yet. If a chat is configured later, the
-annotation replies and reflections written meanwhile are sent then.
+annotation replies and reflections written meanwhile are not sent: each is marked skipped (`no chat`) when it would
+have been, and the companion's pack and today block say how many were written while there was no chat (counts only;
+they are in the entries).
 
 ### Another platform
 
