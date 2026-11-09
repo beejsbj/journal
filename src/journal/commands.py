@@ -83,9 +83,7 @@ def start(cfg: Config, words: str) -> Start:
         except library.UnknownDefinition:
             return Start(None, f"There's no practice called “{word}”. {menu(lib)}")
         return _program_start(lib, prog, (words or "").split()[1:])
-    if not practice.enabled:
-        return Start(None, f"{practice.title} is turned off (enabled: false in its file). {menu(lib)}")
-    return Start(practice)
+    return Start(practice)   # (``enabled: false`` is "not scheduled" only: /start still sends it; the owner, 2026-11-09)
 
 
 

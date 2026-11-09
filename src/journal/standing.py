@@ -17,6 +17,9 @@ fact the journal holds:
   (``phases_of``), when he last answered in it (his captured answers only: a ``/start``, ``/next`` or ``/break``
   inside an off-the-record window would be timing, and a phase's send time moves with them) and its ``pace``.
 * **The gap** in calendar days, and whether it reaches ``pack.returning_days`` (the opener's returning stance).
+* **Written while there was no chat**: how many annotations and reflections were written with ``channel.platform:
+  none`` (marked skipped, ``no chat``, and never sent) since the newest prompt delivered to the chat. Counts only,
+  never their words: they are in the entries.
 
 ``collect`` returns a plain dict; ``pack_lines`` and ``today_lines`` render it. The today block runs in the gateway
 hook, which never reads the transcript: it passes the chat part the tick cached (``today.refresh``) instead of
@@ -222,6 +225,27 @@ def _heard(cfg: Config, data: dict, now: datetime, chat_at: datetime | None, ent
     return out
 
 
+def without_chat(data: dict) -> dict:
+    """``{"annotations", "reflections"}``: how many were written while there was no chat (an annotation reply or a
+    reflection send marked skipped, ``no chat``) since the newest prompt delivered to the chat. Counts only: nothing
+    of their words is read."""
+    last = None
+    for p in _prompts(data):
+        at = _parse(p.get("sent_at")) if p.get("message_id") else None
+        if at is not None and (last is None or at > last):
+            last = at
+
+    def after(mark) -> bool:
+        if not isinstance(mark, dict) or mark.get("skipped") != "no chat":
+            return False
+        at = _parse(mark.get("skipped_at"))
+        return last is None or (at is not None and at > last)
+    found = data.get("reflections") if isinstance(data, dict) else None
+    return {"annotations": sum(after(p.get("annotation_reply")) for p in _prompts(data)),
+            "reflections": sum(after(r.get("telegram")) for r in (found if isinstance(found, list) else [])
+                               if isinstance(r, dict))}
+
+
 # ── programs ─────────────────────────────────────────────────────────────────
 
 def movement(phases_of: str, session: int) -> str:
@@ -279,7 +303,7 @@ def collect(cfg: Config, now: datetime, chat: tuple[datetime | None, str] | None
     out: dict = {"date": today.isoformat(), "heard": None, "chat": "none", "entry": None,
                  "missed": {"total": 0, "counts": {}, "since": None, "since_title": None, "capped": False,
                             "days": pack_lookback_days(cfg), "run": []},
-                 "programs": [], "gap_days": None, "returning": False,
+                 "programs": [], "no_chat": {"annotations": 0, "reflections": 0}, "gap_days": None, "returning": False,
                  "returning_days": pack_returning_days(cfg), "unavailable": []}
     try:
         data = ledger.snapshot(cfg.ledger_path)
@@ -317,6 +341,10 @@ def collect(cfg: Config, now: datetime, chat: tuple[datetime | None, str] | None
         out["programs"] = _programs(cfg, data)
     except Exception:  # noqa: BLE001
         out["unavailable"].append("the program runs")
+    try:
+        out["no_chat"] = without_chat(data)
+    except Exception:  # noqa: BLE001 - the count is lost, never the pack
+        pass
     return out
 
 
@@ -332,6 +360,17 @@ def _when(iso: str | None, day: str, today: date, clock: bool = True) -> str:
 def _missed_text(m: dict) -> str:
     per = ", ".join(f"{k} {n}" for k, n in m["counts"].items())
     return f"{m['total']} — {per}" if per else str(m["total"])
+
+
+def no_chat_text(counts: dict | None) -> str:
+    """``1 annotation and 3 reflections were written; …``, or "" when there were none."""
+    counts = counts or {}
+    n = {what: counts.get(f"{what}s", 0) for what in ("annotation", "reflection")}
+    parts = [f"{k} {what}{'' if k == 1 else 's'}" for what, k in n.items() if k]
+    if not parts:
+        return ""
+    verb = "was" if sum(n.values()) == 1 else "were"
+    return f"{' and '.join(parts)} {verb} written; they are in the entries, never sent to the chat"
 
 
 def program_text(prog: dict, today: date) -> str:
@@ -388,6 +427,8 @@ def pack_lines(cfg: Config, data: dict) -> list[str]:
                      f"{_when(m['since'], m['since'][:10], today)}).")
     for prog in data["programs"]:
         lines.append(f"- Program in progress: {program_text(prog, today)}.")
+    if no_chat_text(data.get("no_chat")):
+        lines.append(f"- While there was no chat: {no_chat_text(data.get('no_chat'))}.")
     if data["gap_days"] is not None:
         days = data["gap_days"]
         span = "less than a day" if days == 0 else ("1 day" if days == 1 else f"{days} days")
@@ -417,4 +458,6 @@ def today_lines(cfg: Config, data: dict) -> list[str]:
         out.append(f"- prompts unanswered{since}: {_missed_text(m)}")
     for prog in data["programs"]:
         out.append(f"- program: {program_text(prog, today)}")
+    if no_chat_text(data.get("no_chat")):
+        out.append(f"- while there was no chat: {no_chat_text(data.get('no_chat'))}")
     return out

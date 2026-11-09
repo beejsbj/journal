@@ -375,6 +375,16 @@ describe("Today", () => {
     expect(must(host.querySelector("li.practice.due .pill")).textContent).toBe("due since 09:00");
   });
 
+  it("offers Write now and Send to chat on a practice turned off: enabled false is not scheduled, nothing more", async () => {
+    visit("/");
+    const rows = [{ id: "gratitude", state: "due", at: "09:00" }];
+    const library = fixtures.library.map((p) => (p.id === "gratitude" ? { ...p, enabled: false } : p));
+    stubApi({ ...reads, "GET /api/v1/today": { ...fixtures.today, practices: { rows, open: [] } }, "GET /api/v1/library": library });
+    const host = mount(<App />);
+    const card = await until(() => must(host.querySelector("li.practice.due")));
+    await until(() => expect([...card.querySelectorAll(".actions button")].map((b) => b.textContent)).toEqual(["Write now", "Send to chat"]));
+  });
+
   it("opens Write now from the address: /today?write=<id>", async () => {
     visit("/today?write=evening");
     stubApi({ ...reads, "GET /api/v1/library/evening/open": view("evening", "Fills the 23:00 slot early; it will not be sent.") });
@@ -441,12 +451,12 @@ describe("Today", () => {
     expect(writeTarget([r("answered", "09:00")], "other")).toBe(-1);
   });
 
-  it("opens no composer for a practice the view cannot open (turned off, unknown, a note)", async () => {
+  it("opens no composer for a practice the view cannot open (unknown, a note)", async () => {
     visit("/today?write=quiet");
-    stubApi({ ...reads, "GET /api/v1/library/quiet/open": json({ error: "disabled", detail: "Quiet is turned off" }, 409) });
+    stubApi({ ...reads, "GET /api/v1/library/quiet/open": json({ error: "not-found", detail: "no practice by that id" }, 404) });
     const host = mount(<App />);
     const card = await until(() => must(host.querySelector("li.practice.write-only")));
-    await until(() => expect(card.querySelector(".error-line")?.textContent).toContain("turned off"));
+    await until(() => expect(card.querySelector(".error-line")?.textContent).toContain("no practice"));
     expect(card.querySelector("textarea")).toBeNull();
   });
 
@@ -705,6 +715,16 @@ describe("The Library", () => {
     const host = mount(<App />);
     const link = await until(() => must(byText(host, "a.button", "Write now")));
     expect(link.getAttribute("href")).toBe("/today?write=gratitude");
+  });
+
+  it("offers Write now and Send to chat on a practice turned off (the owner, 2026-11-09: not scheduled, nothing more)", async () => {
+    visit("/library/gratitude");
+    const off = { ...fixtures.libraryGratitude, definition: { ...fixtures.libraryGratitude.definition, enabled: false } };
+    stubApi({ ...reads, "GET /api/v1/library/gratitude": off });
+    const host = mount(<App />);
+    await until(() => must(byText(host, "button", "Turn on")));
+    expect(byText(host, "a.button", "Write now")?.getAttribute("href")).toBe("/today?write=gratitude");
+    expect(byText(host, "button", "Send to chat")).toBeDefined();
   });
 
   it("turns a practice off by saving the file with enabled false, against the mtime it read", async () => {

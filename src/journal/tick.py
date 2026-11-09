@@ -681,15 +681,38 @@ def _reply_target(p: dict) -> str | None:
     return None
 
 
+def _reply_owed(p: dict) -> bool:
+    """An annotation reply still to send: annotated, not sent, not skipped, attempts left."""
+    reply = p.get("annotation_reply") or {}
+    return bool(p.get("annotated_at")) and not reply.get("message_id") and not reply.get("skipped") \
+        and reply.get("attempts", 0) < REPLY_ATTEMPTS
+
+
+def _skip_annotation_replies(cfg: Config, now: datetime, log: list[str]) -> None:
+    """No chat (``channel.platform: none``): each reply that would have been sent is marked skipped, ``no chat``,
+    and never sent, also once a chat is configured later (the owner, 2026-11-09). The annotations stay in the entry;
+    ``standing`` tells the companion how many there were, never their words. Nothing is attempted (rule 6)."""
+    skipped = 0
+    with ledger.locked(cfg.ledger_path) as data:
+        for p in data["prompts"]:
+            if _reply_owed(p):
+                p.setdefault("annotation_reply", {}).update(skipped="no chat", skipped_at=now.isoformat())
+                skipped += 1
+    if skipped:
+        log.append(f"no chat: {skipped} annotation repl{'y' if skipped == 1 else 'ies'} skipped (in the entries)")
+
+
 def reply_annotations(cfg: Config, now: datetime, log: list[str]) -> None:
     """Send each new annotation to the chat as a reply to the message it annotates (as a message of its own where the
     platform has no replies, or the prompt was made on another platform); exactly once."""
-    if not cfg.telegram.get("annotation_replies", True) or not cfg.has_channel:
-        return  # (no chat: the annotations are in the entry, and nothing is attempted, OPEN-PROMPTS rule 6)
+    if not cfg.telegram.get("annotation_replies", True):
+        return
+    if not cfg.has_channel:
+        _skip_annotation_replies(cfg, now, log)
+        return
     chat = None
     for p in ledger.snapshot(cfg.ledger_path)["prompts"]:
-        reply = p.get("annotation_reply") or {}
-        if not p.get("annotated_at") or reply.get("message_id") or reply.get("attempts", 0) >= REPLY_ATTEMPTS:
+        if not _reply_owed(p):
             continue
         path = Path(p.get("entry_path") or "")
         text = entries.annotations(path.read_text(encoding="utf-8")) if path.is_file() else ""

@@ -64,16 +64,22 @@ class ViewTest(Base):
         self.assertEqual((v["slot"]["date"], v["slot"]["step"]), ("2026-10-14", 1))
         self.assertEqual(v["fills"], "Answers yesterday's prompt in the chat, sent at 23:00.")
 
-    def test_a_practice_turned_off_is_refused_as_send_refuses_it(self):
+    def test_a_practice_turned_off_is_not_scheduled_but_every_face_opens_writes_and_sends_it(self):
+        """The owner, 2026-11-09 (decision 4): ``enabled: false`` means "not scheduled" only. The tick never sends it
+        at its time; a face opens it and saves words into it (an extra entry of the day, as for a practice with no
+        slot that day), and a deliberate send delivers it."""
         (Path(self.cfg.practices_dir) / "quiet.md").write_text(
-            "---\nkind: practice\nid: quiet\ntitle: Quiet\nenabled: false\n---\n- One?\n", encoding="utf-8")
-        before = checksum(self.cfg)
-        for call in (lambda: actions.view(self.cfg, "quiet", now=at(10)),
-                     lambda: actions.answer(self.cfg, "quiet", "words", via="web", now=at(10))):
-            with self.assertRaises(actions.Refused) as e:
-                call()
-            self.assertEqual(e.exception.code, "disabled")
-        self.assertEqual(checksum(self.cfg), before)
+            "---\nkind: practice\nid: quiet\ntitle: Quiet\nschedule.time: 09:00\nenabled: false\n---\n- One?\n",
+            encoding="utf-8")
+        self.send(at(9, 1))
+        self.assertFalse([p for p in self.prompts() if p.get("kind") == "quiet"])   # not scheduled
+        v = actions.view(self.cfg, "quiet", now=at(10))
+        self.assertEqual((v["practice"], v["slot"]["id"], v["slot"]["step"]), ("quiet", "2026-10-14-quiet", 4))
+        info = self.answer("quiet", "a quiet morning", at(10))
+        self.assertEqual((info["prompt"]["id"], info["prompt"]["opened_via"]), ("2026-10-14-quiet", "web"))
+        self.send(at(11), only="quiet")
+        sent = self.prompt("2026-10-14-quiet-2")
+        self.assertEqual((bool(sent["message_id"]), sent["kind"]), (True, "quiet"))
 
     def test_a_program_or_unknown_id_is_refused(self):
         for word in ("nope", "fix-life", ""):

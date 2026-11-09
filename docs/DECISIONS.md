@@ -3087,8 +3087,9 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     `journal send` logs one line, exit 0), and annotation replies, reflection sends, program summaries and their
     retries, program notes and `cli._notify` attempt nothing; status shows no *undelivered* or reply rows; doctor's
     channel row is ok. `Config.channel()` with `none` is `NoChannel` (a send that slipped through fails loudly).
-    **Left open:** an annotation or reflection written while there was no chat stays unsent; if a chat is configured
-    later, the tick sends the backlog (annotation replies and reflections have no age limit).
+    **Left open** (decided since: *Owner's decisions 2026-11-09*, 3, below): an annotation or reflection written
+    while there was no chat stays unsent; if a chat is configured later, the tick sends the backlog (annotation
+    replies and reflections have no age limit).
   - **Rules 9 and 10 key on a face's `via`** (`capture.by_face`: `web`, `cli`, `mcp`), not on a missing
     `platform_message_id` (rule 9's parenthesis) or on any `via` (rule 10's "Fix"): chat captures without a message
     id exist (a gateway event with none, the conversation writer's notes) and so do the sweep's and the writer's own
@@ -3122,7 +3123,7 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     practice's id; a deliberate send attaching when he answered during its opener; the engine-only test not
     exercising `agent.is_failure_text`; the no-chat tests passing with the guards off; rules 9 and 10 catching chat
     captures; `actions` accepting a naive or future time; docs overstating rule 6. **Declined, left open for the
-    owner:** in the small hours the journal day sends practices back to yesterday, also a morning practice: at 03:30
+    owner** (decided since: *Owner's decisions 2026-11-09*, 1, below): in the small hours the journal day sends practices back to yesterday, also a morning practice: at 03:30
     words for *morning* go to yesterday's missed morning (step 2), and `/start morning` re-sends yesterday's
     delivered morning while today's 06:00 still goes out (on `main` it delivered today's). That is the doc's rule as
     written (steps 2–4 on the journal day; `/start` through `resolve`); a practice-level "my day starts here" would
@@ -3136,7 +3137,7 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     `capture.by_face` raised on a damaged `via`; a slot was put on a journal day by its delivery time, so a late tick
     could move it (now by its scheduled time); the today block called a slot the chat never got "missed" with no
     word that it was never sent (now `<id> at HH:MM, not sent to the chat (missed)`); DEPLOY's first check named a
-    log line an answered slot does not write. **Left open for the owner:** a practice scheduled between midnight and
+    log line an answered slot does not write. **Left open for the owner** (decided since: *Owner's decisions 2026-11-09*, 2, below: as built): a practice scheduled between midnight and
     `day_ends_at` (say *night* at 00:30) done in the daytime fills *tonight's* slot, whose id and entry are dated
     tomorrow (`2026-10-16-night` on the 15th), and the tick then skips that send; on `main` a `/start night` at 09:00
     re-sent the 15th's. This is the doc's journal day applied as written (an evening chosen at 15:00 fills tonight's
@@ -3167,6 +3168,7 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   - **A practice turned off is refused** by `actions` (`Refused.code` `disabled`; serve `409 disabled`, the CLI exit
     2, an MCP refusal), as `/start` and `journal send` refuse it. The doc's "a practice can be done at any time" says
     nothing about one he switched off; refusing matches the chat, and a practice turned on again takes words at once.
+    **Reversed by the owner** (*Owner's decisions 2026-11-09*, 4, below): `enabled: false` is "not scheduled" only.
   - **More words for an entry: `actions.add`** (`journal write --entry <stem>`), the doc's *Adding more words to an
     entry already written goes through that entry*: the three refusals, only an entry the engine wrote
     (`entries.engine_file`, moved there from `serve/document.py` so the CLI has it without `serve/`), not a program
@@ -3311,3 +3313,48 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     saving power gets the nudge at once), the tap focuses before it navigates, and the docs now say what the push
     service learns besides the payload's size: the server's address, the one VAPID key, and, since the browser
     registers the site when it subscribes, possibly the site's address whatever `push.subject` says.
+- **Owner's decisions 2026-11-09 (OPEN-PROMPTS)** — the owner's answers to the points the OPEN-CORE reviews left
+  open, and to three more from OPEN-FACES and OPEN-PROGRAMS (PRs #27–#30). Applied where they need code; 5 and 6 are
+  recorded only.
+  1. **A deliberate delivery before `day_ends_at` takes today's calendar date** (`/start <id>`, `journal send <id>`,
+     the web's *Send to chat*). Words he writes before `day_ends_at` still count toward the previous journal day (an
+     evening answered at 00:30 fills last night's evening). So at 03:30 `/start morning` delivers today's morning (its
+     06:00 slot, early: step 3), and the tick's 06:00 send is then done. Built as `slots._by_calendar`: with
+     `delivery=True` and `at` before `day_ends_at`, `resolve`'s steps run over today's calendar date only (a due or
+     open slot; the newest missed; the next later one with no record or a failed send's; an extra entry dated today).
+     **Read to the letter:** at 00:30 with last night's evening still open in the chat, `/start evening` delivers
+     tonight's evening early rather than re-sending last night's (words at 00:30 still answer last night's); this is
+     also what `main` did. Faces never pass `delivery=True`, so a face write cannot move by this, and a delivery
+     stays the only thing that makes a chat boundary. Tests: `tests/test_open_slots.py`
+     (`a_delivery_before_day_ends_at…`, `…after_day_ends_at…`), `tests/test_open_core.py`
+     (`start_before_day_ends_at…`).
+  2. **No change:** a practice slotted before `day_ends_at`, done in the daytime, fills tonight's slot, as built and
+     pinned (`test_the_night_practice_done_in_the_day_fills_tonights_slot`).
+  3. **No chat: annotation replies and reflection sends are skipped, not left pending.** With `channel.platform:
+     none`, each that would have been sent is marked `skipped: "no chat"` (`annotation_reply` and the reflection's
+     `telegram` record, with `skipped_at`), so a chat configured later never sends it, as OPEN-PROGRAMS does for a
+     summary (`summary_unsent: "no chat"`). A reply is marked only when `telegram.annotation_replies` is on (only
+     then would it have been sent). `status` lists no skipped reply as pending and reads a skipped reflection
+     "written, not sent: no chat". Instead the companion is told: `standing.collect` gains `no_chat`, the count of
+     annotations and reflections marked skipped since the newest prompt delivered to the chat (all of them while none
+     has been), and the pack's *Where things stand* and the today block's standing lines carry one line, e.g. "While
+     there was no chat: 12 annotations and 3 reflections were written; they are in the entries, never sent to the
+     chat." Counts only, never their words; the line goes once a prompt is delivered again. MCP's `journal_today`
+     does not get it: its today text does not take standing (`today.collect` without `with_standing`), so nothing
+     there changed. Tests: `NoChannelTest` in `tests/test_open_core.py` (nothing pending or sent after a chat is set;
+     the line in standing, the pack and the today lines, with no word of the annotation or reflection).
+  4. **`enabled: false` means "not scheduled" only.** Every face can still open, write and deliver a disabled
+     practice (the web app, `journal open`/`journal write`, MCP, `/start` and `journal send`); the schedule never
+     sends it. Applied on OPEN-FACES (#28): `actions` no longer refuses one (the `disabled` code is gone, with serve's
+     `409 disabled` on `POST /entries`, `GET /library/{id}/open` and `POST /library/{id}/send`, and the CLI's), and
+     `commands.start` and `journal send` take it; the PWA keeps *Write now* and *Send to chat* on its Today card and
+     Library page. A turned-off practice has no slot (`slots.scheduled_on` is empty for it), so words or a send make
+     an extra entry of the day (`<date>-<id>`, then `-2` …), and the Today rows show it only once it has a record.
+     A program turned off is still refused (the decision names practices). The tests that pinned the refusal now pin
+     the opposite: `test_open_faces.py` (`…turned_off_is_not_scheduled_but_every_face…`), `test_serve_writes.py`,
+     `test_mcp.py`, `test_practices_engine.py` (`…not_due_and_still_starts`), `test_cli.py`, and the web's
+     `writes.test.tsx`.
+  5. **A program started with no chat sends nothing when a chat is configured later;** the owner resumes it with
+     `/start` (as built in OPEN-PROGRAMS, #29). Recorded only.
+  6. **The PWA control for answering an interrupt** comes as a small separate package after #28 and #29 merge.
+     Recorded only.

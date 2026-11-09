@@ -361,9 +361,11 @@ class StartTest(Case):
     def test_what_is_not_a_practice_to_answer(self):
         (self.cfg.practices_dir / "quiet.md").write_text(
             "---\nkind: practice\nid: quiet\ntitle: Quiet\nenabled: false\n---\n- One?\n", encoding="utf-8")
-        for word in ("nope", "fix-life", "quiet", "", "evening now"):
+        for word in ("nope", "fix-life", "", "evening now"):
             with self.subTest(word), self.assertRaises(handlers.Refused):
                 handlers.start(self.cfg, word, NOW)
+        # turned off is "not scheduled" only: MCP opens it and saves into it (the owner's decision 4, 2026-11-09)
+        self.assertEqual(handlers.start(self.cfg, "quiet", NOW)["practice"], "quiet")
 
 
 class PrivacyTest(Case):
