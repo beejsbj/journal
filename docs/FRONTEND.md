@@ -66,7 +66,8 @@ programs with no active run).
   since 09:00") is a slot whose time has come with no chat message for it. `/today?write=<id>` (Today's second path)
   opens *Write now* on the row the words will fill (the newest due or open one, else the newest missed, else the next
   to come), or the practice alone when it has no row today; it is used once (it leaves the address, and a save stops
-  it opening again). A practice the view refuses (turned off, unknown) shows why and no composer. *Send to chat* is
+  it opening again). A practice the view refuses (unknown) shows why and no composer; one turned off is not refused (`enabled: false`
+  is off the schedule, nothing more: its card and its Library page keep *Write now* and *Send to chat*). *Send to chat* is
   left out when `/today` says `chat: false` (a journal with no chat).
 - Program card for each active run: "Session 3/10 · The Identity Construction Tracer · Phase 2/5 open since
   Sunday", buttons *Continue* (opens the Run screen), *Pause*.

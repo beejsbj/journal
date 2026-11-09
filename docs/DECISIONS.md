@@ -3168,6 +3168,7 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   - **A practice turned off is refused** by `actions` (`Refused.code` `disabled`; serve `409 disabled`, the CLI exit
     2, an MCP refusal), as `/start` and `journal send` refuse it. The doc's "a practice can be done at any time" says
     nothing about one he switched off; refusing matches the chat, and a practice turned on again takes words at once.
+    **Reversed by the owner** (*Owner's decisions 2026-11-09*, 4, below): `enabled: false` is "not scheduled" only.
   - **More words for an entry: `actions.add`** (`journal write --entry <stem>`), the doc's *Adding more words to an
     entry already written goes through that entry*: the three refusals, only an entry the engine wrote
     (`entries.engine_file`, moved there from `serve/document.py` so the CLI has it without `serve/`), not a program
@@ -3281,7 +3282,15 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
      the line in standing, the pack and the today lines, with no word of the annotation or reflection).
   4. **`enabled: false` means "not scheduled" only.** Every face can still open, write and deliver a disabled
      practice (the web app, `journal open`/`journal write`, MCP, `/start` and `journal send`); the schedule never
-     sends it. Applied on OPEN-FACES (#28), recorded there.
+     sends it. Applied on OPEN-FACES (#28): `actions` no longer refuses one (the `disabled` code is gone, with serve's
+     `409 disabled` on `POST /entries`, `GET /library/{id}/open` and `POST /library/{id}/send`, and the CLI's), and
+     `commands.start` and `journal send` take it; the PWA keeps *Write now* and *Send to chat* on its Today card and
+     Library page. A turned-off practice has no slot (`slots.scheduled_on` is empty for it), so words or a send make
+     an extra entry of the day (`<date>-<id>`, then `-2` …), and the Today rows show it only once it has a record.
+     A program turned off is still refused (the decision names practices). The tests that pinned the refusal now pin
+     the opposite: `test_open_faces.py` (`…turned_off_is_not_scheduled_but_every_face…`), `test_serve_writes.py`,
+     `test_mcp.py`, `test_practices_engine.py` (`…not_due_and_still_starts`), `test_cli.py`, and the web's
+     `writes.test.tsx`.
   5. **A program started with no chat sends nothing when a chat is configured later;** the owner resumes it with
      `/start` (as built in OPEN-PROGRAMS, #29). Recorded only.
   6. **The PWA control for answering an interrupt** comes as a small separate package after #28 and #29 merge.

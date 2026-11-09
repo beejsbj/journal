@@ -23,7 +23,9 @@ The gateway restarts in **windows**, at least an hour from a ritual (the built-i
 - **Web app.** `POST /entries` with `practice` is `actions.answer`: the words fill that practice's slot (its open
   prompt, its due or missed slot, the next one later today, which the tick then does not send, else an extra entry
   `<date>-<id>-<n>`), **never a `/j` note** (until now, words for a practice with no open prompt became one). Without
-  a practice it is `actions.note`, as before. A practice turned off is `409 disabled`. New route `GET
+  a practice it is `actions.note`, as before. A practice turned off is not refused: `enabled: false` takes it off
+  the schedule, nothing more (the owner's decision 4, 2026-11-09), so the web app, `journal open`/`write`, MCP,
+  `/start` and `journal send` open, write and send it (until now `/start` and `journal send` refused it). New route `GET
   /library/<id>/open` (*Write now*'s view, writes nothing). `GET /today` serves a due row as `due` (OPEN-CORE served it
   as `upcoming`). The PWA: **Write now** on every Today card (all five states), `/today?write=<id>`, the *due* pill,
   and *Send now* is now called **Send to chat** (Today and Library; same route). The committed build is CI's.
