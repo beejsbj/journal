@@ -3116,3 +3116,16 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     interrupt still go to the channel, which refuses them, so they count and alert as before. The doc puts phases
     and interrupts with no chat in package 4. Until then a no-chat install should not start a program run: its
     first phase would fail and alert as on any install whose channel refuses a send.
+  - **Review round 1** (an independent Opus pass over the branch): no blocker, no privacy leak. Fixed, each in its
+    own commit naming it: slots before `day_ends_at` resolved by calendar date (major); an extra entry taking another
+    practice's id; a deliberate send attaching when he answered during its opener; the engine-only test not
+    exercising `agent.is_failure_text`; the no-chat tests passing with the guards off; rules 9 and 10 catching chat
+    captures; `actions` accepting a naive or future time; docs overstating rule 6. **Declined, left open for the
+    owner:** in the small hours the journal day sends practices back to yesterday, also a morning practice: at 03:30
+    words for *morning* go to yesterday's missed morning (step 2), and `/start morning` re-sends yesterday's
+    delivered morning while today's 06:00 still goes out (on `main` it delivered today's). That is the doc's rule as
+    written (steps 2–4 on the journal day; `/start` through `resolve`); a practice-level "my day starts here" would
+    be a doc change, not this package's. Nits declined: on a no-chat install `status` still says reflections are
+    "written, not sent" (true, and harmless); `failure_target` reads `none:<id>` when a chat id is set beside
+    platform `none` (nothing is sent to it); a deliberate re-send of yesterday's slot carries today's date in its
+    header, as a re-send always did.
