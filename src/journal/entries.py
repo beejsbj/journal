@@ -665,6 +665,29 @@ def his_words(body: str) -> str:
     return "\n\n".join(t for t in (raw_entry(body), his_conversation(body)) if t)
 
 
+def entry_words(body: str) -> str:
+    """His words in an entry (and his conversation lines; never her folded replies), or the older formats' raw
+    entry; "" when there are none."""
+    text = his_words(body)
+    if not text:  # older formats
+        m = re.search(r"## Raw Entry\n(.*?)(?=\n## |\Z)", body, re.S)
+        text = m.group(1).strip() if m else ""
+    return text
+
+
+def his_text(path: Path) -> str:
+    """What in a journal file is his, for the quote check: an engine entry's words section and his conversation
+    lines (``entry_words``), never her annotations, her notes, her folded replies, the opener under ``## Prompt`` or
+    the engine's summary; a file of his own (no engine entry, not an analysis) whole, without its front matter;
+    nothing from a file the companion or the engine wrote (a reflection, a week review, an insights document)."""
+    if authored_by_engine(path):
+        return ""
+    body = path.read_text(encoding="utf-8", errors="replace")
+    if kind_of(path) is not None:
+        return entry_words(body)
+    return re.sub(r"\A---\n.*?\n---\n", "", body, count=1, flags=re.S)
+
+
 def without_summary(body: str) -> str:
     """The entry with the engine's marked ``## Summary`` section removed: it is code's prose (a template filled
     from his words, plus its own wording), so a quote check must not accept it as something he wrote. A heading he
