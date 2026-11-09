@@ -3296,7 +3296,14 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
      `409 disabled` on `POST /entries`, `GET /library/{id}/open` and `POST /library/{id}/send`, and the CLI's), and
      `commands.start` and `journal send` take it; the PWA keeps *Write now* and *Send to chat* on its Today card and
      Library page. A turned-off practice has no slot (`slots.scheduled_on` is empty for it), so words or a send make
-     an extra entry of the day (`<date>-<id>`, then `-2` …), and the Today rows show it only once it has a record.
+     an extra entry of the day (`<date>-<id>` first, then the next number past its schedule's slots: a two-slot
+     practice's second is `-3`), and the Today rows show it only once it has a record. **Kept, from the review of
+     these changes:** `library.closer` still takes enabled practices only, so a turned-off evening does not close
+     the day (`test_the_day_closes_on_a_renamed_evening_in_a_fork` pins that: turning it off is how a fork hands
+     `closes: day` to another practice; written on a face, its day reflection waits for the 04:00 fallback); and
+     `/start`'s menu and the skill's *Kinds* list name enabled practices only (what is offered; one turned off is
+     still taken when named). The PWA's comment in `today.tsx` that still says "turned off or unknown" waits for
+     the next web change (a comment alone would cost a CI build).
      A program turned off is still refused (the decision names practices). The tests that pinned the refusal now pin
      the opposite: `test_open_faces.py` (`…turned_off_is_not_scheduled_but_every_face…`), `test_serve_writes.py`,
      `test_mcp.py`, `test_practices_engine.py` (`…not_due_and_still_starts`), `test_cli.py`, and the web's
