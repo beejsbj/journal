@@ -20,7 +20,12 @@ or locked database is logged and skipped; the next tick tries again.
 What the database cannot tell: a text message folded into a running turn is stored without its
 reply pointer, so for those only rule 2 can apply. The audio of a voice note is not linked to its
 row, so a swept voice note is recorded as its transcript without the embedded recording (unless the
-row names the cached file).
+row names the cached file). A picture Hermes attached natively is named in its row: it is kept beside the entry
+while Hermes' cache still holds it. Such a row sent with no caption is stored at the time its turn ran, which
+for a queued message is later than he sent it; the cached file's time is when it arrived (``arrival``).
+
+A row the transcript withheld from his words (``Row.meta["withheld"]``: it still carried something added to his
+message) is never captured; the sweep says so in its log, which files it under the tick's errors.
 """
 from __future__ import annotations
 
@@ -32,7 +37,7 @@ import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from . import audio, capture, channel, compose, entries, ledger, library
+from . import audio, capture, channel, compose, entries, images, ledger, library
 from .config import Config
 from .ports import Row
 
@@ -50,13 +55,48 @@ def words(text: str) -> str:
 
 
 def message(row: Row) -> dict | None:
-    """One of his rows as a capture candidate: {message_id, quote, text, source, audio_path}, or None when it is
-    not his words (handled already, a mirror, a frame or placeholder, nothing) or the platform's internal
-    notification. Another notice is read by its words, as the hook would have seen them."""
-    if row.role != "user" or row.meta.get("internal") or row.kind != "his":
+    """One of his rows as a capture candidate: {message_id, quote, text, source, audio_path} (+ images), or None
+    when it is not his words (handled already, a mirror, a frame or placeholder, withheld, nothing) or the
+    platform's internal notification. Another notice is read by its words, as the hook would have seen them. A
+    picture attached natively is a candidate with or without a caption (``images``: the files its row names)."""
+    if row.role != "user" or row.meta.get("internal"):
+        return None
+    pictures = list(row.meta.get("images") or ())
+    if row.kind != "his" and not (row.kind == "empty" and pictures):
         return None
     return {"message_id": row.platform_message_id, "quote": row.quote, "text": row.text, "source": row.source,
-            "audio_path": row.audio_path}
+            "audio_path": row.audio_path, **({"images": pictures} if pictures else {})}
+
+
+def arrival(row: Row, pictures, since: datetime) -> datetime:
+    """When a message with pictures came in. Hermes stores a picture sent with no caption at the time its turn ran,
+    for a message queued behind a stuck turn long after he sent it; the gateway wrote each picture to its cache as
+    it arrived (a new file every time), so the earliest file time after ``since`` and before the row's own time
+    is when he sent it."""
+    at = row.at
+    for path in pictures or ():
+        try:
+            t = datetime.fromtimestamp(os.stat(path).st_mtime, timezone.utc)
+        except (OSError, ValueError, OverflowError):
+            continue
+        if since <= t < at:
+            at = t
+    return at
+
+
+def keep_pictures(cfg: Config, paths, entry_path: str) -> list[str]:
+    """Copy the pictures a row names beside the entry (``images.keep``), each still in Hermes' cache under a picture's
+    own suffix; one that is gone, too large or cannot be copied is left out (his caption is still saved)."""
+    kept = []
+    for path in paths or ():
+        ext = os.path.splitext(path)[1].lower()
+        if not images.media_type(path) or not os.path.isfile(path):
+            continue
+        try:
+            kept.append(images.keep(cfg, path, entry_path, ext))
+        except (OSError, ValueError, images.ImageTooLarge):
+            continue
+    return kept
 
 
 def parse(content: str, platform_message_id: str | None) -> dict | None:
@@ -187,8 +227,11 @@ def journaled_between(cfg: Config, data: dict, start: datetime, end: datetime) -
 
 
 def reconcile(cfg: Config, msg: dict, at: datetime) -> dict | None:
-    """Capture one stored message if the hook would have. Returns capture info or None."""
+    """Capture one stored message if the hook would have. Returns capture info or None. Its pictures, if any, are
+    kept beside the entry and embedded above his caption, as the hook does."""
     text = msg["text"]
+    pictures = msg.get("images") or ()
+    describe = images.describing(cfg)
     after_j = capture.strip_command(text)
     if text.lstrip().startswith("/") and after_j is None:
         return None  # another slash command
@@ -196,10 +239,15 @@ def reconcile(cfg: Config, msg: dict, at: datetime) -> dict | None:
         if ledger.capture_of(data, msg["message_id"]):
             return None
         if after_j is not None:
-            if not after_j.strip():
+            if not after_j.strip() and not pictures:
                 return None
             p = capture.new_note_prompt(data, cfg, at)
-            info = capture.record(cfg, p, "/j", after_j, at, msg["source"], msg["message_id"], via="sweep")
+            pics = keep_pictures(cfg, pictures, p["stem"] + ".md")
+            if not after_j.strip() and not pics:
+                data["prompts"].remove(p)  # nothing to save after all
+                return None
+            info = capture.record(cfg, p, "/j", after_j, at, "photo" if pics else msg["source"], msg["message_id"],
+                                  via="sweep", images=pics, describe=describe)
             p["needs_edit"] = False
             return info
         prompt = by_quote(cfg, data, msg["quote"], at) if msg["quote"] else None
@@ -209,18 +257,20 @@ def reconcile(cfg: Config, msg: dict, at: datetime) -> dict | None:
         if prompt is None:
             return None
         kept = None
+        stem = capture.entry_stem(cfg, prompt, data)  # the file record() will write; what it holds is kept beside it
         if msg.get("audio_path") and os.path.isfile(msg["audio_path"]):
-            stem = capture.entry_stem(cfg, prompt, data)  # the file record() will write, kept beside it
             try:
                 kept = audio.keep(cfg, msg["audio_path"], stem + ".md",
                                   os.path.splitext(msg["audio_path"])[1].lower() or ".ogg")
             except OSError:
                 kept = None
+        pics = keep_pictures(cfg, pictures, stem + ".md")
         words_ = text or (audio.NOT_TRANSCRIBED if msg["source"] == "audio" else "")
-        if not words_:
+        if not words_ and not pics:
             return None
-        info = capture.record(cfg, prompt, rule, words_, at, msg["source"], msg["message_id"], kept, via="sweep",
-                              transcript="pending" if kept and msg["source"] == "audio" else None, data=data)
+        info = capture.record(cfg, prompt, rule, words_, at, "photo" if pics else msg["source"], msg["message_id"],
+                              kept, via="sweep", transcript="pending" if kept and msg["source"] == "audio" else None,
+                              data=data, images=pics, describe=describe)
         if prompt.get("kind") == "j":
             prompt["needs_edit"] = False
         return info
@@ -299,14 +349,18 @@ def run(cfg: Config, now: datetime, log: list[str], db: Path | None = None) -> i
     off = conversations.snapshot(cfg)
     try:
         for row in found:
+            if row.meta.get("withheld"):  # (the reason is the adapter's fixed label, never his words)
+                log.append(f"sweep: row {row.id} (message {row.platform_message_id or '-'}) still carries "
+                           f"{row.meta['withheld']} once unwrapped; failed closed, not read as his words")
             msg = message(row)
             if msg and msg["message_id"]:
+                at = arrival(row, msg.get("images"), after)
                 # (a /j inside a bare-/x window is public by the pass's own rule, so this asks every row: a /j
                 # merged with a /x message on a later line is off the record, as the hook and the writer take it)
-                if conversations.row_is_off(cfg, pv, row, off):
+                if conversations.row_is_off(cfg, pv, row, off) or (at != row.at and pv.at(at)):
                     last = max(last, row.id)
-                    continue  # off the record (/x): never captured
-                info = reconcile(cfg, msg, row.at)
+                    continue  # off the record (/x), also by when it arrived: never captured
+                info = reconcile(cfg, msg, at)
                 if info:
                     captured += 1
                     log.append(f"swept message {msg['message_id']} into {Path(info['path']).name} ({info['rule']})")
