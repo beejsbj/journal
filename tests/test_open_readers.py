@@ -74,8 +74,9 @@ class TodayTest(ReaderCase):
         self.assertIn("morning at 06:00, not sent to the chat (missed)", today.lines_of(data)[0])
 
 class ServedTodayTest(ServeCase):
-    def test_the_web_app_as_built_is_served_a_due_row_as_upcoming(self):
-        """Until OPEN-FACES rebuilds the PWA, which reads four states, a due row is served as it read before."""
+    def test_a_due_row_is_served_as_due(self):
+        """OPEN-FACES taught the PWA the fifth state, so ``GET /today`` serves a due row as ``collect`` has it (until
+        then it was served as upcoming)."""
         d = Path(self.cfg.practices_dir)
         d.mkdir(parents=True, exist_ok=True)
         (d / "stretch.md").write_text("---\nkind: practice\nid: stretch\ntitle: Stretch\nschedule.time: 09:00\n---\n"
@@ -83,7 +84,7 @@ class ServedTodayTest(ServeCase):
         status, _, body = self.request("GET", "/api/v1/today")
         self.assertEqual(status, 200)
         rows = {r["id"]: r for r in json.loads(body)["practices"]["rows"]}
-        self.assertEqual(rows["stretch"], {"id": "stretch", "state": "upcoming", "at": "09:00"})
+        self.assertEqual(rows["stretch"], {"id": "stretch", "state": "due", "at": "09:00"})
         core = {r["id"]: r for r in today.collect(self.cfg, NOW)["practices"]["rows"]}
         self.assertEqual(core["stretch"]["state"], "due")
 

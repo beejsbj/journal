@@ -66,12 +66,17 @@ def refuse(cfg: Config, text: str | None) -> None:
                                      "transcribed and cannot be part of his words: nothing was saved")
 
 
-def _words(cfg: Config, text: str | None, media: str | None) -> str:
+def _words(cfg: Config, text: str | None) -> str:
     text = (text or "").replace("\r\n", "\n").replace("\r", "\n")
     refuse(cfg, text)
+    return text
+
+
+def _not_empty(text: str, media: str | None) -> None:
+    """Checked after a repeated ``client_id`` is answered: a retry whose upload the first request consumed carries
+    no words and no file, and is the first write's result, not a refusal."""
     if not text.strip() and not media:
         raise Refused("empty", "there are no words to save: nothing was saved")
-    return text
 
 
 def _when(at: datetime | None, now: datetime) -> datetime:
@@ -137,14 +142,16 @@ def answer(cfg: Config, practice, text: str | None, at: datetime | None = None, 
     which is the capture's rule, source and via. ``media``: an audio file kept beside the entry and transcribed by
     the tick, as the web app's upload is. Raises ``Refused`` (nothing written)."""
     via = _via(via)
-    words = _words(cfg, text, media)
+    words = _words(cfg, text)
     now = now or datetime.now(timezone.utc)
     at = _when(at, now)
     p = _practice(cfg, practice)
     with ledger.locked(cfg.ledger_path) as data:
         done = ledger.capture_of_client(data, client_id)
         if done:
-            return {**capture.planned_info(cfg, done[0]), "rule": done[1].get("rule", ""), "duplicate": True}
+            return {**capture.planned_info(cfg, done[0]), "rule": done[1].get("rule", ""), "duplicate": True,
+                    "slot": done[0].get("id")}
+        _not_empty(words, media)
         slot = slots.resolve(cfg, p, at, now=now, data=data)
         rec = _record_for(cfg, data, slot, p, at, via)
         info = capture._web_record(cfg, data, rec, via, words, at, client_id, media, ext, meta, key_of, via=via)
@@ -157,13 +164,14 @@ def note(cfg: Config, text: str | None, at: datetime | None = None, *, via: str,
     """His words as a note of their own (a /j note: ``<date>-j``, ``-j-2`` …), stamped ``at`` (default now). Raises
     ``Refused`` (nothing written)."""
     via = _via(via)
-    words = _words(cfg, text, media)
+    words = _words(cfg, text)
     now = now or datetime.now(timezone.utc)
     at = _when(at, now)
     with ledger.locked(cfg.ledger_path) as data:
         done = ledger.capture_of_client(data, client_id)
         if done:
             return {**capture.planned_info(cfg, done[0]), "rule": done[1].get("rule", ""), "duplicate": True}
+        _not_empty(words, media)
         rec = capture.new_note_prompt(data, cfg, at)
         return capture._web_record(cfg, data, rec, "/j", words, at, client_id, media, ext, meta, via=via)
 
@@ -176,7 +184,8 @@ def add(cfg: Config, stem: str, text: str | None, at: datetime | None = None, *,
     program session's (its answers belong to a phase, which the chat and the web app keep). Raises ``Refused``
     (nothing written)."""
     via = _via(via)
-    words = _words(cfg, text, media)
+    words = _words(cfg, text)
+    _not_empty(words, media)   # (a retry of a block is answered by ``add_web_block``; only the CLI adds this way)
     now = now or datetime.now(timezone.utc)
     at = _when(at, now)
     if entries.entry_file(cfg.root, stem) is None:

@@ -55,28 +55,14 @@ def _text(value, what: str) -> str:
     return value.replace("\r\n", "\n").replace("\r", "\n")
 
 
-def _not_off_record(cfg: Config, text: str) -> None:
-    """``/x`` holds here as in the chat: text that starts with the command, or has a line that does (the chat takes a
-    merged burst with a ``/x`` on a later line as off the record, ``capture.opt_out_inside``), is refused whole."""
-    if capture.opt_out(cfg, text) is not None:
-        raise Refused("this starts with the off-the-record command, so it stays out of the journal: nothing was saved")
-    if capture.opt_out_inside(cfg, text):
-        raise Refused("a line of this starts with the off-the-record command, so none of it goes into the journal: "
-                      "nothing was saved")
-
-
-def _no_placeholder(text: str, what: str) -> None:
-    """The engine's transcript-pending line is not his words (the web refuses it too): no recording will fill it,
-    and the editor would lock the block for good as one still being transcribed."""
-    if audio.TRANSCRIBING in text:
-        raise Refused(f"{what} has the journal's line for a recording still being transcribed, which cannot be part "
-                      "of his words: nothing was saved")
-
-
-def _no_marker(text: str, what: str) -> None:
-    if entries.ENGINE_MARK.search(text):
-        raise Refused(f"{what} has a line shaped like `%% journal … %%`, the engine's own marker (it could pass for "
-                      "the other voice or a program's phase): nothing was saved")
+def _his_or_hers(cfg: Config, text: str) -> None:
+    """The refusals every face has (``actions.refuse``): ``/x`` holds here as in the chat (text that starts with the
+    command, or has a line that does, is refused whole), a line shaped like the engine's own marker could pass for
+    the other voice or a program's phase, and the transcript-pending line is no one's words."""
+    try:
+        actions.refuse(cfg, text)
+    except actions.Refused as e:
+        raise Refused(str(e)) from None
 
 
 def _date(value, name: str) -> date | None:
@@ -275,9 +261,7 @@ def add_note(cfg: Config, now: datetime, note: str, day: str | None = None, kind
     ``kind`` picks the entry (a practice id, or ``note``). Off the record holds as for ``save``: this face cannot see
     a chat turn's state, so a note that starts with the command is refused."""
     text = _text(note, "note")
-    _not_off_record(cfg, text)
-    _no_marker(text, "note")
-    _no_placeholder(text, "note")
+    _his_or_hers(cfg, text)
     if day not in (None, ""):
         _date(day, "date")
     try:

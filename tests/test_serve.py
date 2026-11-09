@@ -572,15 +572,11 @@ class ReadRoutesTest(ServeCase):
         week = got.pop("week")
         self.assertEqual(got.pop("voices"), {"his": "Sam", "hers": "Ada"})   # the two voices, named as the document names them
         self.assertIsNone(got.pop("location_source"))   # no place named by OpenStreetMap: no credit to show
-        def as_served(data):   # (a due row is served as upcoming until OPEN-FACES rebuilds the PWA: DECISIONS.md)
-            for row in data["practices"]["rows"]:
-                row["state"] = "upcoming" if row["state"] == "due" else row["state"]
-            return data
-        self.assertEqual(got, as_served(json.loads(json.dumps(today.collect(self.cfg, NOW, stems=True)))))   # the block's dict
+        self.assertEqual(got, json.loads(json.dumps(today.collect(self.cfg, NOW, stems=True))))   # the block's dict
         for row in got["practices"]["rows"]:      # plus the stems the web app links by, and nothing else
             row.pop("stem", None)
         (got["reflection"] or {}).pop("stem", None)
-        self.assertEqual(got, as_served(json.loads(json.dumps(today.collect(self.cfg, NOW)))))
+        self.assertEqual(got, json.loads(json.dumps(today.collect(self.cfg, NOW))))
         self.assertEqual([d["date"] for d in week], [f"2026-10-{n:02d}" for n in range(9, 16)])  # oldest first
         self.assertEqual(week[-1], {"date": "2026-10-15", "weekday": "Thu", "answered": 0, "missed": 0, "state": "none"})
 

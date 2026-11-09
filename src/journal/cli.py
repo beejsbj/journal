@@ -60,7 +60,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("ritual", metavar="ID", help="a practice id (journal practices list)")
     s.add_argument("--dry-run", action="store_true", help="Print the message instead of sending it")
     s.add_argument("--hold-off-record", action="store_true",
-                   help="Send nothing while a bare /x window is open (a model asking for him: MCP's journal_start)")
+                   help="Send nothing while a bare /x window is open (a send a script or a model asks for)")
     op = subs.add_parser("open", help="Show a practice as you would write it: its opener, its questions, and the "
                                       "slot your words would fill (writes nothing)")
     op.add_argument("practice", metavar="ID", help="a practice id (journal practices list)")

@@ -34,6 +34,8 @@ SAMPLES = {
     r"/api/v1/library/(?P<id>[^/]+)/default": [("/api/v1/library/evening/default", 200),
                                                ("/api/v1/library/fix-life/default", 200),
                                                ("/api/v1/library/gratitude/default", 404)],
+    r"/api/v1/library/(?P<id>[^/]+)/open": [("/api/v1/library/evening/open", 200),
+                                            ("/api/v1/library/fix-life/open", 404)],
     r"/api/v1/runs": [("/api/v1/runs", 200)],
     r"/api/v1/runs/(?P<id>[^/]+)": [("/api/v1/runs/2026-10-15-a1f3", 404)],
     r"/api/v1/runs/(?P<id>[^/]+)/insights": [("/api/v1/runs/2026-10-15-a1f3/insights", 404)],
@@ -48,7 +50,9 @@ SAMPLES = {
 # the chat, and the off-the-record command is honoured on the text itself.
 WRITE_SAMPLES = {
     ("POST", r"/api/v1/entries"): [({"practice": "morning", "text": "a note"}, "/api/v1/entries", 201),
-                                   ({"text": "/x not saved"}, "/api/v1/entries", 422)],
+                                   ({"practice": "evening", "text": "early"}, "/api/v1/entries", 201),
+                                   ({"text": "/x not saved"}, "/api/v1/entries", 422),
+                                   ({"practice": "evening", "text": "ok\n/x not saved"}, "/api/v1/entries", 422)],
     ("POST", r"/api/v1/entries/(?P<stem>[^/]+)/blocks"): [({"text": "more"}, "/api/v1/entries/2026-10-14-evening/blocks", 201)],
     ("PATCH", r"/api/v1/entries/(?P<stem>[^/]+)/blocks/(?P<key>[^/]+)"):
         [({"text": "edited", "was": "First words, about the lighthouse."}, "/api/v1/entries/2026-10-14-evening/blocks/words:0", 200)],
