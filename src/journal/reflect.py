@@ -383,6 +383,8 @@ def write_one(cfg: Config, kind: str, end: date, trigger: str, now: datetime,
 def send(cfg: Config, now: datetime, log: list[str]) -> list[str]:
     """Send each written analysis to the chat once (silently when the overnight fallback wrote it)."""
     alerts, where = [], channel.label(cfg)
+    if not cfg.has_channel:
+        return alerts  # no chat: the analysis is in its file, and nothing is attempted (OPEN-PROMPTS rule 6)
     for rec in ledger.snapshot(cfg.ledger_path).get("reflections") or []:
         tg = rec.get("telegram") or {}  # (the record's name for its send, whatever the platform)
         if not rec.get("written_at") or tg.get("message_id") or tg.get("attempts", 0) >= SEND_ATTEMPTS:

@@ -471,13 +471,21 @@ OFF_RECORD_END = "it stays out of the journal.]"
 OFF_RECORD = re.compile(r"\[Off the record — .*?" + re.escape(OFF_RECORD_END) + r"\s*", re.S)
 
 
-def stored_opener(cfg: Config, record: dict | None) -> str | None:
+def sent_opener(record: dict | None) -> str | None:
+    """The opener the chat message says: ``sent_opener`` when a delivery attached to a record his words on a face
+    made (the record keeps its own ``opener``, OPEN-PROMPTS rule 3), else the record's ``opener``."""
+    rec = record or {}
+    return rec.get("sent_opener") if "sent_opener" in rec else rec.get("opener")
+
+
+def stored_opener(cfg: Config, record: dict | None, sent: bool = False) -> str | None:
     """The opener a send record holds, for a reader that shows it again (the web app, a Telegram fold), or None.
     It is her text, written by the tick's model call. The check is narrow, and is not a privacy pass: it catches a
     literal echo, an opener with a line that starts with the opt-out command or that holds the engine's
     off-the-record notice, and then withholds the whole opener. It cannot tell whether the model drew on something
-    said off the record and put it in other words; what keeps that out is what the tick gives the model."""
-    text = (record or {}).get("opener")
+    said off the record and put it in other words; what keeps that out is what the tick gives the model.
+    ``sent``: the opener of the chat message (``sent_opener``), for a reader of the message (the fold)."""
+    text = sent_opener(record) if sent else (record or {}).get("opener")
     if not isinstance(text, str) or not text.strip():
         return None
     if opt_out(cfg, text) is not None or opt_out_inside(cfg, text) or OFF_RECORD.search(text):

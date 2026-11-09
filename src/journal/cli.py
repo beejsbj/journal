@@ -172,7 +172,9 @@ def add_program_parser(subs) -> None:
 
 
 def _notify(cfg: jconfig.Config, text: str) -> None:
-    """Tell him in the chat (a spawned ``/next`` that could not run): best effort, plain text."""
+    """Tell him in the chat (a spawned ``/next`` that could not run): best effort, plain text. No chat, no note."""
+    if not cfg.has_channel:
+        return
     try:
         cfg.channel().send(cfg.chat_id, html.escape(text, quote=False))
     except Exception:  # noqa: BLE001 - the log has it

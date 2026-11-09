@@ -247,8 +247,10 @@ class _Saved:
         self.days: set[str] = set()
         self.legacy: dict[str, list[str]] = {}  # local date → entry paths with a capture that has no message id
         for p in data["prompts"]:
-            if p.get("local_date") and any(not c.get("platform_message_id") and c.get("rule") not in
-                                           ("auto", "conversation") for c in p.get("captures") or []):
+            # (a capture with ``via`` came from a face or the sweep, not a chat message from before message ids
+            # were kept: matching chat against its words would file a chat message that repeats them here)
+            if p.get("local_date") and any(not c.get("platform_message_id") and not c.get("via") and c.get("rule")
+                                           not in ("auto", "conversation") for c in p.get("captures") or []):
                 path = in_root(cfg, p.get("entry_path") or str(entries.entry_path(
                     cfg.root, p.get("stem") or entries.stem_for(p["local_date"], p["kind"]))))
                 if path:

@@ -1064,7 +1064,10 @@ def _say(cfg: Config, prog: Program, markup: str, log: list[str], now: datetime)
 
 
 def _say_about(cfg: Config, program_id: str, markup: str, log: list[str], now: datetime) -> bool:
-    """``_say`` for a note that must not depend on the program's definition still loading."""
+    """``_say`` for a note that must not depend on the program's definition still loading. With no chat
+    (``channel.platform: none``) nothing is attempted."""
+    if not cfg.has_channel:
+        return False
     try:
         cfg.channel().send(cfg.chat_id, markup)
     except ChannelError as e:
@@ -1555,6 +1558,8 @@ def _send_summary(cfg: Config, prog: Program, run: dict, s: int, now: datetime, 
     session = prog.session(s)
     html = compose.summary_html(prog, s, completion, summary, session.document_title, document, next_line, cfg.names)
     sess = _session(run, s)
+    if not cfg.has_channel:
+        return False  # no chat: the summary is in the entry; nothing is attempted or counted (OPEN-PROMPTS rule 6)
     try:
         mid = cfg.channel().send(cfg.chat_id, html, keyboard=compose.REMOVE_KEYBOARD)
     except ChannelError as e:
@@ -1663,7 +1668,7 @@ def _retry_summary(cfg: Config, prog: Program, run: dict, k: str, sess: dict, no
                    alerts: list[str]) -> None:
     """Send a session's completion message again after a failed send (the same text: summary and document are
     recomputed from his words, the next-session line was kept). The failure that uses the last attempt is alerted."""
-    if sess.get("status") != "completed" or sess.get("summary_sent_at") \
+    if sess.get("status") != "completed" or sess.get("summary_sent_at") or not cfg.has_channel \
             or sess.get("summary_attempts", 0) >= SUMMARY_ATTEMPTS:
         return  # (zero attempts is a completion that was saved but died before its message)
     session = prog.session(int(k))

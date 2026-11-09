@@ -31,8 +31,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from . import (agent, audio, capture, channel, compose, context, conversations, entries, images, ledger, library,
-               mirror, notebook, outage, privacy, programs, prompts, recovery, reflect, schedule, standing, sweep, today,
-               validate, version)
+               mirror, notebook, outage, privacy, programs, prompts, recovery, reflect, schedule, slots, standing, sweep,
+               today, validate, version)
 from .config import Config
 from .library import Practice
 from .ports import ChannelError, Keyboard
@@ -57,7 +57,7 @@ class SendFailed(Alert):
 
 
 def _opener(cfg: Config, practice: Practice | str, now_local: datetime, pid: str,
-            log: list[str] | None = None) -> tuple[str, str, list, list]:
+            log: list[str] | None = None, packs: list[str] | None = None) -> tuple[str, str, list, list]:
     """(opener, source, citations, asked) for a practice's prompt. ``opener.mode: plain`` asks no model; otherwise
     the companion's opener, validated, or the plain one whenever that fails (an opener is never deferred).
 
@@ -66,7 +66,11 @@ def _opener(cfg: Config, practice: Practice | str, now_local: datetime, pid: str
     HTTP status, provider error class) that can never carry his words or the prompt, capped at 200 characters.
     A failure with nothing recognisable adds no line. The line contains "failed", so ``run`` also files it in
     ``errors.jsonl`` (kept to ``ERRORS_KEPT`` records) and ``journal status`` shows it under "Recent errors":
-    wanted, since that is where one looks for why a prompt went out plain."""
+    wanted, since that is where one looks for why a prompt went out plain.
+
+    The context pack is saved under ``pid`` (``context.save``), unless ``packs`` is given: then it is appended there
+    for the caller to save once it knows the prompt goes out (``send_due``: a send skipped by the pre-send check
+    leaves no pack behind)."""
     practice = library.resolve(practice, cfg)
     plain = compose.plain_opener(practice, cfg.names)
     if practice.opener["mode"] == "plain":
@@ -76,7 +80,10 @@ def _opener(cfg: Config, practice: Practice | str, now_local: datetime, pid: str
     except Exception:  # noqa: BLE001 - never block an opener: the pack goes without it, the request without the stance
         stand = None
     pack = context.build(cfg, now_local, stand)
-    context.save(cfg, pid, pack)
+    if packs is None:
+        context.save(cfg, pid, pack)
+    else:
+        packs.append(pack)
     # the run the stand already holds (one read of the ledger); context.unanswered never raises either
     missed = stand["missed"]["run"] if stand else context.unanswered(cfg, now_local)
     try:
@@ -123,18 +130,8 @@ def _archive_sent(cfg: Config, record: dict) -> None:
 
 
 def _practice_fields(p: Practice) -> dict:
-    """What a prompt record carries about its practice beyond ``kind``. Nothing for a built-in, so the rituals'
-    records are what they always were (and ``windows.collapse_hours`` keeps governing them); a practice of his own
-    records its title (a fold or a late reply still has it if the file is renamed or deleted), its window, and
-    ``annotate: false`` when it asks for no annotations."""
-    out: dict = {}
-    if not p.builtin:
-        out.update(title=p.title, collapse_hours=p.collapse_hours)
-        if p.emoji:
-            out["emoji"] = p.emoji
-    if not p.annotate:
-        out["annotate"] = False
-    return out
+    """What a prompt record carries about its practice beyond ``kind`` (``library.record_fields``)."""
+    return library.record_fields(p)
 
 
 def send_due(cfg: Config, now_local: datetime, log: list[str], only: str | None = None, dry_run: bool = False,
@@ -142,31 +139,50 @@ def send_due(cfg: Config, now_local: datetime, log: list[str], only: str | None 
     """Send every practice slot due now (or, with ``only``, that practice at once: ``journal send <id>``, which
     ``/start <id>`` spawns). An unknown ``only`` raises ``library.UnknownDefinition``. With ``hold_off_record`` the
     off-the-record check is made again after the opener is built, just before delivery: the model call can take
-    minutes, and a bare ``/x`` sent meanwhile would be ended by this send (``_held_off_record``)."""
-    snap = ledger.snapshot(cfg.ledger_path)["prompts"]
-    done = {p["id"] for p in snap if p.get("message_id") or p.get("send_attempts", 0) >= SEND_ATTEMPTS
-            or p.get("backfilled")}
+    minutes, and a bare ``/x`` sent meanwhile would be ended by this send (``_held_off_record``).
+
+    A slot is done when it was delivered, ran out of attempts, was backfilled, or was answered on any face (rule 1 of
+    OPEN-PROMPTS). A scheduled send reads its record again under the ledger lock just before it goes (rule 2): words
+    saved on a face during the opener's model call stop it, and its pack is saved only after that check. A deliberate
+    send (``only``) takes its slot from ``slots.resolve`` (rule 3): the practice's due or open slot, its missed one,
+    the next one later today, else an extra entry; never an answered record. With ``channel.platform: none`` nothing
+    is sent, written or counted (rule 6)."""
+    if not cfg.has_channel and not dry_run:
+        if only:
+            log.append(f"{only}: not sent: this journal has no chat (channel.platform: none)")
+        return
+    snap = ledger.snapshot(cfg.ledger_path)
+    done = {p["id"] for p in snap["prompts"] if p.get("message_id") or p.get("send_attempts", 0) >= SEND_ATTEMPTS
+            or p.get("backfilled") or p.get("captures")}
     if only:
-        due = [schedule.Due(library.resolve(only, cfg), 1, now_local)]
+        practice = library.resolve(only, cfg)
+        slot = slots.resolve(cfg, practice, now_local, now=now_local, data=snap, delivery=True)
+        due = [(practice, slot.local_date, slot.id, now_local)]
     else:
-        due = schedule.slots_due(cfg, now_local, done)
+        due = [(d.practice, d.local_date, d.prompt_id, d.at) for d in schedule.slots_due(cfg, now_local, done)]
     names = cfg.names
-    for d in due:
-        practice, local_date, pid = d.practice, d.local_date, d.prompt_id
-        opener, source, cites, asked = _opener(cfg, practice, now_local, pid, log)
+    for practice, local_date, pid, scheduled in due:
+        packs: list[str] = []
+        opener, source, cites, asked = _opener(cfg, practice, now_local, pid, log, packs)
         html = compose.telegram_html(practice, now_local, opener, names=names)
         questions = library.question_snapshot(practice)  # what this prompt carries, kept as sent (library.snapshot_sections)
         record = {
-            "id": pid, "stem": entries.stem_for(local_date, practice.id, d.slot), "kind": practice.id,
-            "local_date": local_date, "scheduled": d.at.isoformat(),
+            "id": pid, "stem": pid, "kind": practice.id,
+            "local_date": local_date, "scheduled": scheduled.isoformat(),
             "chat_id": cfg.chat_id, "opener": opener, "opener_source": source, "citations": cites, "asked": asked,
             "plain_text": compose.plain_text(practice, now_local, opener, names), "html": html,
             **_practice_fields(practice),
             "questions": questions or None,  # always written: a re-send over the cap must clear the old set
         }
         if dry_run:
+            for pack in packs:
+                context.save(cfg, pid, pack)
             log.append(f"[dry-run] {pid} opener_source={source}\n{html}")
             continue
+        if not only and _answered_meanwhile(cfg, pid, log):
+            continue
+        for pack in packs:
+            context.save(cfg, pid, pack)
         if hold_off_record and _held_off_record(cfg, datetime.now(timezone.utc), pid, log):
             continue
 
@@ -180,9 +196,21 @@ def send_due(cfg: Config, now_local: datetime, log: list[str], only: str | None 
         send_prompt(cfg, record, log, retry=plain,
                     # (the record the re-send replaced, as it stood: the old message keeps its opener)
                     refold=lambda old, practice=practice: compose.telegram_html(
-                        practice, now_local, capture.stored_opener(cfg, old), "sent again below", names),
+                        practice, now_local, capture.stored_opener(cfg, old, sent=True), "sent again below", names),
                     refold_bare=lambda old, practice=practice: compose.telegram_html(
                         practice, now_local, None, "sent again below", names))
+
+
+def _answered_meanwhile(cfg: Config, pid: str, log: list[str]) -> bool:
+    """Rule 2's check, under the ledger lock, just before a scheduled send: the slot was answered on a face while the
+    opener was built (the model call can take minutes). Then nothing is sent."""
+    with ledger.locked(cfg.ledger_path) as data:
+        q = ledger.find(data, pid)
+        answered = bool(q and q.get("captures"))
+        via = (q or {}).get("opened_via")
+    if answered:
+        log.append(f"{pid}: not sent: answered meanwhile" + (f" in {slots.FACES.get(via, via)}" if via else ""))
+    return answered
 
 
 def count_send_failure(cfg: Config, record: dict, error: Exception, log: list[str]) -> int:
@@ -191,13 +219,22 @@ def count_send_failure(cfg: Config, record: dict, error: Exception, log: list[st
     pid = record["id"]
     with ledger.locked(cfg.ledger_path) as data:
         q = ledger.find(data, pid)
-        if q is None:  # "scheduled" keeps prune() from dropping the attempt count
+        # answered on a face while the send went out (captures, never delivered): nothing is owed, so nothing is
+        # counted. A delivered record (a re-send) counts as it always did.
+        answered = bool(q and q.get("captures") and not q.get("message_id"))
+        if answered:
+            pass
+        elif q is None:  # "scheduled" keeps prune() from dropping the attempt count
             q = channel.stamp(cfg, {"id": pid, "kind": record["kind"], "local_date": record["local_date"],
                                     "chat_id": cfg.chat_id, "scheduled": record["scheduled"]})
             data["prompts"].append(q)
-        q["send_attempts"] = q.get("send_attempts", 0) + 1
-        q["send_error"] = str(error)[:300]
-        attempts = q["send_attempts"]
+        if not answered:
+            q["send_attempts"] = q.get("send_attempts", 0) + 1
+            q["send_error"] = str(error)[:300]
+        attempts = (q or {}).get("send_attempts", 0)
+    if answered:
+        log.append(f"{pid}: send failed ({error}); not counted: it was answered meanwhile")
+        return attempts
     log.append(f"{pid}: send attempt {attempts}/{SEND_ATTEMPTS} failed ({error})")
     if attempts >= SEND_ATTEMPTS:
         raise SendFailed(f"{pid} was not delivered after {attempts} attempts: {error}") from error
@@ -240,6 +277,8 @@ def send_prompt(cfg: Config, record: dict, log: list[str], *, retry=None, refold
         q = ledger.find(data, pid)
         if q is None:
             data["prompts"].append(record)
+        elif not q.get("message_id") and (q.get("captures") or q.get("opened_via")):
+            _attach(q, record)  # words he wrote on a face meanwhile: the record keeps them, and gains the delivery
         elif not q.get("message_id"):
             q.update(record)
         else:  # manual re-trigger: the new message becomes current; the old one still accepts replies
@@ -278,6 +317,26 @@ def send_prompt(cfg: Config, record: dict, log: list[str], *, retry=None, refold
             f"{mirror.stamp(cfg, datetime.fromisoformat(record['sent_at']))}")
     mirror.to_chat(cfg, what, record["plain_text"], log, ref=("prompts", pid, None))
     return True
+
+
+ATTACHED = ("message_id", "sent_at", "sent_at_local", "chat_id", "platform")  # what a delivery gives a face's record
+
+
+def _attach(q: dict, record: dict) -> None:
+    """A delivery onto a record his words on a face made (the race of OPEN-PROMPTS rule 3: the scheduled send went out
+    with the tick's opener after he answered). The record keeps its own opener, questions, stem and captures, and
+    gains the delivery's fields, plus what the chat message says (``sent_opener``, ``sent_html``,
+    ``sent_plain_text``), which the fold and the sweep read. ``needs_edit``: the next tick folds the message to
+    "answered" instead of leaving its questions showing."""
+    for k in ATTACHED:
+        if k in record:
+            q[k] = record[k]
+    q["sent_opener"] = record.get("opener")
+    q["sent_opener_source"] = record.get("opener_source")
+    q["sent_html"] = record.get("html")
+    q["sent_plain_text"] = record.get("plain_text")
+    q.pop("collapsed_at", None)
+    q["needs_edit"] = True
 
 
 def fold(cfg: Config, now: datetime, log: list[str]) -> None:
@@ -333,7 +392,8 @@ def _fold_edit(cfg: Config, chat, p: dict, status: str, log: list[str]) -> None:
         # web app makes of it; nothing is read from the chat, so a fold never carries what was said off the record
         practice = library.for_prompt(cfg, p)
         sent_local = datetime.fromisoformat(p["sent_at"]).astimezone(cfg.tz)
-        folded = compose.telegram_html(practice, sent_local, capture.stored_opener(cfg, p), status, cfg.names)
+        folded = compose.telegram_html(practice, sent_local, capture.stored_opener(cfg, p, sent=True), status,
+                                       cfg.names)
         bare = compose.telegram_html(practice, sent_local, None, status, cfg.names)
     try:
         chat.edit(p["chat_id"], p["message_id"], folded)
@@ -523,7 +583,10 @@ def annotate(cfg: Config, now: datetime, log: list[str]) -> None:
         body = path.read_text(encoding="utf-8")
         if not entries.annotations_pending(body):
             continue
-        reply = context.companion_reply_after(cfg, first, chat_id=p.get("chat_id"), platform=channel.platform_of(p))
+        # her next chat reply aligns the annotations with a chat answer; words saved on a face (no platform message
+        # on the first capture) have none, and the chat after them is unrelated (OPEN-PROMPTS rule 9)
+        reply = context.companion_reply_after(cfg, first, chat_id=p.get("chat_id"), platform=channel.platform_of(p)) \
+            if p["captures"][0].get("platform_message_id") else None
         asked.add(path)
         try:
             text = agent.ask(cfg, prompts.annotation_request(cfg, entries.without_companion_replies(body), reply), 180,
@@ -591,8 +654,8 @@ def _reply_target(p: dict) -> str | None:
 def reply_annotations(cfg: Config, now: datetime, log: list[str]) -> None:
     """Send each new annotation to the chat as a reply to the message it annotates (as a message of its own where the
     platform has no replies, or the prompt was made on another platform); exactly once."""
-    if not cfg.telegram.get("annotation_replies", True):
-        return
+    if not cfg.telegram.get("annotation_replies", True) or not cfg.has_channel:
+        return  # (no chat: the annotations are in the entry, and nothing is attempted, OPEN-PROMPTS rule 6)
     chat = None
     for p in ledger.snapshot(cfg.ledger_path)["prompts"]:
         reply = p.get("annotation_reply") or {}
