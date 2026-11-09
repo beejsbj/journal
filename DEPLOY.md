@@ -20,27 +20,29 @@ The gateway restarts in **windows**, at least an hour from a ritual (the built-i
 
 **What changes.** The context the engine injects into the companion's turn (`pre_llm_call`: notebook, pack,
 program block, today block) is fenced (`<journal-context>` … `</journal-context>`). The chat reader
-(`hermes/transcript.py`) takes off what was added to his message in storage before reading a row: a natively
-attached picture's notes and everything stored after its placeholders, fenced blocks, recalled memory. A row that
-still carries something added is **withheld** (never captured, written, packed or quoted) and the sweep logs it, so
-it shows in `errors.jsonl` and `journal status`. The sweep now keeps a native picture of a queued message beside its
-entry and stamps the capture with when the picture arrived. Entries already written are not touched. DECISIONS.md,
-OWN-WORDS.
+(`hermes/transcript.py`) takes off what was added to his message in storage before reading a row: the gateway's
+notes in front, a natively attached picture's notes and everything stored after its placeholders, a fenced block or
+recalled memory that ends the message; a list of parts Hermes stored as JSON is read as its text. A row whose words
+still carry such a mark anywhere else is **withheld** whole (never captured, written, packed or quoted) and the
+sweep logs it, so it shows in `errors.jsonl` and `journal status`. The sweep now keeps a native picture of a queued
+message beside its entry (only from Hermes' picture cache) and stamps the capture with when the picture arrived.
+Entries already written are not touched. DECISIONS.md, OWN-WORDS.
 
-**Side and restart.** `turncontext.py` (the fence) runs in the gateway: the companion gets fenced context only after
-`hermes gateway restart`. `privacy.py`, `conversations.py` and `sweep.py` load with the plugin, and
-`hermes/transcript.py` when the hook first reads the chat (the privacy pass); the sweep itself runs in the tick, a
-fresh process, from the next tick after the pin moves. The order is safe either way: before
-the restart the gateway injects unfenced context, and the new reader still cuts a native picture's row at its
-placeholders and withholds an unfenced block by its first line. Rides the next restart window.
+**Side and restart.** `turncontext.py` and the new `contextfence.py` (the fence) run in the gateway: the companion
+gets fenced context only after `hermes gateway restart`. `privacy.py`, `conversations.py` and `sweep.py` load with
+the plugin, and `hermes/transcript.py` when the hook first reads the chat (the privacy pass); the sweep itself and
+`tick.py` run in the tick, a fresh process, from the next tick after the pin moves. The order is safe either
+way: before the restart the gateway injects unfenced context, and the new reader still cuts a native picture's row at
+its placeholders and withholds an unfenced block by its first line. Rides the next restart window.
 
 1. Install the CLI at `<sha>`, move the plugin pin (`hermes -p <profile> plugins install beejsbj/journal --force
    --ref <sha>`), restart `journal-serve` so doctor's version rows agree, then `hermes -p <profile> gateway restart`
    in a window. Nothing is sent.
 2. First checks, without sending: `journal doctor --deep` is as before (its transcript sample counts withheld rows
-   among "read as empty or system"). After the next tick, `errors.jsonl` has no new `sweep: row … still carries`
-   line; one that appears names a row (ids only) Hermes stored with something added: read that row read-only
-   (`?mode=ro`) before deciding anything. The sweep's watermark is unchanged, so rows it already passed are not read
+   among "read as empty or system"). After the next tick, `errors.jsonl` has no new `sweep: withheld row …` line;
+   one that appears names a row (ids only) Hermes stored with something added: read that row read-only
+   (`?mode=ro`) before deciding anything. A `sweep: a picture of message … was not kept (…)` line in the tick's log
+   says why a swept picture stayed out (outside Hermes' picture cache, gone from it, too large, a failed copy). The sweep's watermark is unchanged, so rows it already passed are not read
    again and nothing is captured twice.
 3. Live check, only with the owner (it sends into his chat): with a vault checksum before and after
    (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`), he sends a picture with no caption while the companion is still
