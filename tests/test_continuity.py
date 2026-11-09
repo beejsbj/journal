@@ -157,32 +157,29 @@ class ContinuityTest(Earlier):
 
 
 class QuotesTest(Earlier):
-    """Only his words in quotation marks: a quote that is not his is a bad answer and retried; on the last attempt the
-    sentence that holds it goes, so a stubborn misquote costs a sentence, not the reflection."""
+    """Only his words in quotation marks: a quote that is not his is a bad answer and retried; a reflection that never
+    passes is never written, as before."""
 
     def tick(self, minute):
         return self.reflect(datetime(2026, 10, 14, 23, minute, tzinfo=IST))
 
-    def test_an_invented_quote_is_retried_then_its_sentence_dropped_on_the_last_attempt(self):
-        self.evening()
-        self.answer = GOOD.replace("rain all day, walked anyway", "I miss the lake house")
-        for n, minute in ((1, 45), (2, 50)):
+    def never_written(self, answer):
+        """Three attempts at ``answer``, each a bad one; then the alert, and no file."""
+        self.answer = answer
+        for n, minute in ((1, 45), (2, 50), (3, 55)):
             alerts, log = self.tick(minute)
-            self.assertEqual(alerts, [])
-            self.assertIn(f"2026-10-14-reflection: reflection attempt {n}/3 failed (quote not in his words: "
-                          "'I miss the lake house')", log)
-            self.assertFalse((self.cfg.root / "2026-10-14-reflection.md").exists())
-        alerts, log = self.tick(55)
-        self.assertEqual(alerts, [])
-        self.assertIn("wrote 2026-10-14-reflection.md (annotated) (+1 notebook) (last attempt: 1 quote not his or "
-                      "irregular, sentences dropped)", log)
-        body = (self.cfg.root / "2026-10-14-reflection.md").read_text()
-        self.assertNotIn("lake house", body)
-        self.assertIn("**Patterns and tensions** — That reads as patience held lightly (inference).", body)
-        self.assertIn("**What stood out** — The rain, and a walk in it anyway.", body)
-        self.assertEqual(self.rec("2026-10-14-reflection")["struck"], ["I miss the lake house"])
-        self.assertEqual(len(self.bot.calls), 1)
-        self.assertNotIn("lake house", self.bot.calls[0][1]["text"])
+            self.assertTrue(any(f"reflection attempt {n}/3 failed" in l for l in log), log)
+        self.assertEqual(len(alerts), 1)
+        self.assertIn("2026-10-14-reflection was not written after 3 attempts", alerts[0])
+        self.assertFalse((self.cfg.root / "2026-10-14-reflection.md").exists())
+        self.assertEqual(self.bot.calls, [])
+        return log
+
+    def test_an_invented_quote_is_retried_and_never_written(self):
+        self.evening()
+        log = self.never_written(GOOD.replace("rain all day, walked anyway", "I miss the lake house"))
+        self.assertIn("2026-10-14-reflection: reflection attempt 3/3 failed (quote not in his words: "
+                      "'I miss the lake house')", log)
 
     def test_his_words_reached_through_search_keep_their_marks(self):
         add_prompt(self.cfg, kind="evening", local_date="2026-09-20",
@@ -195,7 +192,6 @@ class QuotesTest(Earlier):
         self.assertIn("wrote 2026-10-14-reflection.md (annotated) (+1 notebook)", log)
         body = (self.cfg.root / "2026-10-14-reflection.md").read_text()
         self.assertIn('"the harbour at dusk … like a door"', body)  # his words, in an entry weeks ago
-        self.assertNotIn("struck", self.rec("2026-10-14-reflection"))
 
     def test_her_words_never_count_as_his(self):
         old = add_prompt(self.cfg, kind="evening", local_date="2026-09-20",
@@ -231,15 +227,9 @@ class QuotesTest(Earlier):
         self.assertTrue(any("failed (quote not in his words: 'I want … to quit … the bus can wait')" in l
                             for l in log), log)
 
-    def test_a_blockquote_line_that_is_not_his_goes_on_the_last_attempt(self):
+    def test_a_blockquote_line_that_is_not_his_is_a_bad_answer(self):
         self.evening()
-        self.answer = GOOD.replace("**To carry forward**", "> I never said this\n\n**To carry forward**")
-        self.tick(45)
-        self.tick(50)
-        _, log = self.tick(55)
-        body = (self.cfg.root / "2026-10-14-reflection.md").read_text()
-        self.assertNotIn("I never said this", body)
-        self.assertIn("**To carry forward** — What would being there look like, on your terms?", body)
+        self.never_written(GOOD.replace("**To carry forward**", "> I never said this\n\n**To carry forward**"))
 
     IRREGULAR = ('You wrote "I adore naps” and slept.',                          # mixed: straight opens, curly closes
                  'You wrote "I love resting\non Sundays" and slept.',              # across a line break
@@ -253,26 +243,14 @@ class QuotesTest(Earlier):
                  'You wrote `I adore naps` and slept.',
                  'You said “so much. That reads as rest.')                         # a mark with no partner
 
-    def test_an_irregular_quote_mark_is_a_bad_answer_and_its_sentence_goes_on_the_last_attempt(self):
+    def test_an_irregular_quote_mark_is_a_bad_answer(self):
         self.evening()
         for text in self.IRREGULAR:
             with self.subTest(text):
                 with ledger.locked(self.cfg.ledger_path) as data:
                     data["reflections"] = []
-                (self.cfg.root / "2026-10-14-reflection.md").unlink(missing_ok=True)
-                self.answer = GOOD.replace("That reads as patience held lightly (inference).", text)
-                for minute in (45, 50):
-                    _, log = self.tick(minute)
-                    self.assertTrue(any("failed (irregular quote mark" in l or "failed (attribution" in l
-                                        for l in log), log)
-                    self.assertFalse((self.cfg.root / "2026-10-14-reflection.md").exists())
-                _, log = self.tick(55)
-                body = (self.cfg.root / "2026-10-14-reflection.md").read_text()
-                self.assertNotIn("adore", body)
-                self.assertNotIn("Sundays", body)
-                self.assertNotIn("never loved", body)
-                self.assertNotIn("so much", body)
-                self.assertIn("“the soup was good … the bus can wait”", body)  # the sentence before it stands
+                self.bot.calls.clear()
+                self.never_written(GOOD.replace("That reads as patience held lightly (inference).", text))
 
     def test_apostrophes_are_not_quotation(self):
         self.evening()
@@ -308,13 +286,11 @@ class EveryQuoteLikeMarkTest(Earlier):
                f"You wrote ❛{INVENTED}❜ today.", f"You wrote 〝{INVENTED}〞 today.", f"You wrote 「{INVENTED}」 today.",
                f"You wrote ‛{INVENTED}’ today.", f"You wrote ’{INVENTED}’ today.",
                f"You wrote &quot;{INVENTED}&quot; today.", f"You wrote &ldquo;{INVENTED}&rdquo; today.",
-               f"You wrote <q>{INVENTED}</q> today.", f"<blockquote>{INVENTED}</blockquote>",
-               f"You wrote: {INVENTED}.", f"As you put it, {INVENTED}.", f"You wrote *{INVENTED}*.",
-               f"In your words, {INVENTED}.", f"You told me {INVENTED} once."])
+               f"You wrote <q>{INVENTED}</q> today.", f"<blockquote>{INVENTED}</blockquote>"])
     BLOCKS = [f"   > {INVENTED}", f"- > {INVENTED}", f"1. > {INVENTED}",
               f"> rain all day, walked anyway\n{INVENTED}"]  # (lazy continuation: Obsidian renders it in the quote)
 
-    def test_none_of_them_is_saved_on_attempt_one_and_the_last_attempt_drops_them(self):
+    def test_none_of_them_is_ever_saved(self):
         self.evening()
         for text in self.INPUTS:
             self.run_one(GOOD.replace("That reads as patience held lightly (inference).", text), text)
@@ -327,14 +303,10 @@ class EveryQuoteLikeMarkTest(Earlier):
                 data["reflections"] = []
             (self.cfg.root / "2026-10-14-reflection.md").unlink(missing_ok=True)
             self.answer = answer
-            _, log = self.tick(45)
-            self.assertTrue(any("reflection attempt 1/3 failed" in l for l in log), log)
+            for n, minute in ((1, 45), (2, 50), (3, 55)):
+                _, log = self.tick(minute)
+                self.assertTrue(any(f"reflection attempt {n}/3 failed" in l for l in log), log)
             self.assertFalse((self.cfg.root / "2026-10-14-reflection.md").exists())
-            self.tick(50)
-            self.tick(55)
-            body = (self.cfg.root / "2026-10-14-reflection.md").read_text()
-            self.assertNotIn("hate my job", body)
-            self.assertIn("**To carry forward** — What would being there look like, on your terms?", body)
 
     def test_the_whole_initial_and_final_punctuation_class_is_irregular(self):
         import unicodedata
@@ -357,15 +329,12 @@ class EveryQuoteLikeMarkTest(Earlier):
             with self.subTest(text):  # (harmless, and failing closed: DECISIONS.md, CONTINUITY)
                 self.assertTrue(validate.unfound(text, docs))
 
-    def test_blockquote_shapes_and_their_lazy_lines_are_checked_and_struck_whole(self):
+    def test_blockquote_shapes_and_their_lazy_lines_are_checked(self):
         docs = ["rain all day, walked anyway"]
         for text in self.BLOCKS:
             with self.subTest(text):
                 found = validate.unfound(text, docs)
                 self.assertEqual(len(found), 1)
-                self.assertEqual(validate.strike("Before.\n\n" + text + "\n\nAfter.",
-                                                 validate.unfound("Before.\n\n" + text + "\n\nAfter.", docs)),
-                                 "Before.\n\nAfter.")
         self.assertEqual(validate.unfound("> rain all day, walked anyway", docs), [])
         self.assertEqual(validate.unfound("- > rain all day,\n  walked anyway", docs), [])
         self.assertEqual(validate.unfound("    > four spaces is code, not a quote", docs), [])
@@ -377,21 +346,6 @@ class EveryQuoteLikeMarkTest(Earlier):
                 self.assertTrue(any(q.startswith("irregular HTML") for _, _, q in validate.unfound(text, [])))
         self.assertEqual(validate.unfound("3 < 4 and 5 > 2, and a <3 heart; AT&T", []), [])
 
-    def test_attribution_needs_a_quotation_in_its_sentence(self):
-        docs = [f"{self.INVENTED}, honestly"]
-        self.assertEqual(validate.unfound(f'You wrote "{self.INVENTED}" and meant it.', docs), [])
-        self.assertEqual(validate.unfound(f'"{self.INVENTED}", as you put it.', docs), [])
-        for text in (f"You wrote: {self.INVENTED}.", f"As you put it, {self.INVENTED}.", "You wrote about the rain.",
-                     f"Your words were {self.INVENTED}.", f"You described it as {self.INVENTED}.",
-                     f"You called it {self.INVENTED}.", f"You said {self.INVENTED}, then slept."):
-            with self.subTest(text):
-                self.assertTrue(any(q.startswith("attribution") for _, _, q in validate.unfound(text, docs)))
-        # (the cost: an honest paraphrase that says "you wrote" is retried; the prompt asks for a quote instead)
-        self.assertEqual(validate.strike(f"Fine day. You wrote: {self.INVENTED}. Then rain.",
-                                         validate.unfound(f"Fine day. You wrote: {self.INVENTED}. Then rain.", docs)),
-                         "Fine day. Then rain.")
-        self.assertEqual(validate.unfound(f"You wrote: {self.INVENTED}.", docs, attribution=False), [])
-
     def test_the_program_and_catch_up_checks_use_the_same_check(self):
         corpus = "I want to sleep, honestly. " + "x " * 200 + "Then to quit."
         for text in (f"You wrote ‛{self.INVENTED}’ today, so rest.", 'You said "No" and slept.',
@@ -402,7 +356,7 @@ class EveryQuoteLikeMarkTest(Earlier):
                 self.assertFalse(validate.check_reflection("insights", "x" * 80 + "\n" + text, corpus)[0])
                 self.assertFalse(validate.check_bridge(text.rstrip("."), corpus)[0])
         self.assertTrue(validate.check_catchup('You said "I want to sleep, honestly" and you should.', corpus)[0])
-        self.assertTrue(validate.check_catchup("You said you wanted to sleep; do.", corpus)[0])  # (no attribution rule)
+        self.assertTrue(validate.check_catchup("You said you wanted to sleep; do.", corpus)[0])  # (paraphrase)
 
 
 class LongRunTest(Earlier):
@@ -487,50 +441,6 @@ class QuoteCheckTest(unittest.TestCase):
         self.assertEqual(self.bad('“I miss the lake house” and "I never rest" and "made up words"', wider=wider),
                          ["made up words"])
         self.assertEqual(calls, [1])
-
-    def strike(self, text):
-        return validate.strike(text, validate.unfound(text, self.DOCS))
-
-    def test_strike_drops_the_sentence_with_its_attribution(self):
-        text = ('**What I notice** — Fine day. You wrote, "I am done pretending…" and it showed. Then rain.\n'
-                '- As you put it, *"a slow kind of drowning"*. The walk helped.\n\n'
-                '> I never rest\n\n'
-                'End.')
-        self.assertEqual(self.strike(text),
-                         "**What I notice** — Fine day. Then rain.\n- The walk helped.\n\nEnd.")
-        # (with no blank line after it, "End." would be the blockquote's lazy continuation and go with it)
-        self.assertEqual(self.strike("Start.\n\n> I never rest\nEnd."), "Start.")
-
-    def test_strike_takes_a_hard_wrapped_sentence_whole(self):
-        self.assertEqual(self.strike('I was tired, and\nyou wrote "I adore naps". Rest came.'), "Rest came.")
-        self.assertEqual(self.strike('Fine. I was tired, and\nyou wrote "I adore naps" then.\nRest came.'),
-                         "Fine.\nRest came.")  # (the wrap that was there stays: only the seam is tidied)
-
-    def test_strike_does_not_end_a_sentence_at_an_abbreviation(self):
-        self.assertEqual(self.strike('**What I notice** — We talked, e.g. about rain. You wrote "I adore naps" today, '
-                                     'i.e. on a Sunday. Dr. Rao called.'),
-                         "**What I notice** — We talked, e.g. about rain. Dr. Rao called.")
-
-    def test_strike_drops_a_line_left_with_only_its_lead_in_or_marker(self):
-        text = ('**What I notice** — Fine day.\n\n**What moved** — You wrote "I adore naps".\n\n'
-                '**To carry forward** — Is "I adore naps" still true?\n')
-        out = self.strike(text)
-        self.assertEqual(out, "**What I notice** — Fine day.")
-        self.assertEqual(reflect._carried(out), "")  # the today block and the web app read nothing, not a wrong line
-        self.assertEqual(self.strike('- first\n- You wrote "I adore naps".\n- third'), "- first\n- third")
-
-    def test_strike_leaves_the_rest_of_the_text_as_it_was(self):
-        text = ('- first item\n  - nested "rain all day, walked anyway" stays\n- second, "I adore naps" goes\n'
-                '  - nested keeps its  indent\n\n\nA paragraph  with two spaces.')
-        self.assertEqual(self.strike(text), '- first item\n  - nested "rain all day, walked anyway" stays\n'
-                                            '  - nested keeps its  indent\n\n\nA paragraph  with two spaces.')
-
-    def test_an_attribution_in_the_sentence_before_goes_too_when_it_says_so(self):
-        # a "you wrote" sentence with no quotation is a problem of its own (round 4), so it goes with the quote; an
-        # attribution in other words stays (accepted: DECISIONS.md, CONTINUITY)
-        self.assertEqual(self.strike('You wrote this on Monday. "I adore naps" was the line.\n\nNext.'), "Next.")
-        self.assertEqual(self.strike('On Monday, this. "I adore naps" was the line.\n\nNext.'),
-                         "On Monday, this.\n\nNext.")
 
     def test_the_other_checks_reject_a_misquote_and_an_irregular_mark(self):
         text = "x" * 80 + '\nYou said "I am exhausted"'

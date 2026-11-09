@@ -172,19 +172,15 @@ def asked(practice: Practice | str, data: dict) -> list[dict]:
 
 
 # ── reflections ──────────────────────────────────────────────────────────────
-# A reflection is free Markdown, so grounding is checked on what it quotes, and it fails closed. Only
-# well-formed double quotation counts as quotation: a straight "…" or curly “…” pair on one line whose
-# inside is not empty and neither starts nor ends with a space, and a blockquote (``_BLOCKQUOTE``, as
-# Obsidian renders one). Every other quote-like character is irregular (``quote_like``: a class, not a
-# list: Unicode's initial and final quotation marks, every quotation mark, prime and corner bracket by
-# name, the apostrophe and backtick; an apostrophe inside a word is the one exception), and so is any
-# HTML tag or entity: it cannot be checked, so it never passes. So is a sentence that says "you wrote"
-# or "you said" with no quotation in it (``_ATTRIBUTION``; reflections only). A day reflection or week
-# review checks each quotation against his words, file by file and paragraph by paragraph
-# (``unfound``); one problem makes the answer a bad one, retried, and only on its last attempt does
-# ``strike`` drop the sentences that hold the problems (``reflect.write_one``). A program's synthesis
-# (``insights``), the catch-up and a program's construction and bridge reject the whole text on one
-# (``_misquote``: the same check, against their one source).
+# A reflection is free Markdown, so grounding is checked on what it quotes. Only well-formed double
+# quotation counts as quotation: a straight "…" or curly “…” pair on one line whose inside is not empty
+# and neither starts nor ends with a space, and a blockquote (``_BLOCKQUOTE``, as Obsidian renders one).
+# A quote-like character outside such a pair is irregular (``quote_like``): it cannot be checked, so it
+# never passes. A day reflection or week review checks each quotation against his words, file by file
+# and paragraph by paragraph (``unfound``); one problem makes the answer a bad one, retried, and one
+# that never passes is never written (``reflect.write_one``). A program's synthesis (``insights``), the
+# catch-up and a program's construction and bridge reject the whole text on one (``_misquote``: the
+# same check, against their one source). Paraphrase is not checked here.
 
 REFLECTION_LIMITS = {"reflection": 3500, "week": 6000, "insights": 5000}  # insights: a program's synthesis
 QUOTE_GAP = 300  # characters of his at most between two parts of one quote stitched with "…"
@@ -193,15 +189,8 @@ _QUOTE_CHARS = frozenset("'`＇")  # the apostrophe, the backtick and the fullwi
 _HTML = re.compile(r"<[A-Za-z][^>\n]*>|</[^>\n]*>|&(?:[A-Za-z][A-Za-z0-9]*|#[0-9]+|#[xX][0-9A-Fa-f]+);")
 _BLOCKQUOTE = re.compile(r"[ ]{0,3}(?:[-*+]\s+|\d+[.)]\s+)?>")  # a blockquote line, in a list item or not
 _BLOCKQUOTE_MARKS = re.compile(r"[ ]{0,3}(?:[-*+]\s+|\d+[.)]\s+)?(?:>[ \t]?)+")
-_ATTRIBUTION = re.compile(r"\b(?:you (?:wrote|said|put it|called it|told me|described it as)|in your words"
-                          r"|your words were)\b", re.I)
 _TYPO = str.maketrans({"’": "'", "‘": "'", "“": '"', "”": '"', "—": "-", "–": "-", " ": " "})
 _ELLIPSIS = re.compile(r"\s*(?:\.\.\.|…|\[\.\.\.\]|\[…\])\s*")
-_SENT_END = re.compile(r"[.!?…]+[\"”’')\]*_]*(?=\s|$)")
-_LEAD = re.compile(r"[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?(?:(?:\*\*[^*\n]+\*\*|__[^_\n]+__)[ \t]*[—–:-]?[ \t]*)?")
-_ONLY_LEAD = re.compile(r"[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]*)?(?:(?:\*\*[^*\n]+\*\*|__[^_\n]+__)[ \t]*[—–:-]?[ \t]*)?")
-_BLOCK = re.compile(r"[ \t]*(?:[-*+][ \t]|\d+[.)][ \t]|>|#|\*\*[^*\n]+\*\*[ \t]*[—–:-])")  # a line that starts a block
-_ABBREVIATIONS = ("e.g.", "i.e.", "etc.", "vs.", "cf.", "mr.", "mrs.", "ms.", "dr.", "st.", "approx.", "a.m.", "p.m.")
 
 
 def _plain(s: str) -> str:
@@ -288,9 +277,9 @@ def quotes(text: str) -> list[str]:
 
 def _misquote(text: str, corpus: str) -> str | None:
     """The first problem with what ``text`` quotes, checked as a reflection's quotes are (``unfound``) against its one
-    source ``corpus`` (his messages, his answers, the compiled document), without the attribution rule: an irregular
-    mark, or a quoted passage that is not there, or has nothing in it to check. None: there is none."""
-    bad = unfound(text, [corpus], attribution=False)
+    source ``corpus`` (his messages, his answers, the compiled document): an irregular mark, or a quoted passage that
+    is not there, or has nothing in it to check. None: there is none."""
+    bad = unfound(text, [corpus])
     return bad[0][2][:60] if bad else None
 
 
@@ -324,12 +313,11 @@ def _paragraphs(docs) -> list[str]:
     return [_plain(p) for d in docs if d for p in re.split(r"\n[ \t]*\n", d) if p.strip()]
 
 
-def unfound(text: str, docs: list[str], wider=None, attribution: bool = True) -> list[tuple[int, int, str]]:
+def unfound(text: str, docs: list[str], wider=None) -> list[tuple[int, int, str]]:
     """What in ``text`` cannot stand as his words, as (start, end, what), in order: every irregular mark (``_scan``;
     its span the mark), every quotation and blockquote (its span its whole lines) that no single paragraph of ``docs``
-    holds with its parts around "…" in order and close together (``_in_order``), every one with nothing in it to
-    check (``_patterns``), and, with ``attribution``, every "you wrote", "you said" … (``_ATTRIBUTION``) in a sentence
-    with no quotation in it: words reported as his without quotation marks cannot be checked either. ``wider`` (a
+    holds with its parts around "…" in order and close together (``_in_order``), and every one with nothing in it to
+    check (``_patterns``). ``wider`` (a
     callable returning more documents, called at most once and only when a passage is missing from ``docs``) is his
     words in every file of the journal, for what a reflection reached through ``journal_search``: a quote stitched
     from several files, or from far apart, is not his."""
@@ -356,115 +344,12 @@ def unfound(text: str, docs: list[str], wider=None, attribution: bool = True) ->
                        else f"irregular quote mark {text[i]!r}") + f": {_around(text, i)}") for i in odd]
     out += [(a, b, inner) for a, b, inner in pairs if not found(inner)]
     out += [(a, b, said or "(an empty blockquote)") for a, b, said in blocks if not said or not found(said)]
-    if attribution:
-        for m in _ATTRIBUTION.finditer(text):
-            if any(a <= m.start() < b for a, b, _ in pairs + blocks):
-                continue  # (his own words, inside a quotation)
-            lo, hi = _sentence(text, m.start(), m.end(), pairs)
-            if not any(lo <= a and b <= hi for a, b, _ in pairs):
-                out.append((m.start(), m.end(), f"attribution without a quotation: {_around(text, m.start())}"))
     return sorted(out)
 
 
 def _around(text: str, i: int) -> str:
     """A few words either side of ``text[i]``, on one line (for a log line)."""
     return " ".join(text[max(0, i - 24):i + 24].split())
-
-
-def _unit(text: str, a: int) -> tuple[int, int]:
-    """The block of ``text`` around ``a``: from the first line of its paragraph, or of the list item, lead-in,
-    blockquote or heading it is in, to the last line before a blank line or the next such line. A hard-wrapped
-    sentence lies within one block."""
-    start = text.rfind("\n", 0, a) + 1
-    while start > 0 and not _BLOCK.match(text, start):
-        prev = text.rfind("\n", 0, start - 1) + 1
-        if not text[prev:start - 1].strip():
-            break
-        start = prev
-    end = text.find("\n", a)
-    end = len(text) if end < 0 else end
-    while end < len(text):
-        nxt = text.find("\n", end + 1)
-        nxt = len(text) if nxt < 0 else nxt
-        line = text[end + 1:nxt]
-        if not line.strip() or _BLOCK.match(line):
-            break
-        end = nxt
-    return start, end
-
-
-def _ends(text: str, lo: int, hi: int, pairs: list[tuple[int, int, str]]) -> list[int]:
-    """Where sentences end in ``text[lo:hi]``: after a full stop (with its closing marks) that is not inside a
-    quotation, not the end of a common abbreviation (e.g., i.e., Dr.), and followed by the end of the block or a new
-    sentence (a capital, a quote mark, emphasis)."""
-    out = []
-    for m in _SENT_END.finditer(text, lo, hi):
-        if any(a <= m.start() < b for a, b, _ in pairs):
-            continue
-        word = text[max(lo, text.rfind(" ", lo, m.start()) + 1):m.end()].lower().strip("\"”’')]*_\n\t")
-        if word.endswith(_ABBREVIATIONS):
-            continue
-        rest = text[m.end():hi].lstrip(" \t\n")
-        if not rest or rest[0] in "\"“*_(" or rest[0].isupper():
-            out.append(m.end())
-    return out
-
-
-def _sentence(text: str, a: int, b: int, pairs: list[tuple[int, int, str]]) -> tuple[int, int]:
-    """The span of the sentence holding ``text[a:b]`` (a quotation or an irregular mark): from the last sentence end
-    before it in its block (``_unit``), or the block's start after a list marker and a bold lead-in such as
-    ``**What I notice** —``, to the first sentence end after it in the block, or the block's end. Full stops inside
-    quotations are not sentence ends (``_ends``)."""
-    lo, hi = _unit(text, a)
-    hi = max(hi, b)
-    start = lo
-    lead = _LEAD.match(text, lo)
-    if lead and lead.end() <= a:
-        start = lead.end()
-    start = max([start, *_ends(text, start, a, pairs)])
-    inner = text[a:b]
-    rest = text[b:hi].lstrip(" \t*_\n")
-    if b - a > 1 and inner[-2:-1] in (".", "!", "?", "…") and (not rest or rest[0].isupper()):
-        return start, b  # the quotation closes its sentence on a full stop
-    after = _ends(text, b, hi, pairs)
-    return start, after[0] if after else hi
-
-
-def strike(text: str, problems: list[tuple[int, int, str]]) -> str:
-    """``text`` without what ``unfound`` found: a blockquote goes whole, anything else goes with the sentence that
-    holds it, its lead-in ("you wrote", "as you put it") included, so no words that are not his stay attributed to
-    him, quoted or reported. Only the seams are tidied: the spaces where a sentence went, and a line left empty or
-    holding nothing but a bold lead-in or a list marker, which goes too (an emptied "To carry forward" leaves no line
-    for the today block to misread). An attribution in the sentence before a quotation ("You wrote this on Monday.")
-    stays."""
-    pairs, _ = _scan(text)
-    blocks = {(a, b) for a, b, _ in _blockquotes(text)}
-    spans = []
-    for a, b, _ in problems:
-        spans.append((a, b) if (a, b) in blocks else _sentence(text, a, b, pairs))
-    merged: list[list[int]] = []
-    for a, b in sorted(spans):
-        if merged and a <= merged[-1][1]:
-            merged[-1][1] = max(merged[-1][1], b)
-        else:
-            merged.append([a, b])
-    for a, b in reversed(merged):
-        left, right = text[:a].rstrip(" \t"), text[b:].lstrip(" \t")
-        glue = "" if (not left or left.endswith("\n") or not right or right[0] in "\n.,;:!?") else " "
-        text, seam = left + glue + right, len(left)
-        ls = text.rfind("\n", 0, seam) + 1
-        le = text.find("\n", seam)
-        le = len(text) if le < 0 else le
-        if text[ls:le].strip() and _ONLY_LEAD.fullmatch(text[ls:le]):  # a lead-in or a list marker left alone
-            text, seam = text[:ls] + text[le + 1:], ls
-        lo, hi = seam, seam
-        while lo > 0 and text[lo - 1] == "\n":
-            lo -= 1
-        while hi < len(text) and text[hi] == "\n":
-            hi += 1
-        if hi - lo > 2:  # (the blank lines either side of what went: one is enough, a paragraph break stays)
-            text = text[:lo] + "\n\n" + text[hi:]
-    return text.strip()
 
 
 def check_reflection(kind: str, text: str | None, corpus: str, misquotes: bool = True) -> tuple[bool, str]:
