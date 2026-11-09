@@ -216,15 +216,18 @@ def send_due(cfg: Config, now_local: datetime, log: list[str], only: str | None 
 
 def _resolve_again(cfg: Config, practice: Practice, pid: str, local_date: str, now_local: datetime,
                    log: list[str]) -> tuple[str, str]:
-    """A deliberate send's slot, read again under the ledger lock once its opener is built: if his words on a face
-    made it a record of his meanwhile (the model call can take minutes), the send resolves again (the next slot that
-    fits, else an extra entry), so a deliberate delivery never attaches to his record (rule 3). (pid, local_date)."""
+    """A deliberate send's slot, read again under the ledger lock once its opener is built: ``slots.resolve`` never
+    gives an answered slot, so if he answered it meanwhile (on a face, or in the chat; the model call can take
+    minutes), the send resolves again (the next slot that fits, else an extra entry). So a deliberate delivery never
+    attaches to his record from a face, nor re-sends a prompt he has just answered (rule 3). (pid, local_date)."""
     with ledger.locked(cfg.ledger_path) as data:
         q = ledger.find(data, pid)
-        if not (q and not q.get("message_id") and (q.get("captures") or q.get("opened_via"))):
+        if not (q and (q.get("captures") or (q.get("opened_via") and not q.get("message_id")))):
             return pid, local_date
         slot = slots.resolve(cfg, practice, now_local, now=now_local, data=data, delivery=True)
-    log.append(f"{pid}: answered meanwhile in {slots.FACES.get(q.get('opened_via'), 'a face')}; sending {slot.id}")
+    via = q.get("opened_via")
+    log.append(f"{pid}: answered meanwhile" + (f" in {slots.FACES.get(via, via)}" if via else "")
+               + f"; sending {slot.id}")
     return slot.id, slot.local_date
 
 

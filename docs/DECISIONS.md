@@ -3064,8 +3064,9 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     `sent_opener` (and `sent_opener_source`), `sent_html`, `sent_plain_text` and `needs_edit`. The issue's
     "deliberate send: the record's own opener, failure not alerting" has no path of its own: `resolve` never gives a
     deliberate send an answered record, and **a deliberate send resolves again** under the ledger lock once its
-    opener is built if he answered its slot on a face meanwhile (`tick._resolve_again`; review round 1), so it goes
-    to the next slot that fits or an extra entry. It can attach only in the instant between that check and the send,
+    opener is built if he answered its slot meanwhile, on a face or in the chat (`tick._resolve_again`; review
+    rounds 1 and 2), so it goes to the next slot that fits or an extra entry rather than attaching to his record or
+    re-sending a prompt he has just answered (on `main`, `/start` always re-sent). It can attach only in the instant between that check and the send,
     as a scheduled send can. What remains of the issue's wording: **a failed send onto a record that has captures
     counts no attempt and raises no alert** (it is logged): nothing is owed.
   - **The web app as built reads four states** (`web/src/types.ts`), so `GET /today` serves a *due* row as

@@ -309,6 +309,20 @@ class ScheduleTest(Base):
         self.assertTrue((self.cfg.state_dir / "packs" / "2026-10-14-morning-2.md").exists())
         self.assertFalse((self.cfg.state_dir / "packs" / "2026-10-14-morning.md").exists())
 
+    def test_a_deliberate_send_answered_in_the_chat_during_its_opener_goes_to_an_extra_entry(self):
+        """Review round 2: /start resolves to the open delivered morning; he replies in the chat while the opener is
+        built, so the send resolves again rather than re-sending onto the prompt he just answered."""
+        self.send(at(6, 1))
+        def replies_meanwhile(cfg, query, *a, **k):
+            capture.capture(self.cfg, CHAT, "701", "slept fine", at(6, 31).astimezone(timezone.utc), "text", "41")
+            raise agent.AgentUnavailable("slow model")
+        self.ask = replies_meanwhile
+        self.send(at(6, 30), only="morning")
+        morning = self.prompt("2026-10-14-morning")
+        self.assertEqual((morning["message_id"], morning.get("previous_message_ids")), ("701", None))
+        extra = self.prompt("2026-10-14-morning-2")
+        self.assertEqual((extra["message_id"], extra["stem"]), ("702", "2026-10-14-morning-2"))
+
     def test_start_after_an_answer_delivers_the_next_slot_that_fits_and_the_tick_skips_it(self):
         self.answer("water", "a glass", at(9, 30))
         self.send(at(10), only="water")
