@@ -213,7 +213,8 @@ def resolve(cfg: Config, practice: Practice | str, at: datetime, *, now: datetim
 
     1. a slot of the practice that is due or open now, today's or yesterday's, newest first, whose time is at or
        before ``at`` (an evening answered at 00:30 takes last night's);
-    2. else the journal day's newest missed slot whose time is at or before ``at``;
+    2. else the journal day's newest missed slot whose time is at or before ``at`` (a slot between midnight and
+       ``day_ends_at`` belongs to the journal day before its date, as words written then do);
     3. else the next slot later the same journal day that has no record (doing it early fills it; the tick then
        skips its send); one already delivered is not taken;
     4. else an extra entry of the practice for the journal day: slot 1's id when no slot of the practice falls on
@@ -257,14 +258,26 @@ def _step1(cfg, p, at, now, data, today: date, delivery: bool) -> Slot | None:
     return _with_step(_newest(found)[0], 1) if found else None
 
 
+def _of_journal_day(cfg, p, now, data, jday: date) -> list[Slot]:
+    """The practice's slots that belong to journal day ``jday``: its date's slots from ``day_ends_at`` on, and the next
+    date's before it (a 00:30 slot is the night of the day before). A slot with no time stays with its date."""
+    out = []
+    for d in (jday, jday + timedelta(days=1)):
+        for s in day(cfg, d.isoformat(), now, data=data, practice=p):
+            when = s.time
+            if (journal_day(cfg, when) if when is not None else d) == jday:
+                out.append(s)
+    return out
+
+
 def _step2(cfg, p, at, now, data, jday: date, delivery: bool) -> Slot | None:
-    found = [s for s in day(cfg, jday.isoformat(), now, data=data, practice=p)
+    found = [s for s in _of_journal_day(cfg, p, now, data, jday)
              if s.state == MISSED and _before(s, at, delivery)]
     return _with_step(_newest(found)[0], 2) if found else None
 
 
 def _step3(cfg, p, at, now, data, jday: date) -> Slot | None:
-    later = [s for s in day(cfg, jday.isoformat(), now, data=data, practice=p)
+    later = [s for s in _of_journal_day(cfg, p, now, data, jday)
              if s.n is not None and s.at is not None and s.at > at and (s.record is None or failed_send(s.record))]
     later.sort(key=lambda s: s.at.astimezone(timezone.utc))
     return _with_step(later[0], 3) if later else None

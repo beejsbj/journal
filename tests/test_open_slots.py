@@ -13,6 +13,7 @@ from journal import ledger, slots
 
 IST = ZoneInfo("Asia/Kolkata")
 WED = datetime(2026, 10, 14, 0, 0, tzinfo=IST)  # a Wednesday
+THU = WED + timedelta(days=1)
 
 WATER = """---
 kind: practice
@@ -33,6 +34,15 @@ schedule.time: 21:00
 collapse_hours: 2
 ---
 - What is still with you?
+"""
+NIGHT = """---
+kind: practice
+id: night
+title: Night
+schedule.time: "00:30"
+collapse_hours: 1
+---
+- What is keeping you up?
 """
 WALK = """---
 kind: practice
@@ -156,6 +166,23 @@ class ResolveTest(SlotCase):
         self.cfg.day_ends_at = "00:15"
         got = self.resolve("dusk", at(0, 30, day=WED + timedelta(days=1)))
         self.assertEqual((got.id, got.step), ("2026-10-15-dusk", 3))
+
+    def _night(self):
+        (Path(self.cfg.practices_dir) / "night.md").write_text(NIGHT, encoding="utf-8")
+
+    def test_a_slot_before_day_ends_at_belongs_to_the_journal_day_before_it(self):
+        """Review round 1: a 00:30 slot on the 15th is the 14th's journal day. Words at 02:30 on the 15th (journal day
+        the 14th) take that slot, missed two hours ago, not the 14th's own 00:30 slot, a day older."""
+        self._night()
+        got = self.resolve("night", at(2, 30, day=THU), now=at(2, 30, day=THU))
+        self.assertEqual((got.id, got.step), ("2026-10-15-night", 2))
+
+    def test_early_words_late_at_night_fill_the_slot_after_midnight(self):
+        """Words at 23:00 on the 14th: the next slot of that journal day is 00:30 on the 15th (step 3), not the 14th's
+        00:30 slot, which belongs to the journal day before."""
+        self._night()
+        got = self.resolve("night", at(23), now=at(23))
+        self.assertEqual((got.id, got.step), ("2026-10-15-night", 3))
 
     def test_step_1_an_open_evening_at_half_past_midnight_is_last_nights(self):
         self.delivered("2026-10-14-evening", "evening", "2026-10-14", at(23))
