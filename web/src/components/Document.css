@@ -1,0 +1,107 @@
+/* Document (components/Document.tsx): the entry as a spread. The hours hang in the left margin (--margin-l), his words
+   run down his column (--measure), her notes stand in the right margin (--margin-r) beside the passage they follow.
+   The grid answers to the entry's container (`.entry-doc`, container "entry"; design/DESIGN.md, "The margins"): from
+   840 px of page all three columns; under it her notes go under their passage; under 560 px the hours fold into a
+   running head above the passage. Outside a container (a test, a preview) it is the middle layout. */
+
+.document {
+  --doc-gap: 24px;
+  display: grid;
+  align-content: start;
+}
+@container entry (min-width: 840px) {
+  .document { --doc-gap: 28px; }
+}
+
+/* each row of the page: the letter at the head, a passage with her notes */
+.doc-letter, .passage {
+  display: grid; grid-template-columns: var(--margin-l) minmax(0, 1fr); column-gap: var(--doc-gap); align-items: start;
+}
+@container entry (min-width: 840px) {
+  .doc-letter, .passage { grid-template-columns: var(--margin-l) minmax(0, var(--measure)) var(--margin-r); }
+}
+
+/* the hour in the margin: italic, lining figures; hers in her soft ink */
+.doc-margin { grid-column: 1; text-align: right; }
+.document time { font-variant-numeric: tabular-nums lining-nums; }
+.her-hour time {
+  display: block; padding-top: 22px; font: italic 400 15px / 1 var(--f-his); color: var(--her-soft);
+}
+.doc-letter { margin-bottom: var(--s3); }
+.doc-letter > .letter { grid-column: 2; animation: letter-in 520ms var(--e-paper) both; }
+@keyframes letter-in { from { opacity: 0; transform: translateY(-10px); } }
+
+/* ---- a passage of his ---- */
+.passage > .block.his { grid-column: 1 / 3; }
+.block.his {
+  position: relative; display: grid; grid-template-columns: var(--margin-l) minmax(0, 1fr); column-gap: var(--doc-gap);
+  padding-top: 30px;
+}
+.block.his > .margin { grid-column: 1; grid-row: 1; text-align: right; color: var(--text-3); }
+.block.his > .margin time {
+  display: block; padding-top: 7px; font: italic 400 15px / 1 var(--f-his); font-variant-numeric: tabular-nums lining-nums;
+}
+.block.his .source {
+  display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin-top: 6px;
+  font: 500 11.5px / 1.25 var(--f-ui); white-space: nowrap;
+}
+.block.his .source svg { width: 13px; height: 13px; flex: none; }
+.block.his > .body { grid-column: 2; grid-row: 1; min-width: 0; transition: transform var(--d-2) var(--e-out); }
+.block.his.pressing > .body { transform: scale(0.985); }
+
+.block.his .words {
+  margin: 0; font-size: 1.3125rem; white-space: pre-wrap; overflow-wrap: anywhere; text-wrap: pretty;
+}
+/* a transcript that has not come: a quiet word in the book's italic, not a box */
+.block.his .badge.pending {
+  display: block; margin: 0; padding: 0; border: 0; border-radius: 0; background: none;
+  font: italic 400 17px / 1.5 var(--f-his); letter-spacing: 0; text-transform: none; color: var(--text-3);
+}
+.replying { display: flex; align-items: baseline; gap: var(--s2); margin: 0 0 6px; font: 400 var(--t-small) / 1.45 var(--f-ui); color: var(--text-3); }
+.replying svg { flex: none; width: 15px; height: 15px; transform: translateY(3px); }
+.replying q { font-size: 13px; font-style: italic; }
+.pictures { display: flex; flex-wrap: wrap; gap: var(--s2); margin: 4px 0 var(--s4); }
+.pictures a { display: block; border-radius: var(--r-s); }
+.pictures img { display: block; max-width: 100%; max-height: 26rem; border-radius: var(--r-s); background: var(--raised); }
+.block.his .player { margin: 4px 0 var(--s4); }
+
+/* ---- her notes beside it (ui/MarginNote) ---- */
+.passage-notes { grid-column: 2; display: grid; gap: var(--s4); margin-top: var(--s4); max-width: 30rem; }
+@container entry (min-width: 840px) {
+  .passage-notes { grid-column: 3; grid-row: 1; margin-top: 0; padding-top: 34px; max-width: none; }
+}
+.passage-notes .margin-note { padding-top: 0; }
+.passage-notes .margin-note-body .md p { margin-bottom: 0.5em; }
+.passage-notes .margin-note-body .md > :last-child { margin-bottom: 0; }
+
+/* ---- program sessions: the phases, and the summary at the end ---- */
+.document > .phase-divider, .document > .summary, .document > .empty {
+  margin-left: calc(var(--margin-l) + var(--doc-gap)); max-width: var(--measure);
+}
+.phase-divider {
+  display: flex; align-items: baseline; gap: 14px; padding-top: 44px;
+  font: italic 400 var(--t-h3) / 1.25 var(--f-his); color: var(--text-2);
+}
+.phase-divider::after { content: ""; flex: 1; min-width: 20px; height: 1px; background: var(--hair-2); transform: translateY(-5px); }
+.document > .summary { padding-top: 48px; }
+.summary .book-head { margin-bottom: var(--s3); }
+.document > .empty { padding-top: var(--s6); }
+
+/* ---- a page too narrow for a margin (a phone): the hours fold into a running head above the passage ---- */
+@container entry (max-width: 559px) {
+  .doc-letter, .passage { grid-template-columns: minmax(0, 1fr); }
+  .doc-letter > .doc-margin { display: none; }
+  .doc-letter > .letter, .passage > .block.his, .passage-notes { grid-column: 1; }
+  .block.his { display: flex; flex-direction: column; padding-top: 26px; }
+  .block.his > .margin { display: flex; align-items: baseline; gap: 10px; min-height: 20px; margin-bottom: 6px; text-align: left; }
+  .block.his > .margin time { padding-top: 0; }
+  .block.his .source { margin-top: 0; justify-content: flex-start; }
+  .block.his .words { font-size: 1.1875rem; }
+  .passage-notes { margin-top: var(--s4); max-width: none; }
+  .document > .phase-divider, .document > .summary, .document > .empty { margin-left: 0; }
+}
+
+/* touch: the fold under her letter reaches 44 px (ui/Letter draws it at 40; raised for the foundation) */
+@media (max-width: 760px), (pointer: coarse) {
+  .doc-letter .letter-questions > .disclosure-head { min-height: var(--tap); }
+}

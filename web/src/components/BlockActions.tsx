@@ -1,11 +1,12 @@
-import { useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { api } from "../api";
 import { loadDraft, saveDraft } from "../drafts";
 import { useAction } from "../hooks";
+import { Copy, More, Pen, Trash } from "../icons";
 import { OFFLINE_WRITE, useOnline, useStaleAsOf } from "../offline";
 import type { Block } from "../types";
-import { ConfirmButton } from "./ConfirmButton";
-import { ErrorLine } from "./Status";
+import { Button, ErrorLine, IconButton, Sheet } from "../ui";
+import "./BlockActions.css";
 
 /**
  * Edit and delete one block of his. His entries are plain Markdown files he can already change in his notes app, so
@@ -23,6 +24,8 @@ export interface BlockTarget {
   keep: boolean;
   /** Called after a change was made, so the entry is read again. */
   onChanged: () => void;
+  /** Where a done action says so in a word ("Copied your words."): the entry's toast. */
+  notify?: ((said: string) => void) | undefined;
 }
 
 const draftKey = (stem: string, key: string) => `edit:${stem}:${key}`;
@@ -173,77 +176,141 @@ export function BlockEditor({ target, onClose }: { target: BlockTarget; onClose:
         (conflict ? (
           <div class="error-line" role="alert">
             <p>{act.error.detail || "This changed since you opened it."} Your edit is kept: reload, then edit again.</p>
-            <button
-              type="button"
-              class="button"
+            <Button
+              size="small"
               onClick={() => {
                 onClose();
                 onChanged();
               }}
             >
               Reload the entry
-            </button>
+            </Button>
           </div>
         ) : (
           <ErrorLine error={act.error} {...(act.error.status === 422 || act.error.status === 409 ? {} : { onRetry: () => void save() })} />
         ))}
-      <div class="composer-actions">
-        <button type="button" class="button" onClick={cancel} disabled={act.busy}>
-          Cancel
-        </button>
-        <button type="submit" class="button primary" disabled={!changed || act.busy || !online || stale}>
+      <div class="block-editor-actions">
+        <Button variant="primary" size="small" type="submit" disabled={!changed || act.busy || !online || stale}>
           {act.busy ? "Saving…" : "Save"}
-        </button>
+        </Button>
+        <Button variant="quiet" size="small" onClick={cancel} disabled={act.busy}>
+          Cancel
+        </Button>
+        <span class="block-editor-note">Only this passage changes.</span>
       </div>
     </form>
   );
 }
 
-/** Edit and Delete under a block of his. Delete asks once, in place. */
-export function BlockButtons({ target, onEdit }: { target: BlockTarget; onEdit: () => void }) {
+const QUESTION = "Delete this block from the entry?";
+
+/**
+ * His tools for one passage. On a pointer that hovers they stand in the left margin under the hour as a frosted pill
+ * that shows on hover or focus (keyboard: Tab reaches them); on touch a "more" button in the passage's running head,
+ * or a long press on the words, raises them in a sheet that quotes the passage. Edit opens the editor in place of the
+ * words; Copy copies them; Delete asks once, in place, under the words ("Delete this block from the entry?"), then
+ * sends the block as it was read. A program's answer has no Delete (the program counts it); offline there is no
+ * Delete (the editor says why it cannot save); a page read from the worker's kept copy gets nothing at all.
+ * There is no server undo, so there is no Undo: the question in place is the safety, as it was.
+ */
+export function BlockButtons({ target, onEdit, sheet = false, onSheet }: {
+  target: BlockTarget;
+  onEdit: () => void;
+  /** The touch sheet, open (the passage's long press opens it too). */
+  sheet?: boolean;
+  onSheet?: (open: boolean) => void;
+}) {
   const act = useAction();
   const online = useOnline();
   const stale = useStaleAsOf() !== null;
-  const { stem, block, onChanged } = target;
+  const [asking, setAsking] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const focus = (which: "keep" | "trash") => root.current?.querySelector<HTMLElement>(`[data-focus="${which}"]`)?.focus();
+  const { stem, block, onChanged, notify } = target;
+  const canDelete = !target.keep && online;
+  useEffect(() => {
+    if (asking) focus("keep");
+  }, [asking]);
   const remove = async () => {
     if (!online || stale) return;
     const done = await act.run(() => api.deleteBlock(stem, block.key, { was: block.text, ...(block.at ? { at: block.at } : {}) }));
     if (done) {
       saveDraft(draftKey(stem, block.key), "");
+      notify?.("The passage is gone from the entry.");
       onChanged();
     }
+  };
+  const copy = () => {
+    const done = navigator.clipboard?.writeText(block.text);
+    if (!done) return notify?.("This browser won't copy from here.");
+    void done.then(() => notify?.("Copied your words."), () => notify?.("This browser won't copy from here."));
+  };
+  const fromSheet = (then: () => void) => {
+    onSheet?.(false);
+    then();
   };
   // A document read from the worker's kept copy is not what is in the file now: nothing is offered on it (a delete
   // there would be a guess about a file nobody has read), and the editor says so if one was already open.
   if (stale) return null;
   return (
-    <div class="block-actions">
-      <button type="button" class="link" onClick={onEdit} disabled={act.busy}>
-        Edit
-      </button>
-      {!online && <p class="offline-note" role="status">{OFFLINE_WRITE}</p>}
-      {!target.keep && online && (
-        <ConfirmButton
-          question="Delete this block from the entry?"
-          yes="Delete"
-          disabled={act.busy}
-          onConfirm={() => void remove()}
-          plain
-        >
-          Delete
-        </ConfirmButton>
+    <div class="block-actions" ref={root}>
+      <div class="block-tools" role="toolbar" aria-label={`This passage${block.at ? `, ${block.at}` : ""}`}>
+        <IconButton label="Edit" onClick={onEdit} disabled={act.busy}>
+          <Pen /><span class="visually-hidden">Edit</span>
+        </IconButton>
+        <IconButton label="Copy" onClick={copy}>
+          <Copy /><span class="visually-hidden">Copy</span>
+        </IconButton>
+        {canDelete && (
+          <IconButton data-focus="trash" label="Delete" onClick={() => setAsking(true)} disabled={act.busy} pressed={asking || undefined}>
+            <Trash /><span class="visually-hidden">Delete</span>
+          </IconButton>
+        )}
+      </div>
+      <IconButton class="block-more" label="More for this passage" onClick={() => onSheet?.(true)}>
+        <More />
+      </IconButton>
+      {(asking || act.error || !online) && (
+        <div class="block-status">
+          {!online && <p class="offline-note" role="status">{OFFLINE_WRITE}</p>}
+          {asking && (
+            <span class="confirm" role="group" aria-label={QUESTION}>
+              <span>{QUESTION}</span>
+              <Button variant="danger" size="small" onClick={() => { setAsking(false); void remove(); }}>
+                Delete
+              </Button>
+              <Button data-focus="keep" variant="quiet" size="small" onClick={() => { setAsking(false); focus("trash"); }}>
+                Keep
+              </Button>
+            </span>
+          )}
+          {act.error &&
+            (act.error.status === 409 ? (
+              <div class="error-line" role="alert">
+                <p>{act.error.detail}</p>
+                <Button size="small" onClick={() => { act.clear(); onChanged(); }}>
+                  Reload the entry
+                </Button>
+              </div>
+            ) : (
+              <ErrorLine error={act.error} />
+            ))}
+        </div>
       )}
-      {act.error &&
-        (act.error.status === 409 ? (
-          <div class="error-line" role="alert">
-            <p>{act.error.detail}</p>
-            <button type="button" class="button" onClick={() => { act.clear(); onChanged(); }}>
-              Reload the entry
-            </button>
+      {sheet && (
+        <Sheet title="This passage" onClose={() => onSheet?.(false)} class="block-sheet">
+          <blockquote class="block-sheet-quote">
+            <small>Your words{block.at ? ` · ${block.at}` : ""}</small>
+            <span class="read">{block.text}</span>
+          </blockquote>
+          <div class="block-sheet-actions">
+            <Button wide icon={<Pen />} onClick={() => fromSheet(onEdit)}>Edit these words</Button>
+            <Button wide icon={<Copy />} onClick={() => fromSheet(copy)}>Copy</Button>
+            {canDelete && <Button wide icon={<Trash />} onClick={() => fromSheet(() => setAsking(true))}>Delete…</Button>}
+            {!online && <p class="offline-note" role="status">{OFFLINE_WRITE}</p>}
           </div>
-        ) : (
-          <ErrorLine error={act.error} />
-        ))}
+        </Sheet>
+      )}
     </div>
   );
 }
