@@ -20,9 +20,10 @@ The gateway restarts in **windows**, at least an hour from a ritual (the built-i
 
 **What changes.** The day reflection and week review read the opening and the question of her last few analyses,
 what he wrote back to each, and the notebook threads the engine filed from the journal; their one-shot runs with
-`-t journal_read`, the new read-only `journal_search` tool (his words in the journal's files), with a 480 s budget. A
-quote that is not his words is a bad answer and retried; on the last attempt the sentence holding it is dropped
-instead of losing the reflection. One voice description goes into the opener, annotation, reflection and week
+`-t journal_read`, the new read-only `journal_search` tool (his words in the journal's files), with a 480 s budget.
+Quotation fails closed: only double quotes paired on one line and blockquote lines count, each must be his words,
+and any other quote-like mark is irregular; either is a bad answer and retried, and on the last attempt the sentence
+holding it is dropped instead of losing the reflection. The catch-up and program checks reject an irregular mark too. One voice description goes into the opener, annotation, reflection and week
 requests. The engine's own one-shots carry `JOURNAL_MODEL_STEP=1`, and the journal's `pre_llm_call` hook adds
 nothing to them (it used to append the whole notebook). New state: `origin` on annotation and reflection follow-ups
 in `notebook.json`; `answers` on the capture of a note that replies to a reflection; `struck` on a reflection's
@@ -52,10 +53,11 @@ the new plugin is safe, so pin first; if the order cannot be kept, pause the tic
    take it from the reflection too.
 3. After the next reflection: the file reads **What I notice** / **What moved** / **To carry forward**; the tick log
    says `wrote <date>-reflection.md (…)`. A quote that is not his shows as `reflection attempt N/3 failed (quote not in
-   his words: …)` and, on the last attempt, `(last attempt: N sentences with a quote not in his words dropped)` with
-   the passages under `struck` in the ledger's reflection record. A run that searches is longer (budget 480 s; the
-   tick waits for it); a timeout after another model step answered in the tick uses an attempt instead of counting
-   as an outage.
+   his words: …)`, a stray or odd mark as `… failed (irregular quote mark …)`, and on the last attempt the log adds
+   `(last attempt: N quotes not his or irregular, sentences dropped)` with the passages under `struck` in the
+   ledger's reflection record. A run that searches is longer (budget 480 s; the tick waits for it); a timeout after
+   another model step answered in the tick uses an attempt instead of counting as an outage, and the try after a
+   timeout that was deferred goes without the search on 300 s.
 4. Rollback: the CLI and the plugin pin at the previous sha, and a gateway restart. The new state fields are
    ignored by the old code; nothing needs undoing.
 

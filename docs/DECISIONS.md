@@ -3036,8 +3036,9 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   him at length and said little of their own. The writer saw one period's files plus a single earlier analysis, had
   no tools, and lost the whole reflection on one misquote, so the safe answer was to stitch his quotes together and
   hedge. The owner asked for this work on 2026-11-09 and had already turned per-entry annotation replies off in his
-  deployment, so the reflection is now the one analytical message of the day. An independent review of the first
-  version found the bugs fixed in the second round (below: replies, quotes, copies, the run budget).
+  deployment, so the reflection is now the one analytical message of the day. Independent reviews of the first and
+  second versions found the bugs fixed in the second and third rounds (below: replies, quotes, copies, the run
+  budget).
   - **Inputs (`reflect.continuity`).** Her last three day reflections within seven days plus the latest week review
     of the six days before (a week review: the last two reviews within three weeks), oldest first. Three days show a
     run (a habit forming, a thread dropped) without outweighing the day's own entries; two weeks show a trend without
@@ -3079,32 +3080,51 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     which `agent.disabled_toolsets` would not. Chosen over a deterministic keyword step because the model knows what
     is worth looking up (a person, a phrase, "the last time"), where code would guess from word counts. Not added to
     MCP: `journal_entries` already searches his words there.
-  - **A sync conflict's copy** (`2026-10-14-evening (1).md`) is read as the file it copies, by that name and its own
-    front matter (`entries._copy_text`): a copy of her analysis gives nothing, a copy of an entry gives the entry's
-    words. Before, a copy had no name the engine knew and was read whole as his, opener and annotations included.
-    Files are still recognised by name and front matter together, so a hand-written file with an analysis's front
-    matter stays his.
-  - **Only his words in quotation marks.** A day reflection's or week review's quotes are checked against his
-    words only: the period's entries (`entries.his_text`), his replies above, and his words in every file of the
-    journal (what search can reach, read only when needed); her earlier analyses, notes, annotations and notebook
-    never count, even when she was given them. A quote stitched with "…" must have its fragments, in order, in one
-    file. Straight quotes are paired left to right at any length (`validate._quotations`), so a short "No" no longer
-    shifts the pairs after it, and a mark with no partner is dropped; the other quote checks read the same pairs.
-    A quote that is not his makes the answer a bad one: nothing is written and it is retried, as before. Only on the
-    **last** attempt, when a retry would lose the reflection, is it written with each sentence that holds such a
-    quote dropped, its lead-in ("you wrote", "as you put it") with it (`validate.strike`), and the passages logged
-    under `struck`. The first version took the quotation marks away and kept the words, which left invented words
-    in his mouth as reported speech ("You wrote, I am done pretending"); the parent chose this (option (a)) pending
-    the owner's veto. The trade: a stubborn misquote now costs a sentence on the last attempt where it used to cost
-    the reflection. README's Guarantees gains the row (it was implicit). The program checks and the catch-up still
-    reject the whole text; the prompt asks for at most three short quotes of his words and says nothing of what
-    happens to a wrong one. Tests changed on purpose: `test_reflect.py`'s invented-quote test (a bad answer is now
-    one that is not prose), `test_outage.py`'s bad answer, and two `test_conversations.py` tests that now read the
-    corpus as `entries.his_text`.
+  - **A sync conflict's copy** (`2026-10-14-evening (1).md`, `… (1) (2).md`, `… 2.md`, a Dropbox `(… conflicted copy
+    …)`, a Syncthing `.sync-conflict-…`) is read as the file it copies (`entries.original_name`), by that name and its
+    own front matter (`entries._copy_text`): a copy of her analysis gives nothing, a copy laid out as an entry gives
+    the entry's words. Before, a copy had no name the engine knew and was read whole as his, opener and annotations
+    included. Files are still recognised by name and front matter together, so a hand-written file with an
+    analysis's front matter stays his, and so does one merely named like a copy (`2026-10-14-evening 3.md` with no
+    entry layout, `notes (1).md`, `2026-10-14 (draft).md`).
+  - **Only his words in quotation marks, and quotation fails closed.** A day reflection's or week review's quotes
+    are checked against his words only: the period's entries (`entries.his_text`), his replies above, and his words
+    in every file of the journal (what search can reach, read only when needed); her earlier analyses, notes,
+    annotations and notebook never count, even when she was given them. Only **well-formed double quotation** counts
+    as quotation (`validate._scan`): a straight `"…"` or curly `“…”` pair on one line, closed by the next double mark,
+    its inside neither empty nor starting or ending with a space, and a `> ` blockquote line. **Every other quote-like
+    mark is irregular** and cannot pass: an unpaired or mixed mark, a quote across a line break, `”…“`, `„…“`, a quote
+    inside a quote, single quotes used as quotation (`‘` anywhere, a `'` that opens a word; `’` and a `'` inside a
+    word are apostrophes), `«»`, `‹›`, backticks. The second round dropped stray marks and kept the words, which let
+    `You wrote "I adore naps” and slept.` reach him on the first attempt as `You wrote I adore naps and slept.`; the
+    third round stopped patching quote syntax case by case. A quote with "…" must have its parts in one paragraph of
+    one file, in order, each within 300 characters of the one before; a quote with no part of three characters
+    (`"Go … be … it"`, `"No"`) has nothing to check and is not his. The prompt asks for straight double quotes only.
+    A quote that is not his, or an irregular mark, makes the answer a bad one: nothing is written and it is retried,
+    as before. Only on the **last** attempt, when a retry would lose the reflection, is it written with each sentence
+    that holds such a quote or mark dropped, its lead-in ("you wrote", "as you put it") with it (`validate.strike`),
+    and the passages logged under `struck`. A sentence starts at its block (paragraph, list item or lead-in), so a
+    hard-wrapped one goes whole; common abbreviations (e.g., i.e., Dr.) do not end one; a line left with only a bold
+    lead-in or a list marker goes too, so an emptied **To carry forward** leaves no line for the today block or the
+    web app to misread; whitespace is tidied only at the seams. **Accepted:** an attribution in the sentence *before*
+    a quote (`You wrote this on Monday. "…"`) stays when the quote's sentence goes: telling such a sentence from any
+    other would need a reading of the prose, not its marks. The first version took the quotation marks away and kept
+    the words, which left invented words in his mouth as reported speech; the parent chose dropping the sentence on
+    the last attempt only (option (a)) pending the owner's veto. The trade: a stubborn misquote or a stray mark costs
+    a sentence on the last attempt where it used to cost the reflection, and a quote of a single short word ("No") is
+    never accepted. README's Guarantees gains the row (it was implicit). The program checks and the catch-up reject
+    the whole text on an irregular mark or a quote not in his words. Tests changed on purpose: `test_reflect.py`'s
+    invented-quote test (a bad answer is now one that is not prose), `test_outage.py`'s bad answer, and two
+    `test_conversations.py` tests that now read the corpus as `entries.his_text`.
   - **A long run is not an outage.** The reflection's budget is 480 s (annotations 180, openers 240), since it may
     search first; the tick waits for it. A run that still times out after another model step answered in the same
     tick uses an attempt, instead of being deferred as "model unreachable" and stopping the tick's other analyses;
-    with no other answer in the tick it is treated as an outage, as before.
+    with no other answer in the tick it is treated as an outage, as before. After a timeout was deferred that way,
+    the next try runs without the search and on the old 300 s budget (`reflect.RETRY_BUDGET`): a hang of the search's
+    own then clears, and the tick is held for at most 360 s a try instead of 540 s. **Still open:** a hang specific to
+    the reflection that is not the search's (the model hangs on this prompt alone) is labelled "model unreachable" and
+    holds the tick for up to 360 s every 30 minutes for up to 7 days, as any outage does; telling it from a real
+    outage would need a second, cheap model call on each deferral.
   - **One voice (`prompts.voice`).** One description of how she writes, carried by the opener, annotation, day
     reflection and week review requests; each keeps its own form (the annotation: about him in the third person, her
     reading in the first). It asks for her own reading in the first person, positions taken, doubt said once in
@@ -3116,4 +3136,5 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     mis-hearing once only when annotations stay in the file (`telegram.annotation_replies: false`); otherwise, and
     always in a reflection, she reads past it.
   - **Open:** whether to add a deterministic "echoes" step (older entries sharing the day's rarer words) if she
-    seldom searches; `journal_search` in MCP; whether 480 s is the right budget once real runs are seen.
+    seldom searches; `journal_search` in MCP; whether 480 s is the right budget once real runs are seen; the
+    reflection-only hang above; an attribution in the sentence before a struck quote.
