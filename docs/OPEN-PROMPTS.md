@@ -77,7 +77,8 @@ tick's 06:00 send is then done. Words he writes at 03:30 still go to the journal
 own limit: when the practice's nearest scheduled slot is last night's, the delivery resolves as words do. `/start
 evening` at 00:30 means last night's 23:00 evening, 1.5 hours behind, not tonight's, 22.5 hours ahead: it sends last
 night's again while that is unanswered, and makes an extra entry of last night once it is answered. Tonight's send
-is left alone. A tie, and a practice with no schedule, are today's.
+is left alone. A tie, and a practice with no schedule, are today's; with no slot on today's date, last night's counts when it is
+under twelve hours behind.
 
 1. A slot of that practice that is **due or open** now, today's or yesterday's, newest first, whose time is at or
    before `at`. An evening answer at 00:30 takes last night's slot.

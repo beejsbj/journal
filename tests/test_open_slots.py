@@ -322,6 +322,23 @@ class ResolveTest(SlotCase):
         got = self.resolve("dusk", at(0, 30, day=THU), delivery=True)
         self.assertEqual((got.id, got.local_date, got.step), ("2026-10-14-dusk-2", "2026-10-14", 4))
 
+    def test_a_delivery_before_day_ends_at_with_no_slot_today_takes_last_nights_within_twelve_hours(self):
+        """A Wednesday-only practice on Thursday: at 00:30 its 21:00 is last night's; one at 09:00, 16 hours behind
+        by 01:00, is not, and /start makes an extra dated today. An exact tie is today's."""
+        d = Path(self.cfg.practices_dir)
+        (d / "late.md").write_text(DUSK.replace("dusk", "late").replace("Dusk", "Late").replace(
+            "schedule.time: 21:00", "schedule.time: 21:00\nschedule.weekday: 2"), encoding="utf-8")
+        (d / "early.md").write_text(DUSK.replace("dusk", "early").replace("Dusk", "Early").replace(
+            "schedule.time: 21:00", "schedule.time: 09:00\nschedule.weekday: 2"), encoding="utf-8")
+        (d / "noon.md").write_text(DUSK.replace("dusk", "noon").replace("Dusk", "Noon").replace(
+            "schedule.time: 21:00", "schedule.time: 13:00"), encoding="utf-8")
+        got = self.resolve("late", at(0, 30, day=THU), delivery=True)
+        self.assertEqual((got.id, got.step), ("2026-10-14-late", 2))
+        got = self.resolve("early", at(1, 0, day=THU), delivery=True)
+        self.assertEqual((got.id, got.local_date, got.step), ("2026-10-15-early", "2026-10-15", 4))
+        got = self.resolve("noon", at(1, 0, day=THU), delivery=True)   # 12 hours each way
+        self.assertEqual((got.id, got.step), ("2026-10-15-noon", 3))
+
     def test_a_delivery_before_day_ends_at_takes_the_nearer_of_two_slots_a_day(self):
         """Water, 09:00 and 15:00: at 02:00 yesterday's 15:00 is 11 hours behind and today's 09:00 seven ahead."""
         got = self.resolve("water", at(2, 0, day=THU), delivery=True)
