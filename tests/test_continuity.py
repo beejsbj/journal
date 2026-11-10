@@ -15,8 +15,8 @@ import test_conversations
 from helpers import CHAT, add_prompt, make_cfg
 from test_reflect import GOOD, IST, Base
 
-from journal import (agent, capture, conversations, entries, ledger, notebook, prompts, reflect, sweep, tools,
-                     validate)
+from journal import (agent, capture, conversations, entries, hookstate, ledger, notebook, prompts, reflect, sweep,
+                     tools, validate)
 
 tc_m = test_conversations.m
 
@@ -569,17 +569,37 @@ class ModelStepTest(unittest.TestCase):
 
     def test_the_journals_hook_adds_nothing_to_a_model_step(self):
         from journal.hermes import hooks, runtime
+        notebook.add(self.cfg, "a thread from chat")
         with mock.patch.dict(os.environ, {agent.MODEL_STEP_ENV: "1"}), \
-                mock.patch.object(runtime, "load_config", side_effect=AssertionError("read the config")), \
+                mock.patch.object(runtime, "load_config", return_value=self.cfg), \
                 mock.patch("journal.turncontext.build", side_effect=AssertionError("built a turn context")):
             self.assertIsNone(hooks.on_llm_call(user_message="Write the reflection", platform="cli",
                                                 session_id="s1", turn_id="t1"))
-        notebook.add(self.cfg, "a thread from chat")
         with mock.patch.dict(os.environ, {}, clear=False), mock.patch.object(runtime, "load_config",
                                                                               return_value=self.cfg):
             os.environ.pop(agent.MODEL_STEP_ENV, None)
             out = hooks.on_llm_call(user_message="hello", platform="cli", session_id="s1", turn_id="t1")
         self.assertIn("a thread from chat", out["context"])  # her own turns keep their notebook, as before
+
+    def test_the_switch_never_costs_a_turn_of_his_its_off_the_record_mark(self):
+        # (review, 2026-11-10: the switch returned before ``inbound.begin_turn``, so a gateway that carried the
+        # variable by mistake lost the mark and the voice capture of every turn; now only the injection is skipped)
+        from journal.hermes import hooks, runtime
+        notebook.add(self.cfg, "a thread from chat")
+        private = capture.off_record_note(self.cfg) + "something he wants kept out"
+
+        def turn(turn_id):
+            with mock.patch.object(runtime, "load_config", return_value=self.cfg), \
+                    mock.patch.object(runtime, "session_value", side_effect={"CHAT_ID": CHAT}.get):
+                return hooks.on_llm_call(user_message=private, platform="telegram", session_id="s1", turn_id=turn_id)
+        with mock.patch.dict(os.environ, {agent.MODEL_STEP_ENV: "1"}):
+            self.assertIsNone(turn("t1"))  # nothing injected
+            self.assertEqual(hookstate.off_turn(self.cfg, "s1")["turn"], "t1")  # and the turn is marked all the same
+            with mock.patch.object(tools.privacy, "view", side_effect=AssertionError("the mark is enough")):
+                refused = json.loads(tools.call(self.cfg, "journal_notebook", {"action": "add", "text": "from /x"},
+                                                tools.ToolTurn("s1", "t1")))
+        self.assertTrue(refused["off_record"])
+        self.assertEqual([i["text"] for i in notebook.open_items(self.cfg)], ["a thread from chat"])
 
 
 if __name__ == "__main__":
