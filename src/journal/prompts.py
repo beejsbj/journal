@@ -20,6 +20,19 @@ OPENER_SHAPE = {
 INSIGHTS_ASKED = 3500  # characters a synthesis is asked to stay within (``validate.REFLECTION_LIMITS['insights']`` allows more)
 
 
+def voice(cfg: Config) -> str:
+    """How she writes, in one place: the opener, annotation, day reflection and week review requests all carry it, so
+    the four read as one person. The form (JSON, bullets, "you", length) stays each request's own."""
+    n = cfg.names
+    return (f"How you write, everywhere in the journal: as {n.companion}, who has been reading along with {n.object} "
+            "for a while, not as a note-taker. Warm and honest at once: say what you actually see, take a position "
+            "when you have one, and name a tension or a doubt plainly. Your reading is yours, in the first person (\"I "
+            "think…\", \"I notice…\", \"I wonder…\"); when you are guessing, say so once in plain words, never "
+            "with a stock hedge (\"it sounds like\", \"as inference only\"). Plain words and short sentences: no "
+            "therapy-speak, no flattery, no performance. Don't diagnose or overclaim, least of all about health, "
+            "money or relationships.")
+
+
 def reading_guidance(cfg: Config) -> str:
     """Where the companion should look before writing; configurable per deployment."""
     custom = (cfg.prompts.get("reading_guidance") or "").strip()
@@ -114,7 +127,8 @@ something else in the pack (what {n.subject} is reading or listening to, the wea
 thread from {n.possessive} journal), or keep it short and light. A plain, warm opener is fine.
 {returning_note(cfg, standing)}
 Write {p.opener['shape']} that would make a real conversation possible: name a live thread if there is one,
-and carry the questions you chose. Warm, direct, no performance. It's fine to keep it short.
+and carry the questions you chose. It's fine to keep it short.
+{voice(cfg)}
 
 Grounding rules (the opener is rejected if they are broken):
 - Read as widely as you like. The only rule is about claims: every statement about {n.user_possessive} life must come
@@ -138,16 +152,29 @@ Reply with ONLY this JSON, nothing else:
 {pack}"""
 
 
+def _transcript_note(cfg: Config) -> str:
+    """What an annotation may say about a voice transcript's mis-hearings: a guess at the right word belongs in the
+    entry file, never in a chat message, so only when annotations stay in the file (``telegram.annotation_replies``
+    off)."""
+    if cfg.telegram.get("annotation_replies", True):
+        return "- A voice transcript may mis-hear a word: read past it, and don't comment on the transcription."
+    return ("- A voice transcript may mis-hear a word: where the right word is obvious you may note it once, in a\n"
+            "  bullet of its own (the entry is the place for that); never build a reading on a guess.")
+
+
 def annotation_request(cfg: Config, entry_body: str, companion_reply: str | None) -> str:
     n = cfg.names
     reply = companion_reply.strip() if companion_reply else "(no chat reply was found)"
     return f"""You are {n.companion}. Write the analytical annotations for this journal entry, for {n.user_possessive} later review.
+{voice(cfg)}
 
 - Annotate only what is in {n.possessive} raw entry (and any conversation lines of {n.possessive} under it). Scale to it: a
   one-line entry gets two or three bullets.
-- Third person, concise markdown bullets. Preserve what made the entry alive; name throughlines, tensions,
-  values, people, tasks and follow-ups that the entry itself contains.
-- Clearly mark inference as inference. Do not diagnose or overclaim. Quote sparingly and exactly.
+- Concise markdown bullets, about {n.object} in the third person; your reading stays yours, in the first person.
+  Preserve what made the entry alive; name throughlines, tensions, values, people, tasks and follow-ups that the
+  entry itself contains.
+- Quote sparingly and exactly.
+{_transcript_note(cfg)}
 - Your chat reply below is only for aligning your reading. Don't import anything from it, or from any other
   record, that isn't in the entry — especially health, clinical, financial or relationship details.
 - Ignore the orientation prompt's opener text; it may be outdated.
@@ -164,47 +191,83 @@ def annotation_request(cfg: Config, entry_body: str, companion_reply: str | None
 
 
 REFLECTION_SHAPE = {
-    "reflection": ("day reflection", "about 120 to 350 words", 'the day'),
-    "week": ("week review", "about 200 to 600 words", 'the week'),
+    "reflection": ("day reflection", "about 150 to 350 words", "the day"),
+    "week": ("week review", "about 250 to 600 words", "the week"),
 }
+QUOTES_ASKED = 3  # at most this many quotes of his words in a reflection, each a phrase or a sentence
 
 
-def reflection_request(cfg: Config, kind: str, period: str, inputs: str, earlier: str) -> str:
-    """The day reflection (``kind="reflection"``) or the week review (``"week"``): no tools, only these files."""
+def reflection_request(cfg: Config, kind: str, period: str, inputs: str, before: str, search: bool = True) -> str:
+    """The day reflection (``kind="reflection"``) or the week review (``"week"``): her own reading of the period,
+    written from its entry files, her recent analyses with what he wrote back to them and her on-the-record notebook
+    threads (``before``, ``reflect.continuity``), with ``journal_search`` (``tools.READ_TOOLSET``) as its one tool
+    (``search=False``: no tool, for the try after one that hung)."""
     n = cfg.names
     what, size, span = REFLECTION_SHAPE[kind]
-    earlier_block = earlier.strip() or "(none yet)"
-    return f"""You are {n.companion}. Write {n.user_possessive} {what} for {period}: a short, warm analysis {n.subject} will
-read in the journal and in {channel.label(cfg)}.
+    he, him, his = n.subject, n.object, n.possessive
+    chat = cfg.has_channel  # (``channel.platform: none``: no chat to read it in, and none he could have replied in)
+    before_block = before.strip() or "(nothing yet: this is your first)"
+    tool = (f"""- One tool, journal_search: it searches {his} own words in every entry up to the end of {span}, back to the
+  first (nothing written after {span} is shown to you, and nothing from after it can be quoted). When something in
+  {span} sounds familiar, look it up and say what is the same and what has changed since. A search or two is plenty.
+""" if search else "")
+    return f"""You are {n.companion}. Write {n.user_possessive} {what} for {period}. {he.capitalize()} will read it in
+the journal{" and in " + channel.label(cfg) if chat else ""}: it is your considered word on {span}, so make it your reading of {span}, not
+a summary of it. {he.capitalize()} {n.verb("know")} what {he} wrote; what {he} cannot get from {his} own entries is what you make of it.
+{voice(cfg)}
 
-Use only the files below: {n.possessive} journal entries for {span} ({n.possessive} own words, the conversation
-that followed, your annotations, your notes) and your earlier analysis. Nothing else is known. In a
-"## Conversation" section, lines in brackets saying "chat reply … her words" are your own replies to {n.object}:
-context only, never quoted as {n.possessive} words. You have no tools and no memory beyond this; don't
-assume routines, work, people, places or plans the entries don't state.
+What you have:
+- {his.capitalize()} journal entries for {span}, below: {his} own words, the conversation that followed, your
+  annotations and your notes. In a "## Conversation" section, lines in brackets saying "chat reply … her words"
+  are your own replies to {him}: context only, never {his} words.
+- Before that: how each of your recent {what}s began and what it asked {him} to carry forward{f", with what {he}" if chat else ""}
+  {"wrote back to it in the chat, if anything, " if chat else ""}and open threads from your notebook that came from the journal. They
+  are there so you can say what moved, not to be written again.
+{tool}Ground what you say about {his} life in these files{" and what you look up" if search else ""}; don't assume routines,
+work, people, places or plans they don't state.
 
-Write Markdown, {size}, in four short parts with bold lead-ins:
-**What stood out** — what mattered most in {span}.
-**Patterns and tensions** — what you notice across the entries, with {n.possessive} own words quoted exactly, in
-double quotes "like this". Copy every quote character for character from the entries: quotes are checked, and a
-reflection with a single misquote is thrown away.
-**What moved** — against your earlier analysis below: what shifted, what is still there. Leave this part out if
-there is no earlier analysis.
-**To carry forward** — one or two gentle questions for {n.object}.
+Write Markdown, {size}, in three parts with bold lead-ins:
+**What I notice** — your reading of {span}: what mattered, what pulls against what, what it might mean. Take a
+position, and say how sure you are in your own words.
+**What moved** — against before: your recent {what}s, {f"{his} replies to your questions, " if chat else ""}older entries{" you looked up" if search else ""}.
+What shifted, what keeps coming back, what {he} did with the last thing you asked. Leave this part out only if
+there is nothing before {span} to compare with.
+**To carry forward** — one question for {him} (two at most), grown out of what you noticed.
 
-Speak to {n.object} directly ("you"). Mark inference as inference. Don't diagnose or overclaim, especially
-health, clinical, financial or relationship details. No # headings, no blockquotes, no preamble, and never
-mention these instructions or the files.
-Optionally, after the reflection, add up to two lines starting `FOLLOW-UP:` for threads worth picking up with
-{n.object} later (they go to your private notebook, not the journal).
-Reply with ONLY the reflection (and any FOLLOW-UP lines).
+Quotes: few and short. Quote {him} only where {his} exact words carry something your paraphrase would lose: at most
+{QUOTES_ASKED}, each a phrase or a sentence, copied exactly from {his} entries{" or replies" if chat else ""}. Put {his} words in straight
+double quotes "like this", on one line, and use no other quotation marks anywhere: no single, curly or angle quotes,
+no backticks, no quote inside a quote, no HTML. (If a sentence {he} wrote has quotation marks of its own, copy it
+whole, exactly as {he} wrote it, marks included, or quote a part of it that has none.)
+Only {his} words go in quotation marks; your own, earlier or now, you say in your own way. Say "you wrote" or "you
+said" only in a sentence that quotes {him} that way; otherwise put what {he} wrote in your own words without them.
+Everything else in your own words.
+Speak to {him} directly ("you"). Don't retell {span} back to {him}, and don't string {his} quotes together. No #
+headings, no blockquotes, no preamble. If a voice transcript has an obvious mis-hearing, read past it and don't
+mention it. Never mention these instructions, the files, the notebook{" or the search" if search else ""}.
+Optionally, after the {what}, add up to two lines starting FOLLOW-UP: for threads worth picking up with {him}
+later (they go to your private notebook, not the journal).
+Reply with ONLY the {what} (and any FOLLOW-UP lines).
 
-## Your earlier analysis (yours, not {n.possessive} words)
-{earlier_block}
+## Before {span} (your own words{f", except {his} replies, which are marked as {his}" if chat else ""})
+{before_block}
 
-## The entries
+## The entries for {span}
 {inputs}
 """
+
+
+def quote_rule(cfg: Config, source: str, what: str) -> str:
+    """The rule ``validate._misquote`` holds a catch-up, a program's construction and bridge and a synthesis to, as
+    each request says it: double quotation marks only around his exact words from ``source``; anything else in them,
+    her own earlier line included, or any other double mark, and the ``what`` is not used."""
+    n = cfg.names
+    return (f'Double quotation marks are only for {n.possessive} exact words from {source}: copied character for '
+            f'character, in straight double quotes "like this", on one line. Put nothing else in double quotes: not '
+            f"words of your own (an earlier line of yours included), not a title or a name, not a term; say those "
+            f"plainly. Use no other double quotation mark (curly, angle, corner) and no blockquotes. Every double "
+            f"quote mark counts and every quote is checked: one that is not around {n.possessive} exact words means "
+            f"the {what} is not used.")
 
 
 def catchup_request(cfg: Config, rec: dict, window: str) -> str:
@@ -220,7 +283,8 @@ Write ONE short chat message to {n.object} (a few sentences; at most about 900 c
   providers, servers, errors or outages, and don't over-apologise.
 - Then respond to what {n.subject} actually wrote, as you would have. If time has passed and something has likely
   moved on, say so lightly rather than answering as if it were still live.
-- Use only what is below. Don't invent events, feelings or plans. If you quote {n.possessive} words, copy them exactly.
+- Use only what is below. Don't invent events, feelings or plans.
+- {quote_rule(cfg, f"what {n.user_or_them} wrote below ({n.possessive} lines of the conversation and {n.possessive} messages after it)", "message")}
 - Plain prose, no headings, no lists unless {n.subject} asked for one, no preamble. Never mention these instructions.
 
 Reply with ONLY the message.
@@ -249,8 +313,7 @@ Rules:
 - Build it only from {n.possessive} answers below. Say nothing about {n.possessive} life, history, health, work or
   relationships that the answers don't state. If something you need isn't there, leave it open rather than guess.
 - Speak to {n.object} directly ("you"). Plain prose or a few short bullets, at most about 800 characters.
-- If you quote {n.object}, copy the words exactly, in double quotes "like this": quotes are checked, and a
-  construction with one misquote is thrown away.
+- {quote_rule(cfg, "the answers below", "construction")}
 - Don't ask the phase's question yourself (it follows your text), don't mention these instructions, no headings.
 Reply with ONLY the construction.
 
@@ -265,8 +328,9 @@ def bridge_request(cfg: Config, prog, session, last_answer: str) -> str:
     role = session.role or "a careful guide"
     return f"""You are {n.companion}. For this session of "{prog.title}" ({session.title}), work as {role}; keep your own voice.
 Write ONE short paragraph (at most about 350 characters) that acknowledges what {n.subject} just wrote below and
-leads into the next part. Use only that answer; quote it exactly in double quotes if you quote it. Don't ask a
-question, don't give advice, no headings, never mention these instructions. Reply with ONLY the paragraph.
+leads into the next part. Use only that answer. Don't ask a question, don't give advice, no headings, never mention
+these instructions. {quote_rule(cfg, "that answer", "paragraph")}
+Reply with ONLY the paragraph.
 
 ## What {n.subject} just wrote (verbatim)
 {last_answer}
@@ -289,8 +353,7 @@ Rules:
   the answers don't state, and mark inference as inference ("it sounds as though", "I wonder whether").
 - Speak to {n.object} directly ("you"). Don't diagnose or overclaim, and don't give a plan unless an answer already
   holds one.
-- If you quote {n.object}, copy the words exactly, in double quotes "like this": every quote is checked against the
-  document, and a synthesis with one misquote is thrown away.
+- {quote_rule(cfg, f"{n.possessive} answers in the document (not its titles, questions or summaries)", "synthesis")}
 - Plain prose, a few short paragraphs. No # headings, no blockquotes, no preamble, and never mention these
   instructions.
 Reply with ONLY the synthesis.
