@@ -19,7 +19,7 @@ import { TodayRoute } from "./routes/today";
 import { useTitle } from "./title";
 
 const NAV = [
-  { href: "/", label: "Today", Icon: Sun, match: (p: string) => p === "/" },
+  { href: "/", label: "Today", Icon: Sun, match: (p: string) => p === "/" || p === "/today" },
   { href: "/entries", label: "Entries", Icon: Book, match: (p: string) => p.startsWith("/entries") },
   { href: "/library", label: "Library", Icon: Shelf, match: (p: string) => p.startsWith("/library") || p === "/new-practice" || p.startsWith("/runs") },
   { href: "/insights", label: "Insights", Icon: Spark, match: (p: string) => p.startsWith("/insights") },
@@ -99,6 +99,8 @@ function Shell() {
         <ErrorBoundary>
           <Router>
             <Route path="/" component={TodayRoute} />
+            {/* (Today's other name: /today?write=<id> opens a practice to write, the link a notification will carry) */}
+            <Route path="/today" component={TodayRoute} />
             <Route path="/entries" component={EntriesRoute} />
             <Route path="/entries/:stem" component={EntryRoute} />
             <Route path="/library" component={LibraryRoute} />

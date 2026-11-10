@@ -55,7 +55,8 @@ export type Voices = Infer<typeof Voices>;
 
 export const PracticeRow = obj({
   id: str,
-  state: oneOf("upcoming", "open", "answered", "missed"),
+  // due: its time has come and the chat has no message for it (not sent yet, or no chat at all): Write now answers it
+  state: oneOf("upcoming", "due", "open", "answered", "missed"),
   at: opt(str),
   sent: opt(str),
   answered: opt(str),
@@ -87,6 +88,7 @@ export const Today = obj({
   weather: nullable(str),
   week: arr(WeekDay),
   voices: opt(Voices),   // absent from an older server: the prompt is then labelled without her name
+  chat: opt(bool),   // false on a journal with no chat (channel.platform: none): nothing to Send to chat
   location_source: opt(nullable(str)),   // "openstreetmap" while OSM named the place: the header credits it
 });
 export type Today = Infer<typeof Today>;
@@ -325,8 +327,19 @@ export type RunOne = Infer<typeof RunOne>;
 // ── Writes: what the server answers ──────────────────────────────────────
 
 export const Spawned = obj({ spawned: bool });
-export const Created = obj({ stem: str, rule: opt(str) });
+export const Created = obj({ stem: str, rule: opt(str), slot: opt(str) });   // slot: the practice's slot the words filled
 export type Created = Infer<typeof Created>;
+
+// ── Write now: a practice opened as a view (GET /library/{id}/open); nothing is written until he saves ──
+
+export const PracticeView = obj({
+  practice: str,
+  title: str,
+  prompt: Prompt, // her plain opener and the questions, or the prompt the chat has when the slot is one
+  slot: obj({ id: str, date: str, state: str, step: num, at: nullable(str), delivered: bool }),
+  fills: str, // where the words go, in words: "Fills the 23:00 slot early; it will not be sent."
+});
+export type PracticeView = Infer<typeof PracticeView>;
 export const Block202 = obj({ key: nullable(str), stem: opt(str), advance: opt(oneOf("settle", "next", "tick")) });
 export type BlockWritten = Infer<typeof Block202>;
 export const UploadMade = obj({ upload: str, bytes: num, mime: str });

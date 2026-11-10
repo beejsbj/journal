@@ -51,6 +51,72 @@ is opened and sent by the next tick's step.
    chat) or `answered` is not pending to old code and is never sent; its record and any answer stay in the ledger and
    the entry.
 
+## OPEN-FACES — do and answer a practice from the web app, the CLI and MCP (2026-11-09; serve side, the CLI and MCP; **no gateway restart of its own**: it rides OPEN-CORE's window; no config change; no state migration)
+
+**What changes.** Every face writes his words through `journal/actions.py` and opens a practice as a view:
+
+- **Web app.** `POST /entries` with `practice` is `actions.answer`: the words fill that practice's slot (its open
+  prompt, its due or missed slot, the next one later today, which the tick then does not send, else an extra entry
+  `<date>-<id>-<n>`), **never a `/j` note** (until now, words for a practice with no open prompt became one). Without
+  a practice it is `actions.note`, as before. A practice turned off is not refused: `enabled: false` takes it off
+  the schedule, nothing more (the owner's decision 4, 2026-11-09), so the web app, `journal open`/`write`, MCP,
+  `/start` and `journal send` open, write and send it (until now `/start` and `journal send` refused it). New route `GET
+  /library/<id>/open` (*Write now*'s view, writes nothing). `GET /today` serves a due row as `due` (OPEN-CORE served it
+  as `upcoming`). The PWA: **Write now** on every Today card (all five states), `/today?write=<id>`, the *due* pill,
+  and *Send now* is now called **Send to chat** (Today and Library; same route). The committed build is CI's.
+- **CLI.** `journal open <id>` prints a practice and the slot it would fill (writes nothing); `journal write [<id>]
+  [-] [--entry STEM] [--at TIME]` writes his words through `actions` (from `$EDITOR` as git commit does, or stdin).
+- **MCP.** `journal_start` returns the practice to answer and **spawns nothing** (it spawned `journal send <id>
+  --hold-off-record`); it is a read-only tool now. `journal_save` with `practice` fills the slot as the web app does.
+- The faces' refusals (`/x` at the start or on any line, the engine's marker lines, the transcript placeholder) are
+  `actions.refuse` in every face now, with the same codes.
+
+**Where it runs.** `serve/**`, `mcp/**`, `cli.py`, `actions.py` and the web build are serve, CLI and MCP side. Two
+modules the gateway imports changed, without a behaviour change for it: `entries.py` gains `STEM`, `entry_file` and
+`engine_file` (moved from `serve/document.py`, which now calls them), and `capture.add_web_block` takes `via=`
+(default `web`, as before); neither the hook, the tools, the commands nor the tick call anything that changed
+(checked with the import list in the table above and a grep for `actions`, `add_web_block`, `engine_file` and
+`entry_file` under `hermes/`, `tools.py`, `inbound.py`, `commands.py` and `tick.py`). So a gateway still running its
+old copy is correct; it picks the new files up at OPEN-CORE's restart. The two chat changes of the package (`/start`
+and `journal send` taking their slot from `slots.resolve`) were built in OPEN-CORE and go out with it.
+
+**Steps.** With OPEN-CORE (same window, or after it): move the plugin pin and the CLI to the merge sha (the plugin pin
+covers the tick; it runs no new code path); `uv tool install --force` the CLI with the `hermes` and `mcp` extras the
+install already uses; `systemctl --user restart journal-serve`. An MCP client picks the new tools up when it next
+starts `journal mcp` (restart the client, or reconnect the server, to see `journal_start`'s new description).
+
+**First checks** (read-only, or writing only under a temporary root):
+
+1. `journal serve check` and `journal doctor`: same version as the tick, no new problems.
+2. **The installed PWA must take the update.** Its old build reads four states and refuses a Today answer with a
+   `due` row ("The server's answer has an unexpected shape"): on a chat install for the minutes between a slot's
+   time and its send, on a no-chat install whenever a slot is due. After the unit restart, open the app and tap
+   **Update available** (or reload it twice in a browser tab); Settings then shows the new build. Rolling serve back
+   while the PWA is new is harmless (the old server serves `due` as `upcoming`, which the new build reads).
+   The web app: Today loads (a due slot reads "due since HH:MM", not "at HH:MM"); every card has **Write now**;
+   pressing it shows the practice and a line such as "Fills the 23:00 slot early; it will not be sent." and writes
+   nothing (`ledger.json`'s mtime and the vault checksum unchanged); **Not now** closes it. `/today?write=evening`
+   opens it on the evening card. On a no-chat install there is no **Send to chat** on Today, and the Library's
+   answers `409 no-chat`. Do not press **Save** as a check: it writes into tonight's slot and the tick then
+   skips that send (use it when he wants to write).
+3. `journal open evening` prints the practice and the slot line and changes nothing (vault checksum before and
+   after). `journal write` is a real write: try it only against a temporary journal, and **without `HERMES_HOME`**:
+   with it set, the profile's plugin settings (`root`, `state_dir` among them) win over the config file, and the
+   "temporary" write lands in the vault and the live ledger (where the tick would then skip tonight's send). So, with
+   a config whose `root` and `state_dir` are under a temporary directory: `env -u HERMES_HOME JOURNAL_CONFIG=<tmp
+   config> journal doctor` first, and go on only if its root and state dir are the temporary ones; then `echo test |
+   env -u HERMES_HOME JOURNAL_CONFIG=<tmp config> journal write evening`, and check `<tmp root>/<date>-evening.md`
+   and that `sent.jsonl` was not written there. Vault checksum before and after: unchanged.
+4. MCP (if a client is configured): `journal_start` with a practice id returns its opener, questions and `fills`, and
+   `manual-trigger.log` gains no line.
+
+**Rollback.** The CLI and the serve unit back to the previous sha (`uv tool install --force … @<previous sha>`, unit
+restart), the plugin pin with OPEN-CORE's rollback if that goes back too. Records written by a face meanwhile are
+OPEN-CORE's face-made records (`opened_via`), which OPEN-CORE's code reads; on code before OPEN-CORE see its rollback
+note below. Words written for a practice through the web app or MCP after this deploy sit in that practice's slot or
+in an extra entry `<date>-<id>-<n>`; older code reads them as an answered prompt (or an unscheduled entry of that
+practice) and leaves them where they are. An MCP client on the old code sends again when `journal_start` is called.
+
 ## OPEN-CORE — slot states, slot resolution, the engine's write of his words, `channel.platform: none` (2026-11-09; tick, hook and serve side; **gateway restart required, in a window**; no config change for current behaviour; no state migration)
 
 **What changes.** A practice's slot has a state read from the schedule and the ledger together (`slots.py`: upcoming,

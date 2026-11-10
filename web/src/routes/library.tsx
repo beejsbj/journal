@@ -173,19 +173,21 @@ function PracticeActions({ one, reload }: { one: LibraryOne; reload: () => void 
   };
   return (
     <div class="actions detail-actions">
-      {d.enabled && (
-        <button
-          type="button"
-          class="button"
-          disabled={act.busy || onItsWay}
-          onClick={async () => {
-            const done = await act.run(() => api.sendNow(d.id));
-            if (done) setOnItsWay(true);
-          }}
-        >
-          {onItsWay ? "On its way…" : "Send now"}
-        </button>
-      )}
+      {/* (turned off is not scheduled, nothing more: it is still written and sent from here; the owner, 2026-11-09) */}
+      <a class="button" href={`/today?write=${encodeURIComponent(d.id)}`}>
+        Write now
+      </a>
+      <button
+        type="button"
+        class="button"
+        disabled={act.busy || onItsWay}
+        onClick={async () => {
+          const done = await act.run(() => api.sendNow(d.id));
+          if (done) setOnItsWay(true);
+        }}
+      >
+        {onItsWay ? "On its way…" : "Send to chat"}
+      </button>
       <a class="button primary" href={`/library/${d.id}/edit`}>
         Edit
       </a>

@@ -130,9 +130,42 @@ class NotesTest(WriteCase):
     def test_without_a_practice_or_an_open_prompt_it_is_a_j_note(self):
         a = self.ok("POST", "/api/v1/entries", {"text": "call the dentist"}, want=201)
         self.assertEqual((a["stem"], a["rule"]), ("2026-10-15-j-2", "/j"))   # -j.md is taken by the fixture's note
-        b = self.ok("POST", "/api/v1/entries", {"practice": "evening", "text": "late thought"}, want=201)
-        self.assertEqual(b["rule"], "/j")   # evening has no open prompt: the words are kept, as a note
         self.assertFalse(self.prompt("2026-10-15-j-2")["needs_edit"])
+        b = self.ok("POST", "/api/v1/entries", {"practice": "j", "text": "a j is a note"}, want=201)
+        self.assertEqual((b["stem"], b["rule"]), ("2026-10-15-j-3", "/j"))
+
+    def test_a_practice_with_no_open_prompt_fills_its_slot_never_a_note(self):
+        """OPEN-FACES: words for a practice go through ``actions.answer`` (``slots.resolve``). At 09:12 tonight's
+        evening has no record, so they fill it early (step 3: the tick skips its send); chosen again, an extra entry.
+        Never a /j note (until OPEN-FACES the evening's words here were one)."""
+        a = self.ok("POST", "/api/v1/entries", {"practice": "evening", "text": "late thought"}, want=201)
+        self.assertEqual((a["stem"], a["rule"], a["slot"]), ("2026-10-15-evening", "web", "2026-10-15-evening"))
+        p = self.prompt("2026-10-15-evening")
+        self.assertEqual((p["opened_via"], p["message_id"], p["needs_edit"]), ("web", None, False))
+        self.assertIn("late thought", self.entry("2026-10-15-evening"))
+        b = self.ok("POST", "/api/v1/entries", {"practice": "evening", "text": "and again"}, want=201)
+        self.assertEqual((b["stem"], b["slot"]), ("2026-10-15-evening-2", "2026-10-15-evening-2"))
+        for name in ("sent.jsonl", "send-times.json"):   # a face's words are no chat boundary
+            self.assertFalse((self.cfg.state_dir / name).exists(), name)
+        self.assertEqual(self.spawned, [])
+
+    def test_a_recording_fills_the_slot_too(self):
+        body, headers = multipart(b"OggS-web-recording")
+        up = self.ok("POST", "/api/v1/uploads", body, want=201, headers=headers)
+        got = self.ok("POST", "/api/v1/entries", {"practice": "evening", "upload": up["upload"]}, want=201)
+        self.assertEqual(got["stem"], "2026-10-15-evening")
+        self.assertEqual((self.cfg.root / "2026-10-15-evening.webm").read_bytes(), b"OggS-web-recording")
+        self.assertEqual(self.prompt("2026-10-15-evening")["captures"][0]["audio"], "2026-10-15-evening.webm")
+
+    def test_a_practice_turned_off_still_takes_his_words(self):
+        """The owner, 2026-11-09 (decision 4): ``enabled: false`` is "not scheduled" only."""
+        (self.cfg.practices_dir / "quiet.md").write_text(
+            "---\nkind: practice\nid: quiet\ntitle: Quiet\nenabled: false\n---\n- One?\n", encoding="utf-8")
+        got = self.ok("POST", "/api/v1/entries", {"practice": "quiet", "text": "x"}, want=201)
+        self.assertEqual(got["stem"], "2026-10-15-quiet")
+        before = (checksum(self.cfg.root), (self.cfg.state_dir / "ledger.json").read_bytes())
+        self.refused("POST", "/api/v1/entries", {"practice": "fix-life", "text": "x"}, want=404)   # a program
+        self.assertEqual((checksum(self.cfg.root), (self.cfg.state_dir / "ledger.json").read_bytes()), before)
 
     def test_refusals_write_nothing(self):
         before = (checksum(self.cfg.root), (self.cfg.state_dir / "ledger.json").read_bytes())
@@ -155,6 +188,9 @@ class NotesTest(WriteCase):
             with self.subTest(text):
                 got = self.refused("POST", "/api/v1/entries", {"practice": "morning", "text": text}, want=422)
                 self.assertEqual(got["error"], "off-the-record")
+                # the web's own words, which the page shows him (web/e2e/writes.spec.ts reads "not saved")
+                self.assertIn("not saved", got["detail"])
+                self.assertIn("still in your browser", got["detail"])
                 self.refused("POST", "/api/v1/entries/2026-10-14-evening/blocks", {"text": text}, want=422)
         self.assertEqual((checksum(self.cfg.root), (self.cfg.state_dir / "ledger.json").read_bytes()), before)
         self.ok("POST", "/api/v1/entries", {"text": "/xylophone is a word"}, want=201)   # only the command, not a prefix
@@ -202,6 +238,53 @@ class NotesTest(WriteCase):
         self.ok("POST", "/api/v1/entries", {"practice": "morning", "text": "Earlier.", "at": "2026-10-15T07:40:00+05:30"},
                 want=201)
         self.assertIn("### 07:40 IST · text", self.entry("2026-10-15-morning"))
+
+
+class NoChatTest(WriteCase):
+    """Review round 1, finding 7: on a journal with no chat (``channel.platform: none``) the web app does not offer
+    to send to one. Today says so (``chat: false``), and a send asked for anyway is ``409 no-chat``, nothing spawned:
+    ``journal send`` would only log that nothing was sent, while the page said "On its way…"."""
+
+    def test_today_says_whether_there_is_a_chat(self):
+        self.assertIs(self.ok("GET", "/api/v1/today", headers={})["chat"], True)
+        self.cfg.platform = "none"
+        self.assertIs(self.ok("GET", "/api/v1/today", headers={})["chat"], False)
+
+    def test_a_send_with_no_chat_is_409_and_nothing_is_spawned(self):
+        self.cfg.platform = "none"
+        self.assertEqual(self.refused("POST", "/api/v1/library/evening/send", want=409)["error"], "no-chat")
+        self.assertEqual(self.spawned, [])
+
+
+class WriteNowTest(WriteCase):
+    """``GET /library/{id}/open``: the practice as Write now shows it (``actions.view``), and the slot words saved now
+    would fill. A view: nothing is written, nothing spawned."""
+
+    def test_the_view_is_the_practice_and_its_slot_and_writes_nothing(self):
+        before = (checksum(self.cfg.root), (self.cfg.state_dir / "ledger.json").read_bytes())
+        got = self.ok("GET", "/api/v1/library/evening/open", headers={})
+        self.assertEqual((got["practice"], got["title"], got["slot"]["id"], got["slot"]["step"], got["slot"]["at"]),
+                         ("evening", "Evening journal", "2026-10-15-evening", 3, "23:00"))
+        self.assertTrue(got["prompt"]["opener"].startswith("Evening"))
+        self.assertEqual(got["prompt"]["opener_source"], "plain")
+        self.assertIn("What's spinning in your mind?", [q["text"] for q in got["prompt"]["questions"]])
+        self.assertIn("23:00", got["fills"])
+        self.assertEqual((checksum(self.cfg.root), (self.cfg.state_dir / "ledger.json").read_bytes()), before)
+        self.assertEqual(self.spawned, [])
+
+    def test_an_open_prompt_is_shown_as_it_was_sent(self):
+        got = self.ok("GET", "/api/v1/library/morning/open", headers={})
+        self.assertEqual((got["slot"]["id"], got["slot"]["state"], got["slot"]["delivered"]),
+                         ("2026-10-15-morning", "open", True))
+        self.assertEqual((got["prompt"]["opener"], got["prompt"]["sent_at_local"]), ("Morning", "06:00 IST"))
+
+    def test_what_has_no_view(self):
+        (self.cfg.practices_dir / "quiet.md").write_text(
+            "---\nkind: practice\nid: quiet\ntitle: Quiet\nenabled: false\n---\n- One?\n", encoding="utf-8")
+        self.refused("GET", "/api/v1/library/nope/open", want=404, headers={})
+        self.refused("GET", "/api/v1/library/fix-life/open", want=404, headers={})   # a program
+        # (turned off is "not scheduled" only: it opens, decision 4 of 2026-11-09)
+        self.assertEqual(self.ok("GET", "/api/v1/library/quiet/open", headers={})["practice"], "quiet")
 
 
 class UploadsTest(WriteCase):
@@ -774,8 +857,8 @@ class LibraryWriteTest(WriteCase):
         self.refused("POST", "/api/v1/library/..%2Fx/send", want=404)
         off = self.NEW.replace("---\n## Body", "enabled: false\n---\n## Body")
         self.ok("PUT", "/api/v1/library/stretching", {"raw": off})
-        self.assertEqual(self.refused("POST", "/api/v1/library/stretching/send", want=409)["error"], "disabled")
-        self.assertEqual(self.spawned, [["send", "gratitude"]])
+        self.ok("POST", "/api/v1/library/stretching/send", want=202)   # turned off is "not scheduled" only (decision 4)
+        self.assertEqual(self.spawned, [["send", "gratitude"], ["send", "stretching"]])
 
     def test_a_spawn_that_cannot_start_is_503(self):
         def boom(cfg, args):

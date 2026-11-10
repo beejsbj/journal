@@ -8,7 +8,7 @@
     "rows": [
       {
         "id": "morning",
-        "state": "upcoming",
+        "state": "due",
         "at": "06:00"
       },
       {
@@ -97,5 +97,6 @@
     "his": "Sam",
     "hers": "Ada"
   },
+  "chat": true,
   "location_source": null
 }
