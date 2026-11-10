@@ -43,8 +43,8 @@ def window(cfg: Config, prompt: dict) -> timedelta:
 
 def open_phase(prompt: dict, at: datetime | None = None) -> bool:
     """A program phase that is (``at``: was, at that moment) the open phase of its run: it takes more than one
-    message. ``programs`` sets ``phase_open`` when the phase is sent and clears it when the run moves on or goes on a
-    break, keeping the spans in between (``open_spans``) for the sweep, which asks about a message's own time."""
+    message. ``programs`` sets ``phase_open`` when the phase becomes current (``programs._open``; a record the chat
+    already has, when it is sent again) and clears it when the run moves on or goes on a break, keeping the spans in between (``open_spans``) for the sweep, which asks about a message's own time."""
     if not prompt.get("program"):
         return False
     if at is not None and prompt.get("open_spans") is not None:  # when it was open, send to close (programs._span)
@@ -323,7 +323,8 @@ class PhaseClosed(Exception):
 
 def add_web_block(cfg: Config, stem: str, text: str, now: datetime, *, media: str | None = None, ext: str = ".ogg",
                   meta: dict | None = None, client_id: str | None = None, phase_prompt: str | None = None,
-                  key_of: Callable[[Path], str | None] | None = None, via: str = WEB_VIA) -> dict:
+                  interrupt_prompt: str | None = None, key_of: Callable[[Path], str | None] | None = None,
+                  via: str = WEB_VIA) -> dict:
     """Append a block of his words to the engine entry ``stem`` (the caller has checked it is the engine's own
     file). Through the entry's ledger prompt when it still has one, so the tick sees the reply (annotations wait on
     the first one); otherwise straight into the file. Nothing already in the file is touched. A repeated
@@ -335,6 +336,10 @@ def add_web_block(cfg: Config, stem: str, text: str, now: datetime, *, media: st
     (checked here under the ledger lock, where ``programs`` closes it; the caller has checked ``stem`` is the run's
     session entry, and the answer goes where ``entry_stem`` says); otherwise
     ``PhaseClosed`` and nothing is written. Moving the run on is the caller's: the settle or ``/next``.
+
+    ``interrupt_prompt``: the ledger id of a session's interrupt that has opened (``programs._open_interrupts``, at
+    its time, delivered to the chat or not). The block is his answer to it, keyed ``%% journal interrupt:N %%`` as a
+    reply to it in the chat is; it moves nothing. ``PhaseClosed`` when it has not opened.
 
     ``key_of(path)`` names the block just written (the web document's key for it); it is called under the lock and
     its answer kept with the capture, so a retry returns the first block's key even after others were added.
@@ -353,8 +358,14 @@ def add_web_block(cfg: Config, stem: str, text: str, now: datetime, *, media: st
                     "untracked": True, "duplicate": True, "block": seen[client_id].get("block")}
         if phase_prompt is not None:
             prompt = ledger.find(data, phase_prompt)
-            if prompt is None or not open_phase(prompt):
+            # (open: in the chat, or current on the faces while its message waits to be sent again, ``face_open``)
+            if prompt is None or not (open_phase(prompt) or prompt.get("face_open")):
                 raise PhaseClosed(phase_prompt)
+            return _web_record(cfg, data, prompt, via, text, now, client_id, media, ext, meta, key_of, via=via)
+        if interrupt_prompt is not None:
+            prompt = ledger.find(data, interrupt_prompt)
+            if prompt is None or not prompt.get("interrupt"):
+                raise PhaseClosed(interrupt_prompt)
             return _web_record(cfg, data, prompt, via, text, now, client_id, media, ext, meta, key_of, via=via)
         prompt = prompt_of_entry(data, stem)
         if prompt is not None:

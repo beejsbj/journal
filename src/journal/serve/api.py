@@ -644,8 +644,9 @@ def run_json(req: Request, run: dict) -> dict:
 
 def _open_phase(req: Request, run: dict) -> dict | None:
     """The run's open phase as data: ``compose.phase_json`` of the definition (his earlier answers filled into its
-    prose slots), plus ``sent_text`` (what Telegram was sent: a reflect phase's construction is only in that),
-    ``open`` (it takes an answer), ``answered`` and ``skipped``. None when the run is over or its session has not begun; ``delivered`` is False while a send is owed."""
+    prose slots), plus ``sent_text`` (the phase as the engine built it: a reflect phase's construction is only in that),
+    ``delivered`` (current for this visit: opened, in the chat or not), ``in_chat`` (the chat has it too), ``open``
+    (it takes an answer), ``answered`` and ``skipped``. None when the run is over or its session has not begun."""
     from .. import compose, programs
     prog = _program_of(req, run)
     cur = run.get("current")
@@ -664,9 +665,12 @@ def _open_phase(req: Request, run: dict) -> dict | None:
     except (IndexError, KeyError, ValueError):   # the definition was edited under a run in progress
         return None
     prompt = ledger.find(ledger.snapshot(req.cfg.ledger_path), ph["prompt_id"]) if ph.get("prompt_id") else None
-    delivered = bool(prompt) and not ph.get("send_due")   # a re-send owed (a /back, a jump) leaves the old prompt there
+    # ``delivered``: the phase is current for this visit (opened: in the chat, or made current with no delivery);
+    # until then a /back or a jump leaves the old prompt there. ``in_chat``: its message is in the chat as well.
+    delivered = bool(prompt) and programs.phase_opened(ph)
     out.update(sent_text=(prompt or {}).get("phase_text"), delivered=delivered,
-               open=delivered and capture.open_phase(prompt) and run.get("status") == "active",
+               in_chat=delivered and bool(prompt.get("message_id")) and not ph.get("send_due"),
+               open=delivered and programs.face_open(prompt) and run.get("status") == "active",
                answered=bool(ledger.answers(prompt)), skipped=bool(ph.get("skipped")),
                phases_total=len(session.phases))
     return out

@@ -16,6 +16,41 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## OPEN-PROGRAMS — programs and interrupts with no chat (2026-11-09; tick, hook and serve side; **gateway restart required, in a window**; no config change; no state migration)
+
+**What changes.** A program phase becomes current before it is sent: its ledger record is written with no
+`message_id` (the run's phase gains `opened_at`), and it is then delivered when there is a chat; `send_due` means
+"owed a delivery". A `/x` window holds the delivery only: an answer in the web app moves the run on while the chat is
+off the record (an answer in the chat still waits for the window), the next phase shows on the web at once and goes
+to the chat when the window closes, and a phase answered on the web before its delivery is not sent. Session 10's
+interrupts open at their time (their ledger record is written, sent or not), and a block posted with `interrupt: N`
+answers one. With `channel.platform: none` a whole run is done in the web app: nothing is sent, attempted or alerted.
+`GET /runs/{id}`'s phase gains `in_chat`, and its `delivered` means the phase is current.
+
+**Side and restart.** `programs.py` and `capture.py` (both gateway-loaded), `cli.py` (`journal program … --face`,
+which only serve passes: its spawned child runs serve's own code, so the two never disagree) and `serve/writes.py`,
+`serve/api.py` changed. So **a gateway restart, in a window** (the hook spawns `journal program settle`, which runs the new code at
+once, but the gateway's own imports of `programs` and `capture` need the restart); the tick runs the new code from
+the next tick after the pin moves; serve waits for `uv tool install --force` and the unit restart. Runs in progress
+read the same: a delivered phase (no `opened_at`, no send owed) is current, and a phase owed a send under the old code
+is opened and sent by the next tick's step.
+
+1. In a window: merge; with `<sha>` the merge commit, install the CLI at `<sha>`, move the plugin pin (`hermes -p
+   <profile> plugins install beejsbj/journal --force --ref <sha>`), `hermes gateway restart`, `systemctl --user restart
+   journal-serve`. Nothing is sent by the deploy.
+2. First checks, without sending: `journal doctor` (no new failure); `journal program status` reads every run as
+   before (a phase owed to the chat says `, still to be sent to the chat`); the web app's run page shows the open phase with
+   its answer box. A run in progress: its next phase goes out as before when he answers in the chat (the tick's log
+   says `sent <run>-sNN-pM`). With no chat: a run started in the web app shows its first phase there, and the tick's
+   log names no send.
+3. Rollback: the CLI and the plugin pin at the previous sha, `hermes gateway restart`, `systemctl --user restart
+   journal-serve`. Old code reads an opened phase with no send owed as delivered: on a chat install every opened
+   phase was also delivered, answered on the web, or is still owed (`send_due`, which old code sends, held ones
+   included), so nothing is lost. On a no-chat install (which old code cannot run anyway, see OPEN-CORE), deliver
+   the open phase with `journal program start <program>` (it sends the open phase again) once a chat is set. An interrupt item `open` (no
+   chat) or `answered` is not pending to old code and is never sent; its record and any answer stay in the ledger and
+   the entry.
+
 ## OPEN-FACES — do and answer a practice from the web app, the CLI and MCP (2026-11-09; serve side, the CLI and MCP; **no gateway restart of its own**: it rides OPEN-CORE's window; no config change; no state migration)
 
 **What changes.** Every face writes his words through `journal/actions.py` and opens a practice as a view:

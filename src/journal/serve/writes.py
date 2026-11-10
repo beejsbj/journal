@@ -233,13 +233,14 @@ def entry_create(req: Request):
     return Reply(200 if info.get("duplicate") else 201, done)
 
 
-def _phase_target(req: Request, stem: str, body: dict) -> tuple[dict, str] | None:
+def _phase_target(req: Request, stem: str, body: dict) -> tuple[dict, str, str] | None:
     """The run and phase prompt a block on entry ``stem`` answers, or None for an entry that is not a program's.
 
     A program session's entry does not exist before its first answer, so the run (not the file) says what ``stem``
     is: some run's session has it as its entry. (If a file of his already sits at that name, the engine files the
     answer under the next free one, ``capture.entry_stem``, and the reply says which; his file is never written.) A block must name the phase it answers, and that phase must be the
-    run's open one, delivered, with the run active: the rule a Telegram message follows, made explicit because a
+    run's open one, current for this visit (``programs.phase_opened``: delivered to the chat or not), with the run
+    active: the rule a Telegram message follows, made explicit because a
     browser cannot rely on "the newest prompt in the chat". 409 ``phase-not-open`` otherwise."""
     from .. import programs
     found = None
@@ -253,10 +254,12 @@ def _phase_target(req: Request, stem: str, body: dict) -> tuple[dict, str] | Non
         if fm.get("program"):
             raise HTTPError(409, "phase-not-open", "this entry belongs to a program run that is no longer there, so "
                                                    "no phase of it is open")
-        if body.get("phase") is not None:
-            raise HTTPError(400, "bad-request", "phase is for the entries of a program session")
+        if body.get("phase") is not None or body.get("interrupt") is not None:
+            raise HTTPError(400, "bad-request", "phase and interrupt are for the entries of a program session")
         return None
     run, s = found
+    if body.get("interrupt") is not None:
+        return _interrupt_target(req, run, s, body)
     if req.lib().programs.get(run["program"]) is None:   # as ``api.wrong_state``: no definition, no open phase
         raise HTTPError(409, "phase-not-open", "the program's definition is missing, so no phase of this run is open",
                         run=run["id"], run_status=run.get("status"))
@@ -269,10 +272,30 @@ def _phase_target(req: Request, stem: str, body: dict) -> tuple[dict, str] | Non
         raise HTTPError(409, "phase-not-open", why, run=run["id"], run_status=run.get("status"))
     cur = run.get("current") or {}
     ph = ((run.get("sessions") or {}).get(str(s)) or {}).get("phases", {}).get(str(phase)) or {}
-    if (cur.get("session"), cur.get("phase")) != (s, phase) or not ph.get("prompt_id") or ph.get("send_due"):
+    # (current for this visit: opened, whether or not the chat has it yet; a delivery owed is not "not open")
+    if (cur.get("session"), cur.get("phase")) != (s, phase) or not programs.phase_opened(ph):
         raise HTTPError(409, "phase-not-open", f"phase {phase} of this session is not the open phase",
                         run=run["id"], where=programs.where(run))
-    return run, ph["prompt_id"]
+    return run, ph["prompt_id"], "phase"
+
+
+def _interrupt_target(req: Request, run: dict, s: int, body: dict) -> tuple[dict, str, str]:
+    """The run and interrupt prompt a block answers (``interrupt``: its number in session ``s``): one that has opened
+    (its time came and the engine wrote its record, ``programs._open_interrupts``), delivered to the chat or not, of
+    the newest confirmation of the session that has one. As a reply to it in the chat, it may come at any age and the
+    run may have finished. 409 ``interrupt-not-open`` otherwise."""
+    n = body.get("interrupt")
+    if isinstance(n, bool) or not isinstance(n, int) or body.get("phase") is not None:
+        raise HTTPError(400, "bad-request", "interrupt must be the number of one of this session's interrupts "
+                                            "(and a block answers a phase or an interrupt, not both)")
+    snap = ledger.snapshot(req.cfg.ledger_path)
+    opened = [i for i in run.get("scheduled") or [] if i.get("session") == s and i.get("n") == n
+              and i.get("status") != "cancelled" and ledger.find(snap, f"{run['id']}-{i['id']}") is not None]
+    if not opened:
+        raise HTTPError(409, "interrupt-not-open", f"interrupt {n} of this session has not opened (its time has not "
+                                                   "come, or it was never sent)", run=run["id"])
+    item = max(opened, key=lambda i: i.get("batch", 1))
+    return run, f"{run['id']}-{item['id']}", "interrupt"
 
 
 def _after_phase_block(req: Request, info: dict) -> str:
@@ -300,6 +323,7 @@ def block_add(req: Request):
     # A retry of a block already written is answered from the ledger, even after the run moved on and wherever the
     # answer was filed (`stem` may be the planned name while a file of his holds it: the answer sits one name on).
     target = None if dup else _phase_target(req, stem, body)
+    interrupt = target is not None and target[2] == "interrupt"
     of_program = target is not None or bool(dup and dup[0].get("run"))
     if not of_program:
         _engine_entry(req)
@@ -309,9 +333,12 @@ def block_add(req: Request):
     with words:
         try:
             info = capture.add_web_block(req.cfg, stem, words.text or "", when, client_id=cid,
-                                         phase_prompt=target[1] if target else None,
+                                         phase_prompt=target[1] if target and not interrupt else None,
+                                         interrupt_prompt=target[1] if interrupt else None,
                                          key_of=lambda p: _last_words_key(req, p), **words.args)
         except capture.PhaseClosed:
+            if interrupt:
+                raise HTTPError(409, "interrupt-not-open", "that interrupt has not opened; reload it") from None
             raise HTTPError(409, "phase-not-open", "the run moved on from that phase; reload it") from None
     path = Path(info["path"])
     # the key the block got when it was written (kept with the capture); a record from before that was kept has
@@ -319,7 +346,7 @@ def block_add(req: Request):
     done = {"key": info.get("block") or _last_words_key(req, path)}
     if of_program:   # (the stem too: the answer goes where the engine files the session, not always at `stem`)
         done["stem"] = path.stem
-        if not info.get("duplicate"):
+        if not info.get("duplicate") and not info["prompt"].get("interrupt"):  # (an interrupt's answer moves nothing)
             done["advance"] = _after_phase_block(req, info)
     return Reply(200 if info.get("duplicate") else 201, done)
 
@@ -774,7 +801,7 @@ def run_start(req: Request):
         raise HTTPError(409, "active-run", "this program has a run in progress: carry on with it, or abandon it first",
                         run=run["id"], run_status=run["status"])
     _one_at_a_time(req, prog.id)
-    args = ["program", "start", prog.id, "--new"] + (["--session", str(session)] if session else [])
+    args = ["program", "start", prog.id, "--new"] + (["--session", str(session)] if session else []) + ["--face"]
     return _spawned(req, args)
 
 
@@ -800,6 +827,8 @@ def run_action(req: Request):
             raise HTTPError(409, "moved-on", "the run is not at that phase any more; reload it",
                             run=run["id"], where=programs.where(run))
         args += ["--expect", expect]
+    if action in ("next", "skip", "back", "resume"):  # (asked for here, not in the chat: ``programs.on_a_face``)
+        args.append("--face")
     # (a run's own transitions are never refused for another program: an unfinished run already holds its slot)
     return _spawned(req, args)
 
