@@ -73,7 +73,11 @@ Steps 2–4 work on the **journal day** of `at`: its local date, except that wor
 A deliberate delivery (`/start <id>`, `journal send <id>`, *Send to chat*) made before `day_ends_at` is the
 exception: its slot is of today's calendar date, not the previous journal day (the owner, 2026-11-09). The same steps
 run over today's slots only, so `/start morning` at 03:30 delivers today's morning (its 06:00 slot, early), and the
-tick's 06:00 send is then done. Words he writes at 03:30 still go to the journal day before.
+tick's 06:00 send is then done. Words he writes at 03:30 still go to the journal day before. The exception has its
+own limit: when the practice's nearest scheduled slot is last night's, the delivery resolves as words do. `/start
+evening` at 00:30 means last night's 23:00 evening, 1.5 hours behind, not tonight's, 22.5 hours ahead: it sends last
+night's again while that is unanswered, and makes an extra entry of last night once it is answered. Tonight's send
+is left alone. A tie, and a practice with no schedule, are today's.
 
 1. A slot of that practice that is **due or open** now, today's or yesterday's, newest first, whose time is at or
    before `at`. An evening answer at 00:30 takes last night's slot.
