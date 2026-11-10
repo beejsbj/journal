@@ -7,7 +7,7 @@ export { Button, ButtonLink, IconButton, TextButton, buttonClass, type ButtonSiz
 export { Field, TextArea, TextField, describedBy } from "./Field";
 export { Switch } from "./Switch";
 export { Segmented, type SegmentedOption } from "./Segmented";
-export { DefaultHint, Stepper, clockTime } from "./Stepper";
+export { DefaultHint, Stepper, TypedStepper, clockTime } from "./Stepper";
 export { Menu, type MenuItem } from "./Menu";
 export { Disclosure } from "./Disclosure";
 export { Dialog, Sheet } from "./Sheet";
@@ -19,6 +19,7 @@ export { Calendar, shiftMonth } from "./Calendar";
 export { ProgressStrip } from "./ProgressStrip";
 export { Clock } from "./Clock";
 export { Ribbon } from "./Ribbon";
+export { BackLink, PageBack } from "./BackLink";
 export { Await, Empty, ErrorLine, Loading, Skeleton } from "./Status";
 export { OfflineRibbon } from "./OfflineRibbon";
 export { ThemeChoice, ThemeToggle } from "./ThemeChoice";

@@ -38,16 +38,23 @@ export function useNext(enabled: boolean): Next | null {
     document.addEventListener("visibilitychange", back);
     return () => document.removeEventListener("visibilitychange", back);
   }, []);
+  // One read in flight at a time, aborted only when the shell goes: moving on to another page before it lands must not
+  // throw it away (the next would wait out the minute, and the rail would stay empty).
+  const inflight = useRef<AbortController | null>(null);
+  useEffect(() => () => inflight.current?.abort(), []);
   useEffect(() => {
-    if (!enabled || Date.now() - last.current < 60_000) return;
+    if (!enabled || inflight.current || Date.now() - last.current < 60_000) return;
     last.current = Date.now();
     const ctl = new AbortController();
+    inflight.current = ctl;
     Promise.all([api.todayQuiet(ctl.signal), api.libraryQuiet(ctl.signal).catch(() => [] as LibraryItem[])])
       .then(([t, lib]) => setNext(nextFrom(t, lib)))
       .catch(() => {
         if (!ctl.signal.aborted) setNext(null);
+      })
+      .finally(() => {
+        if (inflight.current === ctl) inflight.current = null;
       });
-    return () => ctl.abort();
   }, [enabled, path, round]);
   return enabled ? next : null;
 }

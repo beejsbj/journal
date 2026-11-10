@@ -6,10 +6,9 @@ import { Markdown } from "../components/Markdown";
 import { RunStrip, sessionsDone } from "../components/RunCard";
 import { useLive } from "../events";
 import { useAction, useResource } from "../hooks";
-import { ChevronLeft } from "../icons";
 import { useTitle } from "../title";
 import type { BlockWritten, RunAction, RunOne } from "../types";
-import { Await, Button, Disclosure, Empty, ErrorLine, Letter } from "../ui";
+import { Await, Button, Disclosure, Empty, ErrorLine, Letter, PageBack } from "../ui";
 import "./run.css";
 
 const LABEL: Record<RunAction, string> = {
@@ -97,6 +96,7 @@ function PhaseView({ run, hers }: { run: RunOne; hers: string }) {
         label={`Your answer to ${phase.title}`}
         placeholder="Answer in your own words"
         submitLabel="Add to my answer"
+        rest
         closed={closed}
         onSubmit={async (words) => setNote(afterAnswer(await api.addBlock(stem as string, { ...words, phase: phase.phase })))}
       />
@@ -221,12 +221,7 @@ export function RunRoute({ id = "" }: { id?: string }) {
   const hers = useHers();
   return (
     <div class="run-page">
-      <p class="crumb">
-        <a href="/" data-vt="pop">
-          <ChevronLeft />
-          Today
-        </a>
-      </p>
+      <PageBack href="/">Today</PageBack>
       {res.state === "error" && res.error.status === 404 ? (
         <Empty>No run by that name.</Empty>
       ) : (
@@ -278,7 +273,7 @@ export function RunRoute({ id = "" }: { id?: string }) {
                   </ol>
                 </section>
               )}
-              <p class="crumb run-foot">
+              <p class="run-foot">
                 <a href={`/library/${run.program}`}>The program in the Library</a>
               </p>
             </>

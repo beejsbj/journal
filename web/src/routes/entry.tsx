@@ -12,7 +12,7 @@ import { ChevronDown, ChevronLeft, ChevronUp, Envelope, Expand, Pen, SideDots, S
 import { Pane, openWrite, useNavigate, useShellMode, withTransition } from "../shell";
 import { useTitle } from "../title";
 import type { EntryDoc, EntryPage, EntrySummary } from "../types";
-import { Await, Button, Calendar, Disclosure, Empty, IconButton, Segmented, Sheet, Skeleton, TextButton, Toast } from "../ui";
+import { Await, BackLink, Button, Calendar, Disclosure, Empty, IconButton, Segmented, Sheet, Skeleton, TextButton, Toast } from "../ui";
 import { filterQuery, filtersOf, groupByWeek, localDay, params, rememberQuery, rememberedQuery, useWide, useWrittenDays, type Filters } from "./entries";
 import "./entry.css";
 
@@ -341,6 +341,7 @@ function Add({ doc, reload, wide }: { doc: EntryDoc; reload: () => void; wide: b
         label={`Add to this entry, as ${doc.voices.his}`}
         placeholder="Add more, in your own words"
         submitLabel="Add to the entry"
+        rest
         onSubmit={(words) => api.addBlock(doc.stem, words)}
         onDone={reload}
       />
@@ -426,7 +427,7 @@ export function EntryRoute({ stem = "" }: { stem?: string }) {
           {date && <span class="entry-bar-title" aria-hidden={!scrolled}>{date.weekday} {date.d} {date.month}</span>}
         </>
       ) : (
-        <a class="entry-back" href={back} data-vt="pop"><ChevronLeft aria-hidden="true" /> Entries</a>
+        <BackLink class="entry-back" href={back}>Entries</BackLink>
       )}
       <span class="entry-bar-grow" />
       {doc?.writable && (

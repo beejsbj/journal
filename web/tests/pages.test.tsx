@@ -86,8 +86,10 @@ describe("Settings, the save bar", () => {
     const dock = must(host.querySelector(".save-dock"));
     expect(dock.getAttribute("data-shown")).toBe("false");
     expect(must(dock.querySelector(".save-bar")).getAttribute("aria-hidden")).toBe("true");   // hidden: out of the way of a reader
-    // it is the form's last child: its height is the page's last padding, so at the bottom it sits under the last row
-    expect(must(host.querySelector(".settings-form")).lastElementChild).toBe(dock);
+    // WEB-UX integration: it is the page's last child (docked across the page's foot, outside the form; Save names the
+    // form): its height is the page's last padding, so at the bottom it sits under the last row
+    expect(must(host.querySelector(".settings-page")).lastElementChild).toBe(dock);
+    expect(dock.querySelector('button[type="submit"]')?.getAttribute("form")).toBe(must(host.querySelector(".settings-form")).id);
     await click(host.querySelector('button[aria-label="More: Hours a prompt stays open"]'));
     expect(hours.value).toBe("6.5");   // a step of half an hour
     await click(host.querySelector('button[aria-label="Less: Minutes before annotating"]'));

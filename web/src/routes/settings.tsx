@@ -13,14 +13,14 @@ import { ApiError, api, byTailscale, locate, logout, session } from "../api";
 import { lastVia } from "../auth";
 import { OsmCredit, osmNamed } from "../components/OsmCredit";
 import { asApiError, useAction, useResource, type Resource } from "../hooks";
-import { InkBlot, Lock, Minus, Pin, Plus } from "../icons";
+import { InkBlot, Lock, Pin } from "../icons";
 import { INKS, chooseInk, savedInk, type Ink } from "../ink";
 import { isOnline } from "../offline";
 import { FIELDS, GROUPS, buildPatch, keyOf, problem, shown, valueAt, type GroupId, type SettingField } from "../settingsModel";
 import { useTitle } from "../title";
 import type { Json } from "../schema";
 import type { DoctorRow, Located, Session } from "../types";
-import { Await, Button, ButtonLink, DefaultHint, Disclosure, ErrorLine, Letter, Skeleton, Switch, ThemeChoice, reducedMotion } from "../ui";
+import { Await, Button, ButtonLink, DefaultHint, Disclosure, ErrorLine, Letter, Skeleton, Switch, ThemeChoice, TypedStepper, reducedMotion } from "../ui";
 import "./settings.css";
 
 /** A settings tree as dotted rows ("windows.collapse_hours"), the way the config names its keys. */
@@ -351,41 +351,6 @@ function shownValue(f: SettingField, edit: string | undefined, stored: string): 
   return f.def === undefined || typeof f.def === "boolean" ? "" : String(f.def);
 }
 
-/** − value unit +: a number moved a step at a time, and typed when the step is too small for the distance. */
-function NumberStepper({ f, id, value, disabled, invalid, describedBy, onInput }: {
-  f: SettingField; id: string; value: string; disabled: boolean; invalid: boolean; describedBy: string; onInput: (v: string) => void;
-}) {
-  const step = f.step ?? 1;
-  const min = f.min ?? (f.above !== undefined ? f.above + step : -Infinity);
-  const max = f.max ?? Infinity;
-  const n = Number(value.trim());
-  const base = value.trim() !== "" && Number.isFinite(n) ? n : typeof f.def === "number" ? f.def : 0;
-  const move = (by: number) => {
-    const next = Math.min(max, Math.max(min, Math.round((base + by) * 1000) / 1000));
-    if (next !== n) onInput(String(next));
-  };
-  const onKey = (e: KeyboardEvent) => {
-    const by = e.key === "ArrowUp" ? step : e.key === "ArrowDown" ? -step : e.key === "PageUp" ? step * 10 : e.key === "PageDown" ? -step * 10 : 0;
-    if (!by) return;
-    e.preventDefault();
-    move(by);
-  };
-  return (
-    <div class="num-stepper set-stepper" aria-disabled={disabled ? true : undefined}>
-      <button type="button" aria-label={`Less: ${f.label}`} disabled={disabled || base <= min} onClick={() => move(-step)}><Minus /></button>
-      <span class="set-stepper-value">
-        <input id={id} class="set-stepper-input" type="text" inputMode={f.kind === "whole" ? "numeric" : "decimal"} autocomplete="off"
-          role="spinbutton" aria-valuenow={Number.isFinite(n) ? n : undefined} aria-valuemin={Number.isFinite(min) ? min : undefined}
-          aria-valuemax={Number.isFinite(max) ? max : undefined} aria-invalid={invalid ? true : undefined} aria-describedby={describedBy}
-          value={value} disabled={disabled}
-          onKeyDown={onKey} onInput={(e) => onInput((e.currentTarget as HTMLInputElement).value)} />
-        {f.unit && <small aria-hidden="true">{f.unit}</small>}
-      </span>
-      <button type="button" aria-label={`More: ${f.label}`} disabled={disabled || base >= max} onClick={() => move(step)}><Plus /></button>
-    </div>
-  );
-}
-
 function Row({ f, settings, origins, profile, edit, folded, onInput }: {
   f: SettingField; settings: Record<string, Json>; origins: Record<string, string>; profile?: string;
   edit: string | undefined; folded: boolean; onInput: (v: string | undefined) => void;
@@ -414,7 +379,12 @@ function Row({ f, settings, origins, profile, edit, folded, onInput }: {
         aria-invalid={bad ? true : undefined} onInput={(e) => onInput((e.currentTarget as HTMLInputElement).value)} />
     );
   } else if (f.kind === "number" || f.kind === "whole") {
-    control = <NumberStepper f={f} id={id} value={value} disabled={locked !== null} invalid={!!bad} describedBy={hintId} onInput={onInput} />;
+    const step = f.step ?? 1;
+    control = (
+      <TypedStepper id={id} label={f.label} value={value} onInput={onInput} step={step} unit={f.unit} whole={f.kind === "whole"}
+        base={typeof f.def === "number" ? f.def : 0} min={f.min ?? (f.above !== undefined ? f.above + step : -Infinity)} max={f.max ?? Infinity}
+        disabled={locked !== null} invalid={!!bad} describedBy={hintId} />
+    );
   } else {
     control = (
       <input id={id} class="input set-text" type="text" value={value} disabled={locked !== null} aria-describedby={hintId}
@@ -680,10 +650,11 @@ function Everything({ settings, origins }: { settings: Record<string, Json>; ori
 const changesWords = (n: number) => (n === 1 ? "1 change not saved" : `${n} changes not saved`);
 
 /**
- * The page's foot while something is changed and not saved: a frosted pill rising on the soft spring, "2 changes not
- * saved · Discard · Save". It stands at the end of the page's flow and sticks to the foot of the view (above the tab
- * bar on a phone), so at the bottom of the page it sits under the last row and never over it. Hidden, it keeps its
- * place (its height is the page's last padding) and leaves the tab order and the accessibility tree.
+ * The page's foot while something is changed and not saved: a frosted bar docked across the foot of the page, rising
+ * on the soft spring, "2 changes not saved · Discard · Save". It is the page's last child (outside the form; Save
+ * names the form) and sticks to the foot of the view (above the tab bar on a phone): mid-page the rows pass under its
+ * backing, never under a floating control, and at the bottom of the page it sits under the last row. Hidden, it keeps
+ * its place (its height is the page's last padding) and leaves the tab order and the accessibility tree.
  */
 function SaveBar({ changes, busy, invalid, done, error, onDiscard }: {
   changes: number; busy: boolean; invalid: boolean; done: string | null; error: ApiError | null; onDiscard: () => void;
@@ -704,7 +675,7 @@ function SaveBar({ changes, busy, invalid, done, error, onDiscard }: {
           <>
             <span class="save-count" aria-live="polite">{changes === 0 ? "No changes" : changesWords(changes)}</span>
             <Button variant="quiet" size="small" disabled={busy || changes === 0} onClick={onDiscard}>Discard</Button>
-            <Button type="submit" variant="primary" size="small" disabled={busy || invalid || changes === 0}>
+            <Button type="submit" form="settings-form" variant="primary" size="small" disabled={busy || invalid || changes === 0}>
               {busy ? "Saving…" : "Save"}
             </Button>
           </>
@@ -814,7 +785,7 @@ export function SettingsRoute() {
       </header>
       <div class="set-grid">
         <SectionIndex current={current} go={go} healthMark={!!health && (health.warn > 0 || health.fail > 0)} />
-        <form class="settings-form" onSubmit={(e) => { e.preventDefault(); void save(); }}>
+        <form id="settings-form" class="settings-form" onSubmit={(e) => { e.preventDefault(); void save(); }}>
           <Section id="set-ink" n={1} title="Ink and page" lede="The colour her words are typed in, and the page they sit on. Both change at once, on this device only.">
             <InkChoice from={her.state === "ready" && her.data ? her.data : "the companion"} onChoose={setInk} />
             <div class="set-group">
@@ -855,10 +826,10 @@ export function SettingsRoute() {
             <Versions />
             {ready && <Everything settings={ready.settings} origins={ready.origins} />}
           </Section>
-          <SaveBar changes={changes} busy={act.busy} invalid={invalid} done={done} error={act.error}
-            onDiscard={() => { setEdited({}); act.clear(); }} />
         </form>
       </div>
+      <SaveBar changes={changes} busy={act.busy} invalid={invalid} done={done} error={act.error}
+        onDiscard={() => { setEdited({}); act.clear(); }} />
     </div>
   );
 }

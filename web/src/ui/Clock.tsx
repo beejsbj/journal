@@ -36,16 +36,20 @@ export function Clock({ at, weekday, progress, size = 40 }: {
   const x = 20 + Math.cos(a) * 10;
   const y = 20 + Math.sin(a) * 10;
   const night = h >= 18 || h < 6;
+  // the weekday sits in the half of the face the hand is not in, out near the rim, clear of the hub; the tick it
+  // would sit on gives way to it
+  const below = weekday ? y <= 20 : false;
+  const hidden = weekday ? (below ? 6 : 0) : -1;
   return (
     <svg class="clock" viewBox="0 0 40 40" width={size} height={size} aria-hidden="true">
       <circle class={night ? "rim night" : "rim"} cx="20" cy="20" r="15" />
-      {[0, 3, 6, 9].map((k) => {
+      {[0, 3, 6, 9].filter((k) => k !== hidden).map((k) => {
         const t = (k / 12) * 2 * Math.PI - Math.PI / 2;
         return <circle key={k} class="tick" cx={(20 + Math.cos(t) * 12.5).toFixed(1)} cy={(20 + Math.sin(t) * 12.5).toFixed(1)} r=".9" />;
       })}
       <line x1="20" y1="20" x2={x.toFixed(1)} y2={y.toFixed(1)} />
       <circle class="hub" cx="20" cy="20" r="2" />
-      {weekday && <text x="20" y={y > 22 ? 15 : 31}>{weekday}</text>}
+      {weekday && <text class="clock-day" x="20" y={below ? 32 : 13.5}>{weekday}</text>}
     </svg>
   );
 }

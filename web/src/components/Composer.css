@@ -36,20 +36,25 @@
 }
 .composer-closed a { color: var(--text); }
 
-/* offline: the write will wait, said plainly with a half-filled mark (status has no hue) */
-.composer .offline-note, .room .offline-note {
-  display: flex; align-items: baseline; gap: var(--s2); margin: 0; font-size: var(--t-small); line-height: 1.45; color: var(--text-2);
-}
-.composer .offline-note::before, .room .offline-note::before {
-  content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; transform: translateY(-1px);
-  background: linear-gradient(90deg, var(--text-2) 50%, transparent 50%); box-shadow: inset 0 0 0 1.2px var(--text-2);
-}
 
 @media (max-width: 760px), (pointer: coarse) {
   .composer-box { font-size: max(1.1875rem, 16px); min-height: var(--tap); }
 }
 @media (max-width: 760px) {
   .composer { margin-top: 0; }
+  /* at rest (the `rest` prop, `data-rest`): one quiet line, the placeholder and a round Voice, so the box never covers
+     the page. The moment it is used (focused, words or a recording in it, recording, offline, an error, words kept
+     from another box) Composer drops the attribute, or :focus-within lifts it, and the whole box is back. */
+  .composer[data-rest]:not(:focus-within) { display: flex; align-items: center; gap: var(--s2); }
+  .composer[data-rest]:not(:focus-within) .composer-box {
+    flex: 1; min-width: 0; height: var(--tap); min-height: var(--tap); padding: 11px 0; resize: none;
+    box-shadow: none; overflow: hidden; white-space: nowrap;
+  }
+  .composer[data-rest]:not(:focus-within) .composer-actions { flex: none; }
+  .composer[data-rest]:not(:focus-within) .composer-actions > .button.primary,
+  .composer[data-rest]:not(:focus-within) .recorder > .hint:not(.recorder-problem) { display: none; }
+  .composer[data-rest]:not(:focus-within) .recorder .button { width: var(--tap); padding: 0; gap: 0; font-size: 0; border-radius: 50%; }
+  .composer[data-rest]:not(:focus-within) .recorder .button > svg { width: 20px; height: 20px; }
   .composer-actions { flex-wrap: nowrap; }
   .composer-actions .recorder { flex: 0 0 auto; }
   .composer-actions > .button.primary { flex: 1; min-height: 48px; }

@@ -15,6 +15,18 @@
 }
 .num-stepper-value > span { display: inline-block; }
 .num-stepper-value small { margin-left: 3px; font-size: 13px; font-weight: 400; color: var(--text-3); }
+/* typed: the value is a box he can type in (TypedStepper) */
+.num-stepper-field { display: inline-flex; align-items: baseline; justify-content: center; min-width: 96px; padding: 0 2px; }
+.num-stepper-input {
+  width: 5.5ch; min-height: var(--tap); padding: 0 4px; border: 0; border-radius: var(--r-s); background: none; color: var(--text);
+  text-align: right; font: 500 14.5px / 1.2 var(--f-ui); font-variant-numeric: tabular-nums; transition: background var(--d-1);
+}
+.num-stepper-input:hover:not(:disabled) { background: var(--raised); }
+.num-stepper-input:focus { outline: none; background: var(--raised); box-shadow: inset 0 -1.5px 0 var(--text); }
+.num-stepper-input[aria-invalid="true"] { box-shadow: inset 0 -1.5px 0 var(--text); text-decoration: underline wavy var(--text-3); }
+.num-stepper-input:disabled { color: var(--text-2); }
+.num-stepper-field small { margin-left: 4px; font-size: 13px; color: var(--text-3); }
+
 .nudge-up { animation: nudge-up var(--d-3) var(--e-out); }
 .nudge-down { animation: nudge-down var(--d-3) var(--e-out); }
 @keyframes nudge-up { from { transform: translateY(5px); opacity: 0.3; } }
@@ -26,4 +38,8 @@
 
 @media (max-width: 760px) {
   .num-stepper-value { min-width: 64px; }
+}
+/* where a finger types: 16 px or more, or iOS zooms the page when the box takes focus */
+@media (max-width: 760px), (pointer: coarse) {
+  .num-stepper-input { font-size: max(1rem, 16px); }
 }

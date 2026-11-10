@@ -1,11 +1,11 @@
 /**
- * The safe renderer for the companion's Markdown (annotations, reflections, review): paragraphs, bullet lists, bold
- * and italic; everything else is text. The output is a tree of plain data the views turn into elements, so no HTML
+ * The safe renderer for the companion's Markdown (annotations, reflections, review, a program's phase): paragraphs,
+ * bullet lists, quotes (`> `), bold and italic; everything else is text. The output is a tree of plain data the views turn into elements, so no HTML
  * string is ever built and `<script>` in a reply is just letters (FRONTEND.md §1.3).
  */
 
 export type Inline = { text: string; bold?: boolean; italic?: boolean };
-export type MdBlock = { type: "p"; inline: Inline[] } | { type: "ul"; items: Inline[][] };
+export type MdBlock = { type: "p"; inline: Inline[] } | { type: "ul"; items: Inline[][] } | { type: "quote"; blocks: MdBlock[] };
 
 /** `**bold**`, `*italic*` and `_italic_`; an unmatched marker stays literal. */
 export function parseInline(text: string): Inline[] {
@@ -43,10 +43,14 @@ function isBoundary(text: string, at: number): boolean {
   return /[\s([{>"'“‘—-]/.test(before);
 }
 
-export function parseMarkdown(source: string): MdBlock[] {
+/** A quote nested deeper than this is text: no input makes the tree arbitrarily deep. */
+const QUOTE_DEPTH = 3;
+
+export function parseMarkdown(source: string, depth = 0): MdBlock[] {
   const blocks: MdBlock[] = [];
   let paragraph: string[] = [];
   let list: string[] | null = null;
+  let quote: string[] | null = null;
   const endParagraph = () => {
     if (paragraph.length) blocks.push({ type: "p", inline: parseInline(paragraph.join("\n")) });
     paragraph = [];
@@ -55,9 +59,21 @@ export function parseMarkdown(source: string): MdBlock[] {
     if (list) blocks.push({ type: "ul", items: list.map(parseInline) });
     list = null;
   };
+  const endQuote = () => {
+    if (quote) blocks.push({ type: "quote", blocks: parseMarkdown(quote.join("\n"), depth + 1) });
+    quote = null;
+  };
   for (const raw of source.replace(/\r\n?/g, "\n").split("\n")) {
     const line = raw.trimEnd();
     const bullet = /^\s{0,3}[-*+•]\s+(.*)$/.exec(line);
+    const quoted = depth < QUOTE_DEPTH ? /^\s{0,3}>\s?(.*)$/.exec(line) : null;
+    if (quoted) {
+      endParagraph();
+      endList();
+      (quote ??= []).push(quoted[1] ?? "");
+      continue;
+    }
+    endQuote();
     if (!line.trim()) {
       endParagraph();
       endList();
@@ -74,5 +90,6 @@ export function parseMarkdown(source: string): MdBlock[] {
   }
   endParagraph();
   endList();
+  endQuote();
   return blocks;
 }

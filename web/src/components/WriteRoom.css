@@ -142,5 +142,6 @@ html.room-open :is(.stage, .phone-top) { transform: scale(0.972); filter: bright
 @media (prefers-reduced-motion: reduce) {
   .room[open], .room.open { clip-path: none; transition: none; }
   html.room-open :is(.stage, .phone-top) { transform: none; filter: none; }
-  .room-head, .room-page, .room-dock { opacity: 1; transform: none; translate: none; }
+  .room-head, .room-page { opacity: 1; transform: none; translate: none; }
+  .room-dock { opacity: 1; translate: none; }   /* (its transform centres it: kept) */
 }

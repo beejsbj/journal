@@ -10,7 +10,7 @@ import { weekFor } from "../src/routes/insights";
 import { arr } from "../src/schema";
 import { EntryPage, LibraryItem, Week } from "../src/types";
 import blockToday from "../../tests/fixtures/today.json";
-import { fixtures, json, mount, must, storedText, stubFetch, until } from "./helpers";
+import { click, fixtures, json, mount, must, storedText, stubFetch, until } from "./helpers";
 
 // The thread-start block's own dict (pinned by the engine's tests) plus the week strip the route adds: a day with
 // everything on it: a location, weather, tasks and a reflection to carry forward.
@@ -317,6 +317,26 @@ describe("Entries: the month and the sentence", () => {
     item.click();
     await until(() => expect(window.location.search).toBe("?kind=evening"));
     await until(() => expect(host.querySelector(".filter-sentence")?.textContent).toContain("from Evening journal"));
+  });
+});
+
+describe("The rail's Next from her (a wide screen)", () => {
+  it("reads once, not on every page: moving between pages within the minute asks nothing again, and it stays drawn", async () => {
+    vi.stubGlobal("matchMedia", (q: string) => ({ matches: q === "(min-width: 761px)", media: q, addEventListener() {}, removeEventListener() {} }));
+    visit("/library");
+    const { calls } = stubFetch(base);
+    const host = mount(<App />);
+    const next = await until(() => must(host.querySelector(".rail-next")));
+    expect(next.textContent).toContain("Next from Ada");
+    expect(next.textContent).toContain("21:30");
+    const todayReads = () => calls.filter((c) => c === "/api/v1/today").length;
+    expect(todayReads()).toBe(1);   // the rail's quiet read (the Library itself does not read the day)
+    for (const href of ["/entries", "/library", "/entries"]) {   // (pages that do not read the day themselves)
+      await click(must(host.querySelector(`.rail a.nav-item[href="${href}"]`)));
+      await until(() => expect(window.location.pathname).toBe(href));
+    }
+    expect(todayReads()).toBe(1);
+    expect(host.querySelector(".rail-next")?.textContent).toContain("21:30");
   });
 });
 

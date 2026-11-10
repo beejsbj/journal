@@ -1,5 +1,5 @@
 import { Fragment } from "preact";
-import { parseMarkdown, type Inline } from "../markdown";
+import { parseMarkdown, type Inline, type MdBlock } from "../markdown";
 import "./Markdown.css";
 
 function Run({ parts }: { parts: Inline[] }) {
@@ -12,15 +12,18 @@ function Run({ parts }: { parts: Inline[] }) {
   );
 }
 
-/** The companion's Markdown through the safe renderer: elements are built from data, never from an HTML string. */
-export function Markdown({ text }: { text: string }) {
+function Blocks({ blocks }: { blocks: MdBlock[] }) {
   return (
-    <div class="md">
-      {parseMarkdown(text).map((b, i) =>
+    <>
+      {blocks.map((b, i) =>
         b.type === "p" ? (
           <p key={i}>
             <Run parts={b.inline} />
           </p>
+        ) : b.type === "quote" ? (
+          <blockquote key={i}>
+            <Blocks blocks={b.blocks} />
+          </blockquote>
         ) : (
           <ul key={i}>
             {b.items.map((item, j) => (
@@ -31,6 +34,15 @@ export function Markdown({ text }: { text: string }) {
           </ul>
         ),
       )}
+    </>
+  );
+}
+
+/** The companion's Markdown through the safe renderer: elements are built from data, never from an HTML string. */
+export function Markdown({ text }: { text: string }) {
+  return (
+    <div class="md">
+      <Blocks blocks={parseMarkdown(text)} />
     </div>
   );
 }

@@ -201,6 +201,9 @@ export interface ComposerProps {
   voice?: boolean;
   /** Why nothing can be written now (shown in place of the box). */
   closed?: string | undefined;
+  /** On a phone, rest as one quiet line (the placeholder and Voice) while nothing is in it and nothing is happening:
+   *  `data-rest` on the form, which Composer.css draws. The entry's box asks for it so it never covers his words. */
+  rest?: boolean;
   onSubmit: (words: Words) => Promise<unknown>;
   onDone?: () => void;
 }
@@ -208,12 +211,16 @@ export interface ComposerProps {
 /** The inline box: at the foot of an entry, under a program's phase. His words on a ruled line, Voice and the send. */
 export function Composer(props: ComposerProps) {
   const c = useCompose(props);
+  const [recording, setRecording] = useState(false);
   if (props.closed) return <p class="composer-closed">{props.closed}</p>;
+  // at rest: nothing typed or recorded, no error, no kept words, online, not recording (focus is the CSS's own test)
+  const rest = !!props.rest && !c.has && !c.error && !c.kept && c.online && !recording && !c.busy;
   return (
     <>
       <KeptWords c={c} />
       <form
         class="composer"
+        data-rest={rest || undefined}
         onSubmit={(e) => {
           e.preventDefault();
           void c.send();
@@ -241,7 +248,7 @@ export function Composer(props: ComposerProps) {
         {!c.online && <OfflineNote clip={!!c.clip} />}
         {c.error && <ErrorLine error={c.error} {...(c.error.status === 422 ? {} : { onRetry: () => void c.send() })} />}
         <div class="composer-actions">
-          {props.voice !== false && !c.clip && <Recorder onRecorded={c.record} disabled={c.busy} />}
+          {props.voice !== false && !c.clip && <Recorder onRecorded={c.record} disabled={c.busy} onRecording={(on) => setRecording(on)} />}
           <Button type="submit" variant="primary" disabled={!c.has || c.busy}>
             {c.busy ? "Saving…" : (props.submitLabel ?? "Add")}
           </Button>

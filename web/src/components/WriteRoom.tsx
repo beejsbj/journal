@@ -71,8 +71,26 @@ const hhmm = (t: number) => {
 };
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
-/** Focus is on by default; turning it off holds for this tab, not stored anywhere. */
-let focusOn = true;
+/** Focus is on by default; turning it off is kept on this device (`localStorage`, like the ink, the theme and the
+ *  entry's sidebar): `journal:room-focus` is "off" while it is off, absent otherwise. A display preference only. */
+export const FOCUS_KEY = "journal:room-focus";
+
+export function savedFocus(): boolean {
+  try {
+    return localStorage.getItem(FOCUS_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
+
+function keepFocus(on: boolean): void {
+  try {
+    if (on) localStorage.removeItem(FOCUS_KEY);   // the default is no choice at all
+    else localStorage.setItem(FOCUS_KEY, "off");
+  } catch {
+    // storage refused (private mode): the choice holds for this room only
+  }
+}
 
 // ── what the room is for ─────────────────────────────────────────────────────────────────────────────────────────
 
@@ -222,8 +240,9 @@ export function WriteRoom({ req }: { req: WriteRequest }) {
     return () => document.removeEventListener("keydown", key);
   }, []);
 
-  const hers = day.state === "ready" ? (day.data.today?.voices?.hers ?? "the companion")
-    : doc.state === "ready" && doc.data ? doc.data.voices.hers : "the companion";
+  // her name: from the day when the room read it, from the entry when it is more for an entry
+  const hers = (day.state === "ready" ? day.data.today?.voices?.hers : undefined)
+    ?? (doc.state === "ready" && doc.data ? doc.data.voices.hers : undefined) ?? "the companion";
   const titleOf = (id: string) => (day.state === "ready" ? day.data.library.find((p) => p.id === id)?.title : undefined) ?? id;
 
   let page: Page;
@@ -247,8 +266,9 @@ export function WriteRoom({ req }: { req: WriteRequest }) {
     const d = doc.state === "ready" ? doc.data : null;
     page = {
       key: `entry:${target.stem}`,
+      // the entry's title already carries its date
       where: d ? `${d.title}, continued` : "The entry, continued",
-      when: d ? `adding to ${longDay(d.date)}` : "",
+      when: "",
       label: d ? `More for ${d.title}` : "More for the entry",
       placeholder: "Carry on in your own words",
       send: "Add to the entry",
@@ -331,14 +351,14 @@ function Desk({ page, hour, voice, onClose, onMade }: {
     onDone: () => made.current && onMade(made.current),
   });
   const area = useRef<HTMLTextAreaElement>(null);
-  const [focus, setFocus] = useState(focusOn);
+  const [focus, setFocus] = useState(savedFocus);
   const [sel, setSel] = useState<[number, number]>(() => [c.text.length, c.text.length]);
   const [rec, setRec] = useState<{ on: boolean; s: number }>({ on: false, s: 0 });
   const id = `room-${page.key}`;
 
   const toggleFocus = () => {
-    focusOn = !focus;
-    setFocus(focusOn);
+    keepFocus(!focus);
+    setFocus(!focus);
   };
 
   // where the caret is: on every input, key, click and selection change in the page

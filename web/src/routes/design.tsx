@@ -11,11 +11,12 @@ import { INKS, chooseInk, savedInk, type Ink } from "../ink";
 import { withTransition } from "../shell/transition";
 import { useTitle } from "../title";
 import {
-  AudioPlayer, Button, ButtonLink, Calendar, Clock, DefaultHint, Disclosure, Empty, ErrorLine, IconButton, Letter, MarginNote,
+  AudioPlayer, BackLink, Button, ButtonLink, Calendar, Clock, DefaultHint, Disclosure, Empty, ErrorLine, IconButton, Letter, MarginNote,
   Mark, Menu, ProgressStrip, Ribbon, Segmented, Sheet, Skeleton, Stepper, Switch, TextArea, TextButton, TextField, ThemeChoice,
-  Toast, clockTime,
+  PageBack, Toast, TypedStepper, clockTime,
 } from "../ui";
 import { ApiError } from "../api";
+import { Markdown } from "../components/Markdown";
 import "./design.css";
 
 const QUESTIONS = [
@@ -67,6 +68,7 @@ export function DesignRoute() {
   const [sw, setSw] = useState(true);
   const [seg, setSeg] = useState<"list" | "rail" | "none">("list");
   const [hours, setHours] = useState(6);
+  const [lat, setLat] = useState("51.5");
   const [time, setTime] = useState(21 * 60 + 30);
   const [kind, setKind] = useState<"all" | "audio" | "her" | "starred">("all");
   const [practice, setPractice] = useState("any");
@@ -85,8 +87,8 @@ export function DesignRoute() {
 
   return (
     <div class="ds">
+      <PageBack href="/settings">Settings</PageBack>
       <header class="ds-head">
-        <p class="kicker">This device · <a href="/settings">Settings</a></p>
         <h1 class="display">Design system</h1>
         <p class="lede">
           Every part the journal is made of, drawn by the parts themselves. His words in the book's roman, hers typed in
@@ -188,7 +190,7 @@ export function DesignRoute() {
         </ul>
       </Section>
 
-      <Section id="ds-actions" n="06" title="Actions" lede="His actions are the lamp. One primary per view; quiet for the way back; danger asks in place first.">
+      <Section id="ds-actions" n="06" title="Actions" lede="His actions are the lamp. One primary per view; quiet for the way back; danger asks in place first. The way back from a deeper page is one link, the same everywhere.">
         <div class="ds-row">
           <Button variant="primary">Send your answer</Button>
           <Button>Start</Button>
@@ -201,6 +203,7 @@ export function DesignRoute() {
           <Button size="small" icon={<I.Mic />}>Speak it</Button>
           <ButtonLink href="/design#ds-actions" size="small">Open the entry</ButtonLink>
           <TextButton>Show all</TextButton>
+          <BackLink href="/design#ds-actions">Library</BackLink>
         </div>
         <div class="ds-row">
           <IconButton label="Edit"><I.Pen /></IconButton>
@@ -248,6 +251,10 @@ export function DesignRoute() {
           <div class="ds-srow">
             <div class="ds-lab"><b>Day reflection, latest time</b><span class="hint"><DefaultHint isDefault={time === 21 * 60 + 30} value="21:30" onUse={() => setTime(21 * 60 + 30)} /></span></div>
             <Stepper label="Day reflection, latest time" value={time} onChange={setTime} min={0} max={23 * 60 + 45} step={15} format={clockTime} />
+          </div>
+          <div class="ds-srow">
+            <div class="ds-lab"><b><label for="ds-lat">Latitude</label></b><span class="hint">Typed, or stepped: TypedStepper, for a number the step is too small to reach.</span></div>
+            <TypedStepper id="ds-lat" label="Latitude" value={lat} onInput={setLat} base={0} step={0.5} min={-90} max={90} unit="°" />
           </div>
         </div>
         <p class="ds-sentence">
@@ -311,6 +318,9 @@ export function DesignRoute() {
           <MarginNote who="Ada" at="08:02">Certainty you admire in the light, and want for yourself. It comes back on Friday, at the point.</MarginNote>
         </div>
         <Letter from="Ada" at="Sunday" opener="The week leaned on the water. You wrote five evenings out of seven." class="ds-slip" />
+        <Letter from="Ada" class="ds-slip">
+          <Markdown text={"> The tide does not argue with the shore.\n\nA line she quotes stands in from a hairline of her ink, in her italic; her Markdown goes through the safe renderer (**bold**, *italic*, lists, quotes), never as HTML."} />
+        </Letter>
       </Section>
 
       <Section id="ds-media" n="11" title="Voice and time" lede="His recording, the month he wrote in, a program's way through, when a practice comes, and the ribbon on a page he wrote.">
@@ -325,6 +335,7 @@ export function DesignRoute() {
               <li><Clock at="06:00" /><span>Every day · 06:00</span></li>
               <li><Clock at="21:30" /><span>Every day · 21:30</span></li>
               <li><Clock at="12:00" weekday="Wed" /><span>Wednesdays · 12:00</span></li>
+              <li><Clock at="20:00" weekday="Sun" /><span>Sundays · 20:00</span></li>
               <li><Clock /><span>When you need one</span></li>
               <li><Clock progress={{ done: 2, total: 10 }} /><span>A program</span></li>
               <li><Ribbon kind="own" label="Yours" /><span>Yours</span></li>

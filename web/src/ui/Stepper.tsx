@@ -3,6 +3,10 @@
  * spinbutton (arrow keys, Page Up/Down by ten steps, Home/End); the ends disable at min and max, and the value nudges
  * when it changes. The default is never a placeholder: DefaultHint says it quietly beside the row's label ("the
  * default", or "default 6 hours · Use default" once moved).
+ *
+ * `TypedStepper` is the same face with the value typed in place: for a number the step is too small to reach (a
+ * latitude, a minute count), as Settings uses it. It holds what he typed, as a string, valid or not; the form says
+ * what is wrong.
  */
 import type { ComponentChildren } from "preact";
 import { useRef } from "preact/hooks";
@@ -71,3 +75,50 @@ export function DefaultHint({ isDefault, value, onUse }: { isDefault: boolean; v
 /** Minutes after midnight as HH:MM (a time stepper's `format`). */
 export const clockTime = (minutes: number): string =>
   `${String(Math.floor(minutes / 60) % 24).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+
+/** − [typed value] unit +: the value is a text box he can type in, and the steps move it from what is there (or from
+ *  `base` while it is empty). `value` is his text as typed; `onInput` gets the new text. */
+export function TypedStepper({ label, value, onInput, base = 0, min = -Infinity, max = Infinity, step = 1, unit, whole, disabled, invalid, describedBy, id }: {
+  label: string;
+  value: string;
+  onInput: (next: string) => void;
+  /** Where the steps start while the box is empty (the default). */
+  base?: number;
+  min?: number;
+  max?: number;
+  step?: number;
+  unit?: string;
+  /** Whole numbers only: the phone offers digits. */
+  whole?: boolean;
+  disabled?: boolean;
+  invalid?: boolean;
+  describedBy?: string;
+  id?: string;
+}) {
+  const n = Number(value.trim());
+  const from = value.trim() !== "" && Number.isFinite(n) ? n : base;
+  const move = (by: number) => {
+    const next = Math.min(max, Math.max(min, Math.round((from + by) * 1000) / 1000));
+    if (next !== n) onInput(String(next));
+  };
+  const onKey = (e: KeyboardEvent) => {
+    const by = e.key === "ArrowUp" ? step : e.key === "ArrowDown" ? -step : e.key === "PageUp" ? step * 10 : e.key === "PageDown" ? -step * 10 : 0;
+    if (!by) return;
+    e.preventDefault();
+    move(by);
+  };
+  return (
+    <div class="num-stepper num-stepper-typed" aria-disabled={disabled ? true : undefined}>
+      <button type="button" aria-label={`Less: ${label}`} disabled={disabled || from <= min} onClick={() => move(-step)}><Minus /></button>
+      <span class="num-stepper-field">
+        <input id={id} class="num-stepper-input" type="text" inputMode={whole ? "numeric" : "decimal"} autocomplete="off"
+          role="spinbutton" aria-valuenow={value.trim() !== "" && Number.isFinite(n) ? n : undefined}
+          aria-valuemin={Number.isFinite(min) ? min : undefined} aria-valuemax={Number.isFinite(max) ? max : undefined}
+          aria-invalid={invalid ? true : undefined} aria-describedby={describedBy} value={value} disabled={disabled}
+          onKeyDown={onKey} onInput={(e) => onInput((e.currentTarget as HTMLInputElement).value)} />
+        {unit && <small aria-hidden="true">{unit}</small>}
+      </span>
+      <button type="button" aria-label={`More: ${label}`} disabled={disabled || from >= max} onClick={() => move(step)}><Plus /></button>
+    </div>
+  );
+}

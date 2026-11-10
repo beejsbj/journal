@@ -4,7 +4,7 @@ import { litParagraphs, paragraphs, wordCount } from "../src/components/WriteRoo
 import { loadDraft } from "../src/drafts";
 import { closeEvents } from "../src/events";
 import { closeWrite } from "../src/shell";
-import { json, fixtures, byText, choose, click, mount, must, storedText, stubApi, tick, type, until } from "./helpers";
+import { json, fixtures, byText, click, mount, must, storedText, stubApi, tick, type, until } from "./helpers";
 
 // Everything that writes: the composer and the recorder, the entry's meta sheet, Today's buttons, the run screen,
 // the program cards, settings and the "+" sheet. The server is a stub that records what it was sent.
@@ -33,12 +33,35 @@ describe("The composer on an entry", () => {
     const host = mount(<App />);
     const box = await until(() => must(host.querySelector<HTMLTextAreaElement>(".composer textarea")));
     expect(host.querySelector(".document .composer")).toBeNull();   // no editor on any block: the composer is below the document
+    expect(must(box.form).hasAttribute("data-rest")).toBe(true);    // empty: it may rest as one line on a phone
     await type(box, "One more thing, about the sea.");
+    expect(must(box.form).hasAttribute("data-rest")).toBe(false);   // holding words: the whole box
     expect(loadDraft("entry:2026-10-14-evening")).toBe("One more thing, about the sea.");
     await click(byText(host, "button", "Add to the entry"));
     await until(() => expect(writes()).toHaveLength(1));
     expect(writes()[0]?.body).toMatchObject({ text: "One more thing, about the sea.", client_id: expect.stringMatching(/^[\w.-]{1,64}$/) });
     await until(() => expect(host.querySelector<HTMLTextAreaElement>(".composer textarea")?.value).toBe(""));
+    expect(loadDraft("entry:2026-10-14-evening")).toBe("");
+  });
+
+  it("carries on in the write room from the entry's \"In the writing room\", adding to that entry", async () => {
+    // a wide screen: the entry's "Keep writing" head (with the way into the room) stands over its box there
+    vi.stubGlobal("matchMedia", (q: string) => ({ matches: q === "(min-width: 761px)", media: q, addEventListener() {}, removeEventListener() {} }));
+    visit("/entries/2026-10-14-evening");
+    const { writes } = stubApi({ ...reads, "POST /api/v1/entries/2026-10-14-evening/blocks": { key: "words:2", stem: "2026-10-14-evening" } });
+    const host = mount(<App />);
+    const open = await until(() => must(byText(host, "button", "In the writing room")));
+    await click(open);
+    const r = await until(() => must(host.querySelector<HTMLElement>('[role="dialog"]')));
+    const box = await until(() => must(r.querySelector<HTMLTextAreaElement>('textarea[id="room-entry:2026-10-14-evening"]')));
+    await until(() => expect(must(r.querySelector(`label[for="${box.id}"]`)).textContent).toMatch(/^More for /));
+    const letter = await until(() => must(r.querySelector(".letter")));   // her letter of the entry heads the room
+    await until(() => expect(letter.querySelector(".letter-from")?.textContent).toContain("From Ada"));   // her name, from the entry
+    await type(box, "And the light on the water after.");
+    await click(byText(r, "button", "Add to the entry"));
+    await until(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0]?.path).toBe("/api/v1/entries/2026-10-14-evening/blocks");
+    expect(writes()[0]?.body).toMatchObject({ text: "And the light on the water after.", client_id: expect.any(String) });
     expect(loadDraft("entry:2026-10-14-evening")).toBe("");
   });
 
@@ -745,7 +768,7 @@ describe("Settings", () => {
     await click(byText(host, "button", "Save"));
     await until(() => expect(writes()).toHaveLength(1));
     expect(writes()[0]?.body).toEqual({ windows: { collapse_hours: 8 }, today: { enabled: false } });
-    await until(() => expect(host.querySelector(".settings-form .saved")?.textContent).toContain("windows.collapse_hours (config file)"));
+    await until(() => expect(host.querySelector(".save-dock .saved")?.textContent).toContain("windows.collapse_hours (config file)"));
   });
 
   it("shows which layer each field is in", async () => {
@@ -780,7 +803,7 @@ describe("Settings", () => {
     expect(hours.closest(".setting")?.textContent).toContain("At most 72");
     await type(hours, "5");
     await click(byText(host, "button", "Save"));
-    await until(() => expect(host.querySelector(".settings-form .error-line")?.textContent).toContain("is not an allowed value"));
+    await until(() => expect(host.querySelector(".save-dock .error-line")?.textContent).toContain("is not an allowed value"));
   });
 });
 
@@ -976,7 +999,22 @@ describe("The write room", () => {
     await click(focus);
     expect(focus.getAttribute("aria-pressed")).toBe("false");
     expect(page.classList.contains("focus")).toBe(false);
-    await click(focus);   // (the choice holds for the tab: leave it on for the next test)
+    expect(localStorage.getItem("journal:room-focus")).toBe("off");   // kept on this device, like the ink
+    await click(focus);
+    expect(localStorage.getItem("journal:room-focus")).toBeNull();     // on is the default: no choice stored
+  });
+
+  it("keeps Focus off on this device when he turned it off", async () => {
+    visit("/");
+    localStorage.setItem("journal:room-focus", "off");
+    stubApi(reads);
+    const host = mount(<App />);
+    await until(() => must(host.querySelector("li.practice")));
+    await click(byText(host, "button.plus", "Write"));
+    const r = await room(host);
+    expect(must(byText(r, "button", "Focus")).getAttribute("aria-pressed")).toBe("false");
+    expect(must(r.querySelector(".room-page")).classList.contains("focus")).toBe(false);
+    localStorage.removeItem("journal:room-focus");
   });
 
   it("keeps the draft when it closes, and gives it back when it opens again", async () => {

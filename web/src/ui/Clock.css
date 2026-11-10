@@ -8,3 +8,4 @@
 .clock .hub { fill: var(--text); }
 .clock .arc { fill: none; stroke: var(--text); stroke-width: 2; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 20px 20px; }
 .clock text { font: 600 8.5px var(--f-ui); fill: var(--text-2); text-anchor: middle; }
+.clock .clock-day { font-size: 7.5px; font-weight: 600; }

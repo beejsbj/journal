@@ -1,6 +1,6 @@
 import { useState } from "preact/hooks";
 import { describe, expect, it, vi } from "vitest";
-import { Calendar, Disclosure, Letter, Menu, Segmented, Sheet, Stepper, Switch, TextField } from "../src/ui";
+import { Calendar, Clock, Disclosure, Letter, Menu, Segmented, Sheet, Stepper, Switch, TextField, TypedStepper } from "../src/ui";
 import { useShellMode } from "../src/shell/mode";
 import { App } from "../src/app";
 import { click, mount, must, stubFetch, tick, until } from "./helpers";
@@ -60,6 +60,44 @@ describe("the design system's primitives", () => {
     expect(less.disabled).toBe(true);
     await key(spin, "ArrowUp");
     expect(spin.getAttribute("aria-valuenow")).toBe("2");
+  });
+
+  it("TypedStepper keeps what he typed, and steps from it (or from the default while it is empty)", async () => {
+    const seen: string[] = [];
+    function S() {
+      const [v, set] = useState("");
+      return <TypedStepper label="Latitude" value={v} onInput={(x) => { seen.push(x); set(x); }} base={51.5} step={0.5} min={-90} max={90} unit="°" />;
+    }
+    const host = mount(<S />);
+    const box = must(host.querySelector<HTMLInputElement>('input[role="spinbutton"]'));
+    const [less, more] = [...host.querySelectorAll("button")] as [HTMLButtonElement, HTMLButtonElement];
+    expect(box.getAttribute("aria-valuenow")).toBeNull();
+    await click(more);                       // from the default
+    expect(box.value).toBe("52");
+    box.value = "89.75";
+    box.dispatchEvent(new Event("input", { bubbles: true }));
+    await tick();
+    await click(more);                       // stops at its end
+    expect(box.value).toBe("90");
+    expect(more.disabled).toBe(true);
+    await key(box, "PageDown");
+    expect(box.value).toBe("85");
+    expect(less.getAttribute("aria-label")).toBe("Less: Latitude");
+    expect(seen).toEqual(["52", "89.75", "90", "85"]);
+  });
+
+  it("Clock puts a weekday in the half of the face the hand is not in, clear of the hub", () => {
+    const day = (at: string) => {
+      const host = mount(<Clock at={at} weekday="Wed" />);
+      const text = must(host.querySelector<SVGTextElement>("text.clock-day"));
+      return { y: Number(text.getAttribute("y")), ticks: host.querySelectorAll(".tick").length };
+    };
+    expect(day("12:00")).toEqual({ y: 32, ticks: 3 });   // the hand up: the day below, where the six's tick was
+    expect(day("18:00")).toEqual({ y: 13.5, ticks: 3 }); // the hand down: the day above
+    expect(day("09:00").y).toBe(32);                     // the hand across: below
+    const plain = mount(<Clock at="12:00" />);
+    expect(plain.querySelectorAll(".tick")).toHaveLength(4);
+    expect(plain.querySelector("text")).toBeNull();
   });
 
   it("Disclosure says whether it is open, and its closed body is inert", async () => {
