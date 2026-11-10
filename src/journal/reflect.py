@@ -20,15 +20,22 @@ notebook, as with annotations.
 
 Every quotation must be his words (``validate.unfound``): only well-formed double quotation and blockquotes count,
 each found in one paragraph of one file (or one reply of his) with its parts around "…" in order and close
-together: the period's entries, his replies, or his words anywhere in the journal; her own words, old or new, never
-count. A quote mark outside such a pair is irregular. A bad answer (such a quote or mark, or no reflection at all:
-empty, too long, not prose) writes nothing and is retried on later ticks, ``ATTEMPTS`` times, then alerted once; a
-reflection that never passes is never written. Paraphrase is not checked. A model that cannot be reached at all is
-different: that is an outage, which defers the reflection without using an attempt (``outage``: retried at most
-every 30 minutes for up to 7 days, one alert once it has lasted 6 hours). A run that times out while the model has
-answered another step in this tick is a long run, not an outage: it uses an attempt. After a timeout was deferred as
-an outage, the next try runs without the search and on the old budget (``RETRY_BUDGET``): a hang of the search's own
-does not hold the tick for ``BUDGET`` every half hour.
+together: the period's entries, his replies, or his words in any file of the journal dated the period's end or
+before; her own words, old or new, never count. A quote mark outside such a pair is irregular (a sentence of his
+that holds marks of its own may be quoted whole, verbatim). A bad answer (such a quote or mark, or no reflection at
+all: empty, too long, not prose) writes nothing and is retried on later ticks, ``ATTEMPTS`` times, then alerted
+once; a reflection that never passes is never written. The reason logged, kept in ``error`` and alerted is numbers
+(which mark, where, how long), never the reflection's words; the start of a quote that was not his is kept in the
+ledger alone (``rejected_quote``). Paraphrase is not checked. A reflection written after its period (the morning
+fallback, an outage's retry) is held to that period: the search finds nothing dated after its last day
+(``search.UPTO_ENV`` in the one-shot's environment), and no later entry, reply or notebook thread is read or
+quotable.
+
+A model that cannot be reached at all is different: that is an outage, which defers the reflection without using an
+attempt (``outage``: retried at most every 30 minutes for up to 7 days, one alert once it has lasted 6 hours). A run
+that times out while the model has answered another step in this tick is a long run, not an outage: it uses an
+attempt. After a timeout was deferred as an outage, the next try runs without the search and on the old budget
+(``RETRY_BUDGET``): a hang of the search's own does not hold the tick for ``BUDGET`` every half hour.
 
 Unanswered prompts leave no trace in the journal: the files hold only what was answered (the opener is
 in each entry's own file). Records live in the ledger under ``reflections``.

@@ -382,7 +382,7 @@ class ReflectOutageTest(ReflectBase):
     def test_a_bad_answer_still_uses_an_attempt(self):
         self.evening()
         self.reflect(datetime(2026, 10, 14, 23, 45, tzinfo=IST))
-        # (not prose: a bad answer; an invented quote no longer is one, it loses its marks: test_continuity)
+        # (not prose: one kind of bad answer; an invented quote is another: test_continuity, QuotesTest)
         self.down, self.answer = False, '{"reflection": "a confused model answering in JSON, long enough to count"}'
         alerts, log = self.reflect(datetime(2026, 10, 15, 0, 30, tzinfo=IST))
         self.assertTrue(any("reflection attempt 1/3 failed" in l for l in log))

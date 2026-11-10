@@ -176,11 +176,15 @@ def asked(practice: Practice | str, data: dict) -> list[dict]:
 # quotation counts as quotation: a straight "…" or curly “…” pair on one line whose inside is not empty
 # and neither starts nor ends with a space, and a blockquote (``_BLOCKQUOTE``, as Obsidian renders one).
 # A double quote mark of any other kind, or outside such a pair, is irregular (``quote_like``): it cannot
-# be checked, so it never passes. Single quotes, HTML and paraphrase are not judged here (open). A day reflection or week review checks each quotation against his words, file by file
-# and paragraph by paragraph (``unfound``); one problem makes the answer a bad one, retried, and one
-# that never passes is never written (``reflect.write_one``). A program's synthesis (``insights``), the
-# catch-up and a program's construction and bridge reject the whole text on one (``_misquote``: the
-# same check, against their one source).
+# be checked, so it never passes. One case is read again: a quotation whose inside holds marks of its
+# own is one quotation when the whole of it is his verbatim (``_scan``: a sentence of his that quotes
+# someone). Single quotes, HTML and paraphrase are not judged here (open).
+# A day reflection or week review checks each quotation against his words, file by file and paragraph
+# by paragraph (``unfound``); one problem makes the answer a bad one, retried, and one that never
+# passes is never written (``reflect.write_one``). A program's synthesis (``insights``), the catch-up
+# and a program's construction and bridge reject the whole text on one (``_misquote``: the same check,
+# against their one source). What is said of a problem outside the ledger is numbers (``place``,
+# ``problem``): a rejected text's words, which may be his, go to no log line and no alert.
 
 REFLECTION_LIMITS = {"reflection": 3500, "week": 6000, "insights": 5000}  # insights: a program's synthesis
 QUOTE_GAP = 300  # characters of his at most between two parts of one quote stitched with "…"
@@ -288,13 +292,6 @@ def _blockquotes(text: str) -> list[tuple[int, int, str]]:
     if block is not None:
         out.append((block[0], block[1], " ".join(t for t in block[2] if t)))
     return out
-
-
-def quotes(text: str) -> list[str]:
-    """Passages a text presents as quoted: the inside of each well-formed quotation (``_scan``) and what each
-    blockquote says (``_blockquotes``)."""
-    pairs, _ = _scan(text)
-    return [inner for _, _, inner in pairs] + [said for _, _, said in _blockquotes(text or "") if said]
 
 
 def _misquote(text: str, corpus: str, source: str) -> str | None:

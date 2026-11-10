@@ -1,8 +1,9 @@
 """Continuity for day reflections and week reviews (DECISIONS.md, CONTINUITY): what she reads of what came before (her
 last few analyses, what he wrote back to each, the notebook threads the engine filed from the journal), the one tool
-she is given (``journal_search``: ``test_search.py``), only his words in quotation marks (retried, and on the last
-attempt the sentence goes, not the reflection), one voice across the requests, and the engine's own model steps
-getting nothing from the journal's hook."""
+she is given (``journal_search``: ``test_search.py``), only his words in quotation marks (a quote that is not his, or
+an irregular mark, is a bad answer: retried, and a reflection that never passes is never written; the reason is
+said in numbers, never in the reflection's words), a reflection written late bounded by its own period, one voice
+across the requests, and the engine's own model steps getting nothing from the journal's hook."""
 import json
 import os
 import tempfile
@@ -657,8 +658,7 @@ class VoiceTest(unittest.TestCase):
         for part in ("**What I notice**", "**What moved**", "**To carry forward**", "journal_search",
                      f"at most\n{prompts.QUOTES_ASKED}", "don't string his quotes together", "read past it"):
             self.assertIn(part, text)
-        self.assertNotIn("is thrown away", text)
-        self.assertNotIn("loses its quotation marks", text)  # the model is not told how a misquote is handled
+        self.assertNotIn("is thrown away", text)  # the model is not told how a misquote is handled
         self.assertIn("Only his words go in quotation marks", text)
         self.assertIn('Put his words in straight\ndouble quotes "like this", on one line, and use no other quotation '
                       "marks anywhere", text)

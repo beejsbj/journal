@@ -381,6 +381,7 @@ src/journal/
   inbound.py     one incoming message, before any model sees it: `receive(cfg, Inbound) -> Outcome` (/x, audio, /j, replies, program answers, program commands);
                  `begin_turn` (voice transcripts, the off-record turn mark)
   tools.py       the companion's tools for any agent: `specs`, `call(cfg, name, params, turn)`, and `refusal`, which keeps the writes out of an off-record turn
+  search.py      `journal_search`: his words in the journal's dated files (`entries.his_text`), never the chat, her words or the notebook; read-only
   sweep.py       the busy-gap sweep: replies the hook missed, read from the chat transcript
   conversations.py  the chat itself, both sides, written into entries by thread; /x; the backfill
   audio.py       kept audio: metadata, ffprobe, transcription of audio files

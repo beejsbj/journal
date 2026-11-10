@@ -156,7 +156,7 @@ class DayReflectionTest(Base):
         self.assertEqual(self.reflect(datetime(2026, 10, 15, 4, 5, tzinfo=IST)), ([], []))  # alerted once, then quiet
         self.assertFalse(list(self.cfg.root.glob("*-reflection*.md")))
         self.assertEqual(self.bot.calls, [])
-        # (an invented quote no longer costs the reflection: it loses its marks; test_continuity)
+        # (any bad answer does this; an invented quote is one too: test_continuity, QuotesTest)
 
     def test_failed_agent_degrades_to_no_reflection(self):
         sent = self.day()
