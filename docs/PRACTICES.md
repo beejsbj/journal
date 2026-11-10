@@ -475,7 +475,9 @@ clock), the grace window, and that nothing is scheduled from free text.
 As built (WP5; the reasons are in DECISIONS.md, "Taken by packages"): the run stores each interrupt's wall-clock
 time as `local` (read in whatever timezone applies on the day) beside `at`; only a Telegram reply to the interrupt's
 message is its answer (it is written under a `%% journal interrupt:N %%` key); of several due at once the tick sends
-the newest; `/skip` and `/next` go on without interrupts.
+the newest; `/skip` and `/next` go on without interrupts. OPEN-PROGRAMS: each interrupt opens at its time (its
+ledger record is written, sent or not), and a face's block with `interrupt: N` answers it as a reply does; a phase
+becomes current with no delivery, so a run is done on the web app with no chat too.
 
 ### 4.9 Fix-life mapped onto the format
 

@@ -301,7 +301,7 @@ New keys (all names generic; a deployment's overlay supplies its values):
 | `push.when`, `push.subject` | `no-chat`, none (the project's URL) | Web Push from serve (OPEN-PUSH): `no-chat` pushes only with `channel.platform: none`, `always` on a chat install too; the VAPID contact the push services see. |
 | `serve.tailscale_users` | `[]` | Logins signed in by `Tailscale-User-Login` on the socket only, from tailscaled (root peer) only, for a client that is not this host and not marked cross-site (TSAUTH). |
 | `adapter` | `auto` | `hermes` / `none` / `plainchat`; auto = hermes when `hermes_home` is set. |
-| `channel.platform`, `channel.chat_id`, `channel.user_ids` | `telegram`, `telegram.chat_id`, `[]` | The journal's chat (CHANNELS): any Hermes gateway platform, the chat as Hermes names it, and his ids there (empty: the chat is his, as a DM is). `channel.platform: none` is a journal with no chat (OPEN-PROMPTS rule 6, `Config.has_channel`): prompts, annotation replies, reflections, program summaries and notes are not sent, attempted, counted or alerted; slots go upcoming → due → missed by derivation. Program phases and interrupts still go to the channel (refused, counted, alerted) until OPEN-PROGRAMS. An empty chat id on any other platform still fails and alerts. |
+| `channel.platform`, `channel.chat_id`, `channel.user_ids` | `telegram`, `telegram.chat_id`, `[]` | The journal's chat (CHANNELS): any Hermes gateway platform, the chat as Hermes names it, and his ids there (empty: the chat is his, as a DM is). `channel.platform: none` is a journal with no chat (OPEN-PROMPTS rule 6, `Config.has_channel`): prompts, annotation replies, reflections, program summaries and notes are not sent, attempted, counted or alerted; slots go upcoming → due → missed by derivation. Program phases and interrupts are opened with no delivery and answered on a face (OPEN-PROGRAMS). An empty chat id on any other platform still fails and alerts. |
 | `windows.day_ends_at` | `04:00` | The journal day (`slots.journal_day`): words written before it belong to the day before, so an evening answered at 00:30 takes last night's slot; a deliberate send before it takes today's calendar date (`/start morning` at 03:30 delivers today's morning) unless the practice's nearest scheduled slot is last night's (`/start evening` at 00:30). An unusable value is 04:00, and doctor names it. |
 
 Storage, by owner:
@@ -340,9 +340,14 @@ Lock order is always `tick.lock` → `ledger.lock` → `<state>.lock`; no proces
 deadlock and no lost update). Reads are lock-free: every engine write is an atomic `os.replace`.
 
 The `programs` tick step re-checks every active run: a phase whose settle has elapsed but whose advance spawn was
-lost (gateway restart mid-spawn) is advanced here, at most five minutes late. Program sends reuse
-`tick.send_prompt(cfg, record, log)`, extracted from `send_due`, so prompts, phases and one-off interrupts share
-retries, `sent.jsonl`, mirroring and folding.
+lost (gateway restart mid-spawn) is advanced here, at most five minutes late. A phase is current once it is
+**opened** (`programs._open`: its ledger record with `message_id: None`, `sent_at` the moment it became current,
+`phase_open`; the run's `opened_at`), with or without a chat; `send_due` then means "owed a delivery" (only with a
+chat), and `programs.phase_opened` is the one reader of the two. An interrupt opens at its time
+(`programs._open_interrupts`). Opening writes nothing to `sent.jsonl`, `send-times.json` or the thread stamps, so it
+is never a chat boundary; a `/x` window holds the delivery only. Deliveries reuse `tick.send_prompt(cfg, record,
+log)`, extracted from `send_due`, so prompts, phases and one-off interrupts share retries, `sent.jsonl`, mirroring
+and folding.
 
 ## 5. Plugin and CLI installs coexisting
 
