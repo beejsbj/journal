@@ -228,6 +228,15 @@ class QuotesTest(Earlier):
         body = (self.cfg.root / "2026-10-14-reflection.md").read_text()
         self.assertIn('"the harbour at dusk … like a door"', body)  # his words, in an entry weeks ago
 
+    def test_his_sentence_with_its_own_quotation_marks_is_written_as_he_wrote_it(self):
+        self.evening('rain all day. Mother called. She said "come home" and I said no, not yet. the bus can wait')
+        self.answer = GOOD.replace('"rain all day, walked anyway"', '"She said "come home" and I said no, not yet"') \
+            .replace("“the soup was good … the bus can wait”", '"the bus can wait"')
+        _, log = self.tick(45)
+        self.assertIn("wrote 2026-10-14-reflection.md (annotated) (+1 notebook)", log)
+        self.assertIn('You wrote "She said "come home" and I said no, not yet" and',
+                      (self.cfg.root / "2026-10-14-reflection.md").read_text())
+
     def test_her_words_never_count_as_his(self):
         old = add_prompt(self.cfg, kind="evening", local_date="2026-09-20",
                          sent=datetime(2026, 9, 20, 17, 31, tzinfo=timezone.utc), message_id="3")
@@ -444,6 +453,34 @@ class QuoteCheckTest(unittest.TestCase):
                 found = self.bad(text)
                 self.assertTrue(any(f.startswith("irregular quote mark") for f in found), found)
         self.assertEqual(self.bad("You're right; Theo's walk, the kids’ room, the '90s, `code`, don't."), [])
+
+    def test_a_sentence_of_his_with_quotation_marks_of_its_own_can_be_quoted_whole(self):
+        # (review, 2026-11-10: such a sentence could not be quoted in any form, and three identical answers lost the
+        # reflection. A quotation may close at a later mark of its line when the whole of it is his verbatim.)
+        his = ['Mother called. She said "come home" and I said no, I am not ready.\n\nrain all day, walked anyway.',
+               "Later she said “wait… come home” and left."]
+        for text in ('You wrote "She said "come home" and I said no" and left it there.',
+                     "You wrote “She said \"come home\" and I said no”.",       # curly outside, his marks inside
+                     'You wrote "she said "wait… come home" and left".',        # his curly marks, written straight
+                     'You wrote "She said "come home"".',                       # his mark is the last thing quoted
+                     'You wrote "She said "come home" and I said no." Then nothing more.',
+                     '"rain all day" and "She said "come home" and I said no" both stayed with me.'):
+            with self.subTest(text):
+                self.assertEqual(self.bad(text, docs=his), [])
+        for text, first in (('You wrote "She said "go away" and I said no".', "irregular quote mark U+0022 at"),
+                            ('You wrote "I … "come home" and I said no".', "irregular quote mark U+0022 at"),  # stitched
+                            ("You wrote \"She said 'come home' and I said no\".", "She said 'come home' and I said no"),
+                            ('"She said "come home" and I said no" and "made up words".', "made up words")):
+            with self.subTest(text):
+                self.assertTrue(self.bad(text, docs=his)[0].startswith(first), self.bad(text, docs=his))
+        calls = []
+
+        def wider():
+            calls.append(1)
+            return ['Weeks ago: he told me "not yet" and laughed.']
+        self.assertEqual(self.bad('You wrote "he told me "not yet" and laughed".', docs=his, wider=wider), [])
+        self.assertEqual(self.bad('You wrote "rain all day" and "Mother called".', docs=his, wider=wider), [])
+        self.assertEqual(calls, [1])  # (a line with no irregular mark is never read a second time)
 
     def test_a_short_quote_is_checked_as_a_whole_word(self):
         self.assertEqual(self.bad('You said "No".'), ["No"])                         # not a word of his here

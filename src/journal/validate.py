@@ -208,12 +208,17 @@ def quote_like(c: str) -> bool:
     return ("QUOTATION" in name and "DOUBLE" in name) or any(n in name for n in _DOUBLE_NAMES)
 
 
-def _scan(text: str) -> tuple[list[tuple[int, int, str]], list[int]]:
+def _scan(text: str, his=None) -> tuple[list[tuple[int, int, str]], list[int]]:
     """(the well-formed quotations of ``text`` as (start, end, inside), where every irregular mark is). A quotation is
     a straight "…" or curly “…” pair on one line, closed by the next double quote mark on that line (``quote_like``),
     with an inside that is not empty and does not start or end with whitespace. Every other double quote mark is
     irregular: one that opens no such pair, the one that closes it wrongly (a mixed pair, a quote inside a quote, a
-    quote across a line break), and every other kind wherever it stands (« », „, ″, ˮ, 「 」 …)."""
+    quote across a line break), and every other kind wherever it stands (« », „, ″, ˮ, 「 」 …).
+
+    ``his`` (a test: is this passage, exactly as it stands, in his words?) gives a line that has irregular marks one
+    more reading (``_pairs``): an opening mark may close at a later mark of the line when everything between the
+    two, the marks inside included, is his verbatim. A sentence of his that itself holds quotation marks can then
+    be quoted whole; nothing else changes, since a line without irregular marks is never read again."""
     text = text or ""
     pairs: list[tuple[int, int, str]] = []
     odd: list[int] = []
@@ -221,20 +226,45 @@ def _scan(text: str) -> tuple[list[tuple[int, int, str]], list[int]]:
     for line in text.splitlines(keepends=True):
         body = line.rstrip("\r\n")
         marks = [i for i, c in enumerate(body) if quote_like(c)]
-        k = 0
-        while k < len(marks):
-            i = marks[k]
-            if body[i] in '"“' and k + 1 < len(marks):
-                j = marks[k + 1]
-                inner = body[i + 1:j]
-                if body[j] == ('"' if body[i] == '"' else "”") and inner and inner == inner.strip():
-                    pairs.append((pos + i, pos + j + 1, inner))
-                    k += 2
-                    continue
-            odd.append(pos + i)
-            k += 1
+        found, bad = _pairs(body, marks)
+        if bad and his is not None:
+            found, bad = _pairs(body, marks, his)
+        pairs += [(pos + i, pos + j, inner) for i, j, inner in found]
+        odd += [pos + i for i in bad]
         pos += len(line)
     return pairs, odd
+
+
+def _pairs(body: str, marks: list[int], his=None) -> tuple[list[tuple[int, int, str]], list[int]]:
+    """One line's quotations and irregular marks (``_scan``), ``marks`` being where its double quote marks are. With
+    ``his``, an opening mark first tries the later marks of the line, the farthest first, and closes at one when the
+    whole span between them is his verbatim (his own marks lie inside it); otherwise at the next mark, as always."""
+    pairs: list[tuple[int, int, str]] = []
+    odd: list[int] = []
+    k = 0
+    while k < len(marks):
+        i = marks[k]
+        if body[i] in '"“':
+            close = '"' if body[i] == '"' else "”"
+            ends = [k + 1]
+            if his is not None:
+                ends = [m for m in range(len(marks) - 1, k + 1, -1) if _closes(body, i, marks[m], close)
+                        and his(body[i + 1:marks[m]])][:1] + ends
+            m = ends[0]
+            if m < len(marks) and _closes(body, i, marks[m], close):
+                pairs.append((i, marks[m] + 1, body[i + 1:marks[m]]))
+                k = m + 1
+                continue
+        odd.append(i)
+        k += 1
+    return pairs, odd
+
+
+def _closes(body: str, i: int, j: int, close: str) -> bool:
+    """Whether the mark at ``j`` closes a quotation opened at ``i``: the matching mark, around an inside that is not
+    empty and neither starts nor ends with whitespace."""
+    inner = body[i + 1:j]
+    return body[j] == close and bool(inner) and inner == inner.strip()
 
 
 def _blockquotes(text: str) -> list[tuple[int, int, str]]:
@@ -309,7 +339,8 @@ def _paragraphs(docs) -> list[str]:
 
 def unfound(text: str, docs: list[str], wider=None) -> list[tuple[int, int, str]]:
     """What in ``text`` cannot stand as his words, as (start, end, what), in order: every irregular mark (``_scan``;
-    its span the mark), every quotation and blockquote (its span its whole lines) that no single paragraph of ``docs``
+    its span the mark; a quotation that holds marks of its own is one quotation when the whole of it is his
+    verbatim), every quotation and blockquote (its span its whole lines) that no single paragraph of ``docs``
     holds with its parts around "…" in order and close together (``_in_order``, ``_patterns``). ``wider`` (a
     callable returning more documents, called at most once and only when a passage is missing from ``docs``) is his
     words in every file of the journal, for what a reflection reached through ``journal_search``: a quote stitched
@@ -329,7 +360,20 @@ def unfound(text: str, docs: list[str], wider=None) -> list[tuple[int, int, str]
             more = _paragraphs(wider() or [])
         return any(_in_order(rxs, p) for p in more)
 
-    pairs, odd = _scan(text)
+    def whole(q: str) -> bool:
+        """Whether ``q`` exactly as it stands (its own quotation marks included, no "…" stitching) is in one paragraph
+        of his: what lets a quotation close at a later mark of its line (``_scan``)."""
+        nonlocal more
+        f = _plain(q).strip(" .,;:!?-")
+        if not f or any(f in p for p in paras):
+            return bool(f)
+        if wider is None:
+            return False
+        if more is None:
+            more = _paragraphs(wider() or [])
+        return any(f in p for p in more)
+
+    pairs, odd = _scan(text, whole)
     blocks = _blockquotes(text)
     out = [(i, i + 1, f"irregular quote mark U+{ord(text[i]):04X} at {place(text, i)}") for i in odd]
     out += [(a, b, inner) for a, b, inner in pairs if not found(inner)]
