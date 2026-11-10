@@ -18,15 +18,16 @@ The gateway restarts in **windows**, at least an hour from a ritual (the built-i
 
 ## OWN-WORDS — what the engine adds to a turn is never filed as his words (2026-11-09; hook side and tick side; **gateway restart required**; no config or state change)
 
-**What changes.** The context the engine injects into the companion's turn (`pre_llm_call`: notebook, pack,
-program block, today block) is fenced (`<journal-context>` … `</journal-context>`). The chat reader
-(`hermes/transcript.py`) takes off what was added to his message in storage before reading a row: the gateway's
-notes in front, a natively attached picture's notes and everything stored after its placeholders, a fenced block or
-recalled memory that ends the message; a list of parts Hermes stored as JSON is read as its text. A row whose words
-still carry such a mark anywhere else is **withheld** whole (never captured, written, packed or quoted) and the
-sweep logs it, so it shows in `errors.jsonl` and `journal status`. The sweep now keeps a native picture of a queued
-message beside its entry (only from Hermes' picture cache) and stamps the capture with when the picture arrived.
-Entries already written are not touched. DECISIONS.md, OWN-WORDS.
+**What changes.** The context the engine injects into the companion's turn (`pre_llm_call`: notebook, pack, program
+block, today block) is fenced (`<journal-context>` … `</journal-context>`). The chat reader (`hermes/transcript.py`)
+takes off what was added to his message in storage before reading a row: the gateway's notes in front, a natively
+attached picture's notes and what is stored after its placeholders when that is what a turn adds (the fenced context,
+recalled memory, Hermes' own turn note); a list of parts Hermes stored as JSON is read as its text. A row whose words
+still carry such a mark anywhere else (a fenced block or recalled memory ending a message with no picture, and
+anything else after a picture's placeholders, included) is **withheld** whole (never cut, captured, written, packed or
+quoted) and the sweep logs it, so it shows in `errors.jsonl` and `journal status`. The sweep now keeps a native
+picture of a queued message beside its entry (only from Hermes' picture cache) and stamps the capture of one sent with
+no caption with when the picture arrived. Entries already written are not touched. DECISIONS.md, OWN-WORDS.
 
 **Side and restart.** `turncontext.py` and the new `contextfence.py` (the fence) run in the gateway: the companion
 gets fenced context only after `hermes gateway restart`. `privacy.py`, `conversations.py` and `sweep.py` load with
@@ -41,7 +42,11 @@ its placeholders and withholds an unfenced block by its first line. Rides the ne
 2. First checks, without sending: `journal doctor --deep` is as before (its transcript sample counts withheld rows
    among "read as empty or system"). After the next tick, `errors.jsonl` has no new `sweep: withheld row …` line;
    one that appears names a row (ids only) Hermes stored with something added: read that row read-only
-   (`?mode=ro`) before deciding anything. A `sweep: a picture of message … was not kept (…)` line in the tick's log
+   (`?mode=ro`) before deciding anything. It can be a picture's row with something after its placeholders the
+   reader does not know (another plugin's turn context, a new Hermes note): its caption stays out of the journal
+   until the reader is taught that shape (`hermes/transcript.py` `added`). A row the hook already saved and a cron
+   delivery never make such a line; another of Hermes' own rows (a compaction frame, an `[IMPORTANT: …` notice)
+   only when it carries a picture's turn. A `sweep: a picture of message … was not kept (…)` line in the tick's log
    says why a swept picture stayed out (outside Hermes' picture cache, gone from it, too large, a failed copy). The sweep's watermark is unchanged, so rows it already passed are not read
    again and nothing is captured twice.
 3. Live check, only with the owner (it sends into his chat): with a vault checksum before and after

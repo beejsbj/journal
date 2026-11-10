@@ -458,7 +458,7 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   heading and would take the line for summary text. To close: decide whether either is worth the work (a summary that
   stops at the line, then the line in session files too).
 
-- **OWN-WORDS — three things around a queued picture and her context, left open.** (1) *The privacy pass reads a captionless
+- **OWN-WORDS — four things around a queued picture and her context, left open.** (1) *The privacy pass reads a captionless
   picture at its stored time.* Hermes stores the event's time with a message that has text, but a picture sent with
   no caption at the time its turn ran; queued behind a stuck turn, that can be long after he sent it. A picture sent
   inside a bare-`/x` window and run after the window closed is public to the pass, and so is her reply to it. The
@@ -476,7 +476,15 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   in the `api_content` of several hundred more. No reader of the journal opens those sessions (the transcript reads the
   journal's chat only), so nothing of it reaches an entry; it is her private notebook copied where it need not be. To
   close: decide whether the notebook belongs in turns outside the journal's chat (`channel.turn_ours`), as the pack
-  and today block already do not.
+  and today block already do not. (4) *Hermes' own turn note in a row with no picture* (the review of 2026-11-10).
+  Hermes puts its notes for a turn (`[System: …`: the skills that changed, another interface) in a part of their own
+  between his words and the injected part. In a picture's row that is after the placeholders and is cut. If Hermes
+  ever stores a list of text parts with no picture (its gateway builds a list only for a native picture), a fence or
+  recalled memory after the note withholds the row, but the note alone would read as his words
+  (`my words` and under it `[System: …]`). A user row Hermes writes itself that opens `[System: ` (its compressor
+  counts that prefix among its own) is not among the reader's skip prefixes either, as before this package. To close:
+  count such rows read-only in a live database, then add `[System: ` to the skip prefixes and to the marks
+  (`_LEFTOVER`).
 
 ## Taken by packages (recorded here; later packages follow them)
 
@@ -3556,3 +3564,40 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     Hermes in use stores the parts as text.
   - **Not changed:** entries written before this release (the one found stays as it is: cleaning it is the owner's
     decision); `Row.source` (a native picture's row stays `text`; the sweep writes `photo` when it kept a picture).
+  - **Review fixes (2026-11-10), after an independent review of the merge with main.** Where they differ, these
+    replace what is said above.
+    1. *Nothing is cut off a row with no picture.* The reader no longer takes a fenced block, a cut-short one or
+       recalled memory off the end of a row with no picture (`trailing` is gone from `read` and from `loose`).
+       Hermes stores what a turn adds in his row only for a natively attached picture, so such a block at the end of
+       a text message is his or unknown: the row is withheld whole. A list of text parts with no picture reads the
+       same way.
+    2. *After a picture's placeholders, only what a turn adds is cut* (`added`): nothing; the fenced context and
+       recalled memory, all of it; text that opens with Hermes' own turn note (`[System: `) or with a block's head (a
+       row stored before the fence, behind recalled memory or not). Anything else there (his own words in a message
+       that only looks like a picture's turn, another plugin's turn context, a note this reader does not know)
+       leaves the row uncut and withheld whole, with the errors line. **The cost, named:** on a turn that carries
+       an addition the reader does not know, a real picture's caption stays out of the journal until the reader is
+       taught the shape.
+    3. *The opt-out reads what was cut.* The cut-off part goes to the privacy pass (`Row.meta["cut"]`); a line of it
+       that opens with the opt-out makes the whole row private (`privacy._in_cut`: in `row_marked`, and in the pass
+       for a row with no words in front of the placeholders), so the pass is at least as strict as when the row was
+       read whole. What the review found: a typed picture run followed by a `/x` line was saved up to the run, and
+       the `/x` was not read.
+    4. *What cannot be told apart, said as it is.* A message he types that itself ends with a picture's lines (a
+       blank line, `[Image attached at: …]`, `[screenshot]`), or goes on after them only with what a turn adds, reads
+       as a picture's turn: those lines and what follows them are not read as his words (they are still read for the
+       opt-out). README's guarantee says so. "Whole rather than cut" above holds for every other mark.
+    5. *The platform's own rows are not withheld for a mark* (`_FRAMES`: a compaction frame, a cron delivery, an
+       `[IMPORTANT: …` notice, the task list). No reader takes them for his message, and Hermes' notice of a finished
+       background process cuts its output short under a header shaped like the hook spill's
+       (`[… output truncated — `), which filed a false `sweep: withheld` line. An attachment placeholder and a
+       `[System note: …` that his caption or message can follow still fail closed, and a picture's turn under any
+       of them is withheld as before, cut or not. A cron delivery is a thread boundary whatever it holds: it is
+       never a turn, so no picture is read in it. The sweep does not log a row the hook already saved (`handled`):
+       his words are in the entry as he sent them.
+    6. *`arrival` is for a row with no words.* A row with a caption is stored at the time he sent it; a cache file's
+       time no longer moves its capture (an older file time could put it before the prompt was sent, and the
+       capture was dropped without a line).
+
+    Pinned by `test_own_words.py` (the cases under "review fixes", and the three older cases they changed). The
+    fourth open point above (Hermes' own turn note in a row with no picture) came from the same review.
