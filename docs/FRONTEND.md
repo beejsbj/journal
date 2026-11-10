@@ -207,12 +207,21 @@ composer's own (`useCompose`). `/design` (linked from Settings) draws every part
   when they differ), location/timezone (via `PATCH /settings` → `set_location`), windows, reflections, quiet
   minutes, settle minutes, today-block toggles; each field shows its origin (file / hermes / env) and is locked
   when not writable from here (with the CLI hint). Doctor and Status pages (read-only tables).
+- **Notifications** (OPEN-PUSH): this device's Web Push subscription. *Turn on notifications* asks the permission
+  from that tap only (never on load), subscribes with `GET /push`'s key and posts the subscription; *Turn off* ends it
+  in the browser and on the server. It says why it cannot be offered (the server lacks `journal[push]`, an older
+  server, no push in this browser, an iPhone or iPad not running the Home Screen app) and that a journal with a chat
+  pushes nothing under `push.when: no-chat`. The service worker shows a push as the practice's title and "due now"
+  (one per practice, `swCore.nudge`), and a tap opens `/today?write=<id>` in an open page or a new one
+  (`swCore.openTarget`, this site only).
 - As built (WEB-UX): a large title with "At a glance" beside it (health, how this browser signs in, her ink), a
   numbered index that follows the scroll (a strip on a phone), and the sections as quiet cards of rows: switches,
   steppers (`ui/Stepper`, and `ui/TypedStepper` where the value is typed), her four inks as blots with a letter of hers
   retyping in the one chosen, the theme. A change raises a save bar docked across the foot of the page ("2 changes not
   saved · Discard · Save"), with its own backing, so it never floats over a row; at the foot of the page it sits under
-  the last row.
+  the last row. Notifications are a card of their own at the head of *07 This device*: the state in words (On, Off,
+  checking, or why it cannot be offered), *Turn on notifications* or *Turn off*, a blocked permission or a failed
+  change said under it, and what a notification carries.
 
 ## 2. Visual direction
 

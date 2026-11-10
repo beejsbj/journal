@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { SCHEMES, at, settle, toFoot, withInk } from "./lib";
 
-// Insights, Settings and the Library, their states: Settings with a change waiting (the save bar docked at the foot),
+// Insights, Settings and the Library, their states: Settings' notifications card (below), Settings with a change waiting (the save bar docked at the foot),
 // mid-page with the bar up (it must sit on no control), at its foot with the health check open, after a jump from the
 // index, and with another ink chosen; Insights with a day's reflection open; a built-in's reset asked in place.
 
@@ -69,6 +69,34 @@ for (const scheme of SCHEMES) {
       await page.locator(".edited-note .confirm").evaluate((el) => el.scrollIntoView({ block: "center" }));   // clear of the phone's tab bar
       await page.waitForTimeout(300);
       await page.screenshot({ path: `${at(info.project.name, scheme, "library-reset-asking")}.png` });
+    });
+  });
+}
+
+// Notifications on this device (OPEN-PUSH), at the head of "07 This device", with the worker allowed so the device is
+// read, over a server that can push: as headless Chromium starts (notifications denied: "blocked for this site"), and
+// with the permission granted (Off for this device, Turn on notifications). Light and dark, phone and desktop. The
+// other states (the server cannot push, an older server, an iPhone not on the Home Screen, no key yet, On) are pinned
+// by web/tests/push.test.tsx.
+const PUSH = { available: true, detail: "", public_key: "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4", when: "no-chat", active: true, subscriptions: 0 };
+for (const scheme of SCHEMES) {
+  test.describe(`notifications ${scheme}`, () => {
+    test.use({ colorScheme: scheme, serviceWorkers: "allow" });
+    test(`settings notifications ${scheme}`, async ({ page, context }, info) => {
+      await page.route("**/api/v1/push", (r) => r.fulfill({ json: PUSH }));
+      const shoot = async (name: string, button: string) => {
+        await page.goto("/settings");
+        await settle(page, 700);
+        await expect(page.locator(".set-push").getByRole("button", { name: button })).toBeVisible({ timeout: 15_000 });
+        await page.evaluate(() => document.querySelector(".set-push")?.scrollIntoView({ block: "center" }));
+        await page.waitForTimeout(300);
+        await page.screenshot({ path: `${at(info.project.name, scheme, name)}.png` });
+      };
+      await shoot("settings-push-blocked", "Turn on notifications");
+      await expect(page.locator(".set-push .field-error")).toContainText("blocked");
+      await context.grantPermissions(["notifications"]);
+      await shoot("settings-push-off", "Turn on notifications");
+      await expect(page.locator(".set-push .field-error")).toHaveCount(0);
     });
   });
 }

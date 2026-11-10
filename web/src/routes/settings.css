@@ -222,3 +222,13 @@
   .settings-page .save-bar { min-height: 60px; }
 }
 
+
+/* ---- 07: notifications on this device (Notifications): a card of its own above the pairing card ---- */
+.settings-page .set-push { margin-bottom: var(--s3); }
+.settings-page .set-push .set-label { font: 500 var(--t-ui) / 1.35 var(--f-ui); }
+.settings-page .set-push-more { flex-basis: 100%; display: grid; gap: var(--s2); }
+.settings-page .set-push-more:empty { display: none; }
+.settings-page .set-push-more > .field-error, .settings-page .set-push-more > .error-line { margin: 0; }
+.settings-page .set-push-row.on .set-push-state { color: var(--text-2); }
+.settings-page .set-push-note { min-height: 0; padding-top: 12px; padding-bottom: 14px; }
+.settings-page .set-push-note .set-hint { display: block; margin: 0; }

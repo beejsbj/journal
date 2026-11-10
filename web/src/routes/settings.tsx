@@ -17,6 +17,7 @@ import { InkBlot, Lock, Pin } from "../icons";
 import { INKS, chooseInk, savedInk, type Ink } from "../ink";
 import { isOnline } from "../offline";
 import { FIELDS, GROUPS, buildPatch, keyOf, problem, shown, valueAt, type GroupId, type SettingField } from "../settingsModel";
+import { browserDevice, browserEnv, current, sameKey, support, turnOff, turnOn, type Device, type PushEnv } from "../push";
 import { useTitle } from "../title";
 import type { Json } from "../schema";
 import type { DoctorRow, Located, Session } from "../types";
@@ -228,6 +229,122 @@ function Pairing({ who, again }: { who: Session | null | undefined; again: () =>
       </div>
       {actions && <div class="set-actions">{actions}</div>}
     </div>
+  );
+}
+
+// ── 07 this device: notifications ───────────────────────────────────────
+
+type PushStep = { at: "idle" } | { at: "busy" } | { at: "denied" } | { at: "failed"; why: ApiError | string };
+
+/**
+ * Notifications on this device (Web Push from the server, OPEN-PUSH): a practice's name and "due now" when its slot
+ * comes, and nothing else; a tap opens Today's write room on it (`/today?write=<id>`). Turned on from a tap, which asks
+ * the browser's permission then (never on load); each device is turned on by itself. A quiet card of its own in "This
+ * device": the state in words (On, Off, checking), why it cannot be offered when it cannot (the server lacks the extra,
+ * the browser has no push, an iPhone not on the Home Screen yet, no key yet), the blocked permission and a failed
+ * change said plainly, and what a notification carries.
+ */
+export function Notifications(props: { device?: Device | null; env?: PushEnv }) {
+  // read once: a device made at each render would restart the effect below for ever
+  const [device] = useState(() => (props.device === undefined ? browserDevice() : props.device));
+  const [env] = useState(() => props.env ?? browserEnv());
+  const [res, reload] = useResource((signal) => api.push(signal), []);
+  const [on, setOn] = useState<boolean | undefined>(undefined);
+  const [step, setStep] = useState<PushStep>({ at: "idle" });
+  const info = res.state === "ready" ? res.data : null;
+  const key = info?.public_key ?? null;
+  useEffect(() => {
+    if (!device || !key) return;
+    let live = true;
+    current(device)
+      .then((sub) => {
+        if (!live) return;
+        const mine = !!sub && sameKey(sub, key);
+        setOn(mine);
+        // the server may have dropped it (a push service said it was gone) or lost its file: give it back, quietly
+        if (sub && mine) void api.subscribePush(sub.toJSON()).catch(() => undefined);
+      })
+      .catch(() => live && setOn(false));
+    return () => {
+      live = false;
+    };
+  }, [device, key]);
+  const flip = (want: boolean) => {
+    if (!device || !key) return;
+    setStep({ at: "busy" });
+    const work = want ? turnOn(key, device) : turnOff(device).then(() => "off" as const);
+    work
+      .then((out) => {
+        if (out === "denied") {
+          setStep({ at: "denied" });
+          return;
+        }
+        setOn(out === "on");
+        setStep({ at: "idle" });
+        reload();
+      })
+      .catch((e: unknown) => setStep({ at: "failed", why: e instanceof ApiError ? e : "The browser could not change the subscription. Try again." }));
+  };
+  // the row's state line, its control, and anything it has to say under them
+  let state: ComponentChildren;
+  let control: ComponentChildren = null;
+  let more: ComponentChildren = null;
+  if (res.state === "error") {
+    if (res.error.status === 404) state = "This server does not offer notifications yet.";
+    else more = <ErrorLine error={res.error} onRetry={reload} />;
+  } else if (!info) {
+    state = <span role="status">Asking the server…</span>;
+  } else if (!info.available) {
+    state = <>Notifications are not set up on the server. {info.detail}</>;
+  } else if (support(env) === "install-first") {
+    state = "On an iPhone or iPad, add the journal to the Home Screen first (Share, then Add to Home Screen), open it from there, and turn notifications on here.";
+  } else if (support(env) !== "ok" || !device) {
+    state = "This browser can't take notifications from the journal.";
+  } else if (!key) {
+    state = "The server has no key yet to subscribe with; it makes one at its start. Try again in a minute.";
+  } else if (on === undefined) {
+    state = <span role="status">Checking this device…</span>;
+  } else {
+    const blocked = device.permission() === "denied" || step.at === "denied";
+    const busy = step.at === "busy";
+    state = on ? "On for this device." : "Off for this device.";
+    control = on ? (
+      <Button size="small" variant="quiet" disabled={busy} onClick={() => flip(false)}>Turn off</Button>
+    ) : (
+      <Button size="small" disabled={busy || device.permission() === "denied"} onClick={() => flip(true)}>Turn on notifications</Button>
+    );
+    more = (
+      <>
+        {blocked && !on && (
+          <p class="field-error" role="alert">Notifications are blocked for this site. Allow them in the browser's settings, then try again.</p>
+        )}
+        {step.at === "failed" && (typeof step.why === "string" ? <p class="field-error" role="alert">{step.why}</p> : <ErrorLine error={step.why} />)}
+      </>
+    );
+  }
+  return (
+    <section class="set-push" aria-labelledby="push-h">
+      <div class="set-group">
+        <div class={["set-row", "set-push-row", on && "on"].filter(Boolean).join(" ")}>
+          <div class="set-lab">
+            <h3 class="set-label" id="push-h">Notifications</h3>
+            <p class="set-hint set-push-state">{state}</p>
+          </div>
+          {control && <div class="set-control">{control}</div>}
+          {more && <div class="set-push-more">{more}</div>}
+        </div>
+        <div class="set-row set-push-note">
+          <p class="set-hint">
+            A notification says a practice's name and that it is due, nothing else; a tap opens it to write. It travels
+            through the browser maker's push service (Apple, Google, Mozilla or Microsoft), which cannot read it but learns
+            that this site sends this device notifications, and when.
+            {info && info.available && !info.active && (
+              <> This journal has a chat, so nothing is pushed (push.when is no-chat; set it to always to be nudged here too).</>
+            )}
+          </p>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -809,7 +926,8 @@ export function SettingsRoute() {
               )}
             </Section>
           ))}
-          <Section id="set-device" n={7} title="This device" lede="How this browser reaches the journal, and the look of the app, part by part.">
+          <Section id="set-device" n={7} title="This device" lede="How this browser reaches the journal, whether it is nudged when a practice is due, and the look of the app, part by part.">
+            <Notifications />
             <div class="set-group">
               <Pairing who={sign.who} again={sign.again} />
               <div class="set-row">

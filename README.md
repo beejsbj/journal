@@ -171,6 +171,8 @@ Minimal config:
 | `serve.token_env`, `serve.token_command`, `serve.token_key` | `JOURNAL_SERVE_TOKEN`, none, `JOURNAL_SERVE_TOKEN` | Where the API token comes from, resolved like the bot token. With neither configured, `journal serve` generates `<state_dir>/serve-token` (0600). |
 | `serve.trusted_proxies` | `[]` | CIDRs of the reverse proxy in front: only from these is `X-Forwarded-Proto`/`-For` believed. |
 | `serve.socket` | none | An absolute path (at most 107 bytes) of a Unix socket `journal serve` listens on as well as TCP, for `tailscale serve --https=<port> unix:<path>`. Made 0600 at start (its missing directory 0700), removed at stop. A socket anywhere below `/run/user/<uid>/` (`journal-serve/serve.sock`, `journal/serve/serve.sock`) makes `--print-unit` add `RuntimeDirectory=<that path>`; anywhere else only has its mount gated (`RequiresMountsFor`). The path is normalised (`a/../b` is `b`). The server refuses a socket directory that is not the service user's own or that group or others can write (so not directly in `/tmp`), and never removes or reuses a socket file of another user's: another local user who could replace the socket would receive his browser's requests from tailscaled. On the socket the `Host` check reads `X-Forwarded-Host`. Unusable: `journal serve` will not start, doctor says why. |
+| `push.when` | `no-chat` | Web Push from `journal serve` (the extra `journal[push]`; *Web app*, Notifications): `no-chat` pushes a slot only on a journal with no chat (`channel.platform: none`), `always` on a chat install too, beside the chat message. |
+| `push.subject` | the project's URL | The VAPID contact (`mailto:` or `https:`) the browsers' push services see with every push. Left unset, it names the software, not your site. |
 | `serve.tailscale_users` | `[]` | Tailscale logins (`someone@example.com`) signed in with no pairing: a request **on the socket** whose one `Tailscale-User-Login` header is listed needs no cookie or token. Over TCP the header is ignored, whoever sends it. Writes still need the site's `Origin` (`serve.host`, `serve.public_port`). The web app then shows "Signed in via Tailscale as …" and no pairing or Unpair. |
 | `serve.assets_dir` | the packaged `serve/static` | A web app build to serve instead (development). |
 | `serve.allow_write` | `true` | Anything but `true` makes every route that changes the journal answer 405 (the web app then only reads); pairing still works. |
@@ -195,7 +197,8 @@ for it yet). If a chat is configured later, the annotation replies and reflectio
 each is marked skipped (`no chat`) when it would have been, and the companion's pack and today block say how many were
 written while there was no chat (counts only; they are in the entries). A program's summaries are not sent either
 (they belong to sessions done with no chat), and the phase that is current goes to the chat when you `/start` the
-program.
+program. With `journal serve` and the extra `journal[push]`, the installed web app is nudged when
+a slot comes (*Web app*, Notifications).
 
 ### Another platform
 
@@ -557,7 +560,7 @@ recordings, the companion's replies standing in the right margin beside the pass
 (annotations, notes, the day's reflection) unfolding at the end; on a wide screen the list stays beside it as a
 sidebar), **Library** (the practices and programs, grouped,
 with each definition's questions and the file itself), **Insights** (week by week: counts, the week's review, the day
-reflections) and **Settings** (this browser's pairing with Unpair, or "Signed in via Tailscale as …", versions of the server and the tick, every setting with
+reflections) and **Settings** (this browser's pairing with Unpair, or "Signed in via Tailscale as …", notifications on this device, versions of the server and the tick, every setting with
 the layer it comes from, doctor). They also write, through the routes below and nothing else:
 
 - *Today* has **Write now** on every practice, whatever its state (to come, due, waiting, missed, answered): it opens
@@ -609,6 +612,25 @@ The page is built for a thumb: touch targets of at least 44 px, the safe-area in
 phone, the composer above it. Unknown fields in an answer are dropped at the client's
 boundary, and the page never shows off-the-record material (it never reaches a file to be served). With no build
 (`serve.assets_dir` pointing at an empty directory), `/` shows a placeholder page that can only pair a browser.
+
+**Notifications (Web Push).** With the extra `journal[push]` (`uv tool install --force 'journal[push,hermes] @ …'`),
+`journal serve` nudges the installed app when a practice is due. Settings → *Notifications* → **Turn on
+notifications** asks the browser's permission from that tap; each device is turned on by itself, and on an iPhone or
+iPad the app must be on the Home Screen first (iOS 16.4 or later). A notification says the practice's title and "due
+now", nothing else, and a tap opens Today with that practice ready to write (`/today?write=<id>`). A thread in
+`journal serve` looks once a minute: a scheduled slot is pushed once, when its time has come, while it is within
+`windows.grace_hours` and unanswered (done early on a face, it is not pushed). `push.when` says which journals push:
+`no-chat` (the default) only one with no chat (`channel.platform: none`), `always` a chat install too, beside the chat
+message. A push is not a delivery: it writes no prompt record and nothing in `sent.jsonl`, `send-times.json` or the
+thread stamps, so it never starts a thread or ends a `/x` window. The payload is encrypted end to end (RFC 8291,
+signed with VAPID, RFC 8292, and padded to one size), but the browser maker's push service (Apple, Google, Mozilla or
+Microsoft) sees that a notification went to the device and when, the server's address, its VAPID public key (one key
+for all your devices) and the VAPID contact (`push.subject`; by default the project's URL, never your site's name).
+When you turn notifications on, the browser itself registers this site with its push service, so the vendor may
+learn the site's address that way, whatever `push.subject` says; weigh that before turning them on. The key pair and the subscriptions are `state_dir/serve-push.json` (0600), the slots
+already pushed `push-sent.json`; a push service that says a subscription is gone (404 or 410) removes it, and serve
+posts only to the browsers' push services. Without the extra, Settings says push is unavailable and why, and
+`journal doctor`'s `serve push` row says the same (with it: the keys, the devices subscribed, `push.when`).
 
 **Developing the app.** `web/` is built by CI, never on the host that runs the journal: `.github/workflows/web.yml` runs
 `npm ci`, the type check, vitest, `npm run build`, and fails when the rebuilt `src/journal/serve/static` differs from

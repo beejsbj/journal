@@ -77,6 +77,17 @@ describe("Settings, the section index", () => {
   });
 });
 
+describe("Settings, notifications", () => {
+  it("are a card of their own at the head of 07 This device", async () => {
+    visit("/settings");
+    stubApi({ ...read, "GET /api/v1/push": { available: false, detail: "Web Push needs the optional extra journal[push]", public_key: null, when: "no-chat", active: false, subscriptions: 0 } });
+    const host = mount(<App />);
+    const head = await until(() => must(host.querySelector("#set-device #push-h")));
+    expect(head.closest("#set-device")?.querySelector(".set-group")).toBe(head.closest(".set-group"));   // the first card there
+    await until(() => expect(head.closest(".set-push")?.textContent).toContain("journal[push]"));
+  });
+});
+
 describe("Settings, the save bar", () => {
   it("rises with the count of changes, discards them, and stays last in the page so it never covers a row", async () => {
     visit("/settings");

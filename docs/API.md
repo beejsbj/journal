@@ -144,6 +144,9 @@ server.
 | GET | `/settings` | T | – | `{"settings", "origins", "profile"?}` (`profile`: the Hermes profile's name when there is one, so the page prints `hermes -p <profile> config set ...`): the effective config, redacted (`telegram.token_*`, `serve.token_*`, `sources.*.command` shown as `"<set>"`), with `origins` per key | none | |
 | PATCH | `/settings` | T+O | `{"location"?, "timezone"?, "coordinates"?, "windows"?: {...}, "reflections"?: {...}, "conversations.quiet_minutes"?, "programs.settle_minutes"?, "today"?: {...}}` | `200 {written: {key: layer}}` through `config.patch_values` (a nested change is merged into the layer that owns the key; dotted keys are the nested form); `location` goes through `location.set_location` (looked up first; writes location, timezone and coordinates; `timezone` beside it overrides the lookup's; not together with `coordinates`); a Hermes-owned key → 409 with the `hermes config set` hint (the same refusal `journal config set` gives; both run `settings.apply`); an env-owned key → 409; nothing is written unless every key can be | none (atomic file write) | 400 key not allowed (`telegram`, `guard`, `hermes`, `agent`, `serve`, `root`, `state_dir`, `practices_dir` are never writable here; the allow-list is `config.WEB_WRITABLE`), 422 bad value, 503 place lookup unreachable or the config file's directory not writable by the service user |
 | POST | `/settings/location` | T+O | `{"lat": number, "lon": number}` (the browser's position; other keys are ignored) | `200 {"written": {key: layer}, "location", "timezone", "local_time_now"}`: "Use my location". `settings.apply_near` checks that location, timezone and coordinates can all be written (as for a place: a Hermes-owned one is 409 with the lines that set it) **before** the position leaves the host, cuts it to two decimals (about a kilometre), names the place there with OpenStreetMap Nominatim's reverse lookup (zoom 10: a city, town or village; `lookup.reverse_url`) and the place's time zone with Open-Meteo (`timezone=auto`; `lookup.timezone_url`), and saves the three through `location.set_location(near=…)`, the same write and the same `location-history.jsonl` line as a typed place (its `query` reads `device position`). The `coordinates` saved are **the matched place's own** (its centre), never the device's position. The answer names the place, never a position; nothing logs it, and curl reads the lookup address from stdin, so it is not on a command line (DECISIONS.md, WEB-DESIGN) | none (atomic file write) | 422 `invalid` (no number pair, off the map, no named place or no time zone there), 409 not writable, 503 a lookup curl could not reach (any non-zero exit) or that answered an HTTP error (a 429, a 5xx; also for a typed place) or the config file's directory not writable |
+| GET | `/push` | T | – | `{"available", "detail", "public_key", "when", "active", "subscriptions"}`: Web Push on this server (OPEN-PUSH): `available` false without the extra `journal[push]` (`detail` says how to install it), else `public_key` is the VAPID key a browser subscribes with (base64url; made at the first start, or here if the start could not), `when` is `push.when`, `active` whether this journal pushes at all (`always`, or `no-chat` on a journal with no chat), `subscriptions` the number of devices | `locked_state(serve-push.json)` when it makes the keys | 423 |
+| POST | `/push/subscriptions` | T+O | `PushSubscription.toJSON()`: `{"endpoint", "keys": {"p256dh", "auth"}}` | `201` (`200` when this endpoint was already kept; its keys are refreshed) `{"subscriptions": n}`. The endpoint must be `https` on a browser's push service (`fcm.googleapis.com`, `android.googleapis.com`, `updates.push.services.mozilla.com`, `*.push.apple.com`, `*.notify.windows.com`; no user info, port 443), at most 2000 characters; `p256dh` a 65-byte P-256 point, `auth` 16 bytes. One per device, at most ten (the oldest goes). Signed in, but not a `WRITE` route: it changes no entry, so `serve.allow_write: false` keeps it | `locked_state(serve-push.json)` | 400, 422 `bad-subscription`, 423 |
+| DELETE | `/push/subscriptions` | T+O | `{"endpoint"}` | `204`, also when there was none | `locked_state(serve-push.json)` | 400, 423 |
 | GET | `/events` | T | – | `text/event-stream`: `entries-changed {stem}`, `ledger-changed`, `runs-changed {id}`, `library-changed {id}`, `tick {at}`; from a 2-second mtime poller over `root`, `ledger.json`, `runs/`, `practices_dir`, `last-tick.json`; a `: ping` comment every 25 s (a reverse proxy's idle timeout can be as short as 180 s); `Cache-Control: no-transform` | none | |
 
 Not routes, by decision: the notebook (hers), `packs/`, `audio-stash/`, the transcript, `sent.jsonl`,
@@ -161,10 +164,17 @@ annotations/notes writes (`write_annotations`, `add_companion_note` stay the eng
   `media_dir` and only when an engine entry references them).
 - Nothing on the server logs bodies; the access log (off by default, `--access-log` for dev) records method, path,
   status and bytes.
+- **Web Push** (OPEN-PUSH; README *Web app*, Notifications): a background thread in serve makes a pass a minute over
+  the ledger, the library and the config (what serve already reads). A push carries the practice's title, "due now"
+  and its id, never his words, an opener or anything read from an entry; it writes only `serve-push.json` and
+  `push-sent.json`, never a prompt record, `sent.jsonl`, `send-times.json` or the thread stamps, so it is no chat
+  boundary (OPEN-PROMPTS rule 12). Its outbound calls go only to the browsers' push services: a subscription's endpoint
+  must be one of theirs.
 - `tests/test_serve_privacy.py`: `sqlite3.connect` patched to raise `AssertionError`, every route exercised against
   a temp journal with a conversation-bearing entry, a reflection, a program run and a user practice; all return
   their normal status; the write routes get the same walk (one sample each, `sqlite3.connect` and the privacy pass
-  made to fail, a route added without a sample fails the test). `tests/test_serve_fence.py`: the import grep.
+  made to fail, a route added without a sample fails the test), and the push routes and a push pass the same.
+  `tests/test_serve_fence.py`: the import grep.
 
 ## 4. Locking against the tick
 
@@ -177,6 +187,8 @@ annotations/notes writes (`write_annotations`, `add_companion_note` stay the eng
 - Anything that sends or advances is a spawned `journal …` process that waits on `tick.lock` like `/morning`
   does today; the API returns `202` at once. The spawn's output goes to `manual-trigger.log`; `/events` reports the
   resulting `ledger-changed`/`runs-changed`.
+- The push thread takes `locked_state` on its own two files (`serve-push.json`, `push-sent.json`), nothing else, and
+  never `tick.lock`.
 - Lock order (tick → ledger → state) is never inverted by the server; `tests/test_locks.py` runs a hook capture, a
   tick round and a `POST /entries/{stem}/blocks` concurrently in-process and asserts no deadlock and both writes
   present.
