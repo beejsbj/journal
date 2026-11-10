@@ -11,6 +11,17 @@ test.beforeEach(({}, info) => {
   test.skip(info.project.name !== "phone", "measured on the phone viewport");
 });
 
+// No page error on any route, the worker blocked included: a browser that refuses the worker (Playwright's block
+// resolves `register()` with nothing) once left an uncaught "reading 'waiting'" from pwa.ts on every load.
+let errors: string[] = [];
+test.beforeEach(({ page }) => {
+  errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+});
+test.afterEach(({}, info) => {
+  if (info.status !== "skipped") expect(errors, "uncaught errors in the page").toEqual([]);
+});
+
 /** The fixture server has no program run in progress (and starting one would change what the smoke tests read), so the
  *  run screen is drawn from the answer the Python suite pins for it (tests/fixtures/api/run-one.json). */
 async function withRun(page: Page): Promise<void> {
@@ -38,7 +49,7 @@ async function small(page: Page): Promise<string[]> {
       if (el.closest(".visually-hidden")) continue;
       if (el.closest("details:not([open]) > :not(summary)")) continue;   // folded away
       const inSentence = el.tagName === "A" && el.closest("p, .md, .hint, .sub, .empty");
-      if (inSentence && !el.matches(".crumb a")) continue;
+      if (inSentence) continue;
       const isBox = el instanceof HTMLInputElement && (el.type === "checkbox" || el.type === "radio");
       const target = isBox ? (el.closest("label") ?? el) : el;
       const r = target.getBoundingClientRect();
@@ -52,8 +63,12 @@ async function small(page: Page): Promise<string[]> {
   });
 }
 
+/** How far the page runs past the phone's width. Measured against the width the test set, not `innerWidth`: on a
+ *  mobile viewport the browser widens the layout viewport to fit content that overflows, and innerWidth grows with it,
+ *  so the overflow would hide itself. */
 async function sideways(page: Page): Promise<number> {
-  return page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  const width = (page.viewportSize() as { width: number }).width;
+  return page.evaluate((w) => Math.max(document.documentElement.scrollWidth, window.innerWidth) - w, width);
 }
 
 const ROUTES: Array<[string, string]> = [
@@ -67,6 +82,8 @@ const ROUTES: Array<[string, string]> = [
   ["run", "/runs/2026-10-15-run1"],
   ["insights", "/insights"],
   ["settings", "/settings"],
+  ["design", "/design"],
+  ["not-found", "/no/such/page"],
 ];
 
 for (const [name, path] of ROUTES) {

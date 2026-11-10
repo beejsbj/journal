@@ -1,9 +1,10 @@
 import { defineConfig } from "@playwright/test";
 
 /**
- * The design screenshots: every screen at phone and desktop width, light and dark, over the fixture server's
- * `--demo` journal (a prompt in every state). Not part of CI's smoke test; run off the journal's host:
- *   npx playwright test -c playwright.shots.config.ts   (writes shots/out/*.png)
+ * The design screenshots: every screen and its states at phone and desktop width, light and dark, over the fixture
+ * server's `--demo` journal (a prompt in every state). Not part of CI's smoke test; run off the journal's host:
+ *   npx playwright test -c playwright.shots.config.ts   (writes shots/out/<project>-<scheme>-<screen>[-<state>].png)
+ * shots/screens.spec.ts lists the screens; shots/lib.ts holds what the specs share.
  */
 export const SHOTS_BASE = "http://127.0.0.1:8792";
 export const SHOTS_PAIR_FILE = process.env.JOURNAL_SHOTS_PAIR_FILE ?? "/tmp/journal-shots-pair-codes";
