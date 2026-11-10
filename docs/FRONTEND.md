@@ -58,9 +58,12 @@ and under 1100 px. On a phone the page has a top bar (the mark, the theme, Setti
 Today, Entries, **Write** (a lamp disc in the middle), Library, Insights. **Write opens the write room**, which
 replaces the + sheet (DECISIONS.md, WEB-UX-WRITE-ROOM): a full-screen page for his words, large in the book's roman,
 with every paragraph but the one he is in greyed (Focus, on by default; turning it off is kept on the device,
-`localStorage["journal:room-focus"]`). It opens on a new note, from Today's *Answer* / *Speak it* (her letter at its
-head, recording at once for *Speak it*), and from an entry's *In the writing room* (more for that entry); its quiet
-start offers the prompts still open and the programs to start. Drafts, retries, uploads and the offline line are the
+`localStorage["journal:room-focus"]`). It opens on a new note; from Today's *Write now* / *Speak it* and from
+`/today?write=<id>` on a practice (OPEN-FACES, as built in the room: the practice as a view, `GET /library/{id}/open`,
+her letter (the card's prompt when it was sent, else the view's plain opener and questions), the line saying which slot
+the words fill, then *Save*; a practice the view refuses shows why and no box; recording at once for *Speak it*); and
+from an entry's *In the writing room* (more for that entry). Its quiet start offers the prompts still open or due and
+the programs to start. Drafts, retries, uploads and the offline line are the
 composer's own (`useCompose`). `/design` (linked from Settings) draws every part of the system.
 
 ### 1.1 Today
@@ -71,8 +74,17 @@ composer's own (`useCompose`). `/design` (linked from Settings) draws every part
   emoji + title, a state (`Comes at 23:00` / `Waiting since 06:00` / `Answered 06:41` / `Missed · reply anytime`),
   and, once sent, **the whole prompt in her voice, opener and every question, whatever its state** (the row's
   `prompt`; the web never folds a prompt, only Telegram does), then the first line of his reply in his serif when
-  there is one; actions: *Reply* (opens the entry composer; for a prompt with no entry yet, POST `/entries` with `practice`),
-  *Send now* (POST `/library/{id}/send`, shows "on its way", resolves on `ledger-changed`).
+  there is one; actions: *Write now* on every card, whatever its state (OPEN-FACES: opens the practice as a view,
+  `GET /library/{id}/open`, her plain opener and questions unless the card already shows the prompt, and the line
+  saying which slot the words fill, above a composer; *Save* is POST `/entries` with `practice`, which fills the slot
+  `slots.resolve` gives or makes an extra entry, never a `/j` note; nothing is fetched or written before he opens it),
+  *Send to chat* (POST `/library/{id}/send`, shows "on its way", resolves on `ledger-changed`). A *due* card ("due
+  since 09:00") is a slot whose time has come with no chat message for it. `/today?write=<id>` (Today's second path)
+  opens *Write now* on the row the words will fill (the newest due or open one, else the newest missed, else the next
+  to come), or the practice alone when it has no row today; it is used once (it leaves the address, and a save stops
+  it opening again). A practice the view refuses (unknown) shows why and no composer; one turned off is not refused (`enabled: false`
+  is off the schedule, nothing more: its card and its Library page keep *Write now* and *Send to chat*). *Send to chat* is
+  left out when `/today` says `chat: false` (a journal with no chat).
 - Program card for each active run: "Session 3/10 · The Identity Construction Tracer · Phase 2/5 open since
   Sunday", buttons *Continue* (opens the Run screen), *Pause*.
 - Scheduled one-offs today (session-10 interrupts) as a quiet list with times.
@@ -81,8 +93,9 @@ composer's own (`useCompose`). `/design` (linked from Settings) draws every part
 - Empty states: "Nothing scheduled today" / "No program running — start one from the Library".
 - Loading: skeleton cards; offline: last cached `/today` with an "offline, as of 09:12" ribbon.
 - As built (WEB-UX): the day as a numeral with the weekday and month beside it, the week between rules, "Waiting for
-  you" and "Earlier today" with her letters in full (`ui/Letter`, *Answer* the lamp, *Speak it*), "Written today", and
-  on a wide page a right-hand column: what is still to come with leaders to the hour (*Send now*), the programs as
+  you" (open and due) and "Earlier today" with her letters in full (`ui/Letter`; *Write now* the lamp, *Speak it*,
+  *Send to chat*), "Written today", and on a wide page a right-hand column: what is still to come with leaders to the
+  hour (*Write now*, *Send to chat*), the programs as
   strips, "Carry forward". States are quiet words in the book's italic, never pills.
 
 ### 1.2 Entries (History)
@@ -132,7 +145,7 @@ composer's own (`useCompose`). `/design` (linked from Settings) draws every part
 - Source badge: built-in / yours / edited (`source: fork`, a built-in he edited in place), and "default changed"
   when the shipped default has moved on since his edit. Enabled toggle for built-ins (`enabled: false` saved in place).
 - Card → Detail: title, description/intro, the question set (practices) or the sessions and phases (programs),
-  buttons *Send now* (practices), *Start* / *Continue* / *Insights* (programs; `/runs`), *Edit* on every definition,
+  buttons *Write now* (Today, `?write=<id>`) and *Send to chat* (practices), *Start* / *Continue* / *Insights* (programs; `/runs`), *Edit* on every definition,
   a built-in included (it is edited in place: BUILTIN-EDIT), *New practice* (the five-minute path: a form with title,
   time, and one question field pre-filled; saving writes a complete file).
 - An edited built-in shows an *Edited* panel under the actions: his version is used in place of the built-in; "The

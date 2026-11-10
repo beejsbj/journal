@@ -187,10 +187,13 @@ export function EditedNote({ one, onReset }: { one: LibraryOne; onReset: () => v
   );
 }
 
-/** What can be done with a practice: send it now, switch it, change it, put it back. */
+/** What can be done with a practice: write it now (Today, open on it), send it to the chat, switch it, change it, put
+ *  it back. Send to chat is not offered on a journal with no chat (the day's quiet read says so, as Today reads it). */
 function PracticeActions({ one, reload }: { one: LibraryOne; reload: () => void }) {
   const d = one.definition;
   const act = useAction();
+  const [day] = useResource((signal) => api.todayQuiet(signal).catch(() => null), []);
+  const chat = day.state === "ready" ? day.data?.chat : undefined;
   const { route } = useLocation();
   const [onItsWay, setOnItsWay] = useState(false);
   useLive(["ledger-changed"], () => setOnItsWay(false));
@@ -206,12 +209,14 @@ function PracticeActions({ one, reload }: { one: LibraryOne; reload: () => void 
     <div class="detail-actions">
       <div class="actions">
         <ButtonLink variant="primary" href={`/library/${d.id}/edit`} data-vt="push">Edit</ButtonLink>
-        {d.enabled && (
+        {/* (turned off is not scheduled, nothing more: it is still written and sent from here; the owner, 2026-11-09) */}
+        <ButtonLink href={`/today?write=${encodeURIComponent(d.id)}`}>Write now</ButtonLink>
+        {chat !== false && (
           <Button disabled={act.busy || onItsWay} onClick={async () => {
             const done = await act.run(() => api.sendNow(d.id));
             if (done) setOnItsWay(true);
           }}>
-            {onItsWay ? "On its way…" : "Send now"}
+            {onItsWay ? "On its way…" : "Send to chat"}
           </Button>
         )}
         <Button disabled={act.busy} onClick={() => void go(() => setEnabled(one, !d.enabled))}>
@@ -225,7 +230,7 @@ function PracticeActions({ one, reload }: { one: LibraryOne; reload: () => void 
           </ConfirmButton>
         )}
       </div>
-      {!d.enabled && <p class="hint">Turned off: kept, and not sent until you turn it on.</p>}
+      {!d.enabled && <p class="hint">Turned off: not sent on its schedule. Write now and Send to chat still work.</p>}
       {act.error && <ErrorLine error={act.error} />}
     </div>
   );

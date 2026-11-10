@@ -90,10 +90,12 @@ describe("Today", () => {
     expect(reply.querySelector(".words")?.textContent).toContain("The ferry was late");
     expect(answered.querySelector(".letter")?.contains(reply)).toBe(false);   // never inside her letter
     expect(upcoming.querySelector(".letter")).toBeNull();   // not sent yet: nothing to show
-    // what can be done, on the letter's crease: Answer and Speak it while it waits; Reply and Send now once it came and went
-    expect([...open.querySelectorAll(".letter-actions button")].map((b) => b.textContent)).toEqual(["Answer", "Speak it"]);
-    expect([...missed.querySelectorAll(".letter-actions button")].map((b) => b.textContent)).toEqual(["Reply", "Send now"]);
-    expect([...upcoming.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Send now"]);
+    // what can be done, on the letter's crease (OPEN-FACES: Write now on every practice, whatever its state; Send to
+    // chat while it is to come, due or missed): Write now and Speak it while it waits
+    expect([...open.querySelectorAll(".letter-actions button")].map((b) => b.textContent)).toEqual(["Write now", "Speak it"]);
+    expect([...missed.querySelectorAll(".letter-actions button")].map((b) => b.textContent)).toEqual(["Write now", "Send to chat"]);
+    expect([...answered.querySelectorAll(".letter-actions button")].map((b) => b.textContent)).toEqual(["Write now"]);
+    expect([...upcoming.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Write now", "Send to chat"]);
     // no capitals: the day is a numeral, the weekday and month words
     expect(host.querySelector(".today-num")?.textContent).toBe("15");
     expect(host.querySelector(".today-num")?.getAttribute("aria-hidden")).toBe("true");
@@ -125,7 +127,7 @@ describe("Today", () => {
     const missed = must(host.querySelector<HTMLElement>("li.practice.missed"));
     expect(missed.querySelector(".pill")?.textContent).toBe("came at 06:00");
     expect(missed.querySelector(".letter")).toBeNull();
-    expect([...missed.querySelectorAll(".today-actions button")].map((b) => b.textContent)).toEqual(["Reply", "Send now"]);
+    expect([...missed.querySelectorAll(".today-actions button")].map((b) => b.textContent)).toEqual(["Write now", "Send to chat"]);
   });
 
   it("falls back to the pairing screen on a 401", async () => {

@@ -29,7 +29,7 @@ import { ButtonLink } from "./ui/Button";
 const DesignRoute = lazy(() => import("./routes/design").then((m) => m.DesignRoute));
 
 const NAV = [
-  { href: "/", label: "Today", Icon: Today, match: (p: string) => p === "/" },
+  { href: "/", label: "Today", Icon: Today, match: (p: string) => p === "/" || p === "/today" },
   { href: "/entries", label: "Entries", Icon: Entries, match: (p: string) => p.startsWith("/entries") },
   { href: "/library", label: "Library", Icon: Library, match: (p: string) => p.startsWith("/library") || p === "/new-practice" || p.startsWith("/runs") },
   { href: "/insights", label: "Insights", Icon: Insights, match: (p: string) => p.startsWith("/insights") },
@@ -179,6 +179,8 @@ function Shell() {
           <ErrorBoundary>
             <Router>
               <Route path="/" component={TodayRoute} />
+              {/* (Today's other name: /today?write=<id> opens a practice to write, the link a notification will carry) */}
+              <Route path="/today" component={TodayRoute} />
               <Route path="/entries" component={EntriesRoute} />
               <Route path="/entries/:stem" component={EntryRoute} />
               <Route path="/library" component={LibraryRoute} />

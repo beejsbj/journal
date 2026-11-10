@@ -5,6 +5,8 @@ import { loadDraft } from "../src/drafts";
 import { closeEvents } from "../src/events";
 import { closeWrite } from "../src/shell";
 import { json, fixtures, byText, click, mount, must, storedText, stubApi, tick, type, until } from "./helpers";
+import { writeTarget } from "../src/routes/today";
+import type { PracticeRow } from "../src/types";
 
 // Everything that writes: the composer and the recorder, the entry's meta sheet, Today's buttons, the run screen,
 // the program cards, settings and the "+" sheet. The server is a stub that records what it was sent.
@@ -13,8 +15,19 @@ function visit(path: string) {
   window.history.replaceState(null, "", path);
 }
 
+/** A practice opened as a view (GET /library/{id}/open, OPEN-FACES): what the write room shows above his words. */
+const view = (practice: string, fills: string, opener = "Evening 📓 Let the day land.") => ({
+  practice, title: practice, fills,
+  prompt: { sent_at_local: null, opener, opener_source: "plain", asked: [], questions: [{ id: "1.1", text: "What's spinning in your mind?", section: null }] },
+  slot: { id: `2026-10-15-${practice}`, date: "2026-10-15", state: "upcoming", step: 3, at: "23:00", delivered: false },
+});
+
 const reads = {
   "GET /api/v1/today": fixtures.today,
+  "GET /api/v1/library/morning/open": view("morning", "Answers the 06:00 slot, due since 06:00.", "Morning."),
+  "GET /api/v1/library/gratitude/open": view("gratitude", "Answers the prompt in the chat, sent at 21:30."),
+  "GET /api/v1/library/weekly/open": view("weekly", "Answers the prompt in the chat, sent at 20:05."),
+  "GET /api/v1/library/evening/open": view("evening", "Fills the 23:00 slot early; it will not be sent."),
   "GET /api/v1/library": fixtures.library,
   "GET /api/v1/runs": [],
   "GET /api/v1/entries/2026-10-14-evening": fixtures.entryEvening,
@@ -338,19 +351,27 @@ describe("Mood, people and a star", () => {
 describe("Today", () => {
   const open = {
     ...fixtures.today,
-    practices: { rows: [{ id: "morning", state: "open", sent: "06:00", stem: "2026-10-15-morning" }, ...fixtures.today.practices.rows], open: ["morning"] },
+    practices: { rows: [{ id: "morning", state: "open", sent: "06:00", stem: "2026-10-15-morning",
+                          prompt: { sent_at_local: "06:00 IST", opener: "Morning.", opener_source: "ada", asked: [], questions: [] } },
+                        ...fixtures.today.practices.rows.filter((r) => r.id !== "morning")], open: ["morning"] },
   };
 
-  it("answers a waiting prompt in the write room, as a new entry of that practice", async () => {
-    // WEB-UX: Answer on Today opens the write room (it was an inline composer under the card); the write is the same
+  // OPEN-FACES (main) and WEB-UX (this branch) together: Write now on the card opens the write room (WEB-UX: the room
+  // replaced the inline composer), which shows the practice as a view (the slot his words fill, in words) before he
+  // writes; the words then go to POST /entries with the practice, as before
+  it("replies to a waiting prompt as a new entry of that practice, in the write room", async () => {
     visit("/");
-    const { writes } = stubApi({ ...reads, "GET /api/v1/today": open, "POST /api/v1/entries": { stem: "2026-10-15-morning", path: "x", rule: "web" } });
+    const { writes } = stubApi({ ...reads, "GET /api/v1/today": open, "POST /api/v1/entries": { stem: "2026-10-15-morning", path: "x", rule: "web" },
+                                 "GET /api/v1/library/morning/open": view("morning", "Answers the prompt in the chat, sent at 06:00.") });
     const host = mount(<App />);
     const card = await until(() => must(host.querySelector("li.practice.open")));
-    await click(byText(card, "button", "Answer"));
+    await click(byText(card, "button", "Write now"));
     const room = await until(() => must(host.querySelector<HTMLElement>('[role="dialog"]')));
+    await until(() => expect(room.querySelector(".room-fills")?.textContent).toBe("Answers the prompt in the chat, sent at 06:00."));
+    expect(room.querySelectorAll(".letter")).toHaveLength(1);   // the room shows the prompt the chat has, and only once
+    expect(room.querySelector(".letter-body")?.textContent).toContain("Morning.");
     await type(room.querySelector("textarea"), "Slept badly, but the light is good.");
-    await click(byText(room, "button", "Send your answer"));
+    await click(byText(room, "button", "Save"));
     await until(() => expect(writes()).toHaveLength(1));
     expect(writes()[0]?.body).toMatchObject({ practice: "morning", text: "Slept badly, but the light is good." });
     await until(() => expect(room.textContent).toContain("Saved."));
@@ -358,12 +379,155 @@ describe("Today", () => {
     expect(loadDraft("reply:morning:0")).toBe("");
   });
 
+  // (ported from OPEN-FACES to the redesign: the view opens in the write room, not under the card; every behavioural
+  // assertion kept: nothing is asked until he opens it, opening writes nothing, the view's opener and questions and
+  // its fills line, the words posted with the practice, the saved entry linked)
+  const room = (host: HTMLElement) => until(() => must(host.querySelector<HTMLElement>('[role="dialog"]')));
+  const acts = (card: Element) => [...card.querySelectorAll(".letter-actions button, .today-actions button, .later-actions button")].map((b) => b.textContent);
+
+  it("writes a practice that is still to come: the view first (her opener, the questions, the slot), then the words", async () => {
+    visit("/");
+    const { writes, sent } = stubApi({ ...reads, "POST /api/v1/entries": { stem: "2026-10-15-evening", path: "x", rule: "web", slot: "2026-10-15-evening" },
+                                       "GET /api/v1/library/evening/open": view("evening", "Fills the 23:00 slot early; it will not be sent.") });
+    const host = mount(<App />);
+    await until(() => must(host.querySelector("li.practice.upcoming")));
+    const card = must([...host.querySelectorAll<HTMLElement>("li.practice")].find((c) => c.textContent?.includes("Evening")));
+    expect(sent.filter((s) => s.path.endsWith("/open"))).toHaveLength(0);   // nothing asked until he opens it
+    await click(byText(card, "button", "Write now"));
+    const r = await room(host);
+    await until(() => expect(r.querySelector(".letter .letter-body p")?.textContent).toBe("Evening 📓 Let the day land."));
+    expect(r.querySelector(".letter")?.textContent).toContain("What's spinning in your mind?");
+    expect(r.querySelector(".room-fills")?.textContent).toBe("Fills the 23:00 slot early; it will not be sent.");
+    expect(writes()).toHaveLength(0);   // opening is a view: nothing is written
+    await type(r.querySelector("textarea"), "A long day, a good one.");
+    await click(byText(r, "button", "Save"));
+    await until(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0]?.body).toMatchObject({ practice: "evening", text: "A long day, a good one." });
+    await until(() => expect(r.querySelector(".saved a")?.getAttribute("href")).toBe("/entries/2026-10-15-evening"));
+  });
+
+  it("offers Write now on every practice, answered too, and says when one is due", async () => {
+    visit("/");
+    const rows = [{ id: "morning", state: "answered", sent: "06:00", answered: "06:41", stem: "2026-10-15-morning" },
+                  { id: "gratitude", state: "due", at: "09:00" }, { id: "evening", state: "missed", at: "08:00" }];
+    stubApi({ ...reads, "GET /api/v1/today": { ...fixtures.today, practices: { rows, open: [] } } });
+    const host = mount(<App />);
+    await until(() => must(host.querySelector("li.practice.due")));
+    const cards = [...host.querySelectorAll<HTMLElement>("li.practice")];
+    expect(cards.map((c) => acts(c)[0])).toEqual(["Write now", "Write now", "Write now"]);
+    expect(must(host.querySelector("li.practice.due .pill")).textContent).toBe("due since 09:00");
+  });
+
+  it("offers Write now and Send to chat on a practice turned off: enabled false is not scheduled, nothing more", async () => {
+    visit("/");
+    const rows = [{ id: "gratitude", state: "due", at: "09:00" }];
+    const library = fixtures.library.map((p) => (p.id === "gratitude" ? { ...p, enabled: false } : p));
+    stubApi({ ...reads, "GET /api/v1/today": { ...fixtures.today, practices: { rows, open: [] } }, "GET /api/v1/library": library });
+    const host = mount(<App />);
+    const card = await until(() => must(host.querySelector("li.practice.due")));
+    // (WEB-UX adds Speak it beside Write now on a prompt that waits: the room opens recording)
+    await until(() => expect(acts(card)).toEqual(["Write now", "Speak it", "Send to chat"]));
+  });
+
+  it("opens Write now from the address: /today?write=<id>", async () => {
+    visit("/today?write=evening");
+    stubApi({ ...reads, "GET /api/v1/library/evening/open": view("evening", "Fills the 23:00 slot early; it will not be sent.") });
+    const host = mount(<App />);
+    const r = await room(host);
+    await until(() => expect(r.querySelector(".room-fills")?.textContent).toBe("Fills the 23:00 slot early; it will not be sent."));
+    expect(r.querySelector(".room-ctx b")?.textContent).toBe("Evening journal");   // the practice's title, from the Library
+    expect(r.querySelector<HTMLTextAreaElement>("textarea")?.id).toBe("room-reply:evening:2");   // its row today: the 23:00 one
+    expect(host.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+  });
+
+  it("opens a practice with no row today alone, from the address", async () => {
+    visit("/today?write=quiet");
+    stubApi({ ...reads, "GET /api/v1/library/quiet/open": view("quiet", "Starts an extra entry of this practice (2026-10-15-quiet).", "Quiet.") });
+    const host = mount(<App />);
+    const r = await room(host);
+    await until(() => expect(r.querySelector(".room-fills")?.textContent).toContain("extra entry"));
+    expect(r.querySelector(".letter .letter-body p")?.textContent).toBe("Quiet.");
+    expect(r.querySelector<HTMLTextAreaElement>("textarea")?.id).toBe("room-reply:quiet:write");
+  });
+
+  it("after a save from ?write, the reload does not open Write now again, and the address loses ?write", async () => {
+    const listeners: Record<string, () => void> = {};
+    class FakeSource {
+      static CLOSED = 2;
+      readyState = 1;
+      onopen: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      addEventListener(name: string, fn: () => void) {
+        listeners[name] = fn;
+      }
+      close() {}
+    }
+    vi.stubGlobal("EventSource", FakeSource);
+    visit("/today?write=quiet");
+    let saved = false;
+    let opened = 0;
+    const answeredRow = { id: "quiet", state: "answered", sent: "09:13", answered: "09:13", stem: "2026-10-15-quiet" };
+    stubApi({
+      ...reads,
+      "GET /api/v1/today": () => (saved ? { ...fixtures.today, practices: { rows: [...fixtures.today.practices.rows, answeredRow], open: [] } } : fixtures.today),
+      "GET /api/v1/library/quiet/open": () => {
+        opened += 1;
+        return view("quiet", "Starts an extra entry of this practice (2026-10-15-quiet).", "Quiet.");
+      },
+      "POST /api/v1/entries": () => {
+        saved = true;
+        return { stem: "2026-10-15-quiet", path: "x", rule: "web", slot: "2026-10-15-quiet" };
+      },
+    });
+    const host = mount(<App />);
+    const r = await room(host);
+    expect(window.location.search).toBe("");   // used once: a later visit or remount does not open it again
+    await until(() => must(r.querySelector("textarea")));
+    await type(r.querySelector("textarea"), "Quiet words.");
+    await click(byText(r, "button", "Save"));
+    await until(() => must(r.querySelector(".room-done .saved")));
+    await until(() => expect(listeners["ledger-changed"]).toBeDefined());
+    listeners["ledger-changed"]?.();
+    await until(() => must(host.querySelector("li.practice.answered")));
+    expect(host.querySelectorAll('[role="dialog"]')).toHaveLength(1);   // the room was not opened again
+    expect(opened).toBe(1);                                              // nor the view asked for again
+    expect(r.querySelector(".room-done .saved")).not.toBeNull();         // what he saved still says so
+  });
+
+  it("?write opens the card the words will fill: due or open first, then missed, then the next to come", () => {
+    const r = (state: string, at: string) => ({ id: "water", state, at }) as PracticeRow;
+    expect(writeTarget([r("missed", "09:00"), r("open", "15:00"), r("upcoming", "21:00")], "water")).toBe(1);
+    expect(writeTarget([r("missed", "09:00"), r("missed", "12:00"), r("upcoming", "21:00")], "water")).toBe(1);
+    expect(writeTarget([r("answered", "09:00"), r("upcoming", "15:00"), r("upcoming", "21:00")], "water")).toBe(1);
+    expect(writeTarget([r("answered", "09:00")], "water")).toBe(0);
+    expect(writeTarget([r("answered", "09:00")], "other")).toBe(-1);
+  });
+
+  it("opens no composer for a practice the view cannot open (unknown, a note)", async () => {
+    visit("/today?write=quiet");
+    stubApi({ ...reads, "GET /api/v1/library/quiet/open": json({ error: "not-found", detail: "no practice by that id" }, 404) });
+    const host = mount(<App />);
+    const r = await room(host);
+    await until(() => expect(r.querySelector(".error-line")?.textContent).toContain("no practice"));
+    expect(r.querySelector("textarea")).toBeNull();
+    expect(byText(r, "button", "Save")).toBeUndefined();
+  });
+
+  it("offers no Send to chat on a journal with no chat", async () => {
+    visit("/");
+    stubApi({ ...reads, "GET /api/v1/today": { ...fixtures.today, chat: false } });
+    const host = mount(<App />);
+    await until(() => must(host.querySelector("li.practice")));
+    expect(byText(host, "button", "Send to chat")).toBeUndefined();
+    expect(byText(host, "button", "Write now")).toBeDefined();
+  });
+
   it("sends a practice now (spawned), says it is on its way, and clears on the ledger event", async () => {
     visit("/");
     const { writes } = stubApi({ ...reads, "POST /api/v1/library/gratitude/send": json({ spawned: true, log: "/x" }, 202) });
     const host = mount(<App />);
-    const card = await until(() => must(host.querySelector("li.practice.upcoming")));
-    await click(byText(card, "button", "Send now"));
+    const card = await until(() => must([...host.querySelectorAll("li.practice.upcoming")].find((li) => /gratitude/i.test(li.textContent ?? ""))));
+    await click(byText(card, "button", "Send to chat"));
     await until(() => expect(card.textContent).toContain("On its way"));
     expect(writes()[0]?.path).toBe("/api/v1/library/gratitude/send");
   });
@@ -372,8 +536,8 @@ describe("Today", () => {
     visit("/");
     stubApi({ ...reads, "POST /api/v1/library/gratitude/send": json({ error: "engine-unavailable", detail: "cannot start it: OSError" }, 503) });
     const host = mount(<App />);
-    const card = await until(() => must(host.querySelector("li.practice.upcoming")));
-    await click(byText(card, "button", "Send now"));
+    const card = await until(() => must([...host.querySelectorAll("li.practice.upcoming")].find((li) => /gratitude/i.test(li.textContent ?? ""))));
+    await click(byText(card, "button", "Send to chat"));
     await until(() => expect(card.querySelector(".error-line")?.textContent).toContain("cannot start"));
   });
 
@@ -590,12 +754,30 @@ describe("The run screen", () => {
 describe("The Library", () => {
   const withGratitude = { ...reads, "GET /api/v1/library/gratitude": fixtures.libraryGratitude };
 
-  it("sends a practice now", async () => {
+  it("sends a practice to the chat now", async () => {
     visit("/library/gratitude");
     const { writes } = stubApi({ ...withGratitude, "POST /api/v1/library/gratitude/send": json({ spawned: true, log: "/x" }, 202) });
     const host = mount(<App />);
-    await click(await until(() => must(byText(host, "button", "Send now"))));
+    await click(await until(() => must(byText(host, "button", "Send to chat"))));
     await until(() => expect(writes()).toHaveLength(1));
+  });
+
+  it("writes a practice now on Today", async () => {
+    visit("/library/gratitude");
+    stubApi(withGratitude);
+    const host = mount(<App />);
+    const link = await until(() => must(byText(host, "a.button", "Write now")));
+    expect(link.getAttribute("href")).toBe("/today?write=gratitude");
+  });
+
+  it("offers Write now and Send to chat on a practice turned off (the owner, 2026-11-09: not scheduled, nothing more)", async () => {
+    visit("/library/gratitude");
+    const off = { ...fixtures.libraryGratitude, definition: { ...fixtures.libraryGratitude.definition, enabled: false } };
+    stubApi({ ...reads, "GET /api/v1/library/gratitude": off });
+    const host = mount(<App />);
+    await until(() => must(byText(host, "button", "Turn on")));
+    expect(byText(host, "a.button", "Write now")?.getAttribute("href")).toBe("/today?write=gratitude");
+    expect(byText(host, "button", "Send to chat")).toBeDefined();
   });
 
   it("turns a practice off by saving the file with enabled false, against the mtime it read", async () => {
@@ -941,7 +1123,7 @@ describe("The write room", () => {
     await click(offer);
     const box = await until(() => must(r.querySelector<HTMLTextAreaElement>('textarea[id="room-reply:gratitude:0"]')));
     await type(box, "The tea.");
-    await click(byText(r, "button", "Send your answer"));
+    await click(byText(r, "button", "Save"));
     await until(() => expect(writes()).toHaveLength(1));
     expect(writes()[0]?.body).toMatchObject({ practice: "gratitude", text: "The tea." });
   });
@@ -952,7 +1134,7 @@ describe("The write room", () => {
     stubApi({ ...reads, "GET /api/v1/today": fixtures.todayPrompts });
     const host = mount(<App />);
     const card = await until(() => must(host.querySelector("li.practice.open")));
-    await click(byText(card, "button", "Answer"));
+    await click(byText(card, "button", "Write now"));
     const r = await room(host);
     const letter = await until(() => must(r.querySelector(".letter")));
     expect(letter.querySelector(".letter-from")?.textContent).toContain("From Ada");
@@ -961,7 +1143,7 @@ describe("The write room", () => {
     expect(box.value).toBe("Half a thought from before.");
     expect(must(r.querySelector(`label[for="${box.id}"]`)).textContent).toBe("Your answer to Weekly pattern scan");
     expect(r.querySelector(".room-saved")?.textContent).toContain("Draft kept");
-    expect(byText(r, "button", "Send your answer")).toBeDefined();
+    expect(byText(r, "button", "Save")).toBeDefined();
     sessionStorage.clear();
   });
 

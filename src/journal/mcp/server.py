@@ -4,8 +4,8 @@ optional extra ``journal[mcp]``), served over stdio.
 This module is the only one that imports the SDK; ``cli`` imports it only for ``journal mcp`` and explains how to
 install the extra when it is missing, so the core stays stdlib-only. The configuration is loaded again for every
 call (``load``: the CLI's own resolution of ``--config`` / ``--hermes-home``), so a move that changed the timezone
-or a practice added since the client connected is seen at once. stdout is the protocol: nothing here prints, the
-engine logs to stderr, and a spawned send writes to ``manual-trigger.log``.
+or a practice added since the client connected is seen at once. stdout is the protocol: nothing here prints, and
+the engine logs to stderr. Nothing here posts into the chat or spawns anything.
 """
 from __future__ import annotations
 
@@ -22,7 +22,6 @@ from . import handlers
 
 READ = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
 APPEND = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
-SEND = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True)
 
 TOOLS = ("journal_today", "journal_entries", "journal_entry", "journal_save", "journal_practices", "journal_start",
          "journal_program_status", "journal_add_note")
@@ -44,7 +43,8 @@ def instructions(cfg: Config) -> str:
     return (
         f"The journal of {who}: guided practices sent on a schedule, and entries that keep two voices apart: "
         f"{n.possessive} own words, verbatim, and {n.companion}'s (the companion's) replies, annotations and notes. "
-        f"Read with journal_today, journal_entries and journal_entry. journal_save appends words {who} wrote or "
+        f"Read with journal_today, journal_entries and journal_entry. To do a practice with {who}, journal_start "
+        f"shows it (its opener and questions); journal_save with practice then appends what {who} wrote or "
         f"dictated to you, exactly as given; never your own words, a summary or a paraphrase. Your own observations "
         f"go through journal_add_note, which files them as the companion's notes, apart from {n.possessive} words. "
         f"Text starting with the off-the-record command ({off}), or with a line starting with it, is never saved; "
@@ -53,10 +53,9 @@ def instructions(cfg: Config) -> str:
     )
 
 
-def build(load: Callable[[], Config], *, clock: Callable[[], datetime] | None = None,
-          spawn: Callable | None = None) -> MCPServer:
-    """The server, its tools reading the configuration from ``load()`` on every call. ``clock`` and ``spawn`` are for
-    tests (the defaults: the real time, ``serve.writes.spawn_journal``)."""
+def build(load: Callable[[], Config], *, clock: Callable[[], datetime] | None = None) -> MCPServer:
+    """The server, its tools reading the configuration from ``load()`` on every call. ``clock`` is for tests (the
+    default: the real time)."""
     now = clock or (lambda: datetime.now(timezone.utc))
     cfg0 = load()
     n = cfg0.names
@@ -93,10 +92,12 @@ def build(load: Callable[[], Config], *, clock: Callable[[], datetime] | None = 
 
     @server.tool(name="journal_save", title="Save his words", annotations=APPEND, description=(
         f"Append words {who} wrote or dictated to you to the journal, verbatim, exactly as given: never your own "
-        f"words, a summary or a paraphrase. With practice (an id from journal_practices), they answer that "
-        "practice's open prompt when one is waiting; otherwise, or without practice, they become a /j note of "
-        f"their own. Nothing already in the journal changes. Text starting with {off} (off the record), or with a "
-        "line starting with it, is refused and nothing is saved. Returns the entry's stem."))
+        f"words, a summary or a paraphrase. With practice (an id from journal_practices), they are that "
+        "practice's entry: its prompt waiting in the chat, else its slot due now or missed today, else the next "
+        "one later today (filled early, so it is not sent), else an extra entry of that practice. Without "
+        "practice, a /j note of their own. Nothing already in the journal changes. Text starting with "
+        f"{off} (off the record), or with a line starting with it, is refused and nothing is saved. Returns the "
+        "entry's stem and, for a practice, the slot it filled."))
     def journal_save(text: str, practice: str = "") -> dict:
         return _answer(lambda: handlers.save(load(), now(), text, practice or None))
 
@@ -106,13 +107,14 @@ def build(load: Callable[[], Config], *, clock: Callable[[], datetime] | None = 
     def journal_practices() -> dict:
         return _answer(lambda: handlers.practice_list(load()))
 
-    @server.tool(name="journal_start", title="Send a practice now", annotations=SEND, description=(
-        f"Send a practice to {who} now, as /start <id> does in the chat: the journal sends its opener and questions "
-        "in the usual chat, in the background. practice is an id from journal_practices. While the chat is off the "
-        f"record (a bare {off}), nothing is sent. Programs are not started here: {who} begins one in the chat or the "
-        f"web app. Use it only when {who} asks for it."))
+    @server.tool(name="journal_start", title="Open a practice", annotations=READ, description=(
+        f"Open a practice to do with {who} now: its title, its opener and questions (prompt), and which slot "
+        "the answer will fill (slot, fills). practice is an id from journal_practices. Nothing is sent to the "
+        f"chat and nothing is written: ask {who} the questions, then save the answer, verbatim, with journal_save "
+        f"and the same practice. Programs are not done here: {who} begins one in the chat or the web app. "
+        "Read only."))
     def journal_start(practice: str) -> dict:
-        return _answer(lambda: handlers.start(load(), practice, **({"spawn": spawn} if spawn else {})))
+        return _answer(lambda: handlers.start(load(), practice, now()))
 
     @server.tool(name="journal_program_status", title="Program status", annotations=READ, description=(
         "The journal's programs (guided multi-session runs and situational sessions) and any run in progress, "

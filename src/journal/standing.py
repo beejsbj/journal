@@ -17,6 +17,9 @@ fact the journal holds:
   (``phases_of``), when he last answered in it (his captured answers only: a ``/start``, ``/next`` or ``/break``
   inside an off-the-record window would be timing, and a phase's send time moves with them) and its ``pace``.
 * **The gap** in calendar days, and whether it reaches ``pack.returning_days`` (the opener's returning stance).
+* **Written while there was no chat**: how many annotations and reflections were written with ``channel.platform:
+  none`` (marked skipped, ``no chat``, and never sent) since the newest prompt delivered to the chat. Counts only,
+  never their words: they are in the entries.
 
 ``collect`` returns a plain dict; ``pack_lines`` and ``today_lines`` render it. The today block runs in the gateway
 hook, which never reads the transcript: it passes the chat part the tick cached (``today.refresh``) instead of
@@ -165,13 +168,18 @@ def unanswered(cfg: Config, now_local: datetime, data: dict | None = None) -> tu
     prompt, or None; whether the count stopped at ``pack.lookback_days`` before reaching one). Ordered by send
     time: a late reply to an older prompt does not reach past newer ones. A program phase and a note are not
     practice prompts. A record that can't be read is skipped (a corrupt one must never stop a prompt going out).
-    The ``context.unanswered`` run."""
+    The ``context.unanswered`` run.
+
+    Only slots he saw count (OPEN-PROMPTS): a prompt delivered to the chat, or a practice he answered on a face
+    (``opened_via``). A slot that was due with no chat message (a no-chat install) and went by is not "his last
+    prompts got no reply", and the record a failed send left was never seen."""
     data = data if data is not None else ledger.snapshot(cfg.ledger_path)
     cutoff = now_local - timedelta(days=pack_lookback_days(cfg))
     sent = []
     for p in _prompts(data):
         try:
-            if (p.get("kind") not in entries.FREEFORM_IDS and p.get("message_id") and not p.get("program")
+            if (p.get("kind") not in entries.FREEFORM_IDS and (p.get("message_id") or p.get("opened_via"))
+                    and not p.get("program")
                     and _parse(p.get("sent_at")) is not None):
                 sent.append((_parse(p["sent_at"]), p))
         except Exception:  # noqa: BLE001 - one odd record costs itself
@@ -214,6 +222,43 @@ def _heard(cfg: Config, data: dict, now: datetime, chat_at: datetime | None, ent
     today = now.astimezone(cfg.tz).date()
     if d is not None and d <= today and (out is None or d > date.fromisoformat(out["date"])):
         out = {"date": d.isoformat(), "at": None, "via": f"an entry (journal:{entry})"}
+    return out
+
+
+NO_CHAT_SHOWN = timedelta(days=1)  # how long the no-chat line stays once the chat delivers again
+
+
+def without_chat(data: dict, now: datetime | None = None) -> dict:
+    """``{"annotations", "reflections"}``: how many were written while there was no chat (an annotation reply or a
+    reflection send marked skipped, ``no chat``) since the last prompt delivered to the chat before them. The
+    stretch ends at the newest skip; an item written before the delivery that came before it (its reply was still
+    owed when the chat was set to none) was written with a chat and is not counted. Once the chat delivers again
+    the line stays for ``NO_CHAT_SHOWN`` (so the first openers and the first thread's today block carry it, a
+    plain opener's delivery included), then goes. Counts only: nothing of their words is read."""
+    marks = []
+    for p in _prompts(data):
+        r = p.get("annotation_reply")
+        if isinstance(r, dict) and r.get("skipped") == "no chat":
+            marks.append(("annotations", _parse(r.get("skipped_at")), _parse(p.get("annotated_at"))))
+    found = data.get("reflections") if isinstance(data, dict) else None
+    for rec in (found if isinstance(found, list) else []):
+        t = rec.get("telegram") if isinstance(rec, dict) else None
+        if isinstance(t, dict) and t.get("skipped") == "no chat":
+            marks.append(("reflections", _parse(t.get("skipped_at")), _parse(rec.get("written_at"))))
+    out = {"annotations": 0, "reflections": 0}
+    skips = [s for _k, s, _w in marks if s is not None]
+    if not marks:
+        return out
+    newest = max(skips) if skips else None
+    sent = [t for t in (_parse(p.get("sent_at")) for p in _prompts(data) if p.get("message_id")) if t is not None]
+    before = max((t for t in sent if newest is None or t < newest), default=None)
+    back = min((t for t in sent if newest is not None and t > newest), default=None)
+    if back is not None and now is not None and now - back > NO_CHAT_SHOWN:
+        return out
+    for kind, skipped, written in marks:
+        when = written or skipped
+        if before is None or (when is not None and when > before):
+            out[kind] += 1
     return out
 
 
@@ -274,7 +319,7 @@ def collect(cfg: Config, now: datetime, chat: tuple[datetime | None, str] | None
     out: dict = {"date": today.isoformat(), "heard": None, "chat": "none", "entry": None,
                  "missed": {"total": 0, "counts": {}, "since": None, "since_title": None, "capped": False,
                             "days": pack_lookback_days(cfg), "run": []},
-                 "programs": [], "gap_days": None, "returning": False,
+                 "programs": [], "no_chat": {"annotations": 0, "reflections": 0}, "gap_days": None, "returning": False,
                  "returning_days": pack_returning_days(cfg), "unavailable": []}
     try:
         data = ledger.snapshot(cfg.ledger_path)
@@ -312,6 +357,10 @@ def collect(cfg: Config, now: datetime, chat: tuple[datetime | None, str] | None
         out["programs"] = _programs(cfg, data)
     except Exception:  # noqa: BLE001
         out["unavailable"].append("the program runs")
+    try:
+        out["no_chat"] = without_chat(data, now)
+    except Exception:  # noqa: BLE001 - the count is lost, never the pack
+        pass
     return out
 
 
@@ -327,6 +376,17 @@ def _when(iso: str | None, day: str, today: date, clock: bool = True) -> str:
 def _missed_text(m: dict) -> str:
     per = ", ".join(f"{k} {n}" for k, n in m["counts"].items())
     return f"{m['total']} — {per}" if per else str(m["total"])
+
+
+def no_chat_text(counts: dict | None) -> str:
+    """``1 annotation and 3 reflections were written; …``, or "" when there were none."""
+    counts = counts or {}
+    n = {what: counts.get(f"{what}s", 0) for what in ("annotation", "reflection")}
+    parts = [f"{k} {what}{'' if k == 1 else 's'}" for what, k in n.items() if k]
+    if not parts:
+        return ""
+    verb = "was" if sum(n.values()) == 1 else "were"
+    return f"{' and '.join(parts)} {verb} written; they are in the entries, never sent to the chat"
 
 
 def program_text(prog: dict, today: date) -> str:
@@ -383,6 +443,8 @@ def pack_lines(cfg: Config, data: dict) -> list[str]:
                      f"{_when(m['since'], m['since'][:10], today)}).")
     for prog in data["programs"]:
         lines.append(f"- Program in progress: {program_text(prog, today)}.")
+    if no_chat_text(data.get("no_chat")):
+        lines.append(f"- While there was no chat: {no_chat_text(data.get('no_chat'))}.")
     if data["gap_days"] is not None:
         days = data["gap_days"]
         span = "less than a day" if days == 0 else ("1 day" if days == 1 else f"{days} days")
@@ -412,4 +474,6 @@ def today_lines(cfg: Config, data: dict) -> list[str]:
         out.append(f"- prompts unanswered{since}: {_missed_text(m)}")
     for prog in data["programs"]:
         out.append(f"- program: {program_text(prog, today)}")
+    if no_chat_text(data.get("no_chat")):
+        out.append(f"- while there was no chat: {no_chat_text(data.get('no_chat'))}")
     return out

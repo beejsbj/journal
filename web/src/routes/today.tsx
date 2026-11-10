@@ -1,5 +1,6 @@
 import type { ComponentChildren } from "preact";
-import { useState } from "preact/hooks";
+import { useLocation } from "preact-iso";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { api } from "../api";
 import { HeldRunCard, RunCard, holdsQuestions } from "../components/RunCard";
 import { OSM, OsmCredit } from "../components/OsmCredit";
@@ -9,6 +10,7 @@ import { longDay, parseDay } from "../format";
 import { useAction, useResource } from "../hooks";
 import { Chevron, Mic, Pen } from "../icons";
 import { kindLabel, kindOfStem } from "../labels";
+import { writeTarget } from "../components/WriteRoom";
 import { openWrite } from "../shell";
 import { useTitle } from "../title";
 import type { LibraryItem, PracticeRow, Prompt, Run, Today } from "../types";
@@ -17,13 +19,14 @@ import "./today.css";
 
 /**
  * The row's state in words, as the line under its title says it: quietly, in the page's own voice, and the time those
- * words name (typed, as every time on the page is). A prompt he did not answer is not a failure: it says when it
- * came, and Reply is still there under it.
+ * words name. A prompt he did not answer is not a failure: it says when it came, and Write now is still there under it.
  */
 export function rowState(r: PracticeRow): [string, string | null] {
   switch (r.state) {
     case "upcoming":
       return r.at ? ["at", r.at] : ["later today", null];
+    case "due":
+      return r.at ? ["due since", r.at] : ["due now", null];
     case "open":
       return r.sent ? ["waiting since", r.sent] : ["waiting for you", null];
     case "answered":
@@ -64,6 +67,8 @@ function StateWords({ row }: { row: PracticeRow }) {
 function TodayLetter({ prompt, hers, actions }: { prompt: Prompt; hers: string; actions?: ComponentChildren }) {
   const asked = prompt.asked.map((q) => q.question);
   const bare = !prompt.opener && asked.length === 0;
+  // one question and nothing marked asked: the letter folds nothing away (Letter folds two or more), so it is shown
+  const lone = !bare && asked.length === 0 && prompt.questions.length === 1 ? prompt.questions[0] : undefined;
   return (
     <Letter from={hers} at={prompt.sent_at_local ?? undefined} opener={prompt.opener ?? undefined} asked={asked}
       questions={bare ? [] : prompt.questions} askedIds={prompt.asked.map((q) => q.id)} actions={actions}>
@@ -74,6 +79,7 @@ function TodayLetter({ prompt, hers, actions }: { prompt: Prompt; hers: string; 
           ))}
         </ol>
       )}
+      {lone && <p class="letter-asked">{lone.text}</p>}
     </Letter>
   );
 }
@@ -85,7 +91,9 @@ interface CardProps {
   slot: number;
 }
 
-/** Send it now: the server spawns the send; the line says it is on its way until the ledger reports it. */
+export { writeTarget };
+
+/** Send to chat: the server spawns the send; the line says it is on its way until the ledger reports it. */
 function useSendNow(row: PracticeRow) {
   const [onItsWay, setOnItsWay] = useState(false);
   const send = useAction();
@@ -98,49 +106,55 @@ function useSendNow(row: PracticeRow) {
 }
 
 /**
- * A prompt that was sent today: her letter, whatever its state (only Telegram folds a finished prompt), with what can
- * be done on its crease: Answer and Speak it while it waits (the write room blooms from the button), Reply and Send
- * now when it came and went unanswered. Under it, in his serif, the first line of his reply when there is one.
+ * A practice of the day that has come: her letter once it was sent, whatever its state (only Telegram folds a finished
+ * prompt), with what can be done on its crease. **Write now** on every one, whatever its state (the write room opens
+ * on the practice as a view: the slot his words fill, said in words; answered, the words start the next slot that
+ * fits or an extra entry), and Speak it beside it while it waits; **Send to chat** while it is due or missed, unless
+ * the journal has no chat (a practice turned off is only off the schedule: OPEN-FACES, the owner's decision 4). Under
+ * it, in his serif, the first line of his reply when there is one.
  */
 function SentCard({ row, today, library, slot }: CardProps) {
   const p = library.find((x) => x.id === row.id);
   // by the row's own entry: a practice with two slots has two rows with one id, and an id prefix names the first slot's entry
   const entry = row.stem ? today.entries.find((e) => e.stem === row.stem) : undefined;
   const send = useSendNow(row);
-  const canSend = row.state === "missed" && (p?.enabled ?? true);
+  const canSend = (row.state === "due" || row.state === "missed") && today.chat !== false;
+  const waits = row.state === "open" || row.state === "due";
   const title = p?.title ?? row.id;
   const his = today.voices?.his ?? "You";
   const hers = today.voices?.hers ?? "the companion";
-  const answer = (e: Event, voice = false) =>
+  const write = (e: Event, voice = false) =>
     openWrite({ for: { kind: "answer", practice: row.id, slot }, from: e.currentTarget as HTMLElement, voice });
   const open = entry && (
     <ButtonLink href={`/entries/${entry.stem}`} variant="quiet" size="small" class="open-entry">
       Open the entry
     </ButtonLink>
   );
-  const actions = row.state === "open" ? (
+  const sendButton = canSend && (
+    <Button variant="quiet" size={waits ? "medium" : "small"} disabled={send.busy || send.onItsWay} onClick={() => void send.run()}>
+      {send.onItsWay ? "On its way…" : "Send to chat"}
+    </Button>
+  );
+  const actions = waits ? (
     <>
-      <Button variant="primary" icon={<Pen />} onClick={(e) => answer(e)}>
-        Answer
+      <Button variant="primary" icon={<Pen />} onClick={(e) => write(e)}>
+        Write now
       </Button>
-      <Button variant="quiet" icon={<Mic />} onClick={(e) => answer(e, true)}>
+      <Button variant="quiet" icon={<Mic />} onClick={(e) => write(e, true)}>
         Speak it
       </Button>
+      {sendButton}
       {open}
     </>
-  ) : row.state === "missed" ? (
+  ) : (
     <>
-      <Button size="small" icon={<Pen />} onClick={(e) => answer(e)}>
-        Reply
+      <Button size="small" icon={<Pen />} onClick={(e) => write(e)}>
+        Write now
       </Button>
-      {canSend && (
-        <Button variant="quiet" size="small" disabled={send.busy || send.onItsWay} onClick={() => void send.run()}>
-          {send.onItsWay ? "On its way…" : "Send now"}
-        </Button>
-      )}
+      {sendButton}
       {open}
     </>
-  ) : null;
+  );
   return (
     <li class={`today-card practice ${row.state}`}>
       <header class="practice-head">
@@ -148,9 +162,9 @@ function SentCard({ row, today, library, slot }: CardProps) {
         <StateWords row={row} />
       </header>
       {row.prompt ? (
-        <TodayLetter prompt={row.prompt} hers={hers} actions={actions ?? undefined} />
+        <TodayLetter prompt={row.prompt} hers={hers} actions={actions} />
       ) : (
-        actions && <div class="today-actions">{actions}</div>
+        <div class="today-actions">{actions}</div>
       )}
       {entry && (
         <a class="his-reply" href={`/entries/${entry.stem}`}>
@@ -161,17 +175,17 @@ function SentCard({ row, today, library, slot }: CardProps) {
           <span class="words">{entry.first_line}</span>
         </a>
       )}
-      {row.state === "answered" && open && <div class="today-actions">{open}</div>}
       {send.error && <ErrorLine error={send.error} />}
     </li>
   );
 }
 
-/** A prompt still to come today: its name, a dotted leader to its hour, and Send now. */
-function LaterRow({ row, library }: CardProps) {
+/** A prompt still to come today: its name, a dotted leader to its hour, Write now (it fills that slot early, and it is
+ *  then not sent) and Send to chat (not on a journal with no chat). */
+function LaterRow({ row, today, library, slot }: CardProps) {
   const p = library.find((x) => x.id === row.id);
   const send = useSendNow(row);
-  const canSend = p?.enabled ?? true;
+  const canSend = today.chat !== false;
   return (
     <li class="today-card practice upcoming">
       <div class="later-line">
@@ -179,11 +193,16 @@ function LaterRow({ row, library }: CardProps) {
         <span class="lead" aria-hidden="true" />
         <StateWords row={row} />
       </div>
-      {canSend && (
-        <TextButton class="later-send" disabled={send.busy || send.onItsWay} onClick={() => void send.run()}>
-          {send.onItsWay ? "On its way…" : "Send now"}
+      <div class="later-actions">
+        <TextButton onClick={(e) => openWrite({ for: { kind: "answer", practice: row.id, slot }, from: e.currentTarget as HTMLElement })}>
+          Write now
         </TextButton>
-      )}
+        {canSend && (
+          <TextButton disabled={send.busy || send.onItsWay} onClick={() => void send.run()}>
+            {send.onItsWay ? "On its way…" : "Send to chat"}
+          </TextButton>
+        )}
+      </div>
       {send.error && <ErrorLine error={send.error} />}
     </li>
   );
@@ -201,6 +220,12 @@ function dueToday(runs: Run[], day: string): { key: string; time: string; text: 
   }
   return out.sort((a, b) => a.time.localeCompare(b.time));
 }
+
+/** "since 20:05": when the first prompt waiting came (sent), or fell due (its hour). */
+const since = (r: PracticeRow | undefined): string | undefined => {
+  const t = r ? (r.sent ?? r.at) : undefined;
+  return t ? `since ${t}` : undefined;
+};
 
 /** A section of the page: a book head with a rule running out, rising in after the one before it. */
 function Sec({ id, title, count, i, class: cls, children }: {
@@ -224,6 +249,16 @@ function Sec({ id, title, count, i, class: cls, children }: {
 
 export function TodayRoute() {
   useTitle("Today");
+  // ?write=<id> (the link a notification will carry; the Library's Write now) is used once: on the first read it opens
+  // the write room on the row the words will fill (writeTarget: the engine's slot order), or on the practice alone when
+  // it has no row today, and it leaves the address, so neither a later visit nor the reload after his save opens it
+  // again (OPEN-FACES)
+  const query = useLocation().query;
+  const [write] = useState<string | undefined>(() => query.write || undefined);
+  const used = useRef(false);
+  useEffect(() => {
+    if (write) window.history.replaceState(window.history.state, "", window.location.pathname);
+  }, []);
   const [res, reload] = useResource(async (signal) => {
     const [today, library, runs] = await Promise.all([
       api.today(signal),
@@ -239,6 +274,12 @@ export function TodayRoute() {
     return { today, library, runs };
   }, []);
   useLive(["ledger-changed", "entries-changed", "runs-changed", "library-changed", "tick"], reload);
+  useEffect(() => {
+    if (!write || used.current || res.state !== "ready") return;
+    used.current = true;
+    const at = writeTarget(res.data.today.practices.rows, write);
+    openWrite({ for: at >= 0 ? { kind: "answer", practice: write, slot: at } : { kind: "answer", practice: write } });
+  }, [res.state]);
 
   return (
     <div class="today-page">
@@ -248,7 +289,7 @@ export function TodayRoute() {
           const rows = today.practices.rows
             .map((r, slot) => ({ r, slot }))
             .sort((a, b) => rowTime(a.r).localeCompare(rowTime(b.r)) || a.slot - b.slot);
-          const waiting = rows.filter(({ r }) => r.state === "open");
+          const waiting = rows.filter(({ r }) => r.state === "open" || r.state === "due");
           const earlier = rows.filter(({ r }) => r.state === "answered" || r.state === "missed");
           const later = rows.filter(({ r }) => r.state === "upcoming");
           const live = (runs ?? []).filter((r) => r.status === "active" || r.status === "paused");
@@ -280,7 +321,7 @@ export function TodayRoute() {
                 {nothing && <Empty>Nothing scheduled today.</Empty>}
                 {waiting.length > 0 && (
                   <Sec id="waiting-h" title="Waiting for you" i={i++} class="waiting"
-                    count={waiting[0]?.r.sent ? `since ${waiting[0].r.sent}` : undefined}>
+                    count={since(waiting[0]?.r)}>
                     <ul class="today-cards">{waiting.map(card)}</ul>
                   </Sec>
                 )}

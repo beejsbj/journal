@@ -77,8 +77,11 @@ class RunsReadTest(ProgramCase):
         self.assertEqual(rows[0]["program_progress"], {})
 
     def test_a_phase_that_is_owed_a_send_is_not_open(self):
+        # (OPEN-PROGRAMS: a phase owed only its *delivery* is current and open on the web; one a transition has not
+        # yet made current, which is what owing a send meant before, is not)
         run = self.run_file()
         run["sessions"]["1"]["phases"]["1"]["send_due"] = True
+        run["sessions"]["1"]["phases"]["1"].pop("opened_at")
         programs._save(self.cfg, run)
         ph = self.get_json(f"/api/v1/runs/{self.rid}")["phase"]
         self.assertEqual((ph["delivered"], ph["open"]), (False, False))
@@ -328,9 +331,9 @@ class RunStartTest(ProgramCase):
         programs.abandon(self.cfg, self.rid, NOW, self.log)
         got = self.ok("POST", "/api/v1/runs", {"program": "fix-life"}, want=202)
         self.assertTrue(got["spawned"])
-        self.assertEqual(self.spawned, [["program", "start", "fix-life", "--new"]])
+        self.assertEqual(self.spawned, [["program", "start", "fix-life", "--new", "--face"]])
         self.ok("POST", "/api/v1/runs", {"program": "fix-life", "session": 4}, want=202)
-        self.assertEqual(self.spawned[-1], ["program", "start", "fix-life", "--new", "--session", "4"])
+        self.assertEqual(self.spawned[-1], ["program", "start", "fix-life", "--new", "--session", "4", "--face"])
 
     def test_bad_requests(self):
         for body, want in (({}, 400), ({"program": 3}, 400), ({"program": "no-such"}, 404),
@@ -349,13 +352,14 @@ class RunActionTest(ProgramCase):
     def test_each_action_spawns_the_program_command_for_this_run(self):
         for action in ("next", "skip", "pause", "abandon", "insights"):
             self.post(action)
-        self.assertEqual(self.spawned, [["program", a, self.rid] for a in ("next", "skip", "pause", "abandon", "insights")])
+        self.assertEqual(self.spawned, [["program", a, self.rid] + (["--face"] if a in ("next", "skip") else [])
+                                        for a in ("next", "skip", "pause", "abandon", "insights")])
 
     def test_resume_only_for_a_run_on_a_break(self):
         self.assertEqual(self.post("resume", want=409)["error"], "wrong-state")
         programs.pause(self.cfg, self.rid, NOW, self.log)
         self.post("resume")
-        self.assertEqual(self.spawned, [["program", "resume", self.rid, "--paused"]])
+        self.assertEqual(self.spawned, [["program", "resume", self.rid, "--paused", "--face"]])
         for action in ("next", "skip", "back", "pause"):
             self.assertEqual(self.post(action, want=409)["error"], "wrong-state")
 
@@ -366,11 +370,11 @@ class RunActionTest(ProgramCase):
         programs.settle(self.cfg, self.rid, NOW + timedelta(minutes=3), self.log)
         self.spawned.clear()
         self.post("back")
-        self.assertEqual(self.spawned, [["program", "back", self.rid]])
+        self.assertEqual(self.spawned, [["program", "back", self.rid, "--face"]])
 
     def test_expect_binds_a_transition_to_the_phase_that_was_read(self):
         self.post("next", {"expect": "1:1:1"})
-        self.assertEqual(self.spawned, [["program", "next", self.rid, "--expect", "1:1:1"]])
+        self.assertEqual(self.spawned, [["program", "next", self.rid, "--expect", "1:1:1", "--face"]])
         got = self.post("skip", {"expect": "1:2:1"}, want=409)
         self.assertEqual((got["error"], got["where"]), ("moved-on", "1:1:1"))
         for bad in ("1:1", "x", 7, "1:1:1:1"):

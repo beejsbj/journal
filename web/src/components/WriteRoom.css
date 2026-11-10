@@ -48,6 +48,8 @@ html.room-open :is(.stage, .phone-top) { transform: scale(0.972); filter: bright
 .room-head { margin-bottom: 48px; opacity: 0; transform: translateY(-12px); transition: transform 600ms var(--e-paper), opacity 300ms ease; }
 .room.open .room-head { opacity: 1; transform: none; transition: transform 700ms var(--e-paper) 220ms, opacity 400ms ease 220ms; }
 .room-letter .letter-qlist { columns: 1; }
+/* which slot his words fill, in words ("Fills the 23:00 slot early; it will not be sent."): under her letter */
+.room-fills { margin: var(--s3) 0 0; font-size: var(--t-small); line-height: 1.45; color: var(--text-2); }
 .room-questions { margin: 0; padding-left: 1.6em; display: grid; gap: 4px; }
 .room-questions li::marker { color: var(--her-soft); }
 

@@ -101,11 +101,24 @@ interface Day {
   library: LibraryItem[];
 }
 
-/** The row of today's practices an answer is for: its own slot when it was named, else the first still open. */
+/**
+ * The row of today's practices words for a practice will fill, in the order the engine's slot rule takes them
+ * (`slots.resolve`): the newest due or open slot, else the newest missed one, else the next one still to come, else
+ * the first (an answered practice: the words start an extra entry, the server says so). -1: no row of that practice.
+ * Today's `?write=<id>` opens the room on it (OPEN-FACES).
+ */
+export function writeTarget(rows: PracticeRow[], id: string | undefined): number {
+  if (!id) return -1;
+  const mine = rows.map((r, i) => ({ r, i })).filter(({ r }) => r.id === id);
+  const last = (states: string[]) => mine.filter(({ r }) => states.includes(r.state)).pop()?.i;
+  const first = (states: string[]) => mine.find(({ r }) => states.includes(r.state))?.i;
+  return last(["due", "open"]) ?? last(["missed"]) ?? first(["upcoming"]) ?? mine[0]?.i ?? -1;
+}
+
+/** The row of today's practices an answer is for: its own slot when it was named, else the one the words will fill. */
 export function rowFor(rows: PracticeRow[], practice: string, slot?: number): { row: PracticeRow; slot: number } | null {
   if (slot !== undefined && rows[slot]?.id === practice) return { row: rows[slot] as PracticeRow, slot };
-  const i = rows.findIndex((r) => r.id === practice && (r.state === "open" || r.state === "missed"));
-  const j = i >= 0 ? i : rows.findIndex((r) => r.id === practice);
+  const j = writeTarget(rows, practice);
   return j >= 0 ? { row: rows[j] as PracticeRow, slot: j } : null;
 }
 
@@ -114,6 +127,8 @@ function HerLetter({ prompt, hers }: { prompt: Prompt; hers: string }) {
   const asked = prompt.asked.map((q) => q.question);
   // sent with the plain opener and nothing asked: the questions were the message, so they stand open (as on Today)
   const bare = !prompt.opener && asked.length === 0;
+  // one question and nothing marked asked: the letter folds nothing away (Letter folds two or more), so it is shown
+  const lone = !bare && asked.length === 0 && prompt.questions.length === 1 ? prompt.questions[0] : undefined;
   return (
     <Letter class="room-letter" from={hers} at={prompt.sent_at_local ?? undefined} opener={prompt.opener ?? undefined}
       asked={asked} questions={bare ? [] : prompt.questions} askedIds={prompt.asked.map((q) => q.id)}>
@@ -124,6 +139,7 @@ function HerLetter({ prompt, hers }: { prompt: Prompt; hers: string }) {
           ))}
         </ol>
       )}
+      {lone && <p class="letter-asked">{lone.text}</p>}
     </Letter>
   );
 }
@@ -178,6 +194,13 @@ export function WriteRoom({ req }: { req: WriteRequest }) {
     ]);
     return { today, library };
   }, [target.kind]);
+  // an answer: the practice opened as a view (GET /library/{id}/open): her opener and the questions, or the prompt the
+  // chat has, and the slot the words fill, said in words. Opening it writes nothing; a practice it cannot open (an
+  // unknown one, a note) takes no words here (OPEN-FACES)
+  const [view, reloadView] = useResource(
+    (signal) => (target.kind === "answer" ? api.openPractice(target.practice, signal) : Promise.resolve(null)),
+    [target.kind === "answer" ? target.practice : ""],
+  );
   const [doc, reloadDoc] = useResource(
     (signal) => (target.kind === "entry" ? api.entry(target.stem, signal) : Promise.resolve(null)),
     [target.kind === "entry" ? target.stem : ""],
@@ -247,20 +270,32 @@ export function WriteRoom({ req }: { req: WriteRequest }) {
 
   let page: Page;
   if (target.kind === "answer") {
-    const title = titleOf(target.practice);
+    const v = view.state === "ready" ? view.data : null;
+    // its title: the Library's, else the view's (a practice the Library read did not bring), else its id
+    const title = (day.state === "ready" ? day.data.library.find((p) => p.id === target.practice)?.title : undefined) ?? v?.title ?? target.practice;
     const found = day.state === "ready" && day.data.today ? rowFor(day.data.today.practices.rows, target.practice, target.slot) : null;
-    const slot = target.slot ?? found?.slot ?? 0;
+    // the row's own slot; a practice with no row today (?write from the Library) keeps a draft of its own
+    const slot = target.slot ?? found?.slot;
+    // her letter: the one on Today's card when it was sent, else the view's (the plain opener, or the prompt the chat has)
+    const prompt = found?.row.prompt ?? v?.prompt ?? null;
     page = {
-      key: `reply:${target.practice}:${slot}`,
+      key: `reply:${target.practice}:${slot ?? "write"}`,
       where: title,
       when: found?.row.sent ? `her letter of ${found.row.sent}` : "an answer",
       label: `Your answer to ${title}`,
       placeholder: "Answer in your own words",
-      send: "Send your answer",
+      send: "Save",
       submit: (words) => api.createEntry({ practice: target.practice, ...words }),
-      head: day.state === "loading" ? <Skeleton rows={3} shape="line" />
+      closed: view.state === "error" ? "Nothing can be written to it from here." : undefined,
+      head: day.state === "loading" || (view.state === "loading" && !found?.row.prompt) ? <Skeleton rows={3} shape="line" />
         : day.state === "error" ? <ErrorLine error={day.error} onRetry={reloadDay} />
-        : found?.row.prompt ? <HerLetter prompt={found.row.prompt} hers={hers} /> : null,
+        : (
+          <>
+            {prompt && <HerLetter prompt={prompt} hers={hers} />}
+            {v && <p class="room-fills">{v.fills}</p>}
+            {view.state === "error" && <ErrorLine error={view.error} {...(view.error.status >= 500 || view.error.status === 0 ? { onRetry: reloadView } : {})} />}
+          </>
+        ),
     };
   } else if (target.kind === "entry") {
     const d = doc.state === "ready" ? doc.data : null;
@@ -509,7 +544,7 @@ function Start({ day, titleOf, onAnswer, onStarted }: {
 }) {
   const [starting, setStarting] = useState(false);
   const rows = day.state === "ready" ? (day.data.today?.practices.rows ?? []) : [];
-  const open = rows.map((r, slot) => ({ r, slot })).filter(({ r }) => r.state === "open");
+  const open = rows.map((r, slot) => ({ r, slot })).filter(({ r }) => r.state === "open" || r.state === "due");
   return (
     <div class="room-start">
       <p class="room-none">No prompt, no questions: just you.</p>
@@ -519,7 +554,9 @@ function Start({ day, titleOf, onAnswer, onStarted }: {
             <li key={`${r.id}#${slot}`}>
               <Button variant="quiet" size="small" icon={<Pen />} onClick={() => onAnswer(r.id, slot)}>
                 Answer {titleOf(r.id)}
-                {r.sent && <span class="room-offer-when"> (open since {r.sent})</span>}
+                {r.state === "due"
+                  ? r.at && <span class="room-offer-when"> (due since {r.at})</span>
+                  : r.sent && <span class="room-offer-when"> (open since {r.sent})</span>}
               </Button>
             </li>
           ))}

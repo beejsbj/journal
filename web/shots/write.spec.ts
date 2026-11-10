@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { SCHEMES, at, settle, writeButton } from "./lib";
 
 // The write room: on a new note (empty, then with words and the caret in the middle paragraph, so focus greys the
-// rest), answering her letter (from Today's Answer), carrying on an entry (from the entry's "In the writing room", a
+// rest), answering her letter (from Today's Write now), opened from a link (`/today?write=<id>`), carrying on an entry (from the entry's "In the writing room", a
 // wide screen's), and its quiet start offering a program. Nothing is sent: the fixture journal stays as it was.
 
 const WORDS = [
@@ -42,11 +42,22 @@ for (const scheme of SCHEMES) {
     test(`answering her letter ${scheme}`, async ({ page }, info) => {
       await page.goto("/");
       await settle(page);
-      await page.locator(".letter-actions").getByRole("button", { name: "Answer" }).first().click();
+      await page.locator(".letter-actions").getByRole("button", { name: "Write now" }).first().click();
       const room = page.getByRole("dialog");
       await expect(room.locator(".letter")).toBeVisible();
       await page.waitForTimeout(1100);   // the bloom, then her letter dropping in
       await page.screenshot({ path: `${at(info.project.name, scheme, "write-answer")}.png` });
+    });
+
+    // OPEN-FACES: a link (the Library's Write now; a notification later) opens the room on the practice, once: the view
+    // of it (her opener and the questions) and the slot the words fill, said in words
+    test(`opened from a link, ?write ${scheme}`, async ({ page }, info) => {
+      await page.goto("/today?write=evening");
+      const room = page.getByRole("dialog");
+      await expect(room.locator(".room-fills")).toBeVisible();
+      await expect.poll(() => page.evaluate(() => window.location.search)).toBe("");
+      await page.waitForTimeout(1100);
+      await page.screenshot({ path: `${at(info.project.name, scheme, "write-from-link")}.png` });
     });
 
     test(`carrying on an entry ${scheme}`, async ({ page }, info) => {
