@@ -34,6 +34,14 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   *OPEN-PROGRAMS built*: see "OPEN-PROGRAMS" under *Taken*, with its follow-ups for OPEN-FACES and OPEN-PUSH.
   *OPEN-PUSH built*: see "OPEN-PUSH" under *Taken*.
 
+- **PROGRAM-KINDS — two kinds, practice and program (the owner's decisions taken 2026-11-10; the keys proposed, not
+  built; issue #1).** "Situational" stops being a kind: anything with a sequence is a program, and what sets a
+  situational session apart today becomes settings any program's file can carry. The decisions, what the code does
+  today (some of it is not what was assumed), the proposed keys, what this revisits and the order of the packages
+  are in "PROGRAM-KINDS" at the end of *Taken*. Nothing is built: the code, the built-in files, the goldens and
+  PRACTICES.md's format are as they were. To close: the owner takes the open points listed there (the key's name, what
+  a file that says nothing gets, the entry's name, `after:`), then the packages land in the order given.
+
 - **SCRUB-PERSONAL — the source adapters and `brain:` (open, the owner's).** The built-in context sources (tududi,
   chat-scrobbler, listenbrainz, storyteller, audiobookshelf, grimmory) are optional features, but together they
   describe one self-hosted stack. Kept as they are (renaming them is a config and test migration). To close: keep
@@ -2646,6 +2654,8 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     styles, reduced motion and landmarks. Nothing on the server reads the ink.
 
 - **ONE-PROGRAM-RUN (2026-10-27) — one program means one unfinished run; situational sessions are exempt both ways.**
+  *Revisited 2026-11-10 by PROGRAM-KINDS (at the end of this file): the exemption becomes a setting in the program's
+  file instead of its kind. Proposed, not built: until it is, this entry is the rule as it runs.*
   Supersedes ONE-PROGRAM's reading (its "open for him" point). The owner: one program means that while a program
   (fix-life, say) is unfinished, no other program can start; practices and situational sessions keep working.
   (1) **The rule** (`programs.blocking`, asked by `one_at_a_time`): while a program that is not situational has an
@@ -3475,3 +3485,187 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
      `/start` (as built in OPEN-PROGRAMS, #29). Recorded only.
   6. **The PWA control for answering an interrupt** comes as a small separate package after #28 and #29 merge.
      Recorded only.
+- **PROGRAM-KINDS (the owner, 2026-11-10) — two kinds, practice and program; "situational" is no longer a kind**
+  (issue #1). Decided in conversation. Recorded here with what the code on `main` does today (read at `0d46f1b`, after
+  the OPEN-PROMPTS packages merged), the definition keys proposed for it, what it revisits and the order of the
+  packages. **Nothing here is built:** this entry changes no code, no built-in file and no golden, and PRACTICES.md
+  stays the format until the first package lands.
+  - **The owner's decisions (taken).**
+    1. **Two kinds: practice and program.** "Anything with a sequence is a program", at any scale: phases within one
+       sitting (conversation prep, a thought record) or sessions across days (fix-life). A practice is one message
+       that comes back; the chat after it is free conversation, not a sequence: nothing in a practice's definition
+       waits on an answer. "Situational" stops being a kind.
+    2. **One architecture, and settings instead of a kind.** A program of one session and a program of ten are the
+       same thing. What differs between them is not shape but three settings any program can carry: (a) whether an
+       unfinished run holds the one-program slot, (b) whether and when an unfinished run expires, (c) whether a
+       finished run compiles insights. No behaviour is derived from how many sessions a program has.
+    3. **A — a program holds the slot only when its file says so.** The shipped one-off programs (conversation prep,
+       the post-session debrief, later ones such as a thought record) are set not to hold it, so they always work
+       while fix-life is unfinished.
+    4. **B — a phase that a one-off interrupted is not sent again by the engine.** He types `/start fix-life`.
+       Manual, as a program is taken up everywhere else.
+    5. **`kind: situational` keeps working** as another spelling, for at least one release, so the files he has do
+       not break. "Situational" survives at most as a group label in the Library.
+    6. **A program can be run again later** (fix-life in two years): a finished run never stops a new one.
+    7. **Later, as separate packages** (the order is below): programs on a schedule, a schedule by interval, one
+       entry file per day for a check-in that comes often, a mood line in the today block, one `settle:` notion
+       shared by practices and runs, then the content of issue #1.
+  - **What `main` does today** (`file:function`). Decision 2 describes the code as it is: a situational definition
+    loads as a `Program` with one session (`programdefs.parse_situational`), and `Program.situational` is only
+    `kind == "situational"`. What reads that flag:
+    - *The slot.* `programs.blocking` (asked by `programs.one_at_a_time`, from `programs.start` under the tick's
+      lock): a situational definition is never stopped and never stops another. The chat's `/start`
+      (`commands._busy`), the web's `POST /runs` (`serve/writes._one_at_a_time`) and `journal_program propose`
+      (`programview`) pre-check the same function.
+    - *Insights.* `programs.complete_session` compiles after the last session only when the program is not
+      situational, and `commands._program_start` does not take `/start <id> insights` for one. `programs.insights`
+      itself does not look at the kind: `journal program insights <run>` has no refusal for a situational run.
+    - *The entry's name.* `programs._entry_stem`: `<date>-<id>` for a situational run, `<date>-<id>-sNN` for a
+      program's session, the next free `-N` when another run has the name. `entries._ENGINE_NAME` reads both.
+    - *Expiry is already a key, not the kind.* `programs._expired` reads `prog.expires_hours` and nothing else, and
+      `_step_run` and `start` close a run idle that long (`_expire`; a run on a break too). The kind decides only
+      whether a file may say it: `expires_hours` is in `programdefs.SITUATIONAL_KEYS` and not in `PROGRAM_KEYS`, so a
+      `program.md` that carries it is refused ("unknown key").
+    - *More than those four.* The default `advance` (`programdefs._common`: `settle` for a program, `next` for a
+      situational definition). The keys a file may carry, in two lists that share only the common ones: only a
+      situational file takes `expires_hours`, `annotate`, `after` and a session's own keys (`role`, `mission`,
+      `quote`, `minutes`, `framework`, `slot.*`); only a `program.md` takes `sessions`, `pace`, `phases_of`,
+      `debrief`, `insights`, `sources`. Where a definition may live: one file only when it says `kind: situational`
+      (`library._read_programs`); one file that says `kind: program` is read as a practice and refused
+      (`library.parse`). The session number in headers and labels (`compose.phase_header`, `interrupt_header`,
+      `summary_html`; `programview.block`; `standing.program_text`; `status`; the skill's list) and `/start <id> N`
+      (`commands._program_start`). The quote and the text before the first phase, which a situational file may
+      carry and which are never sent (`compose.phase_parts`). The "still open" line after a run ends
+      (`programs.complete_session`, `commands.abandon_reply`). `programdefs.shape`, which a save under a live run is
+      compared by. And the `kind` the API gives the web app (`serve/api._program_item`; `web/src/labels.ts` and
+      `routes/library.tsx` read `"situational"`) and `journal_program` gives the companion
+      (`programview._offer`).
+    - *Running a program again works.* `programs.start` looks for the program's run with `current_run`, which reads
+      `active_runs` (status `active` or `paused`); `complete_session` sets `completed` after the last session, so
+      the next `/start` finds none and begins a run with a new id, its own entry names (`_entry_stem`) and its own
+      insights document (`programs.insights` takes the next free name). `blocking` reads `active_runs` too, so a
+      finished run holds nothing (ONE-PROGRAM-RUN (5)). Pinned for an abandoned run (`tests/test_programs.py`,
+      `test_abandon_then_start_begins_a_new_run`) and for another program after a finished one
+      (`tests/test_one_program.py`, `test_finishing_it_frees_the_slot`). No test starts the same program after its
+      own finished run: read from the code, not pinned, so the first package adds that test.
+    - *Only practices are scheduled.* `library.Library.scheduled` returns enabled practices with a slot and
+      `schedule.slots_due` asks nothing else; `schedule.*` is an unknown key in a program's or a situational file,
+      and `library.fork` refuses a schedule for anything but a practice. The only timed sends a program has are a
+      `schedule` phase's interrupts (`schedule.oneoffs_due`). A slot is `HH:MM` with an optional weekday
+      (`library._slots`): there is no interval.
+  - **Where what was said and the code differ.**
+    (1) *Expiry needs no new setting* (above): the engine already reads it from any program; only the parser keeps
+    it out of a `program.md`.
+    (2) *The flag switches more than the slot, expiry, insights and the entry's name* (above). Of the rest, the
+    default `advance` is behaviour, so the alias has to carry it.
+    (3) *`after:` does nothing.* `programdefs.parse_situational` stores it and no code reads it. The debrief is
+    offered because fix-life's `program.md` says `debrief: post-session-debrief` (`programs.complete_session` files
+    the notebook follow-up). PRACTICES.md §1.5 says `after: fix-life` "lets the engine offer it"; it does not.
+    (4) *`sources:` cannot be written in a one-file definition today* (unknown key), and in a `program.md` nothing
+    reads it: it is a line for whoever reads the file. The lineage issue #1's content is to carry waits on the first
+    package.
+    (5) *Decision B is not new.* PHASE-RESEND-MANUAL (2026-10-29) took it for a situational session, and
+    `programs.still_open_line` is its built form. The decision of 2026-11-09 it was likened to (5 in *Owner's
+    decisions 2026-11-09*) is about a chat configured after a program began with none: the same manner (`/start`),
+    another case. What is new is its reach: any program that does not hold the slot.
+    (6) *"Decision 1's three kinds" is PRACTICES.md's Decision 1.* Row 1 of this file's table is the settle rule and
+    is untouched.
+    (7) *Issue #1 reads differently.* It lists a thought record under "practices to add alongside" and names
+    neither boundary setting nor conflict resolution. Under decision 1 a thought record is a program. The issue's
+    text is not changed here.
+  - **Proposed (not built): the three settings as front-matter keys.** One rule for all three: a setting is off
+    unless the file says it.
+
+    | Setting | Key | Values | A file that does not say | Today |
+    | --- | --- | --- | --- | --- |
+    | (a) holds the slot | `one_at_a_time` (new) | `true`, `false` | `false`: never refused, never refuses | by kind: a program holds it, a situational definition does not |
+    | (b) expires | `expires_hours` (as it is) | a positive number | never expires | the same key and the same code, allowed only in a situational file |
+    | (c) insights | `insights` (as it is, one value more) | `none`, `compile`, `compile+synthesis` | `none` | `compile` for a `program.md` that does not say; never by itself for a situational run |
+
+    - **`one_at_a_time: true` is the rule of ONE-PROGRAM-RUN, said in the file.** While such a program has an
+      unfinished run, the start of another such program is refused, and it is refused while another's is unfinished.
+      A program without it is exempt both ways, as a situational session is today. The name is the rule's own
+      (`programs.one_at_a_time`; "only one program runs at a time" in the refusal). "Slot" is kept out of the key on
+      purpose: the word already means a schedule slot (`slots.py`) and a prose slot (`slot.<name>:`).
+    - **`expires_hours` needs only to be allowed in every program's file.** Two things to know when a program that
+      holds the slot carries it: idle time is counted between sessions and on a break too (`last_activity`), and
+      `blocking` does not ask `_expired` (as `session_in_progress` does), so a run past its hours would still refuse
+      another program until the next tick closes it. The first package makes `blocking` ask.
+    - **`insights: none` compiles nothing by itself.** `/start <id> insights` and `journal program insights` compile
+      on request, for any program.
+    - **One key list.** Every program file takes the union of today's two lists. `sessions`, `pace` and `phases_of`
+      belong to a program with session files. A session's keys go in the file that holds the phases: the session
+      file, or the program's own file when it is one file.
+    - **Two layouts, one kind.** A program is one file (`<id>.md`, its phases in it: one session) or a directory
+      (`<id>/program.md` with `sessions/`). `kind: program` is read in both. The layout decides nothing but what
+      follows from having session files: the entry's name (below), "Session N of M" in headers and labels, and
+      `/start <id> N`.
+    - **`kind: situational` is `kind: program` in one file**, read with what a situational file gets today wherever
+      it does not say: `advance: next` (a program's default stays `settle`), no hold on the slot, no insights by
+      itself, `expires_hours` as written. Under the defaults proposed here that is one default apart from a one-file
+      `kind: program` (`advance`). A key the file does say wins. `journal doctor` and `practices validate` name it as
+      the old spelling, as a note and not a problem. The built-ins are respelled in the first package, not here:
+      fix-life gains `one_at_a_time: true` (it already says `insights: compile`); the two one-offs say
+      `kind: program` and keep their `advance: next`, `expires_hours` and `group: situational`.
+    - **The "still open" line for every run that ends.** Decision B's line (`programs.still_open_line`) is said today
+      only when the run that ends is situational. Under the keys it is said whenever a run completes or is abandoned
+      while another is mid-session; a run that expires still says nothing. The cost ONE-PROGRAM-RUN (6) named stays,
+      now for any program that does not hold the slot: started while another is mid-session it becomes the newest
+      prompt, so the other's open phase no longer takes the next message (`capture.superseded`), and under
+      `capture.mode: arm` an untargeted message after it is not saved. `/start` is the way back.
+  - **Proposed: the entry's name follows the layout, and no file is renamed.** A program in one file writes
+    `<date>-<id>.md`; a program with session files writes `<date>-<id>-sNN.md`, with one session listed too. That is
+    what each existing definition writes today, so every entry in a journal keeps its name and every definition
+    keeps producing the names it produces now; `entries._ENGINE_NAME` already reads both shapes. The other choice,
+    `-s01` for every program, would give conversation prep two name shapes across the release, to no reader's
+    benefit. No key for it: a name is not a setting.
+  - **What this revisits (when built, not before).** PRACTICES.md's Decision 1 ("Three kinds, one engine path")
+    becomes two kinds, and its §1.3–1.5, §4.1 ("A situational run writes…"), §4.2 and §7 are rewritten then.
+    ONE-PROGRAM-RUN's "situational sessions are exempt both ways" becomes "a program holds the slot only when its
+    file says `one_at_a_time: true`"; its rule, `Busy`, the refusal's words and `/abandon` stand.
+    PHASE-RESEND-MANUAL stands, with the wider reach above. README *Programs*, API.md's `kind` values and
+    FRONTEND.md's groups follow. The web app reads `kind: "situational"` from the API, so the first package either
+    keeps that value on the wire for a release or changes server and client together, with a CI build of `static/`.
+    The Library's "Situational" group needs nothing: it comes from the file's `group:` line. The tests that write
+    `kind: situational` files (`tests/test_one_program.py` and others) keep passing through the alias, unchanged:
+    that is the alias's test.
+  - **Packages, in order** (each its own branch and PR; none designed here).
+    1. **PROGRAM-KINDS:** the keys, the alias, `kind: program` in one file, the built-ins respelled, the docs
+       rewritten. Gateway and tick side; the web app too if the wire value changes.
+    2. **Programs on a schedule.** Only practices can be scheduled today. Its own question: what a scheduled program
+       does when its time comes while a run is unfinished.
+    3. **A schedule by interval** (hourly), beside `HH:MM` and a weekday.
+    4. **`entry: day`:** one entry file per day for a check-in that comes often, instead of one per slot
+       (`entries.stem_for`).
+    5. **A mood line in the today block.**
+    6. **One `settle:` notion shared by practices and runs.** Today the word names only a program's advance
+       (`advance: settle`, `programs.settle_minutes`); a practice has `collapse_hours` and the annotation wait, a
+       run `expires_hours`. Which of those it gathers is that package's to say; `expires_hours` stays until then.
+    7. **Issue #1's content,** a thought record (CBT reframing), boundary setting and conflict resolution first:
+       written fresh and neutral, each one's lineage in its `sources:` line. It needs package 1 only (one file,
+       `kind: program`, `sources:`); the issue's longer candidates wait on 2 and 3 where they are timed (a prompt a
+       day, a revisit after three months).
+  - **Open, for the owner.**
+    1. **The key's name:** `one_at_a_time` as proposed, `exclusive`, or another.
+    2. **What a file that says nothing gets.** Proposed: off, for all three (his words for A). That changes two
+       defaults for a program directory he already has: it would stop holding the slot, and, where its `program.md`
+       has no `insights:` line, stop compiling insights by itself. An edit of fix-life made before the release
+       carries the built-in's `insights: compile` and lacks only the new line. Nothing is lost (`/start <id>
+       insights` compiles on request) and nothing that works today is refused, but the one-program rule would lapse
+       for that program without a word. Proposed with it: for the alias's release, `journal doctor` names each
+       program directory of his with no `one_at_a_time` line, and says what to add; an edit of fix-life also reads
+       "the default has changed since you edited it" in the Library when the default it began from is on record
+       (BUILTIN-EDIT). The other choice: keep today's defaults for `kind: program` (holds, compiles) and have
+       the one-offs say `one_at_a_time: false` and `insights: none`. Then a one-file program he writes without those
+       lines is refused while fix-life is unfinished and leaves an insights file after every run, which is against A.
+    3. **`advance` for a one-file program that does not say.** Proposed: `settle`, one default for the kind (row 1
+       of this file's table); both shipped one-offs say `advance: next` themselves, and the alias keeps `next`.
+    4. **The entry's name:** by layout as proposed, or `-s01` everywhere.
+    5. **`after:`.** Nothing reads it. Drop it from the format (the alias would still take it and ignore it), or make
+       it do what PRACTICES.md says.
+    6. **The text before the first phase of a one-file program,** and its `quote:`. Parsed today and never sent.
+       Send them with phase 1, as a session file's are, or refuse them when the file is checked.
+    7. **How long the alias lives.** At least one release (decided). Reading it costs a line in the parser, so it
+       could stay for good beside the doctor note; taking it out later is a decision for this file.
+    8. **Issue #1's text.** It files the thought record under practices and does not name boundary setting or
+       conflict resolution. Not edited here.
