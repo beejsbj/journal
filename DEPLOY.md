@@ -16,6 +16,27 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## MD-ITALICS — `*italic*` renders as italic in Telegram messages (2026-11-09; `compose.py` only; hook side too: a gateway restart; no config or state change)
+
+**What changes.** The companion's Markdown italics written with single asterisks (`*"…"*`, as reflections and
+annotations quote him) now reach Telegram as `<i>…</i>` instead of showing the asterisks. `compose.md_to_html` and
+`compose.md_block_html` (which calls it) do it; `**bold**` still wins, a lone `*` (`5 * 3`, `2*3*4`, a `* ` bullet)
+stays literal, and an italic that would cross another tag stays literal so the HTML is never refused. The plain-text
+forms (`compose._md_plain`, `compose.plain` for a platform without HTML) lose the stars too. Nothing already sent is
+edited, except that a fold of an older opener (`folded_html`) re-renders its stored text with the new rule.
+
+**Side and restart.** `compose.py` is imported by the gateway (the import probe in *What needs what* lists
+`journal.compose`; `inbound`, `tools` and the commands reach it), so this is hook side as well as tick side: the tick
+sends the new rendering from the next tick after the pin moves, and the **gateway restart** brings the companion's own
+paths (annotation and reflection replies, program phases it sends) to it. Until the restart the gateway keeps the old
+rendering; nothing breaks in between. Serve side: untouched (the web app already renders `*italic*`).
+
+1. Install the CLI at `<sha>` and move the plugin pin (`hermes -p <profile> plugins install beejsbj/journal --force
+   --ref <sha>`), then `hermes gateway restart` in the next window. Nothing is sent.
+2. First check, without sending: `python3 -c "from journal import compose; print(compose.md_to_html('*\"a line\"* and 5 * 3'))"`
+   prints `<i>"a line"</i> and 5 * 3`. The next reflection or annotation reply shows its quotes in italic.
+3. Rollback: the plugin pin and the CLI at the previous sha, and a gateway restart.
+
 ## OPEN-PUSH — Web Push from `journal serve` to the installed PWA (2026-11-09; serve side only; **no gateway restart**; a new optional extra `journal[push]`; a new setting `push.*`; no state migration)
 
 **What changes.** `journal serve` can nudge the installed web app when a practice is due (README *Web app*,
