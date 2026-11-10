@@ -177,18 +177,20 @@ class ReadTest(Fixture):
         self.assertEqual(row.meta["images"], ["/c/real.jpg"])
         self.assertWithheld(row, "a picture placeholder")  # his words, as typed, kept whole: but not read as his
 
-    def test_an_injected_block_is_taken_off_only_where_the_turn_stores_it_at_the_end(self):
+    def test_an_injected_block_is_taken_off_only_after_a_pictures_placeholders(self):
         # parts are joined by a line break (agent/session_persistence.py _durable_content); inside the injected part,
         # recalled memory and the hooks' context by a blank line (agent/turn_context.py compose_multimodal_context_part)
         fenced = contextfence.wrap(self.notes)
-        for stored in ("plain words\n" + fenced,
-                       f"plain words\n{SPILL}\n--- head ---\n{fenced[:60]}\n--- tail ---\n{fenced[-40:]}",
-                       f"plain words\n{SPILL}\n--- head ---\n{fenced[:60]}",  # no tail
-                       f"plain words\n{SPILL}\n--- tail ---\n{fenced[-40:]}",  # no head
-                       "plain words\n<memory-context>\nrecalled\n</memory-context>\n\n" + fenced,
-                       as_text_parts("plain words", "<memory-context>\nrecalled\n</memory-context>\n\n" + fenced)):
-            row = self.row(stored)
-            self.assertEqual((row.kind, row.text, row.meta["loose"]), ("his", "plain words", "plain words"))
+        for injected in (fenced,
+                         f"{SPILL}\n--- head ---\n{fenced[:60]}\n--- tail ---\n{fenced[-40:]}",
+                         f"{SPILL}\n--- head ---\n{fenced[:60]}",  # no tail
+                         f"{SPILL}\n--- tail ---\n{fenced[-40:]}",  # no head
+                         "<memory-context>\nrecalled\n</memory-context>\n\n" + fenced):
+            for stored in (native("plain words", ["/c/a.jpg"], injected),
+                           as_parts("plain words", ["/c/a.jpg"], injected)):
+                row = self.row(stored)
+                self.assertEqual((row.kind, row.text, row.meta["loose"]), ("his", "plain words", "plain words"))
+        # (the same blocks ending a row with no picture: never cut, test_a_block_ending_a_row_with_no_picture…)
 
     def test_a_block_at_the_end_of_a_pictures_caption_is_his_not_taken_off(self):
         # everything injected comes after the placeholders: a fence or memory block ending the caption was typed
@@ -230,7 +232,8 @@ class ReadTest(Fixture):
                 self.row(native("/x the view", [str(self.cache / "img_x.jpg")], self.notes), "13", 3,
                          SENT + timedelta(hours=4))]
         self.assertEqual(rows[0].meta["withheld"], "recalled memory")
-        self.assertEqual((rows[1].kind, rows[2].kind), ("his", "his"))
+        self.assertEqual((rows[1].kind, rows[1].meta["withheld"], rows[2].kind),
+                         ("system", "the engine's context fence", "his"))  # (no picture: the block is not cut off)
         v = privacy.compute(self.cfg, rows, [], [], set())
         self.assertEqual(sorted(v.private), [1, 2, 3])
         for row in rows:
@@ -253,6 +256,86 @@ class ReadTest(Fixture):
         row = self.row("[Journal reply — saved verbatim to the evening entry.]\n\nthe lake\n\n" + self.notes)
         self.assertEqual((row.kind, row.meta["withheld"], row.meta["loose"]), ("handled", "an engine block", ""))
         self.assertIsNone(sweep.message(row))
+
+    # ── review fixes (2026-11-10) ────────────────────────────────────────────
+
+    def test_words_after_a_typed_picture_run_are_never_cut_the_row_is_withheld(self):
+        # what follows the placeholders is not something this reader knows the turn to add: it may be his own words
+        # (a message that only looks like a picture's turn), so nothing is cut away and the whole row is withheld
+        fenced = contextfence.wrap(self.notes)
+        run = "[Image attached at: /c/x.jpg]\n[screenshot]"
+        for stored, why in (
+                (f"look at this row:\n\n{run}\nand then my real thought", "a picture placeholder"),
+                (f"{run}\nwhat is this row about?", "a picture placeholder"),
+                # a whole stored row pasted, fence and all, and his own words after it
+                (f"look:\n\n{run}\n{fenced}\nwhy is this in my entry?", "the engine's context fence"),
+                # a real picture's row with another plugin's context, which this reader does not know
+                (native("the walk", ["/c/a.jpg"], "ANOTHER PLUGIN: context of its own"), "a picture placeholder"),
+                (native("the walk", ["/c/a.jpg"], fenced + "\n\nANOTHER PLUGIN: context of its own"),
+                 "the engine's context fence")):
+            row = self.row(stored)
+            self.assertWithheld(row, why)
+            self.assertEqual(row.text, stored.strip())  # nothing of his cut away
+            self.assertNotIn("images", row.meta)
+
+    def test_what_the_turn_adds_after_the_placeholders_is_cut_and_kept_for_the_privacy_pass(self):
+        fenced = contextfence.wrap(self.notes)
+        memory = "<memory-context>\n[System note: recalled memory, NOT new user input.]\n\nrecalled\n</memory-context>"
+        # Hermes' own note for the turn, a part of its own in front of the injected one (agent/skills_index_delta.py)
+        turn_note = ("[System: The skills available in this conversation changed after its system prompt was built.\n"
+                     "Now available (load with skill_view(name) when relevant):\n  - tidy: tidy the desk]")
+        # (recalled memory cut short by Hermes, agent/memory_manager.py: its header is inside the memory block)
+        spilled = ("<memory-context>\n[System note: recalled memory, NOT new user input.]\n\n" + SPILL
+                   + "\n--- head ---\nrecalled\n--- tail ---\nlast of it\n</memory-context>")
+        for injected in (fenced, memory, memory + "\n\n" + fenced, turn_note + "\n" + memory + "\n\n" + fenced,
+                         turn_note, self.notes, memory + "\n\n" + self.notes, spilled + "\n\n" + fenced,
+                         f"{spilled}\n\n{SPILL}\n--- head ---\n{fenced[:60]}\n--- tail ---\n{fenced[-40:]}"):
+            row = self.row(native("the walk", ["/c/a.jpg"], injected))
+            self.assertEqual((row.kind, row.text, row.meta["loose"], row.meta["images"]),
+                             ("his", "the walk", "the walk", ["/c/a.jpg"]), injected[:40])
+            self.assertEqual(row.meta["cut"].strip(), injected)
+        self.assertNotIn("cut", self.row(native("the walk", ["/c/a.jpg"])).meta)  # nothing after the placeholders
+
+    def test_a_block_ending_a_row_with_no_picture_is_never_cut_the_row_is_withheld(self):
+        # with no picture there is no place the turn stores what it adds: a block that ends the message may be his
+        fenced = contextfence.wrap(self.notes)
+        for stored in ("plain words\n" + fenced,
+                       f"plain words\n{SPILL}\n--- head ---\n{fenced[:60]}\n--- tail ---\n{fenced[-40:]}",
+                       f"plain words\n{SPILL}\n--- head ---\n{fenced[:60]}",  # no tail
+                       f"plain words\n{SPILL}\n--- tail ---\n{fenced[-40:]}",  # no head
+                       "plain words\n<memory-context>\nrecalled\n</memory-context>\n\n" + fenced,
+                       f"I wrote this:\n{OPEN}\nmy own tagged text\n{CLOSE}"):
+            row = self.row(stored)
+            self.assertWithheld(row, "the engine's context fence")
+            self.assertEqual(row.text, stored)
+        self.assertWithheld(self.row("docs:\n<memory-context>\nmine\n</memory-context>"), "recalled memory")
+        # (a list of text parts with no picture among them: the same, whatever Hermes put between the parts)
+        row = self.row(as_text_parts("plain words", "[System: a note of Hermes' own for the turn]",
+                                     "<memory-context>\nrecalled\n</memory-context>\n\n" + fenced))
+        self.assertWithheld(row, "the engine's context fence")
+
+    def test_an_opt_out_after_a_typed_run_or_inside_a_typed_block_still_counts(self):
+        fenced = contextfence.wrap(self.notes)
+        run = "[Image attached at: /c/x.jpg]\n[screenshot]"
+        stored = (f"some words\n\n{run}\n/x this part is private",                # (withheld whole)
+                  f"look:\n\n{run}\n{fenced}\n/x and this is private",            # a pasted row, then his own words
+                  f"look:\n\n{run}\n{self.notes}\n/x keep this out",              # cut at an engine head: /x in the cut
+                  f"{run}\n{self.notes}\n/x keep this out too",                    # the same, no words in front
+                  f"words\n{OPEN}\n/x hidden in a block of his own\n{CLOSE}",
+                  "words\n<memory-context>\n/x hidden\n</memory-context>")
+        rows = []
+        for i, text in enumerate(stored):
+            at = SENT + timedelta(hours=i)
+            rows.append(self.row(text, str(40 + i), 2 * i + 1, at))
+            rows.append(transcript.to_row({"id": 2 * i + 2, "ts": at.timestamp() + 60, "role": "assistant",
+                                           "content": "I see what you mean."}))
+        self.assertEqual([r.kind for r in rows[::2]], ["system", "system", "his", "empty", "system", "system"])
+        self.assertIn("/x keep this out", rows[4].meta["cut"])
+        for row in rows[::2]:
+            self.assertTrue(privacy.row_marked(self.cfg, row, set()), row.stored[:30])
+        v = privacy.compute(self.cfg, rows, [], [], set())
+        self.assertEqual(sorted(v.private), [r.id for r in rows])  # each of his rows, and her reply to it
+
 
 
 class FenceTest(Fixture):
@@ -397,6 +480,27 @@ class SweepTest(SweepBase):
         self.assertIn("· photo\n\n![[2026-10-15-j.jpg]]", body)
         self.assertNoneOfTheTurnIn(body)
 
+    # ── review fixes (2026-11-10) ────────────────────────────────────────────
+
+    def test_a_typed_run_with_an_opt_out_after_it_saves_nothing(self):
+        run = "[Image attached at: /c/x.jpg]\n[screenshot]"
+        self.db.add(f"some words\n\n{run}\n/x this part is private", SENT + timedelta(minutes=7), "3562")
+        self.db.add(f"look:\n\n{run}\n{self.notes}\n/x keep this out", SENT + timedelta(minutes=9), "3563")
+        n, log = self.sweep()
+        self.assertEqual(n, 0, log)
+        self.assertFalse(self.entry.exists())
+        self.assertEqual(log, ["sweep: withheld row 1 (message 3562): what is left of it still carries a picture "
+                               "placeholder, so it is not read as his words"])
+
+    def test_words_after_a_typed_run_are_not_saved_cut(self):
+        self.db.add("look at this row:\n\n[Image attached at: /c/x.jpg]\n[screenshot]\nand then my real thought",
+                    SENT + timedelta(minutes=7), "3564")
+        n, log = self.sweep()
+        self.assertEqual(n, 0, log)
+        self.assertFalse(self.entry.exists())
+        self.assertTrue(tick.files_as_error(log[0]))
+
+
 
 class ArrivalTest(Fixture):
     """``sweep.arrival``: the earliest file time between the sweep's horizon and the row's own time."""
@@ -419,6 +523,7 @@ class ArrivalTest(Fixture):
         self.assertEqual(self.at(SENT + timedelta(minutes=20), SENT + timedelta(minutes=5),
                                  self.since - timedelta(hours=2)), SENT + timedelta(minutes=5))  # several: earliest
         self.assertEqual(sweep.arrival(self.row, [str(self.cache / "img_none.jpg")], self.since), self.row.at)
+
 
 
 class ReadersTest(SweepBase):
@@ -480,6 +585,21 @@ class WriterTest(ConversationBase):
         self.assertIn("it was, the whole way home", conv(body))
         self.assertFalse(self.note().exists())
         self.assertNotIn("garden plan", body)
+
+    # ── review fixes (2026-11-10) ────────────────────────────────────────────
+
+    def test_a_typed_run_in_ordinary_chat_is_never_written_cut(self):
+        self.his("one thing", m(0), "580")
+        self.hers("go on", m(1))
+        self.his("look at this row:\n\n[Image attached at: /c/x.jpg]\n[screenshot]\nand then my real thought", m(2),
+                 "581")
+        self.hers("I see it.", m(3))
+        self.tick(m(10))
+        body = self.note().read_text()
+        self.assertIn("one thing", body)
+        for words in ("look at this row", "my real thought", "I see it."):
+            self.assertNotIn(words, body)
+
 
 
 if __name__ == "__main__":

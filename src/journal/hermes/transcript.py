@@ -14,10 +14,12 @@ once what Hermes stored:
   speech-to-text as a placeholder naming the cached file (``gateway/run_inbound.py``
   ``_prepend_inbound_media_file_notes``). A picture attached natively is stored with Hermes' own notes and the
   turn's injected context (the engine's fenced blocks, recalled memory) in his row: what follows his envelopes is
-  cut at the pictures' placeholders (``native``), and an injected block that ends the text is taken off
-  (``trailing``). A row whose remaining words still carry a mark of something added (``leftover``) is not read as
-  his words (``withheld``): it fails closed, as a ``system`` row. A list of parts Hermes stored as JSON is read as
-  its text first (``decode``).
+  cut at the pictures' placeholders (``native``) when what is stored after them is what this reader knows a turn
+  to add (``added``); the cut-off part goes to the privacy pass (``Row.meta["cut"]``), which still reads it for an
+  opt-out. Nothing else is ever cut off a row: one whose words still carry a mark of something added
+  (``leftover``: also a block ending a row with no picture, or anything else after a picture's placeholders) is
+  not read as his words (``withheld``): it fails closed, whole, as a ``system`` row. A list of parts Hermes stored
+  as JSON is read as its text first (``decode``).
 * **Her rows.** A tool step (``tool_calls``), a failed turn (``display_kind = 'failed_turn'``, its notice, or
   the failure copy older Hermes stored), a turn closed without a reply (``[SILENT]``, an interruption), a typed or
   compaction row, or her reply.
@@ -124,12 +126,18 @@ _PICTURE_PARTS = ("image", "image_url", "input_image")
 # A picture attached natively (agent/image_routing.py build_native_content_parts) is his caption, or Hermes' stand-in
 # for none, then a line naming each picture; the stored row is the turn's parts as text, and whatever was injected
 # into the turn is one more part after them (agent/turn_context.py _append_multimodal_context: the engine's context,
-# recalled memory, Hermes' turn notes). Nothing after the pictures' placeholders is his. (A placeholder run leaves its
-# last line break, so a caption of his shaped like one does not hide the real run after it.)
+# recalled memory, Hermes' turn notes). Nothing after the pictures' placeholders is his; but a row is taken for such a
+# turn by its shape alone, so the cut is made only when what follows is what a turn adds (``added``). (A placeholder
+# run leaves its last line break, so a caption of his shaped like one does not hide the real run after it.)
 NATIVE_STAND_IN = "What do you see in this image?"
 _NATIVE = re.compile(r"(?:\A|\n\n)((?:\[Image attached(?: at)?: [^\n]*\]\n)+)((?:\[screenshot\]\n)*\[screenshot\])"
                      r"(?=\n|\Z)")
 _ATTACHED_AT = re.compile(r"^\[Image attached at: (.*)\]$", re.M)
+# Hermes' own notes for a turn, a part of their own in front of the injected one (agent/turn_context.py
+# _merge_gateway_notes: the skills that changed, agent/skills_index_delta.py; another interface,
+# agent/surface_switch.py), and recalled memory in front of an engine block stored before the fence.
+_TURN_NOTE = "[System: "
+_START_MEMORY = re.compile(r"\A<memory-context>(?:(?!<memory-context>).)*?</memory-context>\s*", re.S | re.I)
 # Notes the gateway puts in front of his message for the model, stored with it in a picture's row (Hermes' clean
 # transcript replaces text only: agent/session_persistence.py _override_replaces_content): a skills reload
 # (gateway/slash_commands.py, put in front by gateway/run_turn_runner.py _prepend_pending_note) and the group chat
@@ -151,11 +159,12 @@ _INTERRUPTED = re.compile(
 # gateway.message_timestamps.enabled the model sees it, and a picture's row keeps it, in front of the reply quote).
 _TIMESTAMP = re.compile(r"^\[(?:[A-Z][a-z]{2} \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?: [A-Za-z0-9_+\-/:]+)?"
                         r"|\d{4}-\d{2}-\d{2}T[^\]]+)\]\s*")
-# What was injected into a turn, if it is ever stored after his words with no picture: a block at a line start that
-# ends the text (``trailing``, last first: Hermes joins an injection to a message with a blank line, and the parts of
-# a list with a line break). The engine's fenced context; the same cut short by Hermes (tools/hook_output_spill.py:
-# a header, then a head and a tail of it, either of which may be empty: taken off only when it holds the engine's
-# fence); recalled memory (agent/memory_manager.py). Anywhere else, such a mark is ``leftover``.
+# What is injected into a turn, as it ends what a picture's row stores after its placeholders: a block at a line
+# start that ends the text (``trailing``, last first: Hermes joins an injection to a message with a blank line, and the
+# parts of a list with a line break). The engine's fenced context; the same cut short by Hermes
+# (tools/hook_output_spill.py: a header, then a head and a tail of it, either of which may be empty: taken off only
+# when it holds the engine's fence); recalled memory (agent/memory_manager.py). In his words, in a row with no
+# picture too, such a mark is ``leftover``: nothing is cut off there.
 _SPILL = r"\[[^\]\n]* output truncated — [^\n]*\]\n"
 _END_FENCE = re.compile(rf"(?:\A|\n){re.escape(OPEN)}(?:(?!{re.escape(OPEN)}).)*?{re.escape(CLOSE)}\s*\Z", re.S)
 _END_SPILL = re.compile(rf"(?:\A|\n){_SPILL}(?:(?!\n{_SPILL}).)*\Z", re.S)
@@ -191,17 +200,37 @@ def decode(content: str | None) -> tuple[str, bool]:
                      if isinstance(p, dict) and (p.get("type") == "text" or p.get("type") in _PICTURE_PARTS)), True
 
 
-def native(text: str) -> tuple[str, list[str], bool]:
-    """(his part, the pictures' local files, cut) of a turn with pictures attached natively: the text before the
-    pictures' notes, Hermes' stand-in read as no caption. Unchanged, with ``cut`` False, when ``text`` is not such a
-    turn, or when its picture lines and placeholders do not agree in number (``leftover`` then finds them)."""
-    runs = list(_NATIVE.finditer(text))  # (the last: a caption of his shaped like one stays his)
-    m = runs[-1] if runs else None
-    if not m or len(m.group(1).splitlines()) != len(m.group(2).split()):
-        return text, [], False
+def native(text: str) -> tuple[str, list[str], bool, str]:
+    """(his part, the pictures' local files, cut, what was cut off after the placeholders) of a turn with pictures
+    attached natively: the text before the pictures' notes, Hermes' stand-in read as no caption. Unchanged, with
+    ``cut`` False, when ``text`` is not such a turn: no run of picture lines and placeholders, one whose lines and
+    placeholders do not agree in number, or one followed by something this reader does not know a turn to add
+    (``added``: it may be his own words, in a message that only looks like a picture's turn). ``leftover`` then
+    finds the placeholders, and the row is withheld whole: nothing of it is cut away."""
+    m = pictured(text)
+    if not m or not added(text[m.end():]):
+        return text, [], False, ""
     head = text[:m.start()]
     pictures = [p.strip() for p in _ATTACHED_AT.findall(m.group(1))]
-    return ("" if head.strip() == NATIVE_STAND_IN else head), pictures, True
+    return ("" if head.strip() == NATIVE_STAND_IN else head), pictures, True, text[m.end():]
+
+
+def pictured(text: str) -> re.Match | None:
+    """The run of picture lines and placeholders that makes ``text`` a picture's turn by its shape: the last one (a
+    caption of his shaped like one stays his), when its lines and placeholders agree in number; else None."""
+    runs = list(_NATIVE.finditer(text))
+    m = runs[-1] if runs else None
+    return m if m and len(m.group(1).splitlines()) == len(m.group(2).split()) else None
+
+
+def added(tail: str) -> bool:
+    """Whether what a row stores after a picture's placeholders is what the turn added, as far as this reader can
+    tell: nothing; the engine's fenced context and recalled memory, all of it (``trailing`` takes it off whole); or
+    text that opens with Hermes' own note for the turn (``_TURN_NOTE``) or, behind recalled memory or not, with an
+    engine block's head (a row stored before the fence: nothing closes such a block, so the rest goes with it).
+    Anything else may be his words, or something added that this reader does not know: not cut."""
+    rest = trailing(tail).lstrip()
+    return not rest or rest.startswith(_TURN_NOTE) or _START_MEMORY.sub("", rest, count=1).startswith(HEADS)
 
 
 def timestamps(text: str) -> str:
@@ -212,13 +241,16 @@ def timestamps(text: str) -> str:
 
 
 def trailing(text: str) -> str:
-    """``text`` without the injected blocks that end it (``_END_SPILL``, ``_END_FENCE``, ``_END_MEMORY``). Not for
-    what is left of a native picture's row: everything injected came after its placeholders, so a block at the end of
-    the caption is his, and ``leftover``."""
+    """``text`` without the injected blocks that end it (``_END_SPILL``, ``_END_FENCE``, ``_END_MEMORY``). For what
+    a picture's row stores after its placeholders (``added``) only, never for his words: a block at the end of a
+    caption, or of a row with no picture, may be his, and is ``leftover``."""
     while True:
         for rx in (_END_SPILL, _END_FENCE, _END_MEMORY):  # (a cut-short block first: its head opens a fence)
             m = rx.search(text)
-            if m and (rx is not _END_SPILL or OPEN in m.group(0) or CLOSE in m.group(0)):
+            # (recalled memory can be cut short too, agent/memory_manager.py: that header is inside the memory
+            # block and goes with it, not with the engine's fence after it)
+            if m and (rx is not _END_SPILL or ((OPEN in m.group(0) or CLOSE in m.group(0))
+                                               and "</memory-context>" not in m.group(0).lower())):
                 text = text[:m.start()]
                 break
         else:
@@ -242,10 +274,12 @@ def read(content: str | None, platform_message_id: str | None) -> dict:
     ``kind`` is "his" (his words), "handled" (it carries the hook's journal note: already saved), "mirror"
     (the journal's own send), "system" (a Hermes or gateway row, not his words) or "empty". The text is
     his words alone: no gateway origin note, no gateway note or timestamp in front, no reply quote (kept in
-    ``quote``), nothing after a native picture's placeholders, no injected block at the end. ``images``: the files of
-    pictures attached natively (a captionless one is "empty"); ``native``: the row is such a picture's.
-    ``withheld``: what still marked something added in the words left (``leftover``), a platform note in front of a
-    native picture, or a stored list that could not be read; the row is then "system" (or still "handled")."""
+    ``quote``), nothing after a native picture's placeholders. ``images``: the files of pictures attached natively
+    (a captionless one is "empty"); ``native``: the row is such a picture's; ``cut``: what was stored after its
+    placeholders and cut off, when anything (what the turn added: for the privacy pass only). ``withheld``: what
+    still marked something added in the words left (``leftover``), a platform note in front of a native picture,
+    or a stored list that could not be read; the row is then "system" (or still "handled"), whole: nothing is cut
+    off a row that is withheld."""
     text, readable = decode(content)
     out = {"message_id": str(platform_message_id) if platform_message_id else None, "quote": None,
            "text": "", "source": "text", "audio_path": None, "kind": "empty"}
@@ -273,13 +307,13 @@ def read(content: str | None, platform_message_id: str | None) -> dict:
     m = _REPLY.match(text)
     if m:
         out["quote"], text = m.group(1), text[m.end():]
-    text, pictures, cut = native(text)
+    text, pictures, cut, tail = native(text)
     if pictures:
         out["images"] = pictures
     if cut:
         out["native"] = True
-    else:
-        text = trailing(text)
+        if tail.strip():
+            out["cut"] = tail
     if not text.strip():
         return out
     why = leftover(text)  # (in his words only: a reply quote of hers is not his message)
@@ -353,8 +387,7 @@ def caption(text: str) -> str:
 def clean_user_text(text: str) -> str:
     """His words alone, loosely: no gateway origin note, no quoted message he replied to, no journal hook note
     (the last two hold the companion's own text), no gateway note or timestamp in front, nothing after a native
-    picture's placeholders, no injected block at the end (as ``read`` peels them; a withheld row's ``loose`` is empty
-    instead)."""
+    picture's placeholders (as ``read`` peels them; a withheld row's ``loose`` is empty instead)."""
     text = _NOISE.sub("", text or "")
     # the envelopes in ``read``'s order: the notes in front, then the timestamp, then the reply quote
     for envelope in (_GROUP, _SKILLS_RELOAD, _INTERRUPTED, _GATEWAY_NOTE):
@@ -362,8 +395,7 @@ def clean_user_text(text: str) -> str:
     text = _REPLY_QUOTE.sub("", timestamps(text.lstrip()))  # the quoted message is hers, not his words
     text = _JOURNAL_NOTE_ANYWHERE.sub("\n\n", text)
     text = _JOURNAL_NOTE.sub("", text.lstrip())  # an older note with another ending
-    text, _, cut = native(text)
-    return (text if cut else trailing(text)).strip()
+    return native(text)[0].strip()
 
 
 def _like(text: str | None, prefixes) -> bool:
@@ -439,6 +471,8 @@ def to_row(raw: Mapping) -> Row | None:
         meta["images"] = msg["images"]
     if msg.get("native"):
         meta["native"] = True
+    if msg.get("cut"):
+        meta["cut"] = msg["cut"]
     if msg.get("file_name"):
         meta["file_name"] = msg["file_name"]
     return Row(int(raw["id"]), at, "user", kind, msg["text"], msg["message_id"], msg["quote"], msg["source"],

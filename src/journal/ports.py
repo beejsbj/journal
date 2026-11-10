@@ -39,10 +39,12 @@ platform's envelopes. ``copy`` is the id of the row this one repeats (a compacti
   quote verifier and the outage catch-up have always shown), ``frame`` (the stored text opens with a platform
   frame: compaction, a delivery, a system instruction), ``delivery`` (it is a delivery the context pack leaves
   out: a scheduled delivery, a system instruction, the journal's mirror, or no text at all), ``images`` (the
-  local files of pictures the platform attached to the model's turn itself, named in the row), ``withheld`` (why
-  the row is not read as his words although it may hold some: it still carries something added to his message,
-  such as context injected into the turn; the row is ``system`` with no caption, or stays ``handled``, and its
-  ``loose`` is empty);
+  local files of pictures the platform attached to the model's turn itself, named in the row), ``native`` (the
+  row is the turn of such a picture), ``cut`` (what the row stored after the picture's placeholders and the
+  transcript cut off, when anything: what the turn added, never read as his words; the privacy pass alone reads
+  it, for an opt-out), ``withheld`` (why the row is not read as his words although it may hold some: it still
+  carries something added to his message, such as context injected into the turn; the row is ``system`` with no
+  caption, or stays ``handled``, and its ``loose`` is empty; nothing is cut off such a row);
 * her rows: ``ends_turn`` (this row ends her turn for the privacy pass), ``outage`` (a failed turn that names a
   provider error), ``reply`` (a plain chat reply of hers, for aligning annotations).
 
