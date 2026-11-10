@@ -87,8 +87,8 @@ test("library, insights and settings read", async ({ page }, info) => {
   await expect(page.locator(".week-card")).toBeVisible();
   await shot(page, info, "insights");
   await page.goto("/settings");
-  await page.getByText("Health check").click();   // the diagnostics are folded at the foot of the page
-  await expect(page.locator("table.doctor")).toBeVisible();
+  await page.getByRole("button", { name: /Health check/ }).click();   // the checks are folded at the foot of the page
+  await expect(page.locator(".doctor li.check").first()).toBeVisible();
   await expect(page.getByText(/Paired as/)).toBeVisible();
   await shot(page, info, "settings");
 });

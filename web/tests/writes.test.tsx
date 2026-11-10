@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "../src/app";
 import { loadDraft } from "../src/drafts";
 import { closeEvents } from "../src/events";
-import { json, fixtures, byText, choose, click, mount, must, storedText, stubApi, tick, type, until } from "./helpers";
+import { json, fixtures, byText, click, mount, must, storedText, stubApi, tick, type, until } from "./helpers";
 
 // Everything that writes: the composer and the recorder, the entry's meta sheet, Today's buttons, the run screen,
 // the program cards, settings and the "+" sheet. The server is a stub that records what it was sent.
@@ -607,7 +607,7 @@ describe("The Library", () => {
     const { writes } = stubApi({ ...reads, "GET /api/v1/library/midweek": fixtures.libraryMidweekEdited, "DELETE /api/v1/library/midweek": null });
     const host = mount(<App />);
     const note = await until(() => must(host.querySelector(".edited-note")));
-    expect(host.querySelector(".eyebrow")?.textContent).toContain("edited");
+    expect(host.querySelector(".kicker")?.textContent).toContain("Edited built-in");
     expect(note.textContent).toContain("Your version is used in place of the built-in");
     expect(note.querySelector(".default-changed")?.textContent).toContain("The default has changed since you edited it.");
     expect(byText(note, "a.button", "See what changed")?.getAttribute("href")).toBe("/library/midweek/default");
@@ -626,9 +626,9 @@ describe("The Library", () => {
     const since = await until(() => must(host.querySelector('[aria-labelledby="since-h"] .diff')));
     expect(since.querySelector(".diff-line.ins")?.textContent).toContain("aligned or drifted?");
     expect(since.querySelector(".diff-line.del")?.textContent).toContain("on track?");
-    const yours = must(byText(host, ".diff-section summary", "Your version against the default")).parentElement;
+    const yours = must(byText(host, ".diff-section .disclosure-head", "Your version against the default")).closest(".diff-section");
     expect(yours?.querySelector(".diff-line.ins")?.textContent).toContain("Where has your energy gone this week?");
-    expect(host.querySelector(".eyebrow")?.textContent).toContain("The default");
+    expect(host.querySelector(".kicker")?.textContent).toContain("The default");
     expect(host.querySelectorAll(".question-set li").length).toBeGreaterThan(0);   // the default's own questions
     await click(byText(host, "button", "Reset to default"));
     await click(byText(host, ".confirm button", "Reset to default"));
@@ -642,8 +642,10 @@ describe("The Library", () => {
     stubApi({ ...reads, "GET /api/v1/library": lib });
     const host = mount(<App />);
     const card = await until(() => must(host.querySelector('a[href="/library/midweek"]')));
-    expect(card.querySelector(".badge.source")?.textContent).toBe("edited");
-    expect(card.querySelector(".badge.changed")?.textContent).toBe("default changed");
+    // WEB-UX: an outlined ribbon and quiet words, not boxed badges
+    expect(card.querySelector(".source")?.textContent).toBe("Edited");
+    expect(card.querySelector(".ribbon-mark.edited")).not.toBeNull();
+    expect(card.querySelector(".changed")?.textContent).toBe("default changed");
   });
 
   it("offers Edit on a program too", async () => {
@@ -729,8 +731,12 @@ describe("Settings", () => {
     const hours = await until(() => must(host.querySelector<HTMLInputElement>("#s-windows\\.collapse_hours")));
     expect(hours.value).toBe("6");
     await type(hours, "8");
-    await choose(host.querySelector("#s-today\\.enabled"), "off");
-    await click(byText(host, "button", "Save settings"));
+    // WEB-UX: a flag is a switch (unset, it shows the default: on); the save bar says "Save"
+    const today = must(host.querySelector("#s-today\\.enabled"));
+    expect(today.getAttribute("aria-checked")).toBe("true");
+    await click(today);
+    expect(host.querySelector(".save-count")?.textContent).toBe("2 changes not saved");
+    await click(byText(host, "button", "Save"));
     await until(() => expect(writes()).toHaveLength(1));
     expect(writes()[0]?.body).toEqual({ windows: { collapse_hours: 8 }, today: { enabled: false } });
     await until(() => expect(host.querySelector(".settings-form .saved")?.textContent).toContain("windows.collapse_hours (config file)"));
@@ -741,9 +747,11 @@ describe("Settings", () => {
     stubApi(read);
     const host = mount(<App />);
     const hours = await until(() => must(host.querySelector<HTMLInputElement>("#s-windows\\.collapse_hours")));
-    expect(hours.closest(".field")?.textContent).toContain("In the config file.");
+    expect(hours.closest(".setting")?.textContent).toContain("In the config file.");
+    expect(hours.closest(".setting")?.querySelector(".default-hint")?.textContent).toBe("the default");   // 6 hours is the default
     const cache = must(host.querySelector<HTMLInputElement>("#s-today\\.max_chars"));
-    expect(cache.closest(".field")?.textContent).toContain("default applies");
+    expect(cache.closest(".setting")?.textContent).toContain("default applies");
+    expect(cache.value).toBe("1200");   // unset: the default itself, never a placeholder
   });
 
   it("locks what Hermes owns, with the line that changes it", async () => {
@@ -752,7 +760,8 @@ describe("Settings", () => {
     const host = mount(<App />);
     const quiet = await until(() => must(host.querySelector<HTMLInputElement>("#s-conversations\\.quiet_minutes")));
     expect(quiet.disabled).toBe(true);
-    expect(quiet.closest(".field")?.textContent).toContain("hermes config set plugins.entries.journal.settings.conversations.quiet_minutes");
+    expect(quiet.closest(".setting")?.textContent).toContain("hermes config set plugins.entries.journal.settings.conversations.quiet_minutes");
+    expect(quiet.closest(".setting")?.querySelectorAll("button:not([disabled])")).toHaveLength(0);   // its stepper is locked too
   });
 
   it("will not send a value outside the range, and shows the server's reason for one it refuses", async () => {
@@ -761,10 +770,10 @@ describe("Settings", () => {
     const host = mount(<App />);
     const hours = await until(() => must(host.querySelector<HTMLInputElement>("#s-windows\\.collapse_hours")));
     await type(hours, "100");
-    expect(byText(host, "button", "Save settings")?.hasAttribute("disabled")).toBe(true);
-    expect(hours.closest(".field")?.textContent).toContain("At most 72");
+    expect(byText(host, "button", "Save")?.hasAttribute("disabled")).toBe(true);
+    expect(hours.closest(".setting")?.textContent).toContain("At most 72");
     await type(hours, "5");
-    await click(byText(host, "button", "Save settings"));
+    await click(byText(host, "button", "Save"));
     await until(() => expect(host.querySelector(".settings-form .error-line")?.textContent).toContain("is not an allowed value"));
   });
 });
@@ -803,10 +812,10 @@ describe("Use my location", () => {
     expect(storedText(sessionStorage) + storedText(localStorage)).not.toContain("9.98");   // the position is not kept
     // the place shown is OpenStreetMap's: the credit stays with it, not with the moment it was found
     const place = await until(() => must(host.querySelector<HTMLInputElement>("#s-location")));
-    await until(() => expect(place.closest(".field")?.querySelector(".credit")?.textContent).toBe("Place name © OpenStreetMap contributors"));
-    expect(place.closest(".field")?.querySelector<HTMLAnchorElement>(".credit a")?.href).toBe("https://www.openstreetmap.org/copyright");
+    await until(() => expect(place.closest(".setting")?.querySelector(".credit")?.textContent).toBe("Place name © OpenStreetMap contributors"));
+    expect(place.closest(".setting")?.querySelector<HTMLAnchorElement>(".credit a")?.href).toBe("https://www.openstreetmap.org/copyright");
     await type(place, "Faro");   // typing another place: the credit is not his to carry
-    expect(place.closest(".field")?.querySelector(".credit")).toBeNull();
+    expect(place.closest(".setting")?.querySelector(".credit")).toBeNull();
   });
 
   it("credits nothing for a place typed by hand", async () => {
@@ -826,11 +835,11 @@ describe("Use my location", () => {
     const stored = place.value;
     await type(place, "Faro");
     await type(must(host.querySelector("#s-timezone")), "Europe/Lisbon");
-    expect(byText(host, "button", "Save settings")?.hasAttribute("disabled")).toBe(false);
+    expect(byText(host, "button", "Save")?.hasAttribute("disabled")).toBe(false);
     await click(byText(host, "button", "Use my location"));
     await until(() => must(host.querySelector(".locate .saved")));
     await until(() => expect(must(host.querySelector<HTMLInputElement>("#s-location")).value).toBe(stored));
-    expect(byText(host, "button", "Save settings")?.hasAttribute("disabled")).toBe(true);
+    expect(byText(host, "button", "Save")?.hasAttribute("disabled")).toBe(true);
     expect(writes().map((x) => x.path)).toEqual(["/api/v1/settings/location"]);
   });
 
