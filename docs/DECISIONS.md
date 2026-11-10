@@ -22,6 +22,19 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
 
 ## Raised by packages (open, not decided)
 
+- **X-MEMORY (2026-11-09) — the journal's own model calls load the companion's memory, so `/x` can reach a
+  permanent file.** Every model step (openers, annotations, day reflections, week reviews, program reflections and
+  insights, outage replies) runs `hermes chat --oneshot` in her profile (`hermes/companion.py`). Hermes loads her
+  built-in memory (`MEMORY.md`, `USER.md`) into that call's prompt unless `--ignore-rules` is passed, and
+  `--toolsets none` removes tools, not memory. Since X-SCOPE lets her memory hold what was said off the record,
+  an annotation or reflection written into an entry may carry it in other words; the quote check only catches a
+  literal quote. This widens WEB-DESIGN below (which asked the same of openers alone). To close, one of: run the
+  journal's permanent-writing calls without her memory (`--ignore-rules` drops her persona file too, so the journal
+  would supply her voice itself, or a narrower Hermes switch is found); or refuse her memory tool in an
+  off-the-record turn (Hermes' background memory review would still need checking); or both. **The owner ruled out
+  the first (2026-11-09):** the journal's model calls keep her memory. Still open, and his to decide: refusing her
+  memory tool in an off-the-record turn, at the cost of "/x remember that…" no longer working.
+
 - **OPEN-PROMPTS — a practice can be done without a chat message (design agreed, building; issues #13, #14).**
   Today a practice's prompt exists only once the chat has delivered it (`message_id`), so the web app, the CLI and
   MCP cannot do a practice by themselves, and a web-only install counts every scheduled prompt as a failed send. The
@@ -3034,6 +3047,18 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   situational session interrupts a program's open phase, the program does not resend that phase by itself;
   `/start <word>` brings it back. Manual by design. Closes the open point in ONE-PROGRAM-RUN, review fixes (6) ("whether
   the engine should re-send it on its own").
+- **X-SCOPE (the owner, 2026-11-09) — `/x` keeps a message out of the journal, not out of the agent.** An audit of
+  the live chat found an off-the-record turn in which the companion wrote to her own memory and to a task inbox:
+  the tool guard refuses only the journal's writes (`journal_add_note`, notebook writes, `journal_set_location`).
+  Asked whether `/x` should mean "not stored anywhere" (refuse every write tool in the turn, so "/x remind me to…"
+  stops working) or "not in the journal", the owner chose the journal. README's guarantee now says so: nothing marked
+  `/x` is saved in the journal, read back into the journal's context or quoted; tools that are not the journal's are
+  not refused, and a connected source does not know where its data came from: with `sources.tududi` on, a task
+  made from an `/x` turn can come back through the context pack (and an opener written from it), the Today
+  block, `today-cache.json` and the web app. The guarantee is about what the journal captures, not about
+  what may re-enter as source data. Consequence: her memory may hold what was said off
+  the record (Hermes writes it from her memory tool and from its own background review), and that memory is not
+  the journal's to filter. See X-MEMORY, raised above.
 - **NOTEBOOK-NEWEST (2026-11-09) — the notebook block shows due items, then the newest; a repeated item is not added.**
   `notebook.render` took the first `INJECT` (15) items by age, so at the cap (`MAX_OPEN`, 40) the companion saw the
   oldest, which are also the next to be pruned, and none of the recent notes, reminders the owner asked for among
