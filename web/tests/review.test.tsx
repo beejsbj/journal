@@ -79,7 +79,7 @@ describe("Insights", () => {
         url.searchParams.get("from") === "2026-10-12" && url.searchParams.get("to") === "2026-10-18" ? fixtures.reflections : [],
     });
     const host = mount(<App />);
-    await until(() => expect(host.querySelector(".reflection summary")?.textContent).toContain("reflection"));
+    await until(() => expect(host.querySelector(".reflection")?.id).toBe("2026-10-14-reflection"));
     expect(f.calls.some((c) => c.includes("from=2026-10-12") && c.includes("to=2026-10-18"))).toBe(true);
     expect(f.calls.every((c) => !c.includes("limit=200"))).toBe(true);
   });

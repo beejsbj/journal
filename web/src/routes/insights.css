@@ -1,0 +1,89 @@
+/* Insights (routes/insights.tsx): Folio's page (prose figures, her review as a letter, day by day), Night Room's
+   programs strip, Almanac's numerals for the week. */
+
+.insights-page { max-width: 1080px; margin: 0 auto; padding: 40px var(--gutter) var(--s8); }
+
+/* the week: Earlier and Later around how long ago, then the range set large */
+.week-stepper { display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 6px; }
+.week-stepper .button { color: var(--text-2); }
+.week-ago { min-width: 120px; justify-content: center; margin: 0; }
+.ins-title { margin: 0 0 44px; padding-top: 18px; text-align: center; font-weight: 400; animation: fade-in var(--d-3) both; }
+.ins-title .nums { font: 300 var(--t-numeral) / 0.95 var(--f-his); letter-spacing: -0.04em; font-variant-numeric: lining-nums; }
+.ins-title em { margin-left: 14px; font: italic 300 3rem / 1 var(--f-his); letter-spacing: -0.02em; color: var(--text-2); }
+
+/* two columns: the figures and the programs; her review and her days */
+.ins-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 64px; align-items: start; }
+.prose-figs { margin: 0 0 40px; font: 400 1.7rem / 1.42 var(--f-his); letter-spacing: -0.01em; color: var(--text-2); text-wrap: pretty; }
+.prose-figs b { font-weight: 500; color: var(--text); font-variant-numeric: lining-nums; }
+.ins-sec { margin-bottom: 40px; }
+.ins-sec > .book-head, .ins-days > .book-head { margin: 0 0 6px; font-size: 18px; }
+.ins-programs .progress-strip + .progress-strip { border-top: 1px solid var(--hair); }
+.ins-programs .progress { margin: 0; padding: 12px 0; color: var(--text-2); }
+
+/* her review of the week: a letter of hers, the first paragraph large, the rest folded (no fastening) */
+.ins-review > .kicker { margin: 0 0 18px; }
+.ins-review > .kicker::after { content: none; }
+.review-wrap { scroll-margin-top: 40px; }
+.review.letter { padding: 28px 28px 10px; }
+.review-pull .md p { position: relative; margin: 4px 0 10px 0.4em; font: italic 400 1.3rem / 1.5 var(--f-her); letter-spacing: -0.02em; color: var(--her); text-wrap: pretty; }
+.review-pull .md p::before { content: "\201C"; position: absolute; left: -0.7em; top: -0.05em; opacity: 0.5; }
+.review-pull .md p:not(:first-child)::before { content: none; }
+.review .letter-foot { margin-top: 10px; padding-top: 0; border-top: 0; }
+.review-more { flex: 1 1 100%; }
+.review-more > .disclosure-head {
+  min-height: 50px; padding: 0; border-top: 1px dashed var(--her-edge); border-radius: 0;
+  font: 500 var(--t-small) / 1.2 var(--f-ui); color: var(--her);
+}
+.review-more > .disclosure-head .disclosure-chevron { color: var(--her-soft); }
+.review-more .md { padding: 4px 0 8px; }
+.review-more .md p { margin: 0 0 12px; }
+.review-pending {
+  margin: 0; padding: 20px 0; border-top: 1px solid var(--hair-2); border-bottom: 1px solid var(--hair-2);
+  font: italic 400 18px / 1.5 var(--f-his); color: var(--text-3);
+}
+
+/* day by day: a slip per day, the date as a numeral, her first line beside it */
+.ins-days { margin-top: 40px; }
+.ins-days > .book-head { margin-bottom: 10px; }
+.ins-days .empty { padding: var(--s4) 0; font-size: 17px; }
+.reflection { border-bottom: 1px solid var(--hair); scroll-margin-top: 40vh; }
+.reflection > .slip-head { min-height: 64px; padding: 8px 0; border-radius: 0; }
+.slip { display: flex; align-items: center; gap: 14px; }
+.day-n { flex: none; width: 40px; text-align: center; font: 300 28px / 1 var(--f-his); font-variant-numeric: lining-nums; color: var(--text); }
+.day-n small { display: block; margin-top: 2px; font: 500 11px / 1.4 var(--f-ui); color: var(--text-3); }
+.slip-line { flex: 1; min-width: 0; font-style: italic; }
+.reflection[data-open="true"] .slip-line { color: var(--her-soft); }
+.reflection .disclosure-content { padding: 0 0 18px 54px; }
+.slip-body .md p { margin: 0 0 10px; }
+.slip-body .md ul { margin: 0 0 10px; padding-left: 1.2rem; }
+.from { margin: 6px 0 0; font-size: var(--t-small); color: var(--text-3); }
+.from a { color: var(--text-2); }
+
+/* a week no program moved: the sentence across the page, then her review beside her days */
+.ins-grid.no-programs { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 64px; }
+.no-programs > .ins-col { display: contents; }
+.no-programs .prose-figs { grid-column: 1 / -1; max-width: 46rem; }
+.no-programs .ins-col > .skeletons, .no-programs .ins-col > .error-line { grid-column: 1 / -1; }
+.no-programs .ins-days { margin-top: 0; }
+
+/* a desk without room for two columns: one, in reading order */
+@media (max-width: 1180px) and (min-width: 761px) {
+  .ins-grid, .ins-grid.no-programs { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .no-programs .ins-days { margin-top: 16px; }
+}
+
+/* a phone: prose, her review, the programs, her days */
+@media (max-width: 760px) {
+  .insights-page { padding: 4px 20px var(--s6); }
+  .ins-title { margin-bottom: 28px; }
+  .ins-title .nums { font-size: 4rem; }
+  .ins-title em { display: block; margin: 6px 0 0; font-size: 2rem; }
+  .ins-grid { display: flex; flex-direction: column; gap: 0; }
+  .ins-col { display: contents; }
+  .prose-figs { order: 1; font-size: 1.4rem; margin-bottom: 28px; }
+  .ins-col:last-child > .ins-review, .ins-col:last-child > .skeletons, .ins-col:last-child > .error-line { order: 2; }
+  .ins-programs { order: 3; margin-top: 36px; }
+  .ins-days { order: 4; }
+  .review.letter { padding: 22px 18px 8px; }
+  .reflection .disclosure-content { padding-left: 0; }
+}
