@@ -93,7 +93,9 @@ def notebook_schema(n: Names) -> dict:
         "description": (
             f"Your private notebook (only you see it; it is not in the journal). Use it for threads you mean to "
             f"pick up with {who} later: 'ask how the conversation with X went', 'they wanted to try Y'. Open items "
-            "are shown to you each turn. action=add with text (optional bring_up_after YYYY-MM-DD, optional source); "
+            "are shown to you each turn. action=add with text (optional bring_up_after YYYY-MM-DD, optional source; "
+            "a text already open adds nothing new: that item is raised again, takes the new date if you give one, and the "
+            "result says duplicate, and date_changed when its date moved); "
             "action=resolve with id once it has come up or stopped mattering; action=list to see everything open."
         ),
         "parameters": {
@@ -205,8 +207,10 @@ def _set_location(cfg: Config, params: dict, *, reload: Callable | None = None,
 def _notebook(cfg: Config, params: dict, **_) -> str:
     action = str(params.get("action", "list"))
     if action == "add":
-        return json.dumps({"success": True, "item": notebook.add(cfg, str(params.get("text", "")),
-                           str(params.get("source", "")), params.get("bring_up_after") or None)})
+        item = notebook.add(cfg, str(params.get("text", "")), str(params.get("source", "")),
+                            params.get("bring_up_after") or None)
+        flags = {k: True for k in ("duplicate", "date_changed") if item.get(k)}
+        return json.dumps({"success": True, "item": item, **flags})
     if action == "resolve":
         return json.dumps({"success": True, "item": notebook.resolve(cfg, str(params.get("id", "")),
                                                                      str(params.get("outcome", "")))})

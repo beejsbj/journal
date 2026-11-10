@@ -3,6 +3,8 @@ import { App } from "../src/app";
 import { loadDraft } from "../src/drafts";
 import { closeEvents } from "../src/events";
 import { json, fixtures, byText, choose, click, mount, must, storedText, stubApi, tick, type, until } from "./helpers";
+import { writeTarget } from "../src/routes/today";
+import type { PracticeRow } from "../src/types";
 
 // Everything that writes: the composer and the recorder, the entry's meta sheet, Today's buttons, the run screen,
 // the program cards, settings and the "+" sheet. The server is a stub that records what it was sent.
@@ -312,29 +314,167 @@ describe("Mood, people and a star", () => {
 describe("Today", () => {
   const open = {
     ...fixtures.today,
-    practices: { rows: [{ id: "morning", state: "open", sent: "06:00", stem: "2026-10-15-morning" }, ...fixtures.today.practices.rows], open: ["morning"] },
+    practices: { rows: [{ id: "morning", state: "open", sent: "06:00", stem: "2026-10-15-morning",
+                          prompt: { sent_at_local: "06:00 IST", opener: "Morning.", opener_source: "ada", asked: [], questions: [] } },
+                        ...fixtures.today.practices.rows.filter((r) => r.id !== "morning")], open: ["morning"] },
   };
+
+  const view = (practice: string, fills: string, opener = "Evening 📓 Let the day land.") => ({
+    practice, title: practice, fills,
+    prompt: { sent_at_local: null, opener, opener_source: "plain", asked: [], questions: [{ id: "1.1", text: "What's spinning in your mind?", section: null }] },
+    slot: { id: `2026-10-15-${practice}`, date: "2026-10-15", state: "upcoming", step: 3, at: "23:00", delivered: false },
+  });
 
   it("replies to a waiting prompt as a new entry of that practice", async () => {
     visit("/");
-    const { writes } = stubApi({ ...reads, "GET /api/v1/today": open, "POST /api/v1/entries": { stem: "2026-10-15-morning", path: "x", rule: "web" } });
+    const { writes } = stubApi({ ...reads, "GET /api/v1/today": open, "POST /api/v1/entries": { stem: "2026-10-15-morning", path: "x", rule: "web" },
+                                 "GET /api/v1/library/morning/open": view("morning", "Answers the prompt in the chat, sent at 06:00.") });
     const host = mount(<App />);
     const card = await until(() => must(host.querySelector("li.practice.open")));
-    await click(byText(card, "button", "Reply"));
+    await click(byText(card, "button", "Write now"));
+    await until(() => expect(card.querySelector(".fills")?.textContent).toBe("Answers the prompt in the chat, sent at 06:00."));
+    expect(card.querySelectorAll(".prompt")).toHaveLength(1);   // the card shows the prompt the chat has, and only once
     await type(card.querySelector("textarea"), "Slept badly, but the light is good.");
-    await click(byText(card, "button", "Reply"));
+    await click(byText(card, "button", "Save"));
     await until(() => expect(writes()).toHaveLength(1));
     expect(writes()[0]?.body).toMatchObject({ practice: "morning", text: "Slept badly, but the light is good." });
     await until(() => expect(card.textContent).toContain("Saved."));
     expect(card.querySelector(".saved a")?.getAttribute("href")).toBe("/entries/2026-10-15-morning");
   });
 
+  it("writes a practice that is still to come: the view first (her opener, the questions, the slot), then the words", async () => {
+    visit("/");
+    const { writes, sent } = stubApi({ ...reads, "POST /api/v1/entries": { stem: "2026-10-15-evening", path: "x", rule: "web", slot: "2026-10-15-evening" },
+                                       "GET /api/v1/library/evening/open": view("evening", "Fills the 23:00 slot early; it will not be sent.") });
+    const host = mount(<App />);
+    await until(() => must(host.querySelector("li.practice.upcoming")));
+    const card = must([...host.querySelectorAll<HTMLElement>("li.practice")].find((c) => c.textContent?.includes("Evening")));
+    expect(sent.filter((s) => s.path.endsWith("/open"))).toHaveLength(0);   // nothing asked until he opens it
+    await click(byText(card, "button", "Write now"));
+    await until(() => expect(card.querySelector(".write-now .prompt .opener")?.textContent).toBe("Evening 📓 Let the day land."));
+    expect(card.querySelector(".write-now .prompt li")?.textContent).toContain("What's spinning in your mind?");
+    expect(card.querySelector(".fills")?.textContent).toBe("Fills the 23:00 slot early; it will not be sent.");
+    expect(writes()).toHaveLength(0);   // opening is a view: nothing is written
+    await type(card.querySelector("textarea"), "A long day, a good one.");
+    await click(byText(card, "button", "Save"));
+    await until(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0]?.body).toMatchObject({ practice: "evening", text: "A long day, a good one." });
+    await until(() => expect(card.querySelector(".saved a")?.getAttribute("href")).toBe("/entries/2026-10-15-evening"));
+  });
+
+  it("offers Write now on every practice, answered too, and says when one is due", async () => {
+    visit("/");
+    const rows = [{ id: "morning", state: "answered", sent: "06:00", answered: "06:41", stem: "2026-10-15-morning" },
+                  { id: "gratitude", state: "due", at: "09:00" }, { id: "evening", state: "missed", at: "08:00" }];
+    stubApi({ ...reads, "GET /api/v1/today": { ...fixtures.today, practices: { rows, open: [] } } });
+    const host = mount(<App />);
+    await until(() => must(host.querySelector("li.practice.due")));
+    const cards = [...host.querySelectorAll<HTMLElement>("li.practice")];
+    expect(cards.map((c) => [...c.querySelectorAll(".actions button")].map((b) => b.textContent)[0])).toEqual(
+      ["Write now", "Write now", "Write now"]);
+    expect(must(host.querySelector("li.practice.due .pill")).textContent).toBe("due since 09:00");
+  });
+
+  it("offers Write now and Send to chat on a practice turned off: enabled false is not scheduled, nothing more", async () => {
+    visit("/");
+    const rows = [{ id: "gratitude", state: "due", at: "09:00" }];
+    const library = fixtures.library.map((p) => (p.id === "gratitude" ? { ...p, enabled: false } : p));
+    stubApi({ ...reads, "GET /api/v1/today": { ...fixtures.today, practices: { rows, open: [] } }, "GET /api/v1/library": library });
+    const host = mount(<App />);
+    const card = await until(() => must(host.querySelector("li.practice.due")));
+    await until(() => expect([...card.querySelectorAll(".actions button")].map((b) => b.textContent)).toEqual(["Write now", "Send to chat"]));
+  });
+
+  it("opens Write now from the address: /today?write=<id>", async () => {
+    visit("/today?write=evening");
+    stubApi({ ...reads, "GET /api/v1/library/evening/open": view("evening", "Fills the 23:00 slot early; it will not be sent.") });
+    const host = mount(<App />);
+    const fills = await until(() => must(host.querySelector(".write-now .fills")));
+    expect(fills.closest("li.practice")?.querySelector("h3")?.textContent).toBe("Evening journal");
+    expect(host.querySelectorAll(".write-now")).toHaveLength(1);
+  });
+
+  it("opens a practice with no row today alone, from the address", async () => {
+    visit("/today?write=quiet");
+    stubApi({ ...reads, "GET /api/v1/library/quiet/open": view("quiet", "Starts an extra entry of this practice (2026-10-15-quiet).", "Quiet.") });
+    const host = mount(<App />);
+    const card = await until(() => must(host.querySelector("li.practice.write-only")));
+    await until(() => expect(card.querySelector(".fills")?.textContent).toContain("extra entry"));
+    expect(card.querySelector(".prompt .opener")?.textContent).toBe("Quiet.");
+  });
+
+  it("after a save from ?write, the reload does not open Write now again, and the address loses ?write", async () => {
+    const listeners: Record<string, () => void> = {};
+    class FakeSource {
+      static CLOSED = 2;
+      readyState = 1;
+      onopen: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      addEventListener(name: string, fn: () => void) {
+        listeners[name] = fn;
+      }
+      close() {}
+    }
+    vi.stubGlobal("EventSource", FakeSource);
+    visit("/today?write=quiet");
+    let saved = false;
+    const answeredRow = { id: "quiet", state: "answered", sent: "09:13", answered: "09:13", stem: "2026-10-15-quiet" };
+    stubApi({
+      ...reads,
+      "GET /api/v1/today": () => (saved ? { ...fixtures.today, practices: { rows: [...fixtures.today.practices.rows, answeredRow], open: [] } } : fixtures.today),
+      "GET /api/v1/library/quiet/open": view("quiet", "Starts an extra entry of this practice (2026-10-15-quiet).", "Quiet."),
+      "POST /api/v1/entries": () => {
+        saved = true;
+        return { stem: "2026-10-15-quiet", path: "x", rule: "web", slot: "2026-10-15-quiet" };
+      },
+    });
+    const host = mount(<App />);
+    const card = await until(() => must(host.querySelector("li.practice.write-only")));
+    expect(window.location.search).toBe("");   // used once: a later visit or remount does not open it again
+    await until(() => must(card.querySelector("textarea")));
+    await type(card.querySelector("textarea"), "Quiet words.");
+    await click(byText(card, "button", "Save"));
+    await until(() => must(host.querySelector("li.practice.write-only .saved")));
+    await until(() => expect(listeners["ledger-changed"]).toBeDefined());
+    listeners["ledger-changed"]?.();
+    await until(() => must(host.querySelector("li.practice.answered")));
+    expect(host.querySelectorAll(".write-now")).toHaveLength(0);
+    expect(host.querySelector("li.practice.write-only .saved")).not.toBeNull();   // what he saved still says so
+  });
+
+  it("?write opens the card the words will fill: due or open first, then missed, then the next to come", () => {
+    const r = (state: string, at: string) => ({ id: "water", state, at }) as PracticeRow;
+    expect(writeTarget([r("missed", "09:00"), r("open", "15:00"), r("upcoming", "21:00")], "water")).toBe(1);
+    expect(writeTarget([r("missed", "09:00"), r("missed", "12:00"), r("upcoming", "21:00")], "water")).toBe(1);
+    expect(writeTarget([r("answered", "09:00"), r("upcoming", "15:00"), r("upcoming", "21:00")], "water")).toBe(1);
+    expect(writeTarget([r("answered", "09:00")], "water")).toBe(0);
+    expect(writeTarget([r("answered", "09:00")], "other")).toBe(-1);
+  });
+
+  it("opens no composer for a practice the view cannot open (unknown, a note)", async () => {
+    visit("/today?write=quiet");
+    stubApi({ ...reads, "GET /api/v1/library/quiet/open": json({ error: "not-found", detail: "no practice by that id" }, 404) });
+    const host = mount(<App />);
+    const card = await until(() => must(host.querySelector("li.practice.write-only")));
+    await until(() => expect(card.querySelector(".error-line")?.textContent).toContain("no practice"));
+    expect(card.querySelector("textarea")).toBeNull();
+  });
+
+  it("offers no Send to chat on a journal with no chat", async () => {
+    visit("/");
+    stubApi({ ...reads, "GET /api/v1/today": { ...fixtures.today, chat: false } });
+    const host = mount(<App />);
+    await until(() => must(host.querySelector("li.practice")));
+    expect(byText(host, "button", "Send to chat")).toBeUndefined();
+    expect(byText(host, "button", "Write now")).toBeDefined();
+  });
+
   it("sends a practice now (spawned), says it is on its way, and clears on the ledger event", async () => {
     visit("/");
     const { writes } = stubApi({ ...reads, "POST /api/v1/library/gratitude/send": json({ spawned: true, log: "/x" }, 202) });
     const host = mount(<App />);
-    const card = await until(() => must(host.querySelector("li.practice.upcoming")));
-    await click(byText(card, "button", "Send now"));
+    const card = await until(() => must([...host.querySelectorAll("li.practice.upcoming")].find((li) => /gratitude/i.test(li.textContent ?? ""))));
+    await click(byText(card, "button", "Send to chat"));
     await until(() => expect(card.textContent).toContain("On its way"));
     expect(writes()[0]?.path).toBe("/api/v1/library/gratitude/send");
   });
@@ -343,8 +483,8 @@ describe("Today", () => {
     visit("/");
     stubApi({ ...reads, "POST /api/v1/library/gratitude/send": json({ error: "engine-unavailable", detail: "cannot start it: OSError" }, 503) });
     const host = mount(<App />);
-    const card = await until(() => must(host.querySelector("li.practice.upcoming")));
-    await click(byText(card, "button", "Send now"));
+    const card = await until(() => must([...host.querySelectorAll("li.practice.upcoming")].find((li) => /gratitude/i.test(li.textContent ?? ""))));
+    await click(byText(card, "button", "Send to chat"));
     await until(() => expect(card.querySelector(".error-line")?.textContent).toContain("cannot start"));
   });
 
@@ -561,12 +701,30 @@ describe("The run screen", () => {
 describe("The Library", () => {
   const withGratitude = { ...reads, "GET /api/v1/library/gratitude": fixtures.libraryGratitude };
 
-  it("sends a practice now", async () => {
+  it("sends a practice to the chat now", async () => {
     visit("/library/gratitude");
     const { writes } = stubApi({ ...withGratitude, "POST /api/v1/library/gratitude/send": json({ spawned: true, log: "/x" }, 202) });
     const host = mount(<App />);
-    await click(await until(() => must(byText(host, "button", "Send now"))));
+    await click(await until(() => must(byText(host, "button", "Send to chat"))));
     await until(() => expect(writes()).toHaveLength(1));
+  });
+
+  it("writes a practice now on Today", async () => {
+    visit("/library/gratitude");
+    stubApi(withGratitude);
+    const host = mount(<App />);
+    const link = await until(() => must(byText(host, "a.button", "Write now")));
+    expect(link.getAttribute("href")).toBe("/today?write=gratitude");
+  });
+
+  it("offers Write now and Send to chat on a practice turned off (the owner, 2026-11-09: not scheduled, nothing more)", async () => {
+    visit("/library/gratitude");
+    const off = { ...fixtures.libraryGratitude, definition: { ...fixtures.libraryGratitude.definition, enabled: false } };
+    stubApi({ ...reads, "GET /api/v1/library/gratitude": off });
+    const host = mount(<App />);
+    await until(() => must(byText(host, "button", "Turn on")));
+    expect(byText(host, "a.button", "Write now")?.getAttribute("href")).toBe("/today?write=gratitude");
+    expect(byText(host, "button", "Send to chat")).toBeDefined();
   });
 
   it("turns a practice off by saving the file with enabled false, against the mtime it read", async () => {

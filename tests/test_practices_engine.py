@@ -314,14 +314,14 @@ class UserPracticeTest(Base):
 
 
 class DisabledAndRetiredKeyTest(Base):
-    def test_a_disabled_built_in_is_not_due_and_does_not_start(self):
+    def test_a_disabled_built_in_is_not_due_and_still_starts(self):
+        """The owner, 2026-11-09 (decision 4): ``enabled: false`` is "not scheduled" only; ``/start`` still sends it."""
         fork = library.fork(self.cfg, "evening")
         fork.write_text(fork.read_text().replace("---\n## 1.", "enabled: false\n---\n## 1.", 1), encoding="utf-8")
         self.assertFalse(library.get(self.cfg, "evening").enabled)
         self.assertNotIn("evening", self.due(at(23, 1)))
         found = jcommands.start(self.cfg, "evening")
-        self.assertIsNone(found.practice)
-        self.assertIn("Evening journal is turned off", found.reply)
+        self.assertEqual(found.practice.id, "evening")
 
     def test_a_schedule_key_in_the_config_is_not_read_and_doctor_names_it(self):
         conf = write_config(Path(self.tmp.name) / "c.json", {"root": str(self.cfg.root),
