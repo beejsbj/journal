@@ -48,6 +48,8 @@ html.room-open :is(.stage, .phone-top) { transform: scale(0.972); filter: bright
 .room-head { margin-bottom: 48px; opacity: 0; transform: translateY(-12px); transition: transform 600ms var(--e-paper), opacity 300ms ease; }
 .room.open .room-head { opacity: 1; transform: none; transition: transform 700ms var(--e-paper) 220ms, opacity 400ms ease 220ms; }
 .room-letter .letter-qlist { columns: 1; }
+.room-questions { margin: 0; padding-left: 1.6em; display: grid; gap: 4px; }
+.room-questions li::marker { color: var(--her-soft); }
 
 .room-start { display: grid; gap: var(--s3); justify-items: start; }
 .room-none { margin: 0; font: italic 400 17px / 1.5 var(--f-his); color: var(--text-3); }

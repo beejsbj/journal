@@ -29,7 +29,10 @@ async function small(page: Page): Promise<string[]> {
     const MIN = 43.5;
     const out: string[] = [];
     const sel = 'a[href], button, input:not([type="hidden"]), select, textarea, summary, [role="tab"], [role="button"]';
-    for (const el of Array.from(document.querySelectorAll<HTMLElement>(sel))) {
+    // behind a modal (the write room, a sheet) nothing can be touched, and the page there recedes (scaled down): measure
+    // what is in the modal
+    const modal = Array.from(document.querySelectorAll("dialog[open]")).find((d) => d.matches(":modal"));
+    for (const el of Array.from((modal ?? document).querySelectorAll<HTMLElement>(sel))) {
       const cs = getComputedStyle(el);
       if (cs.visibility === "hidden" || cs.display === "none") continue;
       if (el.closest(".visually-hidden")) continue;

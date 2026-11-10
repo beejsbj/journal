@@ -94,10 +94,19 @@ export function rowFor(rows: PracticeRow[], practice: string, slot?: number): { 
 /** Her letter, from a prompt as he was sent it. */
 function HerLetter({ prompt, hers }: { prompt: Prompt; hers: string }) {
   const asked = prompt.asked.map((q) => q.question);
-  const lone = asked.length === 0 && prompt.questions.length === 1 ? [prompt.questions[0]?.text ?? ""] : [];
+  // sent with the plain opener and nothing asked: the questions were the message, so they stand open (as on Today)
+  const bare = !prompt.opener && asked.length === 0;
   return (
     <Letter class="room-letter" from={hers} at={prompt.sent_at_local ?? undefined} opener={prompt.opener ?? undefined}
-      asked={asked.length ? asked : lone} questions={prompt.questions} askedIds={prompt.asked.map((q) => q.id)} />
+      asked={asked} questions={bare ? [] : prompt.questions} askedIds={prompt.asked.map((q) => q.id)}>
+      {bare && prompt.questions.length > 0 && (
+        <ol class="room-questions">
+          {prompt.questions.map((q) => (
+            <li key={q.id}>{q.text}</li>
+          ))}
+        </ol>
+      )}
+    </Letter>
   );
 }
 
@@ -360,7 +369,8 @@ function Desk({ page, hour, voice, onClose, onMade }: {
   });
 
   const paras = useMemo(() => paragraphs(c.text), [c.text]);
-  const lit = useMemo(() => new Set(litParagraphs(paras, sel[0], sel[1])), [paras, sel]);
+  // (a caret past the end, after the box took another draft, is at its end: the last paragraph is lit)
+  const lit = useMemo(() => new Set(litParagraphs(paras, Math.min(sel[0], c.text.length), Math.min(sel[1], c.text.length))), [paras, sel]);
 
   const status = c.keptAt
     ? (c.keptAt.stored ? `Draft kept · ${hhmm(c.keptAt.at)}` : "This browser keeps no draft")
@@ -378,9 +388,9 @@ function Desk({ page, hour, voice, onClose, onMade }: {
           {page.when && <> · {page.when}</>}
         </p>
         <div class="room-tools">
-          <span class="room-saved" role="status">
+          <span class="room-saved">
             <span class="room-dot" key={c.keptAt?.at ?? 0} aria-hidden="true" />
-            <span class="room-saved-words">{status}</span>
+            <span class="room-saved-words" role="status">{status}</span>
           </span>
           <button type="button" class="room-focus" aria-pressed={focus} onClick={toggleFocus}
             title="Focus: grey all but the paragraph you're in (Ctrl .)" aria-keyshortcuts="Control+. Meta+.">
