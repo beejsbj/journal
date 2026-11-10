@@ -471,6 +471,34 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   heading and would take the line for summary text. To close: decide whether either is worth the work (a summary that
   stops at the line, then the line in session files too).
 
+- **OWN-WORDS — four things around a queued picture and her context, left open.** (1) *The privacy pass reads a captionless
+  picture at its stored time.* Hermes stores the event's time with a message that has text, but a picture sent with
+  no caption at the time its turn ran; queued behind a stuck turn, that can be long after he sent it. A picture sent
+  inside a bare-`/x` window and run after the window closed is public to the pass, and so is her reply to it. The
+  sweep no longer captures such a picture (it checks the arrival time against the windows, Taken below), but the pass
+  and the conversation writer still read the stored time. To close: give the row its arrival time in the adapter
+  (`Row.at` from the cached file, as the sweep's `arrival` does), and re-check the saved pass's rule for a row whose
+  time changes when Hermes clears its cache. (An outage catch-up may read such a reply too: CodeRabbit raised it on the
+  PR; deferred here, not dismissed.) (2) *The conversation writer keeps no picture of a queued message in
+  ordinary chat*: the hook never saw it, so nothing was stashed; its caption is written, the picture is not. To close:
+  carry `Row.meta["images"]` on the writer's event and let `_keep_images` copy from Hermes' cache when there is no
+  stash. (3) *Her notebook is stored in the
+  companion's other sessions.* `turncontext.build` gives the notebook to every turn of hers, not only turns in the
+  journal's chat, and Hermes stores it with the user's message in some of them: a read-only count of one live
+  database found it in the `content` of over two hundred user rows of `tool`-source sessions (her one-shot runs) and
+  in the `api_content` of several hundred more. No reader of the journal opens those sessions (the transcript reads the
+  journal's chat only), so nothing of it reaches an entry; it is her private notebook copied where it need not be. To
+  close: decide whether the notebook belongs in turns outside the journal's chat (`channel.turn_ours`), as the pack
+  and today block already do not. (4) *Hermes' own turn note in a row with no picture* (the review of 2026-11-10).
+  Hermes puts its notes for a turn (`[System: …`: the skills that changed, another interface) in a part of their own
+  between his words and the injected part. In a picture's row that is after the placeholders and is cut. If Hermes
+  ever stores a list of text parts with no picture (its gateway builds a list only for a native picture), a fence or
+  recalled memory after the note withholds the row, but the note alone would read as his words
+  (`my words` and under it `[System: …]`). A user row Hermes writes itself that opens `[System: ` (its compressor
+  counts that prefix among its own) is not among the reader's skip prefixes either, as before this package. To close:
+  count such rows read-only in a live database, then add `[System: ` to the skip prefixes and to the marks
+  (`_LEFTOVER`).
+
 ## Taken by packages (recorded here; later packages follow them)
 
 - **WP0 — an unknown entry id is recognised only with the engine's authorship marker.** The spec's fallback
@@ -3518,6 +3546,104 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
      `/start` (as built in OPEN-PROGRAMS, #29). Recorded only.
   6. **The PWA control for answering an interrupt** comes as a small separate package after #28 and #29 merge.
      Recorded only.
+- **OWN-WORDS (2026-11-09) — what the engine and Hermes add to a turn is never read as his words.** Found by an audit
+  of the live chat: a picture sent while a turn was stuck was queued, and its stored row (the turn as Hermes keeps a
+  natively attached picture: his caption or Hermes' stand-in "What do you see in this image?", a line naming the
+  cached file, a `[screenshot]` placeholder, then the turn's injected context, the companion's private notebook among
+  it) was swept into an entry as his reply. Revised in review (an independent pass and CodeRabbit): the first version
+  took a fence off wherever it sat, which cut his own words when he typed a tag. What holds now:
+  - **The engine fences what it injects.** `turncontext.build` returns its blocks between `<journal-context>` and
+    `</journal-context>` (`contextfence.wrap`); `contextfence.HEADS` are the blocks' first lines, for rows stored
+    without the fence (pinned against the renderers in `test_own_words.FenceTest` and `test_programview`). The marks
+    are a module of their own, so the chat reader does not load the turn's builders.
+  - **The adapter reads his part of a row only where the turn put it** (`hermes/transcript.py` `read`). A list of
+    parts Hermes stored as JSON (`\x00json:` and the list: an in-place compaction, a compaction's copies) is read as
+    Hermes' own text of it first (`decode`; one it cannot read is withheld). Then the envelopes in front come off: the
+    origin note, the `[Note: model was just switched …]` of a `/model` switch (only that note: a first line of his
+    that opens `[Note: ` is his), Hermes' timestamps (`[Tue 2026-04-28 13:40:53 CEST] `, or the older ISO form, with
+    `gateway.message_timestamps` on), a skills reload note, Hermes' note in front of a resumed turn ("A new message has
+    arrived …", "The previous turn was interrupted by …", when a message follows it; the note alone stays a system
+    row) and the group context around a message addressed to her (all stored in a picture's row, since Hermes' clean
+    transcript replaces text only), the reply quote (hers: kept as the quote, never checked as his). In a native picture's row nothing after the placeholders is his (`native`: the last
+    run of picture lines and placeholders, when they agree in number; a run leaves its last line break, so a caption
+    shaped like one does not hide the real one); Hermes' stand-in is no caption, and the files go in
+    `Row.meta["images"]` (`meta["native"]`: the row is such a picture's). In a row with no such picture, an injected
+    block that **ends** the text, at a line start, comes off (`trailing`): the engine's closed fence, the same cut
+    short by Hermes (its header, then a head and a tail, either possibly empty: only when it holds the engine's
+    fence), recalled memory (`<memory-context>`). After a native cut nothing is taken off the caption: everything
+    injected came after the placeholders, so a block ending the caption is his, and a leftover. `loose` (packs, the
+    quote checker, the outage catch-up) peels the envelopes in the same order as the reader (it kept the model note
+    and, behind it, her quoted opener, which the quote checker then took for his words); `loose` otherwise keeps
+    what it always kept (steer markers, audio placeholders, a voice note's quotes: `tests/golden/hermes_rows.json`).
+    The one golden value that changed on purpose: the model-switch row's `loose` and `his_text` are now his words
+    alone ("after the note"), no longer the note in front of them.
+  - **Any other mark fails closed.** If what is left of his words still holds a fence tag (an unclosed one with no
+    cut-short header in front included: CodeRabbit's question, taken this way), a memory tag, a picture line or
+    placeholder, a cut-short header, a gateway note or a line opening with one of `HEADS`, or a native picture's row
+    opens with a platform note this reader does not know (`[System note: …`, `[IMPORTANT: …` and the other
+    `_SKIP_PREFIXES`), the row is **withheld**:
+    `kind` `system` with no caption (a row the hook saved stays `handled`), `meta["withheld"]` names what was found,
+    `loose` is empty. Nothing writes it, packs and the quote checker skip it, and the sweep logs one line per row (row
+    and message id and the reason, never words) under `sweep.WITHHELD`, which the tick files in `errors.jsonl`
+    (`tick.files_as_error`). The privacy pass still reads the whole of it for an opt-out (`privacy._said`), so
+    withholding never hides a `/x` (a withheld delivery or platform frame excepted: no message of his, unless it
+    carries his native picture). **The cost, named, and kept on purpose** (the owner's delegate, review round 3: the
+    same rule guards against a later Hermes storing its additions in a new place): a message he types that holds
+    `<journal-context>` or `<memory-context>` anywhere, a line `[screenshot]`, a line starting `[Image attached: ` or
+    `[Image attached at: `, a line starting `## Journal: today — ` (or another head) or one of the gateway's note
+    openings is not saved, whole rather than cut: it stays in the chat, and the sweep's errors line names the row
+    (ids only). The trade-off for an unclosed fence: Hermes cuts the engine's context
+    short only with its header in front, so an unclosed tag without one is his, or something unknown: withheld.
+  - **A swept picture is kept and stamped when it arrived.** The sweep takes a native picture's row with or without a
+    caption, copies each named file that lies in Hermes' picture cache (`<home>/cache/images` or the older
+    `image_cache`, the path resolved: a row can name any path) beside the entry as the hook does (a `/j` picture
+    makes a note), and stamps the capture with the earliest such file's time between the sweep's horizon and the row's
+    own time (Hermes writes each inbound picture to a new cache file as it arrives); a picture whose arrival falls
+    inside an off-the-record window is not captured. A picture not kept (outside the cache, gone from it, too large,
+    a failed copy) is said in the sweep's log, and his caption is still saved; copies are removed again when the
+    record fails. `Row.at` is unchanged (the open point above). The conversation writer takes a captionless native
+    picture as his message, so one the sweep captured starts the thread in that entry. This revises the IMAGES
+    entries of 2026-10-20 where they say native mode stores no placeholder and the sweep keeps no picture: the
+    Hermes in use stores the parts as text.
+  - **Not changed:** entries written before this release (the one found stays as it is: cleaning it is the owner's
+    decision); `Row.source` (a native picture's row stays `text`; the sweep writes `photo` when it kept a picture).
+  - **Review fixes (2026-11-10), after an independent review of the merge with main.** Where they differ, these
+    replace what is said above.
+    1. *Nothing is cut off a row with no picture.* The reader no longer takes a fenced block, a cut-short one or
+       recalled memory off the end of a row with no picture (`trailing` is gone from `read` and from `loose`).
+       Hermes stores what a turn adds in his row only for a natively attached picture, so such a block at the end of
+       a text message is his or unknown: the row is withheld whole. A list of text parts with no picture reads the
+       same way.
+    2. *After a picture's placeholders, only what a turn adds is cut* (`added`): nothing; the fenced context and
+       recalled memory, all of it; text that opens with Hermes' own turn note (`[System: `) or with a block's head (a
+       row stored before the fence, behind recalled memory or not). Anything else there (his own words in a message
+       that only looks like a picture's turn, another plugin's turn context, a note this reader does not know)
+       leaves the row uncut and withheld whole, with the errors line. **The cost, named:** on a turn that carries
+       an addition the reader does not know, a real picture's caption stays out of the journal until the reader is
+       taught the shape.
+    3. *The opt-out reads what was cut.* The cut-off part goes to the privacy pass (`Row.meta["cut"]`); a line of it
+       that opens with the opt-out makes the whole row private (`privacy._in_cut`: in `row_marked`, and in the pass
+       for a row with no words in front of the placeholders), so the pass is at least as strict as when the row was
+       read whole. What the review found: a typed picture run followed by a `/x` line was saved up to the run, and
+       the `/x` was not read.
+    4. *What cannot be told apart, said as it is.* A message he types that itself ends with a picture's lines (a
+       blank line, `[Image attached at: …]`, `[screenshot]`), or goes on after them only with what a turn adds, reads
+       as a picture's turn: those lines and what follows them are not read as his words (they are still read for the
+       opt-out). README's guarantee says so. "Whole rather than cut" above holds for every other mark.
+    5. *The platform's own rows are not withheld for a mark* (`_FRAMES`: a compaction frame, a cron delivery, an
+       `[IMPORTANT: …` notice, the task list). No reader takes them for his message, and Hermes' notice of a finished
+       background process cuts its output short under a header shaped like the hook spill's
+       (`[… output truncated — `), which filed a false `sweep: withheld` line. An attachment placeholder and a
+       `[System note: …` that his caption or message can follow still fail closed, and a picture's turn under any
+       of them is withheld as before, cut or not. A cron delivery is a thread boundary whatever it holds: it is
+       never a turn, so no picture is read in it. The sweep does not log a row the hook already saved (`handled`):
+       his words are in the entry as he sent them.
+    6. *`arrival` is for a row with no words.* A row with a caption is stored at the time he sent it; a cache file's
+       time no longer moves its capture (an older file time could put it before the prompt was sent, and the
+       capture was dropped without a line).
+
+    Pinned by `test_own_words.py` (the cases under "review fixes", and the three older cases they changed). The
+    fourth open point above (Hermes' own turn note in a row with no picture) came from the same review.
 - **CONTINUITY (2026-11-09) — reflections read what came before, can search his entries, quote only his words, and
   share one voice.** The owner found the day reflections and week reviews were not a continuous partner: they quoted
   him at length and said little of their own. The writer saw one period's files plus a single earlier analysis, had
