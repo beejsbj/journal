@@ -50,7 +50,7 @@ test("a built-in is edited in place, then reset to the default", async ({ page }
   await page.goto("/library/weekly");
   await page.getByRole("link", { name: "Edit", exact: true }).click();
   await expect(page).toHaveURL(/\/library\/weekly\/edit$/);
-  await expect(page.locator(".eyebrow")).toHaveText("Built-in");
+  await expect(page.locator(".editor-head .kicker")).toHaveText("Built-in");
   await page.getByLabel("Title", { exact: true }).fill("Sunday scan");
   await expect(page.getByText("Looks good.")).toBeVisible();
   await page.getByRole("button", { name: "Save", exact: true }).click();

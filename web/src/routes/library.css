@@ -1,0 +1,143 @@
+/* The Library (routes/library.tsx): Folio's rows with ribbons, Night Room's clocks; a practice's page, the default
+   beside his edit, the definition. Also the editor's crumb and head (routes/editor.tsx reads .library-page). */
+
+.library-page { max-width: 900px; margin: 0 auto; padding: 44px var(--gutter) var(--s8); }
+
+/* ---- the list ---- */
+.lib-head { display: flex; align-items: flex-end; gap: 24px; margin-bottom: 10px; }
+.lib-head-words { flex: 1; min-width: 0; }
+.lib-head .lede { max-width: 34rem; margin: 14px 0 0; }
+.lib-legend { display: flex; align-items: center; gap: 10px; margin: 0 0 36px; font-size: var(--t-small); color: var(--text-3); }
+.lib-legend .ribbon-mark { width: 9px; height: 20px; }
+.lib-group { margin-bottom: 44px; }
+.lib-group > .book-head { margin: 0 0 4px; }
+.prac-list { list-style: none; margin: 0; padding: 0; }
+
+.prac {
+  position: relative; display: grid; grid-template-columns: 22px 40px minmax(0, 1fr) 20px; gap: 0 14px; align-items: start;
+  padding: 18px 8px 18px 0; border-bottom: 1px solid var(--hair); color: var(--text); text-decoration: none;
+  transition: background var(--d-2);
+}
+.prac:hover { background: linear-gradient(90deg, transparent, var(--raised) 12%, var(--raised) 88%, transparent); }
+.prac:hover .prac-go { color: var(--text); transform: translateX(2px); }
+.prac.off .prac-main, .prac.off .clock { opacity: 0.55; }
+/* the ribbon hangs from the rule above the row */
+.prac-ribbon { display: flex; justify-content: center; }
+.prac-ribbon .ribbon-mark { margin-top: -19px; }
+.prac .clock { margin-top: 1px; }
+.prac-main { min-width: 0; display: grid; gap: 4px; }
+.prac-title { display: flex; align-items: baseline; gap: 12px; }
+.prac-title .title { font: 400 22px / 1.25 var(--f-his); letter-spacing: -0.005em; }
+.prac-title .lead { flex: 1; min-width: 20px; border-bottom: 1.5px dotted var(--hair-2); transform: translateY(-6px); }
+.prac-title .meta { font-size: var(--t-small); color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.colophon { display: flex; flex-wrap: wrap; align-items: center; font-size: var(--t-small); color: var(--text-3); }
+.colophon > span + span::before { content: "·"; margin: 0 8px; }
+.colophon .mine { color: var(--text); font-weight: 550; }
+.colophon .changed, .colophon .running { font: italic 400 14px / 1.3 var(--f-his); color: var(--text-2); }
+.prac .progress-strip { max-width: 240px; margin-top: 4px; }
+.prac-go { align-self: center; width: 18px; height: 18px; color: var(--text-3); transition: transform var(--d-2) var(--e-out), color var(--d-2); }
+
+/* ---- a practice's page, the default ---- */
+.crumb { margin: 0 0 var(--s4); }
+.crumb a {
+  display: inline-flex; align-items: center; gap: 2px; min-height: var(--tap); margin-left: -6px; padding: 0 10px 0 2px;
+  border-radius: var(--r-m); color: var(--text-2); font: 500 var(--t-ui) / 1 var(--f-ui); text-decoration: none;
+}
+.crumb a:hover { color: var(--text); background: var(--raised); }
+.crumb svg { width: 18px; height: 18px; }
+
+.lib-detail-head { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 0 18px; align-items: start; margin: 0 0 var(--s5); }
+.lib-detail-clock .clock { width: 48px; height: 48px; margin-top: 2px; }
+.lib-detail-head .kicker { margin: 0 0 6px; }
+.lib-emoji { font-size: 15px; line-height: 1; }
+.lib-detail-head .lede { max-width: 36rem; margin: 12px 0 0; font-size: 18px; }
+
+.detail-actions { display: grid; gap: var(--s3); margin: 0 0 var(--s6); }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
+.confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--s2); font-size: var(--t-small); color: var(--text); }
+.detail-actions .hint { margin: 0; }
+.detail-actions .progress-strip { max-width: 28rem; padding-top: 0; }
+.detail-actions .error-line { margin: 0; }
+.detail-actions .error-line a { font-weight: 550; }
+
+.lib-runs { margin-top: var(--s4); }
+.lib-runs > .book-head { margin: 0 0 4px; font-size: 18px; }
+.lib-runs ul { list-style: none; margin: 0; padding: 0; }
+.lib-runs a {
+  display: flex; align-items: baseline; gap: var(--s3); min-height: var(--tap); padding: 10px 0; border-bottom: 1px solid var(--hair);
+  color: var(--text); text-decoration: none;
+}
+.lib-runs a svg { align-self: center; width: 16px; height: 16px; margin-left: auto; color: var(--text-3); }
+.run-when { font: 400 17px / 1.3 var(--f-his); }
+.run-what { font-size: var(--t-small); color: var(--text-3); }
+
+/* his edit of a built-in: the outlined ribbon, what it means, the way back */
+.edited-note {
+  display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 0 14px; margin: 0 0 var(--s6); padding: 18px 20px 16px 8px;
+  border-radius: 16px; background: var(--pane); box-shadow: inset 0 0 0 1px var(--hair-2), var(--elev-tab);
+}
+[data-theme="dark"] .edited-note { background: color-mix(in oklab, var(--raised) 70%, var(--pane)); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .edited-note { background: color-mix(in oklab, var(--raised) 70%, var(--pane)); } }
+.edited-note .ribbon-mark { justify-self: center; margin-top: -18px; }
+.edited-note h2 { margin: 0 0 4px; font: italic 400 20px / 1.2 var(--f-his); }
+.edited-note h2::after { content: none; }
+.edited-note p { margin: 0 0 var(--s2); color: var(--text-2); }
+.edited-note .default-changed { color: var(--text); font-weight: 500; }
+.edited-note .actions { margin-top: var(--s3); }
+
+/* the definition: its questions in the book's roman, numbered; the line for the companion; the file */
+.definition { display: grid; gap: var(--s5); }
+.question-set > .book-head, .session-set > .book-head { margin: 0 0 var(--s2); font-size: 18px; }
+.question-set ol { margin: 0; padding: 0 0 0 1.8rem; display: grid; gap: 6px; font: 400 var(--t-read) / 1.5 var(--f-his); }
+.question-set li::marker { font: 400 var(--t-small) var(--f-ui); color: var(--text-3); }
+.session-set ol { margin: 0; padding: 0 0 0 1.8rem; display: grid; gap: var(--s2); }
+.session-set li::marker { font: 400 var(--t-small) var(--f-ui); color: var(--text-3); }
+.phase-title { font: 400 18px / 1.4 var(--f-his); }
+.phase-type { font: 400 var(--t-small) var(--f-ui); color: var(--text-3); }
+.session-set ul { margin: 4px 0 0; padding: 0 0 0 1.1rem; display: grid; gap: 2px; font-size: var(--t-ui); color: var(--text-2); }
+.companion-line { margin: 0; padding-top: var(--s3); border-top: 1px solid var(--hair); color: var(--text-2); }
+.companion-line .label { margin-right: var(--s2); font: 500 var(--t-small) var(--f-ui); color: var(--text-3); }
+.companion-words { font: italic 400 17px / 1.5 var(--f-his); }
+.raw { border-top: 1px solid var(--hair); }
+.raw .disclosure-title { font-weight: 500; }
+.definition > .raw { margin: 0; }
+.definition .raw pre { margin: 0 0 var(--s3); padding: var(--s3) var(--s4); border: 0; border-radius: var(--r-m); background: var(--sunk); font-size: 0.82rem; line-height: 1.55; overflow-x: auto; }
+.problems.error-line { display: block; margin: 0; }
+.problems ul { margin: 6px 0 0 18px; }
+
+/* a diff, read: a file's name once, a gap per hunk, each line's mark apart from its words; no hue */
+.diff-section { margin: 0 0 var(--s5); }
+.diff-section > .book-head { margin: 0 0 var(--s2); font-size: 18px; }
+.diff-section.disclosure { border-top: 1px solid var(--hair); }
+.diff-section.disclosure > .disclosure-head .disclosure-title { font-weight: 500; }
+.diff {
+  padding: var(--s2) 0; border-radius: var(--r-m); background: var(--sunk); box-shadow: inset 0 0 0 1px var(--hair);
+  font: 400 0.8rem / 1.55 var(--f-code); overflow-x: auto;
+}
+.diff-line { display: grid; grid-template-columns: 1.8em minmax(0, 1fr); padding: 0 var(--s3) 0 var(--s1); }
+.diff-line .mark { text-align: center; color: var(--text-3); user-select: none; }
+.diff-line .text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.diff-line.file { padding-top: var(--s1); color: var(--text-3); }
+.diff-line.hunk { color: var(--text-3); }
+.diff-line.ins { background: var(--raised-2); color: var(--text); font-weight: 600; }
+.diff-line.ins .mark { color: var(--text); }
+.diff-line.del { color: var(--text-2); }
+.diff-line.del .text { text-decoration: line-through; text-decoration-color: var(--text-3); }
+
+@media (max-width: 760px) {
+  .library-page { padding: 4px 20px var(--s6); }
+  .lib-head { display: block; }
+  .lib-head .button { margin-top: var(--s4); }
+  .lib-legend { margin-bottom: 28px; }
+  .prac { grid-template-columns: 14px 40px minmax(0, 1fr); gap: 0 10px; padding-right: 0; }
+  .prac-go { display: none; }
+  .prac-ribbon .ribbon-mark { width: 10px; }
+  .prac-title { flex-wrap: wrap; row-gap: 2px; }
+  .prac-title .lead { display: none; }
+  .prac-title .meta { width: 100%; }
+  .prac-title .title { font-size: 20px; }
+  .lib-detail-head { grid-template-columns: minmax(0, 1fr); }
+  .lib-detail-clock { display: none; }
+  .actions .button { flex: 1 1 auto; }
+  .edited-note { padding-right: 16px; }
+}
