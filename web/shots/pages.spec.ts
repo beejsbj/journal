@@ -40,6 +40,7 @@ for (const scheme of ["light", "dark"] as const) {
           await page.screenshot({ path: `${at}-pending.png` });
           // its foot, the health check open: the bar sits under the last row
           await page.getByRole("button", { name: /Health check/ }).click();
+          await page.waitForTimeout(900);   // the fold opens before the page is measured
           await page.evaluate(() => {
             const pane = document.querySelector<HTMLElement>(".main-pane");
             if (pane && pane.scrollHeight > pane.clientHeight) pane.scrollTop = pane.scrollHeight;

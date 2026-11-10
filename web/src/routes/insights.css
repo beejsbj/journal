@@ -83,7 +83,7 @@
   .prose-figs { order: 1; font-size: 1.4rem; margin-bottom: 28px; }
   .ins-col:last-child > .ins-review, .ins-col:last-child > .skeletons, .ins-col:last-child > .error-line { order: 2; }
   .ins-programs { order: 3; margin-top: 36px; }
-  .ins-days { order: 4; }
+  .ins-days, .no-programs .ins-days { order: 4; margin-top: 36px; }
   .review.letter { padding: 22px 18px 8px; }
   .reflection .disclosure-content { padding-left: 0; }
 }
