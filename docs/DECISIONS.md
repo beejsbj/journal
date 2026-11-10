@@ -3073,3 +3073,48 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   sentence with menus and a month calendar (`/days`), on the same address as before. **Not done:** Delete keeps its
   question in place and has no Undo, since the server has no undo for a block and a delayed delete would change
   when the file is written.
+- **WEB-UX-WRITE-ROOM (2026-11-09) — Write opens a room, not the "+" sheet.** FRONTEND §1 put a sheet behind the tab
+  bar's +: Quick note, Voice, Answer today's prompt, Start. The owner asked for "immersive and inviting typing
+  (literally a writing webapp)" and called the write modal ugly (`design/state.md`, WEB-UX); round 02 drew a room, and
+  he accepted it with focus greying on by default left uncontested. So everything that says Write (the rail's lamp, the
+  tab bar's disc, the `N` key, Today's *Answer* and *Speak it*, an entry's *In the writing room*) calls
+  `openWrite` (`web/src/shell/write.ts`), and the shell draws `components/WriteRoom.tsx`: a native modal dialog that
+  blooms out of the control pressed, his words large in a real textarea over a mirror that greys every paragraph but
+  his own, her letter at its head when he answers, and a quiet start on a new note that offers what the sheet did (the
+  prompts still open, the programs to start). The sheet's other jobs keep their writes: a note is `POST /entries`, an
+  answer `POST /entries` with `practice`, more for an entry `POST /entries/{stem}/blocks`, through the composer's own
+  rules (`useCompose`: the draft per box, the same `client_id` on a retry, the upload reused, the offline line, a `422`
+  without Retry). Turning Focus off is a display preference of the device, kept like the ink and the sidebar
+  (`localStorage["journal:room-focus"]`, "off" while off; never sent). `QuickAdd.tsx` is gone; the tests that drove the
+  sheet drive the room (`web/tests/writes.test.tsx`, `web/e2e/mobile.spec.ts`, `web/e2e/writes.spec.ts`).
+- **WEB-UX-INTEGRATION (2026-11-10) — the three route builds as one app.** Merging the entries, write and pages builds
+  showed what each had hidden alone, and the pass settled it:
+  - **The old sheet is gone.** `web/src/styles/legacy.css` (the pre-WEB-UX rules and the alias block of old token
+    names) is deleted: its live rules moved to the components that need them (the done line `.saved` and the offline
+    line in `ui/Status.css`, the error under a field in `ui/Field.css`, the place credit in `components/OsmCredit.css`,
+    the touch floor for a link on its own line in `styles/base.css`), the rest had no reader. With it went the global
+    `section > h2` head (every head is `.book-head`, `.kicker` or a route's own) and its `!important` 16 px floor on
+    fields, which had flattened the write room's 21 px box on a phone under its 21 px mirror. A merge had left that
+    sheet with an unclosed rule that swallowed every sheet after it; the browser runs caught it.
+  - **Route sheets are scoped** under their root class (`.today-page …`): every route's sheet loads on every page, and
+    unscoped names collided (`.day-n` in Entries and Insights, `.phase-title` in the Library and the run, `.more`,
+    `.actions`, `.confirm`). `design/DESIGN.md`, *Agent guide*, now says so.
+  - **One way back** (`ui/BackLink`, `PageBack`): the Library's, the editor's, the run's and the entry's back links
+    were three looks; `/design` gets one to Settings. **One page rhythm**: `--page-top` / `--page-foot` in
+    `tokens.css` set every page's first and last line; page titles are `.display` at `--t-h1` everywhere but the two
+    the system names for `--t-display` (Settings, Insights' week) and Today's numeral.
+  - **Settings' save bar is docked**: a bar with its own backing across the foot of the page, the page's last child
+    (outside the form; Save names it with `form=`), instead of a pill floating over the steppers' column mid-scroll.
+  - **The composer's resting line is Composer's own**: `rest` puts `data-rest` on the form while nothing is in it or
+    happening, and `Composer.css` draws the one line on a phone; the entry and the run ask for it. (The entry had keyed
+    it on Composer's class names from outside.)
+  - **Smaller fixes:** her letter's question fold is 44 px on touch in `ui/Letter.css` alone; Settings' typed stepper is
+    `ui/TypedStepper`; a weekday on a Library clock sits in the half of the face the hand is not in; her Markdown
+    renders `> ` as a quote (`markdown.ts`, a quote nested at most three deep); a browser that refuses the service
+    worker no longer leaves an uncaught error (`pwa.ts`); the rail's *Next from* read is no longer thrown away when he
+    moves on before it lands; the 360/390 px sideways check measures against the width the test set, not
+    `innerWidth`, which grows with the overflow.
+  - **Tests changed on purpose:** presentation only, each in its commit: the transcript-pending word's class
+    (`.transcript-pending`, was `.badge.pending`); the save dock is the page's last child; the "Saved: …" line is read
+    from the dock; the e2e mobile pass covers `/design` and "Not here" and fails on an uncaught page error; the shots are
+    one suite (`web/shots/`: `screens`, `entries`, `pages`, `write`, `shell`, with `lib.ts`) under stable names.

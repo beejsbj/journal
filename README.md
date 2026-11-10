@@ -517,18 +517,22 @@ open phase and the controls that apply now, its compiled insights).
 
 **The app.** The package carries a built web app (Preact + TypeScript, source in `web/`, build in `src/journal/serve/static`)
 and `/` serves it; a path with no file extension (`/entries/2026-10-14-evening`) answers `index.html` and the page
-routes it. Six views: **Today** (the date, a week strip of answered and missed prompts from the ledger, each practice
+routes it. Its look is a design system of its own (`design/DESIGN.md`; every part drawn at `/design`): warm paper by
+day and a cool night room after dark (the device's setting, or Paper or Night chosen on the device), your words in a
+book's roman, the companion's typed in an ink you choose. On a wide screen a rail beside the page; on a phone a tab bar
+at the foot. Six views: **Today** (the date, a week strip of answered and missed prompts from the ledger, each practice
 with its state, what you wrote today, the reflection's question to carry forward, tasks due), **Entries** (by week and
-day; filter by practice, program or audio; search your words), **Entry** (one continuous document: the prompt in a
-muted wash with its questions folded, your blocks plain and full width with time and source in the margin and an audio
-player for recordings, the companion's replies folded to one line with her name and time, and an Analysis tab for her
-annotations, notes, the day's reflection and a program's summary), **Library** (the practices and programs, grouped,
+day; filter by practice, program or audio; search your words), **Entry** (one continuous document: her prompt as a letter at
+its head with its questions folded, your blocks with the hour and source in the left margin and a player for
+recordings, the companion's replies standing in the right margin beside the passage they follow, and her readings
+(annotations, notes, the day's reflection) unfolding at the end; on a wide screen the list stays beside it as a
+sidebar), **Library** (the practices and programs, grouped,
 with each definition's questions and the file itself), **Insights** (week by week: counts, the week's review, the day
 reflections) and **Settings** (this browser's pairing with Unpair, or "Signed in via Tailscale as …", versions of the server and the tick, every setting with
 the layer it comes from, doctor). They also write, through the routes below and nothing else:
 
-- *Today* has **Reply** on a prompt that is waiting (a new entry of that practice) and **Send now** on one that is
-  not; a card per program in progress with **Continue** and **Pause** or **Resume**; the one-off questions still to
+- *Today* has **Answer** and **Speak it** on a prompt that is waiting (a new entry of that practice, written in the
+  write room) and **Send now** on one that is not; a card per program in progress with **Continue** and **Pause** or **Resume**; the one-off questions still to
   come today; and "No program running" when none is.
 - *Entry* has a composer at the foot that adds a block of your words (text, or a voice note recorded in the page: the
   microphone is asked for only when you press Voice, and it needs a secure page) and **Mood, people, star**. Nothing
@@ -546,7 +550,10 @@ the layer it comes from, doctor). They also write, through the routes below and 
 - The **run screen** (`/runs/<id>`) shows the open phase as it was sent, a box for your answer, **Next**, **Skip**,
   **Back**, **Pause**, **Resume** and **Abandon** (as the server says they apply), a strip of phases and the run's
   sessions; a step takes a moment (it is a spawned `journal program …`) and the page follows the change.
-- The **+** in the bar: a quick note, a voice note, an answer to a prompt that is waiting, or the start of a program.
+- **Write** (the rail's, the tab bar's, or the `N` key) opens the write room: a full-screen page for a note, an
+  answer to her letter (from Today's **Answer**, or **Speak it** to begin with your voice) or more for an entry, your
+  words large with every paragraph but the one you are in greyed (Focus; off is kept on the device), and a quiet start
+  that offers the prompts still waiting and the programs to start.
 - *Settings* changes location, time zone, the windows, the reflections, the quiet and settle minutes and the today
   block, each shown with where it lives; a setting in Hermes settings or the environment is locked, with the line that
   changes it.

@@ -135,7 +135,10 @@ drawing it on the same grid and stroke; show it on `/design`.
   Insights. Content keeps `--bar-h` clear at the bottom.
 - **Panes.** A route may take the stage and lay its own panes side by side (the entries list beside an open entry;
   10 px apart, the open one raised `--elev-2`).
-- **The page measure.** His column is `--measure` (35 rem). Page padding is `--gutter` (56 desktop, 20 phone).
+- **The page measure.** His column is `--measure` (35 rem). Page padding is `--gutter` (56 desktop, 20 phone); every
+  page's first line (its back link or its head) is `--page-top` below the pane's top (40, 8 on a phone) and its last
+  `--page-foot` above the end (64, 32). A page deeper than a place starts with its way back (`PageBack`), and its title
+  is `.display` at `--t-h1` (only Settings and Insights' week take `--t-display`; Today and an entry, the numeral).
   Lists, forms and settings keep a reading width (about 1000–1060 px max for a whole page).
 - **The margins.** Wherever he writes, the **hours hang in the left margin** (`--margin-l`, 72 px: the time in italic,
   its source under it), and **her notes stand in the right margin** (`--margin-r`, 200 px) beside the passage they
@@ -201,22 +204,24 @@ All in `web/src/ui/` (TSX plus a CSS file each), exported from `web/src/ui/index
 | `Button` | label, optional icon; `primary` (lamp), `secondary` (outlined, default), `quiet`, `danger`; `small`; `wide`; disabled; press-in | his actions | one primary per view; danger is the lamp too, asked in place first |
 | `ButtonLink` | a link with a button's look | going somewhere (Open the entry, Continue) | |
 | `TextButton` | underlined words | an action inside a line (Show all, Use default) | |
+| `BackLink`, `PageBack` | ‹ and the place's name, quiet sans, 44 px | the way back from a deeper page (a practice, the editor, a run, an entry, /design) | `PageBack` sets it on its own line at the page's head; `data-vt="pop"` |
 | `IconButton` | 40 px (44 touch) face, `label` required, `pressed` toggle, `small` | icon-only controls | the label is its name and tooltip |
 | `Field`, `TextField`, `TextArea` | label, control, hint, error (filled mark + words); `voice="his"` for his words on a ruled line; `hideLabel` | every form field | ids wire `aria-describedby` and `aria-invalid` |
 | `Switch` | 52 × 32 track in a 44 px target, the lamp when on | something that acts at once | named by `label` or `labelledBy` |
 | `Segmented` | sunk track, paper thumb on the spring; text or `iconOnly`; `wide` on a phone | one of a few | radio group, arrows move, one tab stop |
 | `Stepper` | − value unit +, ends disable, value nudges | a number with a unit, a time (`format={clockTime}`, step 15) | value is a spinbutton |
+| `TypedStepper` | − [typed value] unit +; steps from what is typed, or from `base` while empty | a number the step is too small to reach (Settings' fields) | holds his text as typed, valid or not; the form says what is wrong |
 | `DefaultHint` | "the default", or "default 6 hours · Use default" | beside a setting's label | defaults are never placeholders |
 | `Menu` | a trigger (`.choice` in a sentence, or any button) and a frosted list, radio or actions, counts | the filter sentence, a row's More | top layer, keyboard, Escape returns focus |
 | `Disclosure` | head (icon, title, peek), chevron in a well, body | readings, the week's review, a day's slip, health | animated height; closed body is inert |
 | `Sheet` (`Dialog`) | scrim, panel, head with title and Close | a short task over the page (mood, people, star) | native modal dialog: top layer, real trap, Escape, focus returns |
 | `Toast` | message, up to two actions, on the lamp | "The passage is gone. Undo"; the update prompt | foot of a wide screen, top on a phone; `role=status` |
-| `Letter` | From line with her dot and the time; opener; the asked question in italic; questions folded by part, "asked" marked; actions on a crease | her prompt anywhere: entry head, Today, the room, her week review | **no fastening**; read-only |
+| `Letter` | From line with her dot and the time; opener; the asked question in italic; questions folded by part (44 px on touch), "asked" marked; actions on a crease | her prompt anywhere: entry head, Today, the room, her week review, a run's phase | **no fastening**; read-only; her Markdown inside goes through `components/Markdown` (paragraphs, lists, quotes, bold, italic) |
 | `MarginNote` | "Ada · 08:02" with her dot; her words behind a hairline of her ink | her note beside a passage | the entry's grid places it |
 | `AudioPlayer` | lamp play disc, 54 bars (34 on a phone), time, speed (hidden on a phone) | his recording | a real `<audio>` underneath; the bars are a slider |
 | `Calendar` | month in the roman, arrows, M–S, written days bold with a dot (buttons), today ringed, chosen day on the lamp | filtering by day | one tab stop, arrows walk written days |
 | `ProgressStrip` | title, "3 of 10", segments (done in his ink, current partly filled) | a program's way through | a progressbar |
-| `Clock` | a face: hand at the hour, shaded at night, weekday for weekly, dashed for "when you need one", arc for a program | Library rows | decorative |
+| `Clock` | a face: hand at the hour, shaded at night, weekday for weekly (in the half the hand is not in), dashed for "when you need one", arc for a program | Library rows | decorative |
 | `Ribbon` | a bookmark ribbon, solid (his own) or outlined (a built-in he rewrote) | Library rows | replaces boxed "yours"/"edited" badges |
 | `Skeleton` (`Loading`) | rows, lines or blocks shimmering | while a read is out | `role=status` "Loading" |
 | `ErrorLine` | a filled mark, the sentence, Retry | a failed read or write | `role=alert` |
@@ -224,6 +229,10 @@ All in `web/src/ui/` (TSX plus a CSS file each), exported from `web/src/ui/index
 | `OfflineRibbon` | a frosted strip at the page's head: "offline, as of 09:12" | the view came from the kept copy | sticky |
 | `ThemeChoice`, `ThemeToggle` | System · Paper · Night; a sun/moon icon button | Settings; the rail's foot and the phone's top bar | |
 | `Mark` | the margin j | the rail, the phone top, pairing | in `icons.tsx` |
+
+The app's own parts that follow the system without being in `ui/` (`web/src/components/`): `Composer` (the inline box;
+`rest` lets it rest as one line on a phone while nothing is in it or happening, drawn by its own sheet through
+`data-rest`), `WriteRoom`, `Document`, `BlockActions`, `Markdown`.
 
 The shell's own parts (`web/src/shell/`): `Pane` (a pane on the desk, `glow`, `entry` to raise it, `vt` to name it),
 `useShellMode`, `withTransition` / `useNavigate`, `openWrite` / `useWriteRequest` (section 8).
@@ -277,8 +286,9 @@ Don't (the owner's vetoes and the system's):
 2. Put the route in `web/src/routes/<name>.tsx` with its own `web/src/routes/<name>.css`, imported by the TSX.
    Build from `web/src/ui` (`import { Button, Letter } from "../ui"`). If a part is missing, it belongs in `ui/` (raise
    it; the foundation owns `ui/`, `tokens.css`, `styles/base.css`, `icons.tsx`, `app.tsx`).
-3. Delete your route's rules from `web/src/styles/legacy.css` as you convert it (and the alias block's names you no
-   longer read). Nothing new goes into `legacy.css`.
+3. Scope every rule of your sheet under the route's root class (`.today-page .practice-head`, not `.practice-head`):
+   every route's sheet is loaded on every page, so an unscoped class restyles another route that happens to use it.
+   A rule two routes need belongs to a component, not to either route. (The old sheet, `legacy.css`, is gone.)
 4. Use the shell's seams:
    - **Fold the rail** while your route is on screen: `useShellMode({ fold: true })`.
    - **Lay your own panes** (list beside entry): `useShellMode({ panes: true })`, then render `<Pane>` elements
@@ -305,6 +315,6 @@ The owner's words: `design/state.md`.
 
 **CSS convention.** One sheet per component or route, beside its TSX and imported by it; class names are the
 component's own (kebab case: `.letter`, `.num-stepper`, `.calendar-grid`); a route scopes under its root class.
-Order: `tokens.css`, `styles/base.css`, `styles/legacy.css` (imported first in `main.tsx`), then every component's and
-route's sheet as the app imports it, so the system wins a tie with the old sheet. Breakpoints: phone `max-width: 760px`;
+Order: `tokens.css`, `styles/base.css` (imported first in `main.tsx`), then every component's and route's sheet as
+the app imports it, so a component's rule wins a tie with the base. Breakpoints: phone `max-width: 760px`;
 the folded rail `max-width: 1100px`; touch `(pointer: coarse)`; an entry's margins by container query on its pane.
