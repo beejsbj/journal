@@ -190,14 +190,6 @@ or alerted (prompts, annotation replies, reflections, program summaries and note
 Each slot still has its state, read from the schedule (upcoming, due, missed), and words written for a practice fill
 its slot (`actions.answer`: the web app's *Write now*, `journal write <id>`, MCP's `journal_save`; docs/OPEN-PROMPTS.md). Annotations and reflections are still
 written into the files. An empty `chat_id` on any other platform is not this: it still fails and alerts, so an install
-<<<<<<< HEAD
-that loses its chat id is noticed. Program phases and interrupts still need a chat until OPEN-PROGRAMS: on a no-chat
-install a program run's phase fails and alerts, so don't start one there yet. If a chat is configured later, the
-annotation replies and reflections written meanwhile are not sent: each is marked skipped (`no chat`) when it would
-have been, and the companion's pack and today block say how many were written while there was no chat (counts only;
-they are in the entries). With `journal serve` and the extra `journal[push]`, the installed web app is nudged when
-a slot comes (*Web app*, Notifications).
-=======
 that loses its chat id is noticed. Programs run there too: a phase becomes current with no message (the web app's run
 page shows it and takes the answer, and the run moves on by the program's rule), and session 10's interrupts open at
 their time and take an answer on the web (`POST /entries/{stem}/blocks` with `interrupt`; the web app has no control
@@ -205,8 +197,8 @@ for it yet). If a chat is configured later, the annotation replies and reflectio
 each is marked skipped (`no chat`) when it would have been, and the companion's pack and today block say how many were
 written while there was no chat (counts only; they are in the entries). A program's summaries are not sent either
 (they belong to sessions done with no chat), and the phase that is current goes to the chat when you `/start` the
-program.
->>>>>>> origin/main
+program. With `journal serve` and the extra `journal[push]`, the installed web app is nudged when
+a slot comes (*Web app*, Notifications).
 
 ### Another platform
 
