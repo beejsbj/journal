@@ -34,7 +34,8 @@
   content: ""; position: absolute; inset: 0; background: var(--text); transform-origin: left; transform: scaleX(0.45);
   animation: seg-fill 1.4s var(--e-out) 0.3s both;
 }
-.phase-title { margin: 0 0 var(--s4); font: 400 var(--t-h2) / 1.15 var(--f-his); font-optical-sizing: auto; color: var(--text); text-wrap: balance; }
+.phase-title::after { content: none; }   /* (the legacy sheet still rules every section > h2) */
+.phase-title { display: block; margin: 0 0 var(--s4); font: 400 var(--t-h2) / 1.15 var(--f-his); font-optical-sizing: auto; color: var(--text); text-wrap: balance; }
 .phase-sent > .hint { margin: 0 0 var(--s2); }
 .phase > .hint { margin: 0 0 var(--s2); }
 .phase-letter { margin-bottom: var(--s4); }
@@ -56,7 +57,7 @@
 
 /* ── insights and sessions ── */
 .run-sec { margin-bottom: var(--s7); }
-.run-sec > .book-head { margin-bottom: var(--s3); }
+.run-sec > .book-head { margin: 0 0 var(--s3); }
 .run-sec > .empty { margin: 0 0 var(--s3); }
 .sessions { list-style: none; margin: 0; padding: 0; }
 .sessions li { border-bottom: 1px solid var(--hair); }
@@ -81,7 +82,8 @@
   /* the thumb writes and sends: the answer box stays above the bar at the foot and grows when it is used */
   .phase > .composer {
     position: sticky; z-index: var(--z-sticky); bottom: calc(var(--bar-h) + env(safe-area-inset-bottom));
-    margin-top: var(--s3); padding: var(--s2) 0; background: var(--pane); border-top: 1px solid var(--hair);
+    margin: var(--s3) calc(-1 * var(--gutter)) 0; padding: var(--s2) var(--gutter); background: var(--pane);
+    border-top: 1px solid var(--hair); box-shadow: 0 -12px 24px -18px rgb(0 0 0 / 0.25);
   }
   .phase > .composer .composer-box { min-height: var(--tap); height: 3.4rem; resize: none; }
   .phase > .composer:focus-within .composer-box { height: min(30vh, 10rem); }

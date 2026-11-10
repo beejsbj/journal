@@ -6,7 +6,6 @@
 .today-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s2); }
 @container (min-width: 860px) {
   .today-grid { grid-template-columns: minmax(0, 1fr) 290px; gap: 56px; }
-  .today-side { padding-top: 132px; }   /* level with the week strip, under the date */
 }
 
 /* ── the head: the day as a numeral, the weekday and month beside it ── */
@@ -24,8 +23,10 @@
 
 /* ── sections ── */
 .today-sec { margin-bottom: 40px; }
-.today-sec > .book-head { margin-bottom: 18px; }
+.today-sec > .book-head { margin: 0 0 18px; }
+.carry > h2::after { content: none; }   /* (the legacy sheet still rules every section > h2) */
 .today-page > .empty, .today-main > .empty { margin: 0 0 var(--s6); }
+.today-sec > .empty { margin: 0; padding: 0; font-size: 1.0625rem; }   /* a quiet line in a section, not a page-sized empty */
 
 /* ── a prompt that was sent: its name and state, her letter, his reply ── */
 .today-cards { list-style: none; display: grid; gap: var(--s7); }
@@ -60,8 +61,9 @@
 
 /* ── Written today ── */
 .written-list { list-style: none; }
+.written-list > li { border-bottom: 1px solid var(--hair); }
 .written-row {
-  display: block; padding: 12px 10px; margin: 0 -10px; border-radius: var(--r-m); border-bottom: 1px solid var(--hair);
+  display: block; padding: 12px 10px; margin: 0 -10px; border-radius: var(--r-m);
   color: var(--text); text-decoration: none; transition: background var(--d-1);
 }
 .written-row:hover { background: var(--raised); }

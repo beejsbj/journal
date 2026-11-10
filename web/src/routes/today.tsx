@@ -304,7 +304,7 @@ export function TodayRoute() {
                   </Sec>
                 )}
               </div>
-              <aside class="today-side" aria-label="Later, and what carries">
+              <aside class="today-side" aria-label="The rest of the day">
                 {later.length > 0 && (
                   <Sec id="later-h" title="Later today" i={i++}>
                     <ul class="today-later">

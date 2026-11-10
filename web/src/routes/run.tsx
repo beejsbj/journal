@@ -210,6 +210,7 @@ const SESSION_WORDS: Record<string, string> = {
   in_progress: "open",
   left: "left",
   pending: "to come",
+  "not-started": "to come",
   skipped: "skipped",
 };
 
@@ -261,7 +262,7 @@ export function RunRoute({ id = "" }: { id?: string }) {
                         <>
                           <span class="n num">{s.number}</span>
                           <span class="t">{s.title}</span>
-                          <span class="kind">{SESSION_WORDS[s.status] ?? s.status.replace("_", " ")}</span>
+                          <span class="kind">{SESSION_WORDS[s.status] ?? s.status.replace(/[_-]/g, " ")}</span>
                         </>
                       );
                       return (
