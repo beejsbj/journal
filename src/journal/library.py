@@ -1043,6 +1043,22 @@ def question_snapshot(practice: Practice) -> list[dict]:
     return out if size <= SNAPSHOT_MAX_CHARS else []
 
 
+def record_fields(p: Practice) -> dict:
+    """What a prompt record carries about its practice beyond ``kind``. Nothing for a built-in, so the rituals'
+    records are what they always were (and ``windows.collapse_hours`` keeps governing them); a practice of his own
+    records its title (a fold or a late reply still has it if the file is renamed or deleted), its window, and
+    ``annotate: false`` when it asks for no annotations. A delivery (``tick.send_due``) and his first words on a face
+    (``actions.answer``) write the same."""
+    out: dict = {}
+    if not p.builtin:
+        out.update(title=p.title, collapse_hours=p.collapse_hours)
+        if p.emoji:
+            out["emoji"] = p.emoji
+    if not p.annotate:
+        out["annotate"] = False
+    return out
+
+
 def snapshot_sections(record: Mapping | None) -> tuple[tuple[str | None, tuple[Question, ...]], ...] | None:
     """A send record's snapshot as ``Practice.sections`` shapes it, or None when the record has none (it went out
     before snapshots, or the set was too big) or what it holds is not a well-formed list: the reader then uses the

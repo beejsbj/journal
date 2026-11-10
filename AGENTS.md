@@ -13,24 +13,36 @@ One engine in `src/journal`, four faces over the same config, state and entry fi
 | Face | Where | What it is |
 | --- | --- | --- |
 | `journal` CLI | `cli.py` (console script `journal`) | `journal tick`, run every five minutes, does all scheduled work; the other subcommands inspect and maintain (`journal --help`). |
-| Hermes plugin | repo root: `plugin.yaml`, `__init__.py` → `hermes/` | The companion's integration: hooks (`pre_gateway_dispatch` capture, `pre_llm_call` context, `pre_tool_call` guard), the companion's tools, slash commands, the `skills/journal-system` skill, `hermes journal …`. The journal works in one chat on any gateway platform (the `channel` setting; default Telegram and `telegram.chat_id`): `channel.py` decides which messages and turns are the journal's (platform, chat, owners), and every send goes through the `Channel` port (`telegram.TelegramChannel`, else `hermes/channel.py` through `hermes journal deliver`). |
+| Hermes plugin | repo root: `plugin.yaml`, `__init__.py` → `hermes/` | The companion's integration: hooks (`pre_gateway_dispatch` capture, `pre_llm_call` context, `pre_tool_call` guard), the companion's tools, slash commands, the `skills/journal-system` skill, `hermes journal …`. The journal works in one chat on any gateway platform (the `channel` setting; default Telegram and `telegram.chat_id`): `channel.py` decides which messages and turns are the journal's (platform, chat, owners), and every send goes through the `Channel` port (`telegram.TelegramChannel`, else `hermes/channel.py` through `hermes journal deliver`). With `channel.platform: none` there is no chat at all: prompts, annotation replies, reflections, program summaries and notes are not sent, attempted, counted or alerted, and practices are done on the other faces (program phases still need a chat until OPEN-PROGRAMS). |
 | `journal serve` + PWA | `serve/` (stdlib HTTP server and API); `web/` (Preact source) built into `serve/static/` | A private web app over the same files. Reads entries and state JSON, never the chat transcript; calls no model; sends by spawning `journal send`. |
 | `journal mcp` | `mcp/` (optional extra `journal[mcp]`) | The engine's calls as MCP tools over stdio, under serve's rules. |
 
 Adapters stay thin: the seam is `inbound`, `turncontext`, `tools`, `commands` and the two ports in `ports.py`
-(README *Adapters* and *Ports*; `docs/ARCHITECTURE.md` §2).
+(README *Adapters* and *Ports*; `docs/ARCHITECTURE.md` §2). His words from a face go through `actions.py` (`answer`,
+`note`: the refusals of `/x`, marker lines and the transcript placeholder live there), which takes its slot from
+`slots.py` (`docs/OPEN-PROMPTS.md`; serve and MCP still call `capture.capture_web` until package OPEN-FACES moves
+them onto it).
 
 ## How a prompt flows
 
 1. **Due.** `tick.run` takes `tick.lock`; `schedule.slots_due` checks every scheduled practice in the library
-   (`library.py`: built-ins in `library/practices/`, his own in `practices_dir`).
+   (`library.py`: built-ins in `library/practices/`, his own in `practices_dir`). A slot is done when delivered, out of
+   attempts, backfilled, or answered on any face. `slots.py` reads every slot's state (upcoming, due, open, answered,
+   missed) from the schedule and the ledger for Today, the today block, `status` and the web history, and
+   `slots.resolve` says which slot words, or a deliberate send (`/start`, `journal send`), go to.
 2. **Opener.** `context.build` makes a dated, sourced pack (`standing.py`, `sources.py`); `agent.ask` asks the
    companion; `validate.check` rejects uncited claims and quotes not in the record. Any failure gives the plain opener.
 3. **Send.** `compose.py` → `cfg.channel()` (the `Channel` port: the Bot API on Telegram, Hermes' senders elsewhere); the record goes into the ledger (`ledger.py`) and `sent.jsonl`; `mirror.py`
-   copies it into the companion's chat session.
+   copies it into the companion's chat session. Just before a scheduled send the tick reads the record again under the
+   ledger lock: answered on a face meanwhile, nothing goes (the pack is saved only after that check). A send that
+   loses the race attaches to the face's record (`sent_opener`, `sent_html`, `sent_plain_text`, `needs_edit`) and
+   never overwrites it. With `channel.platform: none` nothing is sent or written.
 4. **Capture.** His reply reaches the gateway hook before any model runs: `hermes/hooks.py` → `inbound.receive` →
    `capture.py` → `entries.record_reply`. The next tick's `sweep.py` catches what the hook missed (the busy path), and
    `conversations.py` writes the chat that follows into the entry, by thread. Every one of them asks `privacy.py`.
+   Words on a face go through `actions.answer` into the slot `slots.resolve` gives, in one locked call: a record with
+   `opened_via` and no `message_id`, so nothing that reads the chat (matching, the sweep, folding, thread boundaries,
+   the `/x` windows) ever sees it, and nothing goes to `sent.jsonl`, `send-times.json` or the thread stamps.
 5. **After.** Later ticks move program runs (`programs.py`), fold the sent message where the platform allows edits
    (header, the opener as sent when it fits and parses, a status line; elsewhere the prompt is closed as sent), transcribe audio and describe pictures (`tick.process_audio`, `tick.process_images`),
    annotate and reply (`tick.annotate`, `tick.reply_annotations`), write reflections (`reflect.py`), and catch up
@@ -53,10 +65,14 @@ Adapters stay thin: the seam is `inbound`, `turncontext`, `tools`, `commands` an
   (`grep -rnE '"[a-z-]+\.jsonl?"' src/journal` finds them). Shared JSON state is read, changed and written under `ledger.locked` /
   `ledger.locked_state`, with a `<name>.lock` beside the file; `tick.lock` serialises ticks; `sent.jsonl`,
   `errors.jsonl` and the other `.jsonl` logs are plain appends.
+- **Prompt records** (`ledger.json`): a delivered prompt has `message_id`; one made by his words on a face has
+  `opened_via` (`web`, `cli`, `mcp`) and `sent_at` the time of those words; a failed send leaves `send_attempts` and
+  nothing else. `slots.py` is the one reader of what that means for a slot; the chat-side readers keep requiring
+  `message_id`.
 - **The chat transcript**: Hermes' sessions database, opened read-only, and only by `hermes/transcript.py`.
 - **Config**: defaults → JSON file → Hermes plugin settings, with `$JOURNAL_*` environment overrides for one run
   (`JOURNAL_CONFIG`, `JOURNAL_STATE_DIR`, `JOURNAL_PRACTICES_DIR`, `JOURNAL_SERVE_BIND`, …) (`config.py`; README
-  *Configure*).
+  *Configure*). `windows.day_ends_at` (default `04:00`) sets the journal day: words before it belong to the day before (a deliberate send then takes today's date, or last night's when that slot is the nearer).
 
 ## Contracts
 

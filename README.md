@@ -106,7 +106,8 @@ Minimal config:
 | `windows.grace_hours` | `2` | How late a scheduled prompt may still go out (e.g. after downtime). |
 | `windows.opener_budget_seconds` | `240` | Model time for the opener. |
 | `windows.annotate_after_minutes` | `20` | Wait after the first reply before annotating. |
-| `channel.platform` | `telegram` | The platform the journal's chat is on: any Hermes gateway platform (`telegram`, `discord`, `slack`, `signal`, `whatsapp`, `matrix`, `mattermost` …). See *Another platform* below. |
+| `windows.day_ends_at` | `04:00` | Words written before this time belong to the day before (the journal day): a practice answered at 00:30 fills last night's slot, not tonight's. A deliberate send (`/start <id>`, `journal send <id>`, Send to chat) before it takes today's date, or last night's when the practice's nearest scheduled slot is last night's: `/start morning` at 03:30 delivers today's morning, and its 06:00 send is then done; `/start evening` at 00:30 is last night's evening, and tonight's is left alone. |
+| `channel.platform` | `telegram` | The platform the journal's chat is on: any Hermes gateway platform (`telegram`, `discord`, `slack`, `signal`, `whatsapp`, `matrix`, `mattermost` …). See *Another platform* below. `none`: a journal with no chat at all (see *No chat* below). |
 | `channel.chat_id` | `""` (on Telegram: `telegram.chat_id`) | The chat prompts go to and replies are captured from, as Hermes names it. |
 | `channel.user_ids` | `[]` | Your own ids on that platform. Set, only your messages in the chat are journaled (anyone else's pass through untouched) and only your sessions are read; empty, everything in the chat is yours, as in a direct-message chat. |
 | `telegram.chat_id` | `""` | The Telegram chat prompts go to and replies are captured from (when `channel` names no other). |
@@ -179,6 +180,19 @@ Minimal config:
 | `programs.keyboard` | `true` | Send `/next` `/skip` `/back` `/break` as reply-keyboard buttons with each phase; `false` leaves typed commands only (the fallback if a client or gateway mishandles the buttons). |
 | `state_dir` | `<HERMES_HOME>/plugin-data/journal`, standalone `~/.local/state/journal` | Ledger, notebook, packs, program runs (`runs/`), the hook's between-callback state (`hook-state.json`). `$JOURNAL_STATE_DIR` overrides. |
 | `practices_dir` | `<state_dir>/practices` | Your own practice files and your edits of the built-in ones (see *Practices*). Outside the journal on purpose: the journal holds entries only. `$JOURNAL_PRACTICES_DIR` overrides (and is then not writable from a config layer). Use an absolute path (doctor warns on a relative one, as for `root` and `state_dir`: cron, the gateway and a shell each start in a different directory). |
+
+### No chat
+
+`"channel": {"platform": "none"}` says the journal has no chat on purpose: nothing is ever sent, attempted, counted
+or alerted (prompts, annotation replies, reflections, program summaries and notes), and the schedule writes nothing.
+Each slot still has its state, read from the schedule (upcoming, due, missed), and words written for a practice fill
+its slot (`actions.answer`; the web app, the CLI and MCP move onto it in OPEN-FACES, docs/OPEN-PROMPTS.md). Annotations and reflections are still
+written into the files. An empty `chat_id` on any other platform is not this: it still fails and alerts, so an install
+that loses its chat id is noticed. Program phases and interrupts still need a chat until OPEN-PROGRAMS: on a no-chat
+install a program run's phase fails and alerts, so don't start one there yet. If a chat is configured later, the
+annotation replies and reflections written meanwhile are not sent: each is marked skipped (`no chat`) when it would
+have been, and the companion's pack and today block say how many were written while there was no chat (counts only;
+they are in the entries).
 
 ### Another platform
 

@@ -23,7 +23,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable
 
-from .. import audio, capture, entries, images, ledger, library, location, reflect, status, today, version
+from .. import audio, capture, entries, images, ledger, library, location, reflect, slots, status, today, version
 from .. import settings as settings_
 from ..config import Config, effective_today, profile_from_home
 from . import auth, document
@@ -176,24 +176,21 @@ def logout(req: Request):
 
 # ── today, entries, days ─────────────────────────────────────────────────────
 
-def _sent_prompts(cfg: Config) -> list[dict]:
-    """The ledger's sent prompts of the structured practices (a /j note or a freeform capture is no prompt, and
-    neither is a program phase: ``/skip`` records on the run, not the ledger, so a skipped or passed-over phase
-    would read as missed; Today's rows leave program prompts out too, ``today.collect``)."""
-    return [p for p in ledger.snapshot(cfg.ledger_path)["prompts"]
-            if p.get("message_id") and p.get("sent_at") and p.get("kind") not in entries.FREEFORM_IDS
-            and not p.get("program")]
+OUTCOMES = {slots.ANSWERED: "answered", slots.MISSED: "missed", slots.OPEN: "open", slots.DUE: "open"}
 
 
-def _prompt_outcome(cfg: Config, p: dict, now: datetime) -> str | None:
-    """``answered`` (it has a capture), ``missed`` (its window has closed with none), ``open`` (still waiting) or None
-    (a record the engine would not have written)."""
-    if p.get("captures"):
-        return "answered"
-    try:
-        return "missed" if now - datetime.fromisoformat(p["sent_at"]) >= capture.window(cfg, p) else "open"
-    except (TypeError, ValueError):
-        return None
+def _outcomes(cfg: Config, now: datetime, first: date, last: date) -> dict[str, list[str]]:
+    """local date → the outcome of each slot of the structured practices that day (``slots.history``): ``answered``
+    (on any face), ``missed`` (its window closed with none, delivered or not), ``open`` (still waiting: delivered and
+    open, or due). Upcoming slots are no outcome yet. A /j note is no slot, and neither is a program phase: ``/skip``
+    records on the run, not the ledger, so a skipped or passed-over phase would read as missed (Today's rows leave
+    program prompts out too, ``today.collect``)."""
+    out: dict[str, list[str]] = {}
+    end = min(last, now.astimezone(cfg.tz).date())
+    for s in slots.history(cfg, first, end, now) if first <= end else []:
+        if s.state in OUTCOMES:
+            out.setdefault(s.local_date, []).append(OUTCOMES[s.state])
+    return out
 
 
 def week_strip(cfg: Config, now: datetime, days_: int = 7) -> list[dict]:
@@ -202,11 +199,11 @@ def week_strip(cfg: Config, now: datetime, days_: int = 7) -> list[dict]:
     day's prompts, none waiting), ``partial`` (some answered, some missed or still waiting), ``missed`` (none answered)
     or ``none`` (nothing sent, or only open prompts)."""
     end = now.astimezone(cfg.tz).date()
-    prompts = _sent_prompts(cfg)
+    found = _outcomes(cfg, now, end - timedelta(days=days_ - 1), end)
     out = []
     for back in range(days_ - 1, -1, -1):
         day = end - timedelta(days=back)
-        outcomes = [_prompt_outcome(cfg, p, now) for p in prompts if p.get("local_date") == day.isoformat()]
+        outcomes = found.get(day.isoformat(), [])
         answered, missed, waiting = outcomes.count("answered"), outcomes.count("missed"), outcomes.count("open")
         state = ("none" if not answered and not missed else "missed" if not answered
                  else "answered" if not missed and not waiting else "partial")
@@ -224,6 +221,12 @@ def today_(req: Request):
     prompt is labelled with the companion's name."""
     data = today.collect(req.cfg, req.now, stems=True)
     rows = (data.get("practices") or {}).get("rows") or []
+    for r in rows:
+        # The PWA as built reads four states (``web/src/types.ts``); until OPEN-FACES teaches it ``due``, a slot that
+        # is due with no chat message is served as it read before: still to come, with Send now (DECISIONS.md,
+        # OPEN-CORE)
+        if r.get("state") == slots.DUE:
+            r["state"] = slots.UPCOMING
     if any(r.get("stem") for r in rows):
         try:
             records = document.prompt_records(req.cfg)
@@ -423,8 +426,8 @@ def insights_weeks(req: Request):
     cfg = req.cfg
     end_day = reflect.week_end_day(cfg)
     last = end + timedelta(days=(end_day - end.weekday()) % 7)
-    prompts = _sent_prompts(cfg)
     found = document.all_entries(cfg)
+    outcomes_by_day = _outcomes(cfg, req.now, start - timedelta(days=6), last)  # (every day of every week shown)
     out = []
     try:
         from .. import programs
@@ -437,7 +440,7 @@ def insights_weeks(req: Request):
         first = week_end - timedelta(days=6)
         lo, hi = first.isoformat(), week_end.isoformat()
         mine = [path for path, _ in found if lo <= path.stem[:10] <= hi]
-        outcomes = [_prompt_outcome(cfg, p, req.now) for p in prompts if lo <= (p.get("local_date") or "") <= hi]
+        outcomes = [o for d, os in outcomes_by_day.items() if lo <= d <= hi for o in os]
         answered, missed = outcomes.count("answered"), outcomes.count("missed")
         review = entries.analyses_on(cfg.root, hi, "week")
         out.append({"week_end": hi, "entries": len(mine), "words": sum(document.words_count(p) for p in mine),

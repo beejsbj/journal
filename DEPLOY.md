@@ -16,6 +16,57 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## OPEN-CORE — slot states, slot resolution, the engine's write of his words, `channel.platform: none` (2026-11-09; tick, hook and serve side; **gateway restart required, in a window**; no config change for current behaviour; no state migration)
+
+**What changes.** A practice's slot has a state read from the schedule and the ledger together (`slots.py`: upcoming,
+due, open, answered, missed), and one function says which slot words or a deliberate delivery go to
+(`slots.resolve`). The tick counts a slot answered on any face as done, reads the record again under the ledger lock
+just before a scheduled send (saving the pack only after that check), and a send that loses that race attaches to the
+record without overwriting it. `/start <id>` and `journal send <id>` take their slot from `slots.resolve`: `/start
+water` at 15:00 delivers the slot that is due, and `/start morning` after the morning is answered starts an extra
+entry (`<date>-morning-2`) instead of re-sending into the answered one. `journal/actions.py` (`answer`, `note`, with
+the three refusals) is new; no face calls it yet (OPEN-FACES). Today's rows, the today block, `status`, the opener's
+unanswered count and the web app's week strip and insights read slot states: a past slot that was never delivered now
+shows (missed, or due), and the web app is served a due row as upcoming. `channel.platform: none` is a journal with
+no chat: nothing is sent, written, counted or alerted; an annotation reply or reflection that would have been sent is
+marked skipped (`no chat`) and never sent, also after a chat is set, and the pack and today block count them (owner's
+decision 3, 2026-11-09). New setting `windows.day_ends_at` (default `04:00`); a deliberate send before it takes
+today's date (`/start morning` at 03:30 delivers today's morning; owner's decision 1), or last night's slot when
+that is the nearer one (`/start evening` at 00:30). `agent`
+no longer imports the Hermes adapter for its failure copy; `status` does not need `serve/` for doctor. A no-chat
+install should not start a program run yet: phases with no chat come with OPEN-PROGRAMS.
+
+**Side and restart.** `tick.py`, `slots.py`, `actions.py`, `capture.py` (`sent_opener`), `sweep.py`, `today.py`,
+`standing.py`, `prompts.py`, `conversations.py`, `entries.py`, `config.py`, `library.py`, `status.py`, `agent.py`,
+`reflect.py`, `programs.py`, `cli.py` and `hermes/companion.py` changed; the gateway imports most of them (`today`,
+`capture`, `conversations`, `entries`, `sweep`, `config`, `library`, `programs` at least), and `/start` resolves
+through the spawned `journal send`, which the tick's code runs. So **a gateway restart, in a window** (at least an hour
+from a ritual). The tick is a fresh process and runs the new code from the next tick after the pin moves; serve
+(`serve/api.py`) waits for `uv tool install --force` and the unit restart. Ledger records gain fields only when a face
+answers (none can until OPEN-FACES), a send loses the race, or a no-chat tick marks an annotation reply or a
+reflection `skipped: "no chat"` (with `skipped_at`); existing records read the same.
+
+1. In a window: merge to `main`; with `<sha>` the merge commit, install the CLI at `<sha>`, move the plugin pin
+   (`hermes -p <profile> plugins install beejsbj/journal --force --ref <sha>`), `hermes gateway restart`,
+   `systemctl --user restart journal-serve`. Nothing is sent by the deploy.
+2. First checks, without sending: `journal doctor` (the `channel` row as before; no new failure); `journal status`
+   shows a `Today:` line with each slot's state and `Due now` as before; `journal today` renders the block (a past
+   slot that was never sent now reads `<id> at HH:MM, not sent to the chat (missed)`); the web app's Today loads (a due slot shows as still
+   to come, with Send now) and its week strip still parses. `journal send <id> --dry-run` prints the message for the
+   slot it would take. The next scheduled prompt goes out as before (the tick's log says `sent <id>`); a slot already
+   answered is done and logs nothing (only a face answer during the opener's model call logs `<id>: not sent:
+   answered meanwhile`, and none can come before OPEN-FACES).
+3. Rollback: the CLI and the plugin pin at the previous sha, `hermes gateway restart`, `systemctl --user restart
+   journal-serve`. Old code reads a face-made record as an undelivered prompt with captures and would send it once
+   more if the rollback lands inside its `grace_hours` (one chat message he has already answered; his words and the
+   entry stay, the record's opener becomes the newly sent one); no face writes one before OPEN-FACES, so on this
+   package's own rollback there is none. An extra entry made by `/start` (`<date>-<id>-<n>`) stays a delivered
+   record old code reads normally. **A no-chat install** (`channel.platform: none`) must not be rolled back as it
+   is: old code reads `none` as a platform with no chat, so every slot, reflection and summary fails and alerts; set
+   a real channel or stop its tick first. Old code does not know the `skipped: "no chat"` mark either: with a real
+   channel set, it sends the annotation replies and reflections skipped meanwhile (it checks only for a message id and
+   attempts left), so stopping the tick is the safe choice.
+
 ## SCRUB-PERSONAL — the repo holds nothing specific to a deployment (2026-10-28; docs, tests and comments, one doctor row; no gateway restart needed; no config or state change)
 
 **What changes.** Docs, tests and fixtures are generic; the deployment overlay left the repo

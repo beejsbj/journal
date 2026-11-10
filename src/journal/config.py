@@ -33,6 +33,7 @@ from typing import Any, Callable, Mapping
 from zoneinfo import ZoneInfo
 
 PLUGIN_ID = "journal"
+NO_CHANNEL = "none"  # ``channel.platform: none``: a journal with no chat (OPEN-PROMPTS rule 6)
 
 DEFAULTS: dict[str, Any] = {
     "root": None,  # required: the journal directory; one Markdown file per entry lands here
@@ -50,9 +51,11 @@ DEFAULTS: dict[str, Any] = {
         "grace_hours": 2.0,             # how late a scheduled prompt may still be sent
         "opener_budget_seconds": 240,   # model time for the opener
         "annotate_after_minutes": 20,   # wait after the first reply before annotating
+        "day_ends_at": "04:00",         # words written before this belong to the day before (the journal day)
     },
     "channel": {                        # the journal's chat (CHANNELS): any Hermes gateway platform
-        "platform": "telegram",         # telegram, discord, slack, signal, whatsapp, matrix, … (Hermes' Platform names)
+        "platform": "telegram",         # telegram, discord, slack, signal, whatsapp, matrix, … (Hermes' Platform names);
+                                        # "none": no chat at all, practices are done on the faces (OPEN-PROMPTS)
         "chat_id": "",                  # the chat as Hermes names it; empty on telegram = telegram.chat_id
         "user_ids": [],                 # his ids on the platform; empty = everyone in the chat is him (a DM)
     },
@@ -360,6 +363,7 @@ class Config:
     grace_hours: float = 2.0
     opener_budget_seconds: int = 240
     annotate_after_minutes: int = 20
+    day_ends_at: str = "04:00"  # windows.day_ends_at: words written before it belong to the day before
     state_dir: Path = field(default_factory=lambda: xdg_state_dir())
     names: Names = field(default_factory=Names)
     telegram: dict = field(default_factory=lambda: copy.deepcopy(DEFAULTS["telegram"]))
@@ -398,6 +402,13 @@ class Config:
     def __post_init__(self):
         if self.practices_dir is None:  # a Config built by hand (tests) gets the same default as from_dict
             self.practices_dir = self.state_dir / "practices"
+
+    @property
+    def has_channel(self) -> bool:
+        """Whether the journal has a chat to deliver into. ``channel.platform: none`` says it has none, on purpose:
+        nothing is sent, attempted, counted or alerted, and practices are done on the faces (OPEN-PROMPTS rule 6).
+        Any other platform has one, even with no chat id (that one still fails and alerts, so it is noticed)."""
+        return self.platform != NO_CHANNEL
 
     @property
     def under_hermes(self) -> bool:
@@ -454,7 +465,12 @@ class Config:
 
     def channel(self):
         """Where the engine sends (``ports.Channel``): the Telegram Bot API on Telegram, else Hermes' own senders for
-        the configured platform; with ``adapter: none`` off Telegram, nothing (every send is refused)."""
+        the configured platform; with ``adapter: none`` off Telegram, nothing (every send is refused). With
+        ``channel.platform: none`` the callers send nothing at all (``has_channel``); a send that reached here anyway
+        is refused."""
+        if self.platform == NO_CHANNEL:
+            from .ports import NoChannel
+            return NoChannel(self.platform)
         if self.platform == "telegram":
             from .telegram import TelegramChannel
             return TelegramChannel(self)
@@ -583,6 +599,7 @@ def from_dict(data: Mapping, *, hermes_home: Path | None = None, config_file: Pa
             grace_hours=float(windows.get("grace_hours", 2)),
             opener_budget_seconds=int(windows.get("opener_budget_seconds", 240)),
             annotate_after_minutes=int(windows.get("annotate_after_minutes", 20)),
+            day_ends_at=str(windows.get("day_ends_at") or "04:00"),
             state_dir=state_dir,
             practices_dir=practices_dir,
             names=Names(user=str(user.get("name") or ""), companion=str(comp.get("name") or "Companion"),
@@ -719,7 +736,9 @@ def problems(cfg: Config) -> list[str]:
         if not Path(path).is_absolute():
             out.append(f"{key} is relative ({path}): each process would resolve it against its own working "
                        "directory; use an absolute path")
-    if not cfg.chat_id:
+    if not cfg.has_channel:
+        pass  # no chat on purpose: nothing to send to, nothing to capture from
+    elif not cfg.chat_id:
         out.append("telegram.chat_id is not set: prompts cannot be sent and replies are not captured"
                    if cfg.platform == "telegram" else
                    f"channel.chat_id is not set: prompts cannot be sent to {cfg.platform} and replies are not captured")
@@ -729,6 +748,8 @@ def problems(cfg: Config) -> list[str]:
                    "direct-message chat with the companion")
     if cfg.collapse_hours <= 0:
         out.append("windows.collapse_hours must be positive")
+    if not _TIME.match(str(cfg.day_ends_at)):
+        out.append(f"windows.day_ends_at must be a time like 04:00 (got {cfg.day_ends_at!r}); 04:00 is used")
     if cfg.grace_hours < MIN_GRACE_HOURS:
         out.append(f"windows.grace_hours is {cfg.grace_hours:g}: under {MIN_GRACE_HOURS:g} h (one tick) a scheduled "
                    "prompt can be missed and never sent")
@@ -800,6 +821,16 @@ def _positive(value) -> float | None:
     except (TypeError, ValueError):
         return None
     return n if n > 0 and n == n and n != float("inf") else None
+
+
+def day_ends_at(cfg: "Config") -> tuple[int, int]:
+    """``windows.day_ends_at`` as (hour, minute): words written before it belong to the day before (the journal day,
+    ``slots.journal_day``); an unusable value is the default 04:00 (doctor reports it)."""
+    value = str(cfg.day_ends_at or "")
+    if not _TIME.match(value):
+        value = "04:00"
+    hh, mm = value.split(":")
+    return int(hh), int(mm)
 
 
 def today_max_chars(cfg: "Config") -> int:

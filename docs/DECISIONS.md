@@ -29,7 +29,8 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   neither is a state derived from the schedule, a practice can be done any time on any face, `channel.platform:
   none` means no delivery by intent, and Web Push from `journal serve` nudges the PWA. Nothing a face writes, and no
   push, is a chat boundary, so neither can end a `/x` window. The owner took choices A–E on 2026-11-09 (recorded
-  there). To close: packages OPEN-CORE, OPEN-FACES, OPEN-PUSH and OPEN-PROGRAMS land.
+  there). To close: packages OPEN-CORE, OPEN-FACES, OPEN-PUSH and OPEN-PROGRAMS land. *OPEN-CORE built*: see
+  "OPEN-CORE" under *Taken*, which records where it read the doc.
 
 - **SCRUB-PERSONAL — the source adapters and `brain:` (open, the owner's).** The built-in context sources (tududi,
   chat-scrobbler, listenbrainz, storyteller, audiobookshelf, grimmory) are optional features, but together they
@@ -3031,3 +3032,169 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   situational session interrupts a program's open phase, the program does not resend that phase by itself;
   `/start <word>` brings it back. Manual by design. Closes the open point in ONE-PROGRAM-RUN, review fixes (6) ("whether
   the engine should re-send it on its own").
+- **OPEN-CORE (2026-11-09) — slot states, slot resolution, the engine's write of his words, attach-only delivery and
+  `channel.platform: none`** (docs/OPEN-PROMPTS.md, package 1; issue #17). What the package built, and what it
+  decided where the doc left room:
+  - **One module, `slots.py`.** `slots.day` gives every slot of a date in its state (upcoming, due, open, answered,
+    missed) from the schedule and the ledger; `slots.resolve(cfg, practice, at, *, now, data, delivery)` is the four
+    steps of the doc; `slots.history` serves the web history. **A slot's window before anything was delivered** is
+    the one a delivery at the slot's time would have had: the practice's `collapse_hours`, else
+    `windows.collapse_hours` (not `grace_hours`, which stays the tick's sending window only). So a slot never sent on
+    a chat install reads *due* for that window, then *missed*.
+  - **`windows.day_ends_at`** (default `04:00`) is the doc's `day_ends_at`, under `windows` beside the other times; an
+    unusable value is 04:00 and doctor names it.
+  - **Step 4, "slot 1's id when the practice has no schedule"** is read as *when no slot of the practice falls on that
+    day*: `/start weekly` on a Wednesday is still `<date>-weekly` (the goldens freeze exactly that send, and a weekday
+    slot's id is never used on another day), and the next free number after the scheduled slots otherwise. A number
+    is free when neither a ledger record nor an entry file has it (a record pruned after 120 days leaves its file).
+  - **A deliberate delivery uses `resolve` with `delivery=True`**: `at` is now, so the "sent at or before `at`" check
+    is left out (it is true by construction, and a check against a send time from another clock would turn a re-send
+    into an extra entry). `scheduled` on a deliberate send's record is still the moment it was asked for, as before.
+  - **`actions.answer` / `actions.note`** hold the three refusals (`Refused.code`: `off-the-record`, `reserved-line`,
+    `placeholder`, plus `empty`, `not-a-practice` and `bad-time`: a time with no offset, or more than five
+    minutes ahead of the server's clock, as `serve/writes._at` refuses; no past limit here, since words before the
+    previous journal day make an extra entry and fill no old slot), take the ledger lock once for the record and the capture, and
+    write through `capture._web_record` (the web app's path), so rule, source and via are the face's (`web`, `cli`,
+    `mcp`). A face-made record: `message_id: None`, `sent_at` and `opened_at` the time of his words,
+    `opened_at_local`, `opened_via`, the plain opener (`opener_source: plain:<face>`), the question snapshot and the
+    practice's record fields. Its entry header reads `_Written 05:40 IST in the web app · opener: plain:web_`. The
+    faces still call `capture.capture_web` until OPEN-FACES moves them; nothing here is reachable from a face yet.
+  - **Attach-only delivery** happens only in the race of rule 3 (a scheduled send that goes out after he answered on
+    a face): the record keeps its fields and gains `message_id`, `sent_at`, `sent_at_local`, `chat_id`, `platform`,
+    `sent_opener` (and `sent_opener_source`), `sent_html`, `sent_plain_text` and `needs_edit`. The issue's
+    "deliberate send: the record's own opener, failure not alerting" has no path of its own: `resolve` never gives a
+    deliberate send an answered record, and **a deliberate send resolves again** under the ledger lock once its
+    opener is built if he answered its slot meanwhile, on a face or in the chat (`tick._resolve_again`; review
+    rounds 1 and 2), so it goes to the next slot that fits or an extra entry rather than attaching to his record or
+    re-sending a prompt he has just answered (on `main`, `/start` always re-sent). It can attach only in the instant between that check and the send,
+    as a scheduled send can. What remains of the issue's wording: **a failed send onto a record that has captures
+    counts no attempt and raises no alert** (it is logged): nothing is owed.
+  - **The web app as built reads four states** (`web/src/types.ts`), so `GET /today` serves a *due* row as
+    *upcoming* (with its `at`, and Send now) until OPEN-FACES teaches the PWA *due*; `today.collect`, the block and
+    MCP's today text have *due*. A row now also appears for a past slot with no record (*missed*, or *due*), where it
+    was absent before; `tests/fixtures/api/today.json` changes by that row.
+  - **The web history (`week_strip`, `insights/weeks`) counts slots** (`slots.history`): a slot delivered to the chat
+    or answered on any face, as before plus the face. A slot with neither counts (as missed, or waiting while due)
+    **only on a no-chat install**, where the due slot is the prompt; on a chat install a slot the chat never got (the
+    tick was down) was never before him and stays out of his history, as it always did (the doc's map says "slot
+    states" here; this keeps the chat install's history as the tests pin it, and is the same line `standing` draws:
+    slots he saw). A derived slot counts only from its practice's first record in the ledger on, so a newly added
+    practice, or the days before the ledger kept anything, read as nothing rather than as a row of misses; a no-chat
+    install's history therefore starts at his first answer of each practice.
+  - **`standing.unanswered`** counts delivered prompts and face-made records (`opened_via`); a backfilled record and
+    a failed send's record are not counted (as before). `her_messages` stays delivered-only.
+  - **`channel.platform: none`** is `Config.has_channel` false: `send_due` returns before writing anything (a
+    `journal send` logs one line, exit 0), and annotation replies, reflection sends, program summaries and their
+    retries, program notes and `cli._notify` attempt nothing; status shows no *undelivered* or reply rows; doctor's
+    channel row is ok. `Config.channel()` with `none` is `NoChannel` (a send that slipped through fails loudly).
+    **Left open** (decided since: *Owner's decisions 2026-11-09*, 3, below): an annotation or reflection written
+    while there was no chat stays unsent; if a chat is configured later, the tick sends the backlog (annotation
+    replies and reflections have no age limit).
+  - **Rules 9 and 10 key on a face's `via`** (`capture.by_face`: `web`, `cli`, `mcp`), not on a missing
+    `platform_message_id` (rule 9's parenthesis) or on any `via` (rule 10's "Fix"): chat captures without a message
+    id exist (a gateway event with none, the conversation writer's notes) and so do the sweep's and the writer's own
+    `via`s, and those keep reading as before (review round 1). Face captures get no alignment text and are not legacy
+    chat captures, which is what the doc's two rules are for.
+  - **Engine alone:** `agent.is_failure_text` holds Hermes' failure copy itself (the adapter re-exports it), and
+    `status.serve_rows` answers one row when `serve/` is not installed; a test runs `today`, `status`, `doctor` and
+    `tick` from a copy of the package without `hermes/`, `serve/` and `mcp/`.
+  - **Built against the doc as merged (#16, `c7ab632`).** Step 3 of `resolve` also takes a later slot whose only
+    record is a failed send's (no delivery, no captures), and `actions.answer` fills that record in; choosing a
+    practice again after an answer fills the next slot that fits (a 09:30 answer, then `/start water` or words at
+    10:00, take the unrecorded 15:00 slot, and the tick skips its send) before any extra entry.
+  - **"A second write staying with its slot on a multi-slot practice"** (the doc's test list) is read through its
+    paragraph *Adding more words to an entry already written goes through that entry*: more words for a slot already
+    answered go through the entry (the web app's `POST …/blocks` today, `journal write --entry` in OPEN-FACES), and
+    `actions.answer`, which is "choosing the practice", fills the next slot that fits. So OPEN-CORE has no entry-level
+    write in `actions`; the two sentences of the doc only agree read this way.
+  - **Tests changed.** `tests/test_serve.py`'s `GET /today` equality maps a *due* row to *upcoming* before comparing
+    with `today.collect` (the served mapping above), and `tests/fixtures/api/today.json` gains the 06:00 morning row,
+    *due* at 09:12 and served *upcoming*. `tests/fixtures/today.json` (the block's fixture) does not change, unlike
+    the doc's test list expects: its fixed day has neither a due slot nor a face answer, and the new lines are pinned
+    in `tests/test_open_readers.py`. No other existing test changed: the pre-send check holds the opener's pack back
+    through a context variable in `tick` rather than a new `_opener` parameter, so the tests that stand in for
+    `_opener` with its five-argument signature keep working.
+  - **Left for OPEN-PROGRAMS:** with `channel.platform: none`, a program phase (`programs._send_phase`) and an
+    interrupt still go to the channel, which refuses them, so they count and alert as before. The doc puts phases
+    and interrupts with no chat in package 4. Until then a no-chat install should not start a program run: its
+    first phase would fail and alert as on any install whose channel refuses a send.
+  - **Review round 1** (an independent Opus pass over the branch): no blocker, no privacy leak. Fixed, each in its
+    own commit naming it: slots before `day_ends_at` resolved by calendar date (major); an extra entry taking another
+    practice's id; a deliberate send attaching when he answered during its opener; the engine-only test not
+    exercising `agent.is_failure_text`; the no-chat tests passing with the guards off; rules 9 and 10 catching chat
+    captures; `actions` accepting a naive or future time; docs overstating rule 6. **Declined, left open for the
+    owner** (decided since: *Owner's decisions 2026-11-09*, 1, below): in the small hours the journal day sends practices back to yesterday, also a morning practice: at 03:30
+    words for *morning* go to yesterday's missed morning (step 2), and `/start morning` re-sends yesterday's
+    delivered morning while today's 06:00 still goes out (on `main` it delivered today's). That is the doc's rule as
+    written (steps 2–4 on the journal day; `/start` through `resolve`); a practice-level "my day starts here" would
+    be a doc change, not this package's. Nits declined: on a no-chat install `status` still says reflections are
+    "written, not sent" (true, and harmless); `failure_target` reads `none:<id>` when a chat id is set beside
+    platform `none` (nothing is sent to it); a deliberate re-send of yesterday's slot carries today's date in its
+    header, as a re-send always did.
+  - **Review round 2** (a second independent Opus pass): no blocker, no privacy leak, the round-1 fixes hold. Fixed:
+    a deliberate send answered *in the chat* during its opener re-sent onto that prompt (now it resolves again, as for
+    a face); `her_messages` after a lost race named the face's plain opener instead of the one the chat message has;
+    `capture.by_face` raised on a damaged `via`; a slot was put on a journal day by its delivery time, so a late tick
+    could move it (now by its scheduled time); the today block called a slot the chat never got "missed" with no
+    word that it was never sent (now `<id> at HH:MM, not sent to the chat (missed)`); DEPLOY's first check named a
+    log line an answered slot does not write. **Left open for the owner** (decided since: *Owner's decisions 2026-11-09*, 2, below: as built): a practice scheduled between midnight and
+    `day_ends_at` (say *night* at 00:30) done in the daytime fills *tonight's* slot, whose id and entry are dated
+    tomorrow (`2026-10-16-night` on the 15th), and the tick then skips that send; on `main` a `/start night` at 09:00
+    re-sent the 15th's. This is the doc's journal day applied as written (an evening chosen at 15:00 fills tonight's
+    evening), and `tests/test_open_slots.py` pins it; none of the built-ins is scheduled before 04:00. Today's rows
+    stay by calendar date, so that 15th row reads missed while the words wait in the 16th's slot. If the owner wants
+    such a practice's daytime words in last night's slot instead, step 2 would also take the missed slots of `at`'s
+    calendar date: a doc change.
+- **Owner's decisions 2026-11-09 (OPEN-PROMPTS)** — the owner's answers to the points the OPEN-CORE reviews left
+  open, and to three more from OPEN-FACES and OPEN-PROGRAMS (PRs #27–#30). Applied where they need code; 5 and 6 are
+  recorded only.
+  1. **A deliberate delivery before `day_ends_at` takes today's calendar date** (`/start <id>`, `journal send <id>`,
+     the web's *Send to chat*). Words he writes before `day_ends_at` still count toward the previous journal day (an
+     evening answered at 00:30 fills last night's evening). So at 03:30 `/start morning` delivers today's morning (its
+     06:00 slot, early: step 3), and the tick's 06:00 send is then done. Built as `slots._by_calendar`: with
+     `delivery=True` and `at` before `day_ends_at`, `resolve`'s steps run over today's calendar date only (a due or
+     open slot; the newest missed; the next later one with no record or a failed send's; an extra entry dated today).
+     **Read to the letter** this sent tonight's evening early for `/start evening` at 00:30; amended 2026-11-10 to
+     the nearest slot (*Decision 1's evening case*, under 3 below). Faces never pass `delivery=True`, so a face write cannot move by this, and a delivery
+     stays the only thing that makes a chat boundary. Tests: `tests/test_open_slots.py`
+     (`a_delivery_before_day_ends_at…`, `…after_day_ends_at…`), `tests/test_open_core.py`
+     (`start_before_day_ends_at…`).
+  2. **No change:** a practice slotted before `day_ends_at`, done in the daytime, fills tonight's slot, as built and
+     pinned (`test_the_night_practice_done_in_the_day_fills_tonights_slot`).
+  3. **No chat: annotation replies and reflection sends are skipped, not left pending.** With `channel.platform:
+     none`, each that would have been sent is marked `skipped: "no chat"` (`annotation_reply` and the reflection's
+     `telegram` record, with `skipped_at`), so a chat configured later never sends it, as OPEN-PROGRAMS does for a
+     summary (`summary_unsent: "no chat"`). A reply is marked whatever `telegram.annotation_replies` says, so
+     turning replies on with a chat later sends no backlog. `status` lists no skipped reply as pending and reads a
+     skipped reflection "written, not sent: no chat". Instead the companion is told: `standing.collect` gains
+     `no_chat`, the count of annotations and reflections written (by `annotated_at` / `written_at`) after the last
+     prompt delivered before the newest skip, and the pack's *Where things stand* and the today block's standing
+     lines carry one line, e.g. "While there was no chat: 12 annotations and 3 reflections were written; they are in
+     the entries, never sent to the chat." Counts only, never their words. A reply still owed from before the chat
+     was set to none is skipped too but not counted (it was written with a chat). Once the chat delivers again the
+     line stays a day (`standing.NO_CHAT_SHOWN`), so a plain opener's delivery does not take it away before an
+     opener's pack or the first thread's today block has carried it. MCP's `journal_today`
+     does not get it: its today text does not take standing (`today.collect` without `with_standing`), so nothing
+     there changed. Tests: `NoChannelTest` in `tests/test_open_core.py` (nothing pending or sent after a chat is set;
+     the line in standing, the pack and the today lines, with no word of the annotation or reflection).
+     **Decision 1's evening case (2026-11-10).** Read to the letter, decision 1 also covered a practice that closes
+     the day: at 00:30, `/start evening` delivered tonight's evening early, the tick's 23:00 send was then done, and
+     the day's reflection was written from words meant for last night. The owner's example was a morning, and he was
+     asked "nearest slot, or always today?" without answering before the work changed hands; the orchestrator took
+     nearest, which keeps his 03:30 morning and is the smaller surprise at 00:30. He can still say "always today":
+     it is one condition in `slots.resolve`. The rule: before `day_ends_at`, a deliberate delivery takes today's
+     calendar date unless the practice's scheduled slot nearest to now belongs to the journal day before
+     (`slots._last_night_is_nearer`); then it resolves as words do (last night's slot while it is due, open or
+     missed; an extra entry of last night once it is answered). A tie, a slot that is both, and a practice with no
+     schedule are today's; with no slot on today's date, last night's counts when under twelve hours behind. The
+     rule is not evening-only: a 13:00 practice started at 00:30 is yesterday's, as its words then would be. A
+     delivery of last night's slot after midnight is headed with today's date (declined for re-sends above; the
+     same here). Tests: the four `test_a_delivery_before_day_ends_at_…` cases after the 03:30 one in
+     `tests/test_open_slots.py`.
+  4. **`enabled: false` means "not scheduled" only.** Every face can still open, write and deliver a disabled
+     practice (the web app, `journal open`/`journal write`, MCP, `/start` and `journal send`); the schedule never
+     sends it. Applied on OPEN-FACES (#28), recorded there.
+  5. **A program started with no chat sends nothing when a chat is configured later;** the owner resumes it with
+     `/start` (as built in OPEN-PROGRAMS, #29). Recorded only.
+  6. **The PWA control for answering an interrupt** comes as a small separate package after #28 and #29 merge.
+     Recorded only.

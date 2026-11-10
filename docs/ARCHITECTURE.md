@@ -94,6 +94,11 @@ src/journal/
   hookstate.py        NEW  pending voice / pending pack / off-record turns, persisted under ledger.locked_state
   questions.py        (removed in WP13: the goldens and tools ask the Practice)
   schedule.py         due() over every scheduled practice + runs' one-off scheduled steps
+  slots.py            NEW  slot states (upcoming, due, open, answered, missed) from the schedule and the ledger; the
+                           journal day (`windows.day_ends_at`); resolve(): which slot words or a deliberate send go to
+                           (OPEN-PROMPTS)
+  actions.py          NEW  his words from a face: answer() into the slot resolve() gives, note(); the refusals (`/x`,
+                           marker lines, the transcript placeholder) for every face; never a chat boundary
   capture.py, entries.py, compose.py, prompts.py, validate.py, reflect.py   keyed by Practice, not `kind in KINDS`
   privacy.py, conversations.py, sweep.py, recovery.py, context.py, mirror.py   consume ports.Row via cfg.transcript()
   agent.py            ask() facade + CommandCompanion (argv template); raises AgentUnavailable
@@ -291,7 +296,8 @@ New keys (all names generic; a deployment's overlay supplies its values):
 | `serve.socket` | none | A Unix socket served as well as TCP (0600), for `tailscale serve … unix:<path>` (TSAUTH). |
 | `serve.tailscale_users` | `[]` | Logins signed in by `Tailscale-User-Login` on the socket only, from tailscaled (root peer) only, for a client that is not this host and not marked cross-site (TSAUTH). |
 | `adapter` | `auto` | `hermes` / `none` / `plainchat`; auto = hermes when `hermes_home` is set. |
-| `channel.platform`, `channel.chat_id`, `channel.user_ids` | `telegram`, `telegram.chat_id`, `[]` | The journal's chat (CHANNELS): any Hermes gateway platform, the chat as Hermes names it, and his ids there (empty: the chat is his, as a DM is). |
+| `channel.platform`, `channel.chat_id`, `channel.user_ids` | `telegram`, `telegram.chat_id`, `[]` | The journal's chat (CHANNELS): any Hermes gateway platform, the chat as Hermes names it, and his ids there (empty: the chat is his, as a DM is). `channel.platform: none` is a journal with no chat (OPEN-PROMPTS rule 6, `Config.has_channel`): prompts, annotation replies, reflections, program summaries and notes are not sent, attempted, counted or alerted; slots go upcoming → due → missed by derivation. Program phases and interrupts still go to the channel (refused, counted, alerted) until OPEN-PROGRAMS. An empty chat id on any other platform still fails and alerts. |
+| `windows.day_ends_at` | `04:00` | The journal day (`slots.journal_day`): words written before it belong to the day before, so an evening answered at 00:30 takes last night's slot; a deliberate send before it takes today's calendar date (`/start morning` at 03:30 delivers today's morning) unless the practice's nearest scheduled slot is last night's (`/start evening` at 00:30). An unusable value is 04:00, and doctor names it. |
 
 Storage, by owner:
 
@@ -315,6 +321,12 @@ Four processes may touch the journal; locks and order are fixed:
 | Tick (`journal tick`, every 5 min, fresh process) | send → privacy → sweep → conversations → programs → fold → audio → annotate → reply → reflect → recover → mirror → cache → prune → notebook | `tick.lock` (non-blocking: skips the round if held), then `ledger.locked` per write |
 | Spawned one-shots (`journal send <id>`, `journal program <action> <run>`) | one send or one program transition | `tick.lock` blocking, then `ledger.locked` |
 | `journal serve` (long-running, user unit) | reads; small locked writes; spawns for anything that sends | `ledger.locked` / `locked_state` for writes; **never** `tick.lock` |
+
+His words from a face (`actions.answer`, `actions.note`) are one `ledger.locked` call each: the slot is resolved, its
+record made or filled in, and the capture written under the same lock, never under `tick.lock`. The tick's scheduled
+send re-reads its record under `ledger.locked` just before `chat.send` (OPEN-PROMPTS rule 2), so a face answer made
+during the opener's model call stops the send; one made between that check and the send attaches the delivery to the
+face's record (rule 3) instead of overwriting it.
 
 Lock order is always `tick.lock` → `ledger.lock` → `<state>.lock`; no process takes them in another order
 (`tests/test_locks.py` runs a hook write, a tick and a serve write concurrently in-process and asserts no
