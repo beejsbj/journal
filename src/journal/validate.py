@@ -267,12 +267,16 @@ def quotes(text: str) -> list[str]:
     return [inner for _, _, inner in pairs] + [said for _, _, said in _blockquotes(text or "") if said]
 
 
-def _misquote(text: str, corpus: str) -> str | None:
+def _misquote(text: str, corpus: str, source: str) -> str | None:
     """The first problem with what ``text`` quotes, checked as a reflection's quotes are (``unfound``) against its one
-    source ``corpus`` (his messages, his answers, the compiled document): an irregular double quote mark, or a quoted
-    passage that is not there. None: there is none."""
+    source ``corpus`` (his messages, his answers, the compiled document), as a reason: an irregular double quote mark
+    (in numbers only: the mark and where it stands, ``place``), or ``quote not in <source>:`` with the start of the
+    quoted passage that is not there, as before. None: there is none."""
     bad = unfound(text, [corpus])
-    return bad[0][2][:60] if bad else None
+    if not bad:
+        return None
+    what = bad[0][2]
+    return what if what.startswith("irregular") else f"quote not in {source}: {what[:60]!r}"
 
 
 def _patterns(q: str) -> list[re.Pattern]:
@@ -327,15 +331,26 @@ def unfound(text: str, docs: list[str], wider=None) -> list[tuple[int, int, str]
 
     pairs, odd = _scan(text)
     blocks = _blockquotes(text)
-    out = [(i, i + 1, f"irregular quote mark {text[i]!r}: {_around(text, i)}") for i in odd]
+    out = [(i, i + 1, f"irregular quote mark U+{ord(text[i]):04X} at {place(text, i)}") for i in odd]
     out += [(a, b, inner) for a, b, inner in pairs if not found(inner)]
     out += [(a, b, said or "(an empty blockquote)") for a, b, said in blocks if not said or not found(said)]
     return sorted(out)
 
 
-def _around(text: str, i: int) -> str:
-    """A few words either side of ``text[i]``, on one line (for a log line)."""
-    return " ".join(text[max(0, i - 24):i + 24].split())
+def place(text: str, start: int, end: int | None = None) -> str:
+    """Where ``text[start:end]`` stands, in numbers only: ``character 412 (line 3)``, and its length when ``end`` is
+    given. What a log line, a ledger record or an alert may say of a rejected text: never its words, which may be
+    his."""
+    at = f"character {start + 1} (line {text.count(chr(10), 0, start) + 1})"
+    return at if end is None else f"{at}, {end - start} characters long"
+
+
+def problem(text: str, bad: tuple[int, int, str]) -> str:
+    """One finding of ``unfound`` in numbers only, for a log line, a ledger record's ``error`` or an alert: an
+    irregular mark is said that way already; a quotation that is not his is named by where it stands and how long
+    it is."""
+    start, end, what = bad
+    return what if what.startswith("irregular") else f"a quote not in his words at {place(text, start, end)}"
 
 
 def check_reflection(kind: str, text: str | None, corpus: str, misquotes: bool = True) -> tuple[bool, str]:
@@ -349,9 +364,9 @@ def check_reflection(kind: str, text: str | None, corpus: str, misquotes: bool =
     limit = REFLECTION_LIMITS[kind]
     if len(text) > limit:
         return False, f"too long ({len(text)} > {limit})"
-    bad = _misquote(text, corpus) if misquotes else None
+    bad = _misquote(text, corpus, "the entries") if misquotes else None
     if bad is not None:
-        return False, f"quote not in the entries: {bad!r}"
+        return False, bad
     return True, "ok"
 
 
@@ -374,9 +389,9 @@ def check_catchup(text: str | None, corpus: str) -> tuple[bool, str]:
     m = _TECHNICAL.search(text)
     if m and m.group(0).lower() not in _plain(corpus).split():
         return False, f"technical detail ({m.group(0)!r})"
-    bad = _misquote(text, corpus)
+    bad = _misquote(text, corpus, "his messages")
     if bad is not None:
-        return False, f"quote not in his messages: {bad!r}"
+        return False, bad
     return True, "ok"
 
 
@@ -398,9 +413,9 @@ def check_reflect_phase(text: str | None, answers: str) -> tuple[bool, str]:
         return False, "agent error text"
     if len(text) > REFLECT_PHASE_LIMIT:
         return False, f"too long ({len(text)} > {REFLECT_PHASE_LIMIT})"
-    bad = _misquote(text, answers)
+    bad = _misquote(text, answers, "his answers")
     if bad is not None:
-        return False, f"quote not in his answers: {bad!r}"
+        return False, bad
     return True, "ok"
 
 
@@ -417,7 +432,7 @@ def check_bridge(text: str | None, last_answer: str) -> tuple[bool, str]:
         return False, f"too long ({len(text)} > {BRIDGE_LIMIT})"
     if "?" in text:
         return False, "asks a question"
-    bad = _misquote(text, last_answer)
+    bad = _misquote(text, last_answer, "his answer")
     if bad is not None:
-        return False, f"quote not in his answer: {bad!r}"
+        return False, bad
     return True, "ok"

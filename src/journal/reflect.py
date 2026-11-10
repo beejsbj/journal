@@ -480,14 +480,16 @@ def write_one(cfg: Config, kind: str, end: date, trigger: str, now: datetime,
             return _outage(cfg, rid, kind, end, now, str(e), log), True
         raw, timed_out = None, str(e)  # a long run, not an outage: the model answered another step in this tick
     text, followups = notebook.split_followups(raw or "")
-    ok, reason = False, timed_out or "agent failed"
+    ok, reason, rejected = False, timed_out or "agent failed", None
     if raw:
         ok, reason = validate.check_reflection(kind, text, "", misquotes=False)
         bad = validate.unfound(text, [entries.his_text(p) for p in mine] + his_replies,
                                lambda: search.his_texts(cfg)) if ok else []
         if bad:  # a bad answer, retried; one that never passes is never written
-            what = bad[0][2]
-            ok, reason = False, (what[:80] if what.startswith("irregular") else f"quote not in his words: {what[:60]!r}")
+            # (the reason is in numbers only: it goes to the tick's output, ``error`` and the alert, which leave the
+            # state dir. The start of a quote that was not his stays in the ledger alone, as main kept it there.)
+            ok, reason = False, validate.problem(text, bad[0])
+            rejected = None if bad[0][2].startswith("irregular") else bad[0][2][:60]
     path = None
     if ok:
         path = _target(cfg, kind, end)
@@ -502,11 +504,14 @@ def write_one(cfg: Config, kind: str, end: date, trigger: str, now: datetime,
             recs.append(rec)
         rec["attempts"] = rec.get("attempts", 0) + 1
         outage.clear(rec)  # the model answered, well or badly
+        rec.pop("rejected_quote", None)
         if ok:
             rec.update(written_at=now.isoformat(), path=str(path), trigger=trigger)
             rec.pop("error", None)
         else:
             rec["error"] = reason[:300]
+            if rejected:
+                rec["rejected_quote"] = rejected  # (shown nowhere: ``status`` and the web app read ``error``)
         attempts = rec["attempts"]
     if ok:
         log.append(f"wrote {path.name} ({trigger})" + (f" (+{len(followups)} notebook)" if followups else "")

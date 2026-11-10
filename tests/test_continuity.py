@@ -15,8 +15,8 @@ import test_conversations
 from helpers import CHAT, add_prompt, make_cfg
 from test_reflect import GOOD, IST, Base
 
-from journal import (agent, capture, conversations, entries, hookstate, ledger, notebook, prompts, reflect, sweep,
-                     tools, validate)
+from journal import (agent, capture, conversations, entries, hookstate, ledger, notebook, prompts, reflect, status,
+                     sweep, tools, validate)
 
 tc_m = test_conversations.m
 
@@ -178,8 +178,43 @@ class QuotesTest(Earlier):
     def test_an_invented_quote_is_retried_and_never_written(self):
         self.evening()
         log = self.never_written(GOOD.replace("rain all day, walked anyway", "I miss the lake house"))
-        self.assertIn("2026-10-14-reflection: reflection attempt 3/3 failed (quote not in his words: "
-                      "'I miss the lake house')", log)
+        self.assertIn("2026-10-14-reflection: reflection attempt 3/3 failed (a quote not in his words at character "
+                      "96 (line 3), 23 characters long)", log)
+
+    def test_a_rejection_is_said_in_numbers_never_in_the_reflections_words(self):
+        # (review, 2026-11-10: the tick's output and the alert leave the state dir, and ``error`` is what ``journal
+        # status`` and the web app show; a rejected reflection's text, which may be his words, goes to none of them)
+        self.evening()
+        for answer, reason in (
+                (GOOD.replace("That reads as patience held lightly (inference).",
+                              "You said the soup was good” and meant it."),
+                 "irregular quote mark U+201D at character 216 (line 3)"),
+                (GOOD.replace("rain all day, walked anyway", "I miss the lake house"),
+                 "a quote not in his words at character 96 (line 3), 23 characters long")):
+            with self.subTest(reason):
+                with ledger.locked(self.cfg.ledger_path) as data:
+                    data["reflections"] = []
+                self.answer = answer
+                said = []
+                for minute in (45, 50, 55):
+                    alerts, log = self.tick(minute)
+                    said += alerts + log
+                rec = self.rec("2026-10-14-reflection")
+                self.assertEqual(rec["error"], reason)
+                self.assertEqual(alerts, [f"2026-10-14-reflection was not written after 3 attempts: {reason}"])
+                shown = str(status.status(self.cfg, datetime(2026, 10, 14, 23, 56, tzinfo=IST), web=True)["reflections"])
+                self.assertIn(reason, shown)
+                for line in [*said, shown]:
+                    for words in ("lake house", "soup", "meant it", "rain all day"):
+                        self.assertNotIn(words, line)
+                # the start of a quote that was not his stays in the ledger alone (as main kept it), shown nowhere
+                self.assertEqual(rec.get("rejected_quote"), "I miss the lake house" if "not in his" in reason else None)
+        with ledger.locked(self.cfg.ledger_path) as data:
+            data["reflections"] = [dict(rec, attempts=1)]  # (attempts used up are not tried again: one left here)
+        self.answer = GOOD
+        _, log = self.tick(59)
+        self.assertIn("wrote 2026-10-14-reflection.md (annotated) (+1 notebook)", log)
+        self.assertNotIn("rejected_quote", self.rec("2026-10-14-reflection"))  # gone once a reflection is written
 
     def test_his_words_reached_through_search_keep_their_marks(self):
         add_prompt(self.cfg, kind="evening", local_date="2026-09-20",
@@ -213,7 +248,8 @@ class QuotesTest(Earlier):
                     data["reflections"] = [r for r in data.get("reflections") or [] if r["id"] != "2026-10-14-reflection"]
                 self.answer = GOOD.replace("rain all day, walked anyway", quote)
                 _, log = self.tick(45)
-                self.assertTrue(any("failed (quote not in his words:" in l for l in log), log)
+                self.assertTrue(any("failed (a quote not in his words at character" in l for l in log), log)
+                self.assertEqual(self.rec("2026-10-14-reflection")["rejected_quote"], quote)
                 self.assertFalse((self.cfg.root / "2026-10-14-reflection.md").exists())
 
     def test_a_quote_stitched_from_several_entries_is_not_his(self):
@@ -224,8 +260,8 @@ class QuotesTest(Earlier):
         self.evening()
         self.answer = GOOD.replace("rain all day, walked anyway", "I want … to quit … the bus can wait")
         _, log = self.tick(45)
-        self.assertTrue(any("failed (quote not in his words: 'I want … to quit … the bus can wait')" in l
-                            for l in log), log)
+        self.assertTrue(any("failed (a quote not in his words at character" in l for l in log), log)
+        self.assertEqual(self.rec("2026-10-14-reflection")["rejected_quote"], "I want … to quit … the bus can wait")
 
     def test_a_blockquote_line_that_is_not_his_is_a_bad_answer(self):
         self.evening()
@@ -445,7 +481,7 @@ class QuoteCheckTest(unittest.TestCase):
                                                 "No, and then I left. I loved some of it")[0])
         ok, why = validate.check_catchup("You wrote ˮI adore napsˮ and slept. Glad you rested.", "I adore naps")
         self.assertFalse(ok)
-        self.assertIn("irregular quote mark 'ˮ'", why)
+        self.assertEqual(why, "irregular quote mark U+02EE at character 11 (line 1)")  # the mark and where, no words
 
 
 class ReplyThroughConversationsTest(test_conversations.Base):
