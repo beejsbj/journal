@@ -5,9 +5,12 @@
   transition: background var(--d-1);
 }
 .entry-row:hover { background: var(--raised); }
-.entry-row .row-top { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.entry-row .row-top { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .entry-row .title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 550 var(--t-ui) / 1.3 var(--f-ui); }
-.entry-row time { margin-left: auto; flex: none; font: 400 var(--t-small) / 1 var(--f-ui); color: var(--text-3); }
+/* the time leads the line, with the day's numeral beside it: date and time in one place (the owner's rule) */
+.entry-row time { flex: none; font: 400 var(--t-small) / 1 var(--f-ui); font-variant-numeric: tabular-nums; color: var(--text-3); }
+.entry-row time::after { content: "·"; margin-left: 10px; opacity: 0.6; }
+.entry-row .marks { align-self: center; opacity: 0.8; }
 .entry-row .first-line {
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 4px;
   font: 400 18px / 1.45 var(--f-his); color: var(--text-2); text-wrap: pretty;

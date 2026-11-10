@@ -44,7 +44,8 @@ export function Marks({ entry }: { entry: EntrySummary }) {
 }
 
 /**
- * One entry in the list: the practice's name and the time, quiet, on a line with its marks; then his first line, the
+ * One entry in the list: the time and the practice's name, quiet, on one line ("21:38 · Daily gratitude"; the time
+ * stays with the date, the day's numeral beside it, never at the row's far end), then its marks; then his first line, the
  * line that matters, in the book's roman (two lines at most, the search's hits marked); then the moods and people he
  * set, as words. No emoji, no pills.
  */
@@ -56,9 +57,9 @@ export function EntryRow({ entry, q = "", i = 0, vt }: { entry: EntrySummary; q?
     <a class={["entry-row", "rise", note && "note"].filter(Boolean).join(" ")} href={`/entries/${entry.stem}`} data-vt={vt}
       style={{ "--i": Math.min(i, 14) }}>
       <span class="row-top">
+        {entry.time && <time>{entry.time}</time>}
         <span class="title">{title}</span>
         <Marks entry={entry} />
-        {entry.time && <time>{entry.time}</time>}
       </span>
       <span class="first-line">{marked(entry.first_line || "…", q)}</span>
       {tags.length > 0 && <span class="row-tags">{tags.join(" · ")}</span>}

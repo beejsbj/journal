@@ -5,15 +5,8 @@
 
 /* ---------- the panes (wide screens) ---------- */
 @media (min-width: 761px) {
-  /* the list page and the side pane are one view: the shell's pane gives up its name while the route lays panes, so the
-     side pane can take it ("page") and the list morphs into the sidebar */
-  .shell[data-stage="panes"] .main-pane { view-transition-name: none; }
-  /* the offline ribbon floats over the panes instead of taking a column of its own */
-  .shell[data-stage="panes"] .main-pane > .ribbon {
-    position: absolute; z-index: var(--z-pop); top: 18px; left: 50%; transform: translateX(-50%); border-radius: var(--r-pill);
-    box-shadow: var(--elev-pop);
-  }
-
+  /* the side pane takes the view-transition name "page" (the shell's pane gives it up while a route lays panes:
+     shell.css), so the list morphs into the sidebar */
   .side-pane { flex: none; width: var(--side-list); background: color-mix(in oklab, var(--raised) 70%, var(--pane)); box-shadow: none; }
   .side-pane.rail { width: var(--side-rail); }
   .entry-pane { flex: 1; }
@@ -175,7 +168,22 @@
     background: var(--pane);
   }
   .add .composer { margin-top: 0; }
-  .add .composer textarea { min-height: var(--tap); height: 3.4rem; resize: none; }
+  .add .composer textarea { min-height: var(--tap); height: 5.5rem; resize: none; }   /* opens at once: mobile.spec measures it on the tap */
   .add .composer:focus-within textarea { height: min(30vh, 10rem); }
   .readings { margin-top: var(--s7); }
+
+  /* At rest the box is one quiet line ("Add more, in your own words" and a mic), so it never covers his words. It is
+     the whole composer again the moment it is used: focused, holding words or a recording, recording, offline, or
+     saying something (an error, words kept from another box). Composer itself is unchanged: this reads its state
+     from the page (the textarea's placeholder shows only while it is empty). Without :has() the box stays whole. */
+  .entry-doc > .add:not(:focus-within):has(.composer textarea:placeholder-shown):not(:has(.clip, .error-line, .composer-kept, .offline-note, .recording)) { padding-top: 4px; padding-bottom: 4px; }
+  .entry-doc > .add:not(:focus-within):has(.composer textarea:placeholder-shown):not(:has(.clip, .error-line, .composer-kept, .offline-note, .recording)) .composer { display: flex; align-items: center; gap: var(--s2); }
+  .entry-doc > .add:not(:focus-within):has(.composer textarea:placeholder-shown):not(:has(.clip, .error-line, .composer-kept, .offline-note, .recording)) .composer textarea {
+    flex: 1; height: var(--tap); padding: 11px 0; border: 0; box-shadow: none; overflow: hidden; white-space: nowrap;
+  }
+  .entry-doc > .add:not(:focus-within):has(.composer textarea:placeholder-shown):not(:has(.clip, .error-line, .composer-kept, .offline-note, .recording)) .composer-actions { flex: none; }
+  .entry-doc > .add:not(:focus-within):has(.composer textarea:placeholder-shown):not(:has(.clip, .error-line, .composer-kept, .offline-note, .recording)) .composer-actions .button.primary, .entry-doc > .add:not(:focus-within):has(.composer textarea:placeholder-shown):not(:has(.clip, .error-line, .composer-kept, .offline-note, .recording)) .recorder .hint { display: none; }
+  .entry-doc > .add:not(:focus-within):has(.composer textarea:placeholder-shown):not(:has(.clip, .error-line, .composer-kept, .offline-note, .recording)) .recorder .button { width: var(--tap); padding: 0; gap: 0; font-size: 0; border-radius: 50%; }
+  .entry-doc > .add:not(:focus-within):has(.composer textarea:placeholder-shown):not(:has(.clip, .error-line, .composer-kept, .offline-note, .recording)) .recorder .button > svg { width: 20px; height: 20px; }
+
 }
