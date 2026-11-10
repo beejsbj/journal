@@ -5,10 +5,8 @@ which tools refuse in an off-the-record turn is ``journal.tools``.
 pre_gateway_dispatch  a message event becomes an ``inbound.Inbound``; the ``Outcome`` goes back as Hermes' dict
                       (``rewrite`` the text, ``skip`` a command the engine already ran, or None to pass).
 pre_llm_call          ``inbound.begin_turn`` writes the voice transcripts that arrived and marks an off-record turn;
-                      ``turncontext.build`` returns the notebook, pack / program block and today block to inject.
-                      In the engine's own one-shots (``agent.MODEL_STEP_ENV`` in their environment) nothing is
-                      injected; ``begin_turn`` still runs, so the switch can never cost a turn of his its
-                      off-the-record mark.
+                      ``turncontext.build`` returns the notebook, pack / program block and today block to inject
+                      (nothing in the engine's own one-shots, ``agent.MODEL_STEP_ENV``; ``begin_turn`` still runs).
 pre_tool_call         ``tools.refusal`` (a write in an off-record turn), then the guard.
 
 Every callback fails open for capture (a bug must never drop a message) and the guard fails open too (a bug must
@@ -114,9 +112,7 @@ def on_llm_call(user_message=None, platform=None, session_id=None, turn_id=None,
     turn = turncontext.Turn(platform=str(platform or ""), session_id=session_id, turn_id=turn_id,
                             user_message=user_message or "", at=datetime.now(timezone.utc),
                             chat_id=runtime.session_value("CHAT_ID"), user_id=runtime.session_value("USER_ID"))
-    # (before the model-step switch below: the voice transcripts and the off-the-record mark are his turn's, and a
-    # process that carries the variable by mistake must not lose them; a one-shot's CLI turn has neither)
-    inbound.begin_turn(cfg, turn, spawn=commands.spawn)
+    inbound.begin_turn(cfg, turn, spawn=commands.spawn)  # (first: the switch below must never cost a turn its /x mark)
     if os.environ.get(agent.MODEL_STEP_ENV) == "1":  # the engine's own one-shot (an opener, a reflection …): it
         return None  # sees only the query the engine wrote (no notebook, no pack, no today block)
     try:

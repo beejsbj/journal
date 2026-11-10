@@ -266,8 +266,8 @@ def quote_rule(cfg: Config, source: str, what: str) -> str:
             f'character, in straight double quotes "like this", on one line. Put nothing else in double quotes: not '
             f"words of your own (an earlier line of yours included), not a title or a name, not a term; say those "
             f"plainly. Use no other double quotation mark (curly, angle, corner) and no blockquotes. Every double "
-            f"quote mark is checked, and one that is not around {n.possessive} exact words means the {what} is not "
-            f"used.")
+            f"quote mark counts and every quote is checked: one that is not around {n.possessive} exact words means "
+            f"the {what} is not used.")
 
 
 def catchup_request(cfg: Config, rec: dict, window: str) -> str:

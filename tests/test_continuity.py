@@ -705,7 +705,8 @@ class VoiceTest(unittest.TestCase):
                 self.assertIn("Double quotation marks are only for his exact words from ", text)
                 self.assertIn("Put nothing else in double quotes: not words of your own (an earlier line of yours "
                               "included), not a title or a name, not a term", text)
-                self.assertIn(f"one that is not around his exact words means the {what} is not used.", text)
+                self.assertIn(f"every quote is checked: one that is not around his exact words means the {what} is "
+                              "not used.", text)
                 self.assertNotIn("thrown away", text)
         self.assertIn("from what Theo wrote below (his lines of the conversation and his messages after it)",
                       asks["message"])
