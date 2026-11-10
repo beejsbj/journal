@@ -162,6 +162,16 @@ class CatchUpTest(Base):
         self.assertEqual(self.recs()[0]["status"], "noted")
         self.assertIn("no usable reply after 3 attempts", self.mirror.calls[-1]["text"])
 
+    def test_her_own_lines_before_the_outage_are_not_his_words(self):
+        self.outage()
+        self.answers = ['Back now. "how was the drive?" was my last question; rough day, though?']  # her line
+        log = self.run_at(T0 + timedelta(hours=1))
+        self.assertEqual(log, ["outage-3: catch-up attempt 1/3 failed (quote not in his messages: 'how was the "
+                               "drive?')"])
+        self.answers = ['Back now. "hi, back home now" you said, then a rough day. How is it now?']  # his line
+        self.assertEqual(self.run_at(T0 + timedelta(hours=1, minutes=1)),
+                         ["sent the catch-up for outage-3 (2 unanswered message(s))"])
+
     def test_a_failed_send_retries_the_same_text(self):
         self.outage()
         self.bot.fail = 1

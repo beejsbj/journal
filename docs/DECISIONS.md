@@ -3513,3 +3513,170 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
      `/start` (as built in OPEN-PROGRAMS, #29). Recorded only.
   6. **The PWA control for answering an interrupt** comes as a small separate package after #28 and #29 merge.
      Recorded only.
+- **CONTINUITY (2026-11-09) — reflections read what came before, can search his entries, quote only his words, and
+  share one voice.** The owner found the day reflections and week reviews were not a continuous partner: they quoted
+  him at length and said little of their own. The writer saw one period's files plus a single earlier analysis, had
+  no tools, and lost the whole reflection on one misquote, so the safe answer was to stitch his quotes together and
+  hedge. The owner asked for this work on 2026-11-09 and had already turned per-entry annotation replies off in his
+  deployment, so the reflection is now the one analytical message of the day. Five review rounds shaped it (below:
+  replies, quotes, copies, the run budget); the quote machinery that tried to keep a reflection with a bad quote was
+  split out to #26.
+  - **Inputs (`reflect.continuity`).** Her last three day reflections within seven days plus the latest week review
+    of the six days before (a week review: the last two reviews within three weeks), oldest first. Three days show a
+    run (a habit forming, a thread dropped) without outweighing the day's own entries; two weeks show a trend without
+    turning a review into a history. Of each, only its opening paragraph and the question it left him (**To carry
+    forward**), 600 characters each: her whole earlier prose, often longer than the day's entries, invited her to echo
+    herself; the opening says where she stood and the question what she asked. Then what he wrote back to it in the
+    chat (three replies, 600 characters each), found two ways, as the conversation writer files them: a reply that
+    starts a thread becomes a note of its own whose capture records the analysis it answers (`answers`, set by
+    `conversations._Writer.new_note` with `answers_ours`' own test), and the note's words are his reply; a reply
+    inside a thread filed elsewhere is one of his blocks quoting that analysis. "None in the chat" is said as such,
+    since he may have taken it up in an entry instead.
+  - **The notebook into permanent files (a new path).** Only a thread the engine filed from a journal file reaches a
+    reflection (`notebook.on_record`): an annotation's or a reflection's `FOLLOW-UP:` line, which now carries
+    `origin` (`annotation`, `reflection`), with a `source` that names a file still in the journal folder. A thread
+    she adds in chat (`journal_notebook`) is **excluded, not passed through `privacy.py`**: the pass judges chat rows,
+    and an item is her paraphrase, written in a turn whose context may hold what was said off the record earlier in
+    the conversation, so no check can tell which of its words came from where. Exclusion fails closed. The tool has
+    no `origin` parameter, so a model cannot claim one; items written before this package have none and count as
+    hers from chat (they age out within `STALE_DAYS`, 21 days). Her chat turns and the opener pack keep the whole
+    notebook as before (Decision 2). The deploy moves the plugin pin before the CLI, so no process files an
+    on-the-record follow-up while its one-shots still get the whole notebook from the old hook (DEPLOY.md).
+  - **Found on the way: the journal's hook gave every one-shot the whole notebook.** Hermes fires `pre_llm_call` in
+    `hermes chat --oneshot` too (platform `cli`), and `turncontext.build` adds the notebook on every turn, so each
+    engine model step (opener, annotation, reflection, catch-up, a program's construction) got every open item,
+    chat ones included, appended to its query; `reflect.py` said the notebook was not an input, which did not hold
+    under Hermes. Every run `agent.CommandCompanion` starts now carries `JOURNAL_MODEL_STEP=1`, and
+    `hermes.hooks.on_llm_call` adds nothing to such a turn: a model step gets only what the engine wrote. The opener
+    loses only a duplicate (its pack holds the notebook); the other steps lose an input they were never meant to
+    have. Her own Hermes memory is outside this package (X-MEMORY, PR #21): the one-shots load it as before.
+  - **Search: a read-only tool, not a retrieval step.** `journal_search` (`search.py`, stdlib) searches his words in
+    the journal's dated files (`entries.his_text`, moved there from `context.py`: an entry's words section and his
+    conversation lines, a dated file of his own whole; never her annotations, notes, folded replies or analyses). It
+    never opens the chat transcript, a pack, the notebook or her memory, and writes nothing, so it is allowed in an
+    off-record turn like any read. It is registered in a toolset of its own, `journal_read` (`tools.READ_TOOLSET`):
+    Hermes resolves a plugin toolset by name, so the reflection's one-shot runs with `-t journal_read` and has that
+    tool and nothing that writes. A new plugin toolset is on in her chat too, even where the platform's toolsets were
+    saved, unless the last save already knew it and left it out (Hermes' `known_plugin_toolsets`); switching
+    `journal_read` off for the platform in `hermes tools` keeps search out of her chat and leaves the reflection's,
+    which `agent.disabled_toolsets` would not. Chosen over a deterministic keyword step because the model knows what
+    is worth looking up (a person, a phrase, "the last time"), where code would guess from word counts. Not added to
+    MCP: `journal_entries` already searches his words there.
+  - **A sync conflict's copy** (`2026-10-14-evening (1).md`, `… (1) (2).md`, `… 2.md`, a Dropbox `(… conflicted copy
+    …)`, a Syncthing `.sync-conflict-…`) is read as the file it copies (`entries.original_name`), by that name and its
+    own front matter (`entries._copy_text`): a copy of her analysis gives nothing, a copy laid out as an entry gives
+    the entry's words. Before, a copy had no name the engine knew and was read whole as his, opener and annotations
+    included. Files are still recognised by name and front matter together, so a hand-written file with an
+    analysis's front matter stays his, and so does one merely named like a copy (`2026-10-14-evening 3.md` with no
+    entry layout, `notes (1).md`, `2026-10-14 (draft).md`).
+  - **Only his words in quotation marks; a bad quote is a bad answer, as on main.** A day reflection's or week
+    review's quotes are checked against his words only: the period's entries (`entries.his_text`), his replies above,
+    and his words in every file of the journal (what search can reach, read only when needed); her earlier analyses,
+    notes, annotations and notebook never count, even when she was given them. Quotation is a straight `"…"` or curly
+    `“…”` pair on one line, closed by the next double quote mark on that line, its inside neither empty nor starting
+    or ending with a space, and a blockquote as Obsidian renders one (`_BLOCKQUOTE`: up to three spaces, perhaps a
+    list item's marker, then `>`, with the non-blank lines straight after it as lazy continuation), checked as one
+    passage. A quote with "…" must have its parts in one paragraph of one file, in order, each within 300 characters
+    of the one before; a part under three characters must be a whole word of his ("No" is not the end of "know").
+    **Every double quote mark outside such a pair is irregular**, as a class (`validate.quote_like`): `"` and `＂`,
+    anything Unicode names a double quotation mark (`“ ” „ ‟ « » ❝ ❞ 〝 〞 〟`), the double, triple and quadruple
+    primes (`″ ‴ ⁗ ‶ ‷ ʺ`), the double apostrophe `ˮ`, and the corner brackets CJK quotes with (`「 」 『 』`). A
+    quote that is not his, or an irregular mark, makes the answer a bad one: nothing is written and it is retried,
+    `ATTEMPTS` times, then alerted; **a reflection that never passes is not written**, exactly as on main. The prompt
+    asks for straight double quotes only, few short quotes, and no "you wrote" without a quote. The program checks
+    and the catch-up (`_misquote`) run the same check against their one source: every quote whatever its length,
+    "…" parts together, and any irregular double mark fails the text. The catch-up's source was his messages *and*
+    the conversation before the outage in both voices, so a line of hers passed as his; it is now his lines only.
+    **Split out (2026-11-09).** Four reviews in a row broke a "keep the reflection" design: unquoting (invented words
+    stayed as reported speech), dropping stray marks (`You wrote "X”` reached him as `You wrote X`), a denylist of
+    odd marks (18 shapes outside it), then a class rule with sentence striking and attribution markers (a striking
+    span that kept a middle sentence, markers satisfied by any quote in the sentence, homoglyphs such as `ˮ` and
+    `ʼ`, missed phrasings, and false positives on possessives, `'90s`, backticks and autolinks). The writer is a
+    cooperative model and the realistic risk, attribution in paraphrase, is semantic, so this package keeps main's
+    behaviour for a bad quote with the checks above, and drops striking, unquoting and the attribution rule.
+    **Open (#26):** paraphrase is not policed (a sentence that says he wrote something, without quotation marks);
+    single quotes, backticks and HTML used as quotation are not judged; and a reflection with a bad quote is still
+    lost once its attempts run out. #26 records what the four reviews found and proposes a semantic check (a small
+    model asked whether a sentence attributes words or claims to him that his words do not hold) instead of more
+    patterns. **Not flagged here, on purpose:** single quotes, apostrophes and possessives (`the kids’ room`,
+    `'90s`, `'cause`), backticks, autolinks and HTML, since a false positive now costs the whole reflection. Tests
+    changed on purpose: `test_reflect.py`'s invented-quote test (a bad answer is now one that is not prose; the
+    invented quote is `test_continuity.py`'s), `test_outage.py`'s bad answer, and two `test_conversations.py` tests
+    that now read the corpus as `entries.his_text`.
+  - **A long run is not an outage.** The reflection's budget is 480 s (annotations 180, openers 240), since it may
+    search first; the tick waits for it. A run that still times out after another model step answered in the same
+    tick uses an attempt, instead of being deferred as "model unreachable" and stopping the tick's other analyses;
+    with no other answer in the tick it is treated as an outage, as before. After a timeout was deferred that way,
+    the next try runs without the search and on the old 300 s budget (`reflect.RETRY_BUDGET`): a hang of the search's
+    own then clears, and the tick is held for at most 360 s a try instead of 540 s. **Still open:** a hang specific to
+    the reflection that is not the search's (the model hangs on this prompt alone) is labelled "model unreachable" and
+    holds the tick for up to 360 s every 30 minutes for up to 7 days, as any outage does; telling it from a real
+    outage would need a second, cheap model call on each deferral.
+  - **One voice (`prompts.voice`).** One description of how she writes, carried by the opener, annotation, day
+    reflection and week review requests; each keeps its own form (the annotation: about him in the third person, her
+    reading in the first). It asks for her own reading in the first person, positions taken, doubt said once in
+    plain words, and names the stock hedges as things not to write; "mark inference as inference" is gone from the
+    four. The reflection asks for **What I notice**, **What moved** and **To carry forward** (the today block and the
+    web app read only the last), at most three short quotes, no retelling, and the search. The four
+    `opener_request` goldens were regenerated for the voice line; no built-in practice file changed.
+  - **Transcription guesses** belong in the entry file, never in a chat message: an annotation may note an obvious
+    mis-hearing once only when annotations stay in the file (`telegram.annotation_replies: false`); otherwise, and
+    always in a reflection, she reads past it.
+  - **Review fixes (2026-11-10).** An independent review of this branch merged with main (OPEN-CORE, OPEN-FACES,
+    OPEN-PROGRAMS, OPEN-PUSH) found nothing blocking and seven smaller things; this is how each was settled. Where a
+    bullet above says otherwise, this one holds. (1) *The model-step switch skips only the injection.*
+    `hooks.on_llm_call` returned on `JOURNAL_MODEL_STEP=1` before `inbound.begin_turn`. Harmless in a one-shot (a CLI
+    turn has no voice note and no mark), but a gateway that carried the variable by mistake would have lost the
+    off-the-record mark and the voice capture of every turn of his. `begin_turn` now runs first and the switch skips
+    `turncontext.build` alone. (2) *A rejection is said in numbers, never in the reflection's words.* A quote check's
+    reason goes to the tick's output, to the ledger record's `error` (which `journal status` and the web app's status
+    show), to `errors.jsonl` and, after three attempts, to the alert; a failing tick's notice carries the start of
+    that tick's output off the host. This package's irregular-mark branch put 48 characters of the reflection around
+    the mark there, often his words. Now an irregular mark is named by code point and place (`irregular quote mark
+    U+201D at character 216 (line 3)`; `validate.place`), everywhere it is reported, the catch-up and program checks
+    included, and a reflection's quote that is not his as `a quote not in his words at character 96 (line 3), 23
+    characters long` (`validate.problem`) in the log line, `error` and the alert. **Main's excerpt, where it stays:**
+    main put the first 60 characters of an unfound quote in the reason. For a reflection those characters now stay in
+    the ledger alone, in `rejected_quote` (a new optional field, shown on no surface, dropped once the reflection is
+    written), since its reason is alerted. For the catch-up, a program's construction and bridge and the synthesis the
+    reason is **unchanged from main** (`quote not in his messages: '…'` and the like, in their log lines, their
+    records, the mirrored note and the entry's reflect note): none of them raises an alert with it. **Open:** such a
+    log line can still leave the host inside the notice of a tick that fails for another reason; and the model is told
+    nothing on a retry (the request is the same), so a retry repeats a mistake as easily as it mends it. A request
+    that names the last rejection may show the model its own text; it would need the rejected text kept in the state
+    dir. (3) *A sentence of his that holds quotation marks can be quoted whole.* His entry says `She said "come home"
+    and I said no`. Quoted verbatim, the inner marks were irregular; with single marks inside, the quote was not his
+    words; three such answers lost the reflection. A line that has irregular marks now gets one more reading
+    (`validate._scan`, `_pairs`): an opening mark may close at a later mark of the line when the whole span between
+    them, the marks inside included, is in one paragraph of his verbatim (no "…" stitching; the same folding of case,
+    spaces and curly marks as any quote), and the quotation then passes the usual check as well. This is containment
+    in his words, not another pattern rule: a line without irregular marks is never read again, so nothing that passed
+    or failed before changes. Still a bad answer: an invented sentence with marks inside, one stitched with "…", and
+    his sentence with its marks changed to single ones (he must be copied as he wrote). (4) *Every request states the
+    rule its check applies.* The catch-up, a program's construction and bridge and the synthesis took the reflection's
+    check in this package while their requests still said only "copy the words exactly": a catch-up that put her own
+    earlier line in double quotes was not used, unwarned, and after three he got no reply. `prompts.quote_rule` says
+    it in all four: double quotation marks only around his exact words from the named source, never an earlier line of
+    hers, a title or a term, no other double mark, no blockquotes. (5) *A reflection written late is held to its own
+    period.* The morning fallback, and an outage's retry up to seven days on, could search and quote what he wrote
+    after the period: his replies were bounded by its end, the search and the wider quote corpus were not. The
+    reflection's one-shot now carries `JOURNAL_SEARCH_UPTO` (its period's last day; `search.UPTO_ENV`, passed through
+    `agent.ask(env=…)`), and `journal_search` finds nothing dated after it whatever `date_to` says, names the bound in
+    its result (`through`) and refuses to search under a bound that is no date. The bound is the engine's, in the
+    run's environment, because the tool is called by the model inside that run and a prompt line alone would be a
+    request, not a bound; the request says it too. The wider corpus is his words in files dated the period's end or
+    before, and `reflect.continuity` leaves out a notebook thread filed from a later file, as it left out a later
+    reply. Her chat carries no such variable and searches everything. Dates are file names': a note written after
+    midnight belongs to the next day here, as it does in `entries_on`. (6) *Wording.* The reflection request used
+    "knows" and "doesn't" with any pronoun ("They knows what they wrote"): `Names.verb` for the one, a modal for the
+    other. With `channel.platform: none` it said "in the journal and in None" and spoke of what he "wrote back to it
+    in the chat": the chat is left out of the request, and `reflect.continuity` leaves out the reply block.
+    **Unchanged:** the opener request's "Quotes from journal entries and None" on a no-chat install is OPEN-CORE's
+    line, not this package's. (7) *Leftovers of the split.* A test docstring and two comments still said a bad quote
+    costs a sentence or its marks, not the reflection; a negative assertion pinned a wording that exists nowhere;
+    `validate.quotes` had no caller; README's module tree had no `search.py`. All gone or corrected.
+  - **Open:** whether to add a deterministic "echoes" step (older entries sharing the day's rarer words) if she
+    seldom searches; `journal_search` in MCP; whether 480 s is the right budget once real runs are seen; the
+    reflection-only hang above; paraphrase, single quotes and HTML as quotation, and keeping a reflection with a bad
+    quote (#26); the summaries in a synthesis's source; from the review fixes: a retry that tells the model what was
+    rejected, and main's quote excerpt in the catch-up's and the programs' log lines (#26 for the first).

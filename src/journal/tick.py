@@ -648,7 +648,7 @@ def annotate(cfg: Config, now: datetime, log: list[str]) -> None:
             added = 0
             for f in followups:  # the annotations are written: a notebook failure must not hold back completion
                 try:
-                    if notebook.add(cfg, f, source=path.stem).get("duplicate"):
+                    if notebook.add(cfg, f, source=path.stem, origin="annotation").get("duplicate"):
                         log.append(f"{p['id']}: follow-up already in the notebook, not added")
                     else:
                         added += 1

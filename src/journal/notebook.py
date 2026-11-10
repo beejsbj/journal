@@ -4,6 +4,13 @@ Private to the companion by design: it lives in the engine's state dir, outside 
 only the `journal_notebook` tool and the annotation pass write it. Open items are injected into
 every companion turn and into openers. Cleanup is automatic: resolved items move to an archive
 file at once, and open items untouched for STALE_DAYS are archived as stale (never deleted).
+
+An item the engine itself files from a journal file (an annotation's or a reflection's ``FOLLOW-UP:`` line) carries
+``origin`` (``ON_RECORD``) and its ``source`` names that file. Only those reach a reflection (``on_record``): an item
+she adds in chat is her paraphrase, written in a turn whose context may hold what was said off the record earlier in
+the conversation, and nothing can tell which of its words came from where, so it never reaches a reflection (fails
+closed; items written before ``origin`` existed count as hers from chat). Her turns and the opener's pack still
+carry every open item, as before. DECISIONS.md, CONTINUITY.
 """
 from __future__ import annotations
 
@@ -21,6 +28,7 @@ from .config import Config
 STALE_DAYS = 21
 MAX_OPEN = 40
 INJECT = 15
+ON_RECORD = ("annotation", "reflection")  # origins the engine writes from a journal file (never the tool's)
 
 
 def _paths(cfg: Config) -> tuple[Path, Path]:
@@ -49,11 +57,13 @@ def _same(text: str) -> str:
 
 
 def add(cfg: Config, text: str, source: str = "", bring_up_after: str | None = None,
-        now: datetime | None = None) -> dict:
+        now: datetime | None = None, origin: str | None = None) -> dict:
     """Add an open item. A text the same as an open item's (``_same``) adds no item: the open item is raised again
     instead (``touched_at`` now, so the stale sweep and the cap count from the repeat; a ``bring_up_after`` given
     replaces its date, the latest ask winning; a ``source`` given replaces its source) and comes back with
-    ``"duplicate": True``, plus ``"date_changed": True`` when its date moved, so a caller can say so."""
+    ``"duplicate": True``, plus ``"date_changed": True`` when its date moved, so a caller can say so.
+    ``origin``: only the engine passes it, for a follow-up it files from a journal file (``ON_RECORD``); a repeat
+    never gives an open item an origin it did not have (one she added in chat stays off the record's side)."""
     text = (text or "").strip()
     if not text:
         raise ValueError("empty notebook item")
@@ -62,6 +72,8 @@ def add(cfg: Config, text: str, source: str = "", bring_up_after: str | None = N
     now = now or datetime.now(timezone.utc)
     item = {"id": secrets.token_hex(3), "text": text[:500], "source": source, "created_at": now.isoformat(),
             "touched_at": now.isoformat(), "bring_up_after": bring_up_after, "status": "open"}
+    if origin:
+        item["origin"] = origin
     path, _ = _paths(cfg)
     with ledger.locked(path) as data:
         items = data.setdefault("items", [])
@@ -99,6 +111,22 @@ def open_items(cfg: Config) -> list[dict]:
     path, _ = _paths(cfg)
     data = ledger.snapshot(path)
     return list(data.get("items", []))
+
+
+def on_record(cfg: Config, limit: int = INJECT) -> list[dict]:
+    """The open items the engine filed from a journal file that is still there (``origin`` in ``ON_RECORD``, ``source``
+    naming a file in the journal folder), newest ``limit`` of them, oldest first. Nothing she added in chat."""
+    root = Path(cfg.root)
+    keep = [it for it in open_items(cfg) if it.get("origin") in ON_RECORD and _file_name(it.get("source"))
+            and (root / f"{it['source']}.md").is_file()]
+    keep.sort(key=lambda i: i.get("created_at") or "")
+    return keep[-limit:] if limit > 0 else []
+
+
+def _file_name(source) -> bool:
+    """A file name of the journal folder's shape (no path, no separators): ``2026-10-14-evening``."""
+    s = str(source or "")
+    return bool(s) and "/" not in s and "\\" not in s and not s.startswith(".")
 
 
 def sweep(cfg: Config, now: datetime | None = None) -> int:

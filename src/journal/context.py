@@ -14,6 +14,7 @@ from pathlib import Path
 
 from . import channel, conversations, entries, ledger, notebook, sources, standing
 from .config import Config, pack_entries, pack_max_chars, pack_pointers
+from .entries import entry_words, his_text  # noqa: F401  (moved to entries; read here by name)
 from .validate import CONVERSATION_HEADING, MINE, STANDING_HEADING
 
 REFLECTION_DAYS = 3
@@ -148,16 +149,6 @@ def conversation(cfg: Config, now_local: datetime, db: Path | None = None) -> li
     return [line for _, line in rows] + ([note] if note else [])
 
 
-def entry_words(body: str) -> str:
-    """His words in an entry (and his conversation lines; never her folded replies), or the older formats' raw
-    entry; "" when there are none."""
-    text = entries.his_words(body)
-    if not text:  # older formats
-        m = re.search(r"## Raw Entry\n(.*?)(?=\n## |\Z)", body, re.S)
-        text = m.group(1).strip() if m else ""
-    return text
-
-
 def _end_of(d, cfg: Config) -> datetime:
     """The last moment of local day ``d``: a dated item's place among timed ones (his entry of a day outlasts that
     day's chat lines when the far end is dropped)."""
@@ -274,19 +265,6 @@ def _his_messages(cfg: Config, db: Path | None = None, now: datetime | None = No
 def telegram_messages(cfg: Config, db: Path | None = None) -> list[str]:
     """His recent Telegram messages to the companion, oldest first (the journal's own mirrored sends excluded)."""
     return [line for _, line in _his_messages(cfg, db)]
-
-
-def his_text(path: Path) -> str:
-    """What in a journal file is his, for the quote check: an engine entry's words section and his conversation
-    lines (``entry_words``), never her annotations, her notes, her folded replies, the opener under ``## Prompt`` or
-    the engine's summary; a file of his own (no engine entry, not an analysis) whole, without its front matter;
-    nothing from a file the companion or the engine wrote (a reflection, a week review, an insights document)."""
-    if entries.authored_by_engine(path):
-        return ""
-    body = path.read_text(encoding="utf-8", errors="replace")
-    if entries.kind_of(path) is not None:
-        return entry_words(body)
-    return re.sub(r"\A---\n.*?\n---\n", "", body, count=1, flags=re.S)
 
 
 def _his_chat_text(row) -> str | None:
