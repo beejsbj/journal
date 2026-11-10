@@ -62,7 +62,8 @@ answer nothing waits for is sent off it for such a channel (``inbound``).
 **Companion.** ``ask`` returns her text, or None for an answer with nothing in it; it raises
 ``CompanionUnavailable`` when no answer could be had at all (an outage: the caller defers without spending an
 attempt). ``agent.ask`` is the facade the engine calls. ``image`` (a path) attaches one picture to the question;
-a companion that cannot take one answers None.
+a companion that cannot take one answers None. ``env`` adds variables to the run's environment (the reflection's
+search bound, ``search.UPTO_ENV``); the facade passes it only when a step gives one.
 """
 from __future__ import annotations
 
