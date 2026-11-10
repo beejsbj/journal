@@ -60,6 +60,229 @@ the new plugin is safe, so pin first; if the order cannot be kept, pause the tic
 4. Rollback: the CLI and the plugin pin at the previous sha, and a gateway restart. The new state fields are
    ignored by the old code; nothing needs undoing.
 
+## OPEN-PUSH — Web Push from `journal serve` to the installed PWA (2026-11-09; serve side only; **no gateway restart**; a new optional extra `journal[push]`; a new setting `push.*`; no state migration)
+
+**What changes.** `journal serve` can nudge the installed web app when a practice is due (README *Web app*,
+Notifications; docs/OPEN-PROMPTS.md *Push notifications*, rule 12):
+
+- With the extra `journal[push]` (`cryptography`), serve makes a VAPID key pair at its first start
+  (`state_dir/serve-push.json`, 0600) and runs a thread that makes a pass a minute: each scheduled slot whose time has
+  come, still within `windows.grace_hours`, unanswered and not pushed before is pushed once to every subscribed device
+  (`push-sent.json` remembers it, three days). A push says the practice's title and "due now", nothing else. It
+  writes no prompt record and nothing in `sent.jsonl`, `send-times.json` or `hook-state.json`.
+- New routes: `GET /api/v1/push`, `POST` and `DELETE /api/v1/push/subscriptions` (signed in; not write routes, so
+  `serve.allow_write: false` keeps them).
+- New setting `push.when`: `no-chat` (default) pushes only on a journal with `channel.platform: none`, so **a chat
+  install pushes nothing until `push.when: always` is set** in the config file; `push.subject` (the VAPID contact;
+  default the project's URL). `plugin.yaml` documents the key with no default, as it does `serve`.
+- The PWA: Settings → *Notifications* (turn on from a tap, turn off); the service worker shows a push and opens
+  `/today?write=<id>` on a tap. The committed build is CI's.
+- `journal doctor` and `journal serve check`: a `serve push` row.
+
+**Where it runs.** `serve/**` and the web build are serve side. Outside them: `cli.py` (`journal serve` starts the
+thread), `status.py` (the doctor row; imports `serve/` lazily, inside the row), `config.py` (the `push` default and its
+check) and `plugin.yaml` (the key's description). The gateway imports `config.py` but nothing on a gateway path reads
+`push` (only `serve/push.py` and the doctor row do), and it imports neither `status.py` nor `serve/` (checked with
+the import list in the table above); so the gateway keeps its old copy correctly and takes the new one at any later
+restart, and the settings form shows `push` after that restart. The tick runs no new code path.
+
+**Steps.** Move the plugin pin to the merge sha with the CLI (the same-sha rule), then:
+
+```sh
+uv tool install --force 'journal[hermes,push] @ git+https://github.com/beejsbj/journal@<sha>'   # keep the extras the install has (mcp too, if used)
+systemctl --user restart journal-serve
+```
+
+On a journal with a chat, decide whether it should push at all; if yes, set `"push": {"when": "always"}` in the
+config file (serve rereads it at the next request; the push thread at its next pass).
+
+**First checks** (read-only for the journal):
+
+1. `journal serve check`: the `serve push` row says the keys exist ("… devices subscribed; push.when …"); without the
+   extra it says how to install it. `stat -c %a <state dir>/serve-push.json` is `600`.
+2. Open the installed app, tap **Update available**, Settings → *Notifications*: "Off for this device" and **Turn on
+   notifications** (on an iPhone: only in the Home Screen app). Turn it on, allow; the row now counts one device.
+   On a chat install under `no-chat` the section says nothing is pushed.
+3. A test push to the subscribed devices, writing nothing to the journal (it reads `serve-push.json` and posts a
+   notification that opens Today on a tap):
+
+   ```sh
+   "$(uv tool dir)/journal/bin/python" - <<'PY'
+   import json, os
+   from pathlib import Path
+   from journal.serve import webpush
+   state = json.loads((Path(os.environ["STATE_DIR"]) / "serve-push.json").read_text())
+   body = json.dumps({"title": "Test", "body": "due now"}).encode()
+   for sub in state["subscriptions"]:
+       print(webpush.send(sub, body, vapid_private=state["vapid"]["private"], subject="https://github.com/beejsbj/journal"))
+   PY
+   ```
+
+   with `STATE_DIR` exported as the `state dir` doctor prints. Each device answers `Result(status='sent', …)`; a
+   `gone` one has unsubscribed (the next real pass removes it).
+4. Receipts across the first real slot after the restart: the vault checksum, and `sha256sum` of `ledger.json`,
+   `sent.jsonl`, `send-times.json` and `hook-state.json` taken before the slot's time and again a minute after the push
+   arrives, differ only by what the tick itself did for that slot (on a no-chat install: nothing). `journal serve`'s
+   log shows no `push pass failed` line.
+
+**Rollback.** The CLI and the serve unit back to the previous sha (`uv tool install --force … @<previous sha>`, unit
+restart). The old server ignores `serve-push.json` and `push-sent.json` (leave them, or remove them: removing the keys
+means every device turns notifications on again later). The new PWA keeps its subscription, finds no `/push` route
+("This server does not offer notifications yet") and gets no pushes; turn notifications off on each device first to
+end the subscriptions cleanly. The plugin pin needs no rollback of its own.
+
+## OPEN-PROGRAMS — programs and interrupts with no chat (2026-11-09; tick, hook and serve side; **gateway restart required, in a window**; no config change; no state migration)
+
+**What changes.** A program phase becomes current before it is sent: its ledger record is written with no
+`message_id` (the run's phase gains `opened_at`), and it is then delivered when there is a chat; `send_due` means
+"owed a delivery". A `/x` window holds the delivery only: an answer in the web app moves the run on while the chat is
+off the record (an answer in the chat still waits for the window), the next phase shows on the web at once and goes
+to the chat when the window closes, and a phase answered on the web before its delivery is not sent. Session 10's
+interrupts open at their time (their ledger record is written, sent or not), and a block posted with `interrupt: N`
+answers one. With `channel.platform: none` a whole run is done in the web app: nothing is sent, attempted or alerted.
+`GET /runs/{id}`'s phase gains `in_chat`, and its `delivered` means the phase is current.
+
+**Side and restart.** `programs.py` and `capture.py` (both gateway-loaded), `cli.py` (`journal program … --face`,
+which only serve passes: its spawned child runs serve's own code, so the two never disagree) and `serve/writes.py`,
+`serve/api.py` changed. So **a gateway restart, in a window** (the hook spawns `journal program settle`, which runs the new code at
+once, but the gateway's own imports of `programs` and `capture` need the restart); the tick runs the new code from
+the next tick after the pin moves; serve waits for `uv tool install --force` and the unit restart. Runs in progress
+read the same: a delivered phase (no `opened_at`, no send owed) is current, and a phase owed a send under the old code
+is opened and sent by the next tick's step.
+
+1. In a window: merge; with `<sha>` the merge commit, install the CLI at `<sha>`, move the plugin pin (`hermes -p
+   <profile> plugins install beejsbj/journal --force --ref <sha>`), `hermes gateway restart`, `systemctl --user restart
+   journal-serve`. Nothing is sent by the deploy.
+2. First checks, without sending: `journal doctor` (no new failure); `journal program status` reads every run as
+   before (a phase owed to the chat says `, still to be sent to the chat`); the web app's run page shows the open phase with
+   its answer box. A run in progress: its next phase goes out as before when he answers in the chat (the tick's log
+   says `sent <run>-sNN-pM`). With no chat: a run started in the web app shows its first phase there, and the tick's
+   log names no send.
+3. Rollback: the CLI and the plugin pin at the previous sha, `hermes gateway restart`, `systemctl --user restart
+   journal-serve`. Old code reads an opened phase with no send owed as delivered: on a chat install every opened
+   phase was also delivered, answered on the web, or is still owed (`send_due`, which old code sends, held ones
+   included), so nothing is lost. On a no-chat install (which old code cannot run anyway, see OPEN-CORE), deliver
+   the open phase with `journal program start <program>` (it sends the open phase again) once a chat is set. An interrupt item `open` (no
+   chat) or `answered` is not pending to old code and is never sent; its record and any answer stay in the ledger and
+   the entry.
+
+## OPEN-FACES — do and answer a practice from the web app, the CLI and MCP (2026-11-09; serve side, the CLI and MCP; **no gateway restart of its own**: it rides OPEN-CORE's window; no config change; no state migration)
+
+**What changes.** Every face writes his words through `journal/actions.py` and opens a practice as a view:
+
+- **Web app.** `POST /entries` with `practice` is `actions.answer`: the words fill that practice's slot (its open
+  prompt, its due or missed slot, the next one later today, which the tick then does not send, else an extra entry
+  `<date>-<id>-<n>`), **never a `/j` note** (until now, words for a practice with no open prompt became one). Without
+  a practice it is `actions.note`, as before. A practice turned off is not refused: `enabled: false` takes it off
+  the schedule, nothing more (the owner's decision 4, 2026-11-09), so the web app, `journal open`/`write`, MCP,
+  `/start` and `journal send` open, write and send it (until now `/start` and `journal send` refused it). New route `GET
+  /library/<id>/open` (*Write now*'s view, writes nothing). `GET /today` serves a due row as `due` (OPEN-CORE served it
+  as `upcoming`). The PWA: **Write now** on every Today card (all five states), `/today?write=<id>`, the *due* pill,
+  and *Send now* is now called **Send to chat** (Today and Library; same route). The committed build is CI's.
+- **CLI.** `journal open <id>` prints a practice and the slot it would fill (writes nothing); `journal write [<id>]
+  [-] [--entry STEM] [--at TIME]` writes his words through `actions` (from `$EDITOR` as git commit does, or stdin).
+- **MCP.** `journal_start` returns the practice to answer and **spawns nothing** (it spawned `journal send <id>
+  --hold-off-record`); it is a read-only tool now. `journal_save` with `practice` fills the slot as the web app does.
+- The faces' refusals (`/x` at the start or on any line, the engine's marker lines, the transcript placeholder) are
+  `actions.refuse` in every face now, with the same codes.
+
+**Where it runs.** `serve/**`, `mcp/**`, `cli.py`, `actions.py` and the web build are serve, CLI and MCP side. Two
+modules the gateway imports changed, without a behaviour change for it: `entries.py` gains `STEM`, `entry_file` and
+`engine_file` (moved from `serve/document.py`, which now calls them), and `capture.add_web_block` takes `via=`
+(default `web`, as before); neither the hook, the tools, the commands nor the tick call anything that changed
+(checked with the import list in the table above and a grep for `actions`, `add_web_block`, `engine_file` and
+`entry_file` under `hermes/`, `tools.py`, `inbound.py`, `commands.py` and `tick.py`). So a gateway still running its
+old copy is correct; it picks the new files up at OPEN-CORE's restart. The two chat changes of the package (`/start`
+and `journal send` taking their slot from `slots.resolve`) were built in OPEN-CORE and go out with it.
+
+**Steps.** With OPEN-CORE (same window, or after it): move the plugin pin and the CLI to the merge sha (the plugin pin
+covers the tick; it runs no new code path); `uv tool install --force` the CLI with the `hermes` and `mcp` extras the
+install already uses; `systemctl --user restart journal-serve`. An MCP client picks the new tools up when it next
+starts `journal mcp` (restart the client, or reconnect the server, to see `journal_start`'s new description).
+
+**First checks** (read-only, or writing only under a temporary root):
+
+1. `journal serve check` and `journal doctor`: same version as the tick, no new problems.
+2. **The installed PWA must take the update.** Its old build reads four states and refuses a Today answer with a
+   `due` row ("The server's answer has an unexpected shape"): on a chat install for the minutes between a slot's
+   time and its send, on a no-chat install whenever a slot is due. After the unit restart, open the app and tap
+   **Update available** (or reload it twice in a browser tab); Settings then shows the new build. Rolling serve back
+   while the PWA is new is harmless (the old server serves `due` as `upcoming`, which the new build reads).
+   The web app: Today loads (a due slot reads "due since HH:MM", not "at HH:MM"); every card has **Write now**;
+   pressing it shows the practice and a line such as "Fills the 23:00 slot early; it will not be sent." and writes
+   nothing (`ledger.json`'s mtime and the vault checksum unchanged); **Not now** closes it. `/today?write=evening`
+   opens it on the evening card. On a no-chat install there is no **Send to chat** on Today, and the Library's
+   answers `409 no-chat`. Do not press **Save** as a check: it writes into tonight's slot and the tick then
+   skips that send (use it when he wants to write).
+3. `journal open evening` prints the practice and the slot line and changes nothing (vault checksum before and
+   after). `journal write` is a real write: try it only against a temporary journal, and **without `HERMES_HOME`**:
+   with it set, the profile's plugin settings (`root`, `state_dir` among them) win over the config file, and the
+   "temporary" write lands in the vault and the live ledger (where the tick would then skip tonight's send). So, with
+   a config whose `root` and `state_dir` are under a temporary directory: `env -u HERMES_HOME JOURNAL_CONFIG=<tmp
+   config> journal doctor` first, and go on only if its root and state dir are the temporary ones; then `echo test |
+   env -u HERMES_HOME JOURNAL_CONFIG=<tmp config> journal write evening`, and check `<tmp root>/<date>-evening.md`
+   and that `sent.jsonl` was not written there. Vault checksum before and after: unchanged.
+4. MCP (if a client is configured): `journal_start` with a practice id returns its opener, questions and `fills`, and
+   `manual-trigger.log` gains no line.
+
+**Rollback.** The CLI and the serve unit back to the previous sha (`uv tool install --force … @<previous sha>`, unit
+restart), the plugin pin with OPEN-CORE's rollback if that goes back too. Records written by a face meanwhile are
+OPEN-CORE's face-made records (`opened_via`), which OPEN-CORE's code reads; on code before OPEN-CORE see its rollback
+note below. Words written for a practice through the web app or MCP after this deploy sit in that practice's slot or
+in an extra entry `<date>-<id>-<n>`; older code reads them as an answered prompt (or an unscheduled entry of that
+practice) and leaves them where they are. An MCP client on the old code sends again when `journal_start` is called.
+
+## OPEN-CORE — slot states, slot resolution, the engine's write of his words, `channel.platform: none` (2026-11-09; tick, hook and serve side; **gateway restart required, in a window**; no config change for current behaviour; no state migration)
+
+**What changes.** A practice's slot has a state read from the schedule and the ledger together (`slots.py`: upcoming,
+due, open, answered, missed), and one function says which slot words or a deliberate delivery go to
+(`slots.resolve`). The tick counts a slot answered on any face as done, reads the record again under the ledger lock
+just before a scheduled send (saving the pack only after that check), and a send that loses that race attaches to the
+record without overwriting it. `/start <id>` and `journal send <id>` take their slot from `slots.resolve`: `/start
+water` at 15:00 delivers the slot that is due, and `/start morning` after the morning is answered starts an extra
+entry (`<date>-morning-2`) instead of re-sending into the answered one. `journal/actions.py` (`answer`, `note`, with
+the three refusals) is new; no face calls it yet (OPEN-FACES). Today's rows, the today block, `status`, the opener's
+unanswered count and the web app's week strip and insights read slot states: a past slot that was never delivered now
+shows (missed, or due), and the web app is served a due row as upcoming. `channel.platform: none` is a journal with
+no chat: nothing is sent, written, counted or alerted; an annotation reply or reflection that would have been sent is
+marked skipped (`no chat`) and never sent, also after a chat is set, and the pack and today block count them (owner's
+decision 3, 2026-11-09). New setting `windows.day_ends_at` (default `04:00`); a deliberate send before it takes
+today's date (`/start morning` at 03:30 delivers today's morning; owner's decision 1), or last night's slot when
+that is the nearer one (`/start evening` at 00:30). `agent`
+no longer imports the Hermes adapter for its failure copy; `status` does not need `serve/` for doctor. A no-chat
+install should not start a program run yet: phases with no chat come with OPEN-PROGRAMS.
+
+**Side and restart.** `tick.py`, `slots.py`, `actions.py`, `capture.py` (`sent_opener`), `sweep.py`, `today.py`,
+`standing.py`, `prompts.py`, `conversations.py`, `entries.py`, `config.py`, `library.py`, `status.py`, `agent.py`,
+`reflect.py`, `programs.py`, `cli.py` and `hermes/companion.py` changed; the gateway imports most of them (`today`,
+`capture`, `conversations`, `entries`, `sweep`, `config`, `library`, `programs` at least), and `/start` resolves
+through the spawned `journal send`, which the tick's code runs. So **a gateway restart, in a window** (at least an hour
+from a ritual). The tick is a fresh process and runs the new code from the next tick after the pin moves; serve
+(`serve/api.py`) waits for `uv tool install --force` and the unit restart. Ledger records gain fields only when a face
+answers (none can until OPEN-FACES), a send loses the race, or a no-chat tick marks an annotation reply or a
+reflection `skipped: "no chat"` (with `skipped_at`); existing records read the same.
+
+1. In a window: merge to `main`; with `<sha>` the merge commit, install the CLI at `<sha>`, move the plugin pin
+   (`hermes -p <profile> plugins install beejsbj/journal --force --ref <sha>`), `hermes gateway restart`,
+   `systemctl --user restart journal-serve`. Nothing is sent by the deploy.
+2. First checks, without sending: `journal doctor` (the `channel` row as before; no new failure); `journal status`
+   shows a `Today:` line with each slot's state and `Due now` as before; `journal today` renders the block (a past
+   slot that was never sent now reads `<id> at HH:MM, not sent to the chat (missed)`); the web app's Today loads (a due slot shows as still
+   to come, with Send now) and its week strip still parses. `journal send <id> --dry-run` prints the message for the
+   slot it would take. The next scheduled prompt goes out as before (the tick's log says `sent <id>`); a slot already
+   answered is done and logs nothing (only a face answer during the opener's model call logs `<id>: not sent:
+   answered meanwhile`, and none can come before OPEN-FACES).
+3. Rollback: the CLI and the plugin pin at the previous sha, `hermes gateway restart`, `systemctl --user restart
+   journal-serve`. Old code reads a face-made record as an undelivered prompt with captures and would send it once
+   more if the rollback lands inside its `grace_hours` (one chat message he has already answered; his words and the
+   entry stay, the record's opener becomes the newly sent one); no face writes one before OPEN-FACES, so on this
+   package's own rollback there is none. An extra entry made by `/start` (`<date>-<id>-<n>`) stays a delivered
+   record old code reads normally. **A no-chat install** (`channel.platform: none`) must not be rolled back as it
+   is: old code reads `none` as a platform with no chat, so every slot, reflection and summary fails and alerts; set
+   a real channel or stop its tick first. Old code does not know the `skipped: "no chat"` mark either: with a real
+   channel set, it sends the annotation replies and reflections skipped meanwhile (it checks only for a message id and
+   attempts left), so stopping the tick is the safe choice.
+
 ## SCRUB-PERSONAL — the repo holds nothing specific to a deployment (2026-10-28; docs, tests and comments, one doctor row; no gateway restart needed; no config or state change)
 
 **What changes.** Docs, tests and fixtures are generic; the deployment overlay left the repo

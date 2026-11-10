@@ -5,14 +5,14 @@ added to ``api.ROUTES`` without a sample here fails the test, so the walk stays 
 import json
 import sqlite3
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest import mock
 
 from serve_helpers import HERS, IST, NOW, ServeCase
 
 from journal import conversations, ledger, privacy
-from journal.serve import api, auth, writes
+from journal.serve import api, auth, push, writes
 
 SAMPLES = {
     r"/healthz": [("/healthz", 200)],
@@ -34,6 +34,8 @@ SAMPLES = {
     r"/api/v1/library/(?P<id>[^/]+)/default": [("/api/v1/library/evening/default", 200),
                                                ("/api/v1/library/fix-life/default", 200),
                                                ("/api/v1/library/gratitude/default", 404)],
+    r"/api/v1/library/(?P<id>[^/]+)/open": [("/api/v1/library/evening/open", 200),
+                                            ("/api/v1/library/fix-life/open", 404)],
     r"/api/v1/runs": [("/api/v1/runs", 200)],
     r"/api/v1/runs/(?P<id>[^/]+)": [("/api/v1/runs/2026-10-15-a1f3", 404)],
     r"/api/v1/runs/(?P<id>[^/]+)/insights": [("/api/v1/runs/2026-10-15-a1f3/insights", 404)],
@@ -48,8 +50,12 @@ SAMPLES = {
 # the chat, and the off-the-record command is honoured on the text itself.
 WRITE_SAMPLES = {
     ("POST", r"/api/v1/entries"): [({"practice": "morning", "text": "a note"}, "/api/v1/entries", 201),
-                                   ({"text": "/x not saved"}, "/api/v1/entries", 422)],
-    ("POST", r"/api/v1/entries/(?P<stem>[^/]+)/blocks"): [({"text": "more"}, "/api/v1/entries/2026-10-14-evening/blocks", 201)],
+                                   ({"practice": "evening", "text": "early"}, "/api/v1/entries", 201),
+                                   ({"text": "/x not saved"}, "/api/v1/entries", 422),
+                                   ({"practice": "evening", "text": "ok\n/x not saved"}, "/api/v1/entries", 422)],
+    ("POST", r"/api/v1/entries/(?P<stem>[^/]+)/blocks"): [({"text": "more"}, "/api/v1/entries/2026-10-14-evening/blocks", 201),
+                                                          ({"text": "x", "interrupt": 1},   # (no run holds it)
+                                                           "/api/v1/entries/2026-10-15-fix-life-s01/blocks", 409)],
     ("PATCH", r"/api/v1/entries/(?P<stem>[^/]+)/blocks/(?P<key>[^/]+)"):
         [({"text": "edited", "was": "First words, about the lighthouse."}, "/api/v1/entries/2026-10-14-evening/blocks/words:0", 200)],
     ("DELETE", r"/api/v1/entries/(?P<stem>[^/]+)/blocks/(?P<key>[^/]+)"):
@@ -68,6 +74,18 @@ WRITE_SAMPLES = {
                                      ({"conversations": {"quiet_minutes": 30}}, "/api/v1/settings", 200),
                                      ({"location": "Lisbon"}, "/api/v1/settings", 200)],
     ("POST", r"/api/v1/settings/location"): [({"lat": 38.7, "lon": -9.1}, "/api/v1/settings/location", 200)],
+}
+
+# Web Push (``push.ROUTES``): the settings read and the subscriptions, which reach no chat either
+PHONE = {"endpoint": "https://fcm.googleapis.com/fcm/send/device-one",
+         "keys": {"p256dh": "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4",
+                  "auth": "BTBZMqHH6r4Tts7J_aSIgg"}}
+PUSH_SAMPLES = {
+    ("GET", r"/api/v1/push"): [(None, "/api/v1/push", 200)],
+    ("POST", r"/api/v1/push/subscriptions"): [(PHONE, "/api/v1/push/subscriptions", 201),
+                                              ({"endpoint": "https://push.example.org/x"},
+                                               "/api/v1/push/subscriptions", 422)],
+    ("DELETE", r"/api/v1/push/subscriptions"): [({"endpoint": PHONE["endpoint"]}, "/api/v1/push/subscriptions", 204)],
 }
 
 
@@ -115,6 +133,24 @@ class PrivacyTest(ServeCase):
             self.assertEqual(self.request("GET", "/", token=False)[0], 200)
         self.assertEqual(calls, [])
 
+    def test_write_nows_view_of_a_prompt_the_chat_has_opens_no_database(self):
+        """``GET /library/{id}/open`` on a delivered, unanswered prompt shows it as sent (``capture.stored_opener``):
+        the walk above samples the undelivered branch; this one the other (review round 1)."""
+        from journal import ledger
+        with ledger.locked(self.cfg.ledger_path) as data:
+            data["prompts"].append({"id": "2026-10-15-morning", "stem": "2026-10-15-morning", "kind": "morning",
+                                    "local_date": "2026-10-15", "chat_id": self.cfg.chat_id, "message_id": "900",
+                                    "sent_at": (NOW - timedelta(hours=2)).isoformat(), "sent_at_local": "07:12 IST",
+                                    "opener": "Morning. The rain again.", "opener_source": "ada", "asked": []})
+
+        def refuse(*a, **k):
+            raise AssertionError("journal serve opened a SQLite database or asked the privacy pass")
+        with mock.patch.object(sqlite3, "connect", refuse), mock.patch.object(privacy, "view", refuse):
+            code, _h, body = self.request("GET", "/api/v1/library/morning/open")
+        self.assertEqual(code, 200, body[:300])
+        got = json.loads(body)
+        self.assertEqual((got["slot"]["delivered"], got["prompt"]["opener"]), (True, "Morning. The rain again."))
+
     def test_every_write_route_answers_without_the_sessions_database_either(self):
         walked = {(m, p) for m, p, _fn, _a in writes.ROUTES}
         self.assertEqual(walked - set(WRITE_SAMPLES), set(), "add a sample for each new write route")
@@ -143,6 +179,29 @@ class PrivacyTest(ServeCase):
                     with self.subTest(method=method, path=path, body=body):
                         code, _h, raw = self.request(method, path, body, headers={"Origin": self.origin})
                         self.assertEqual(code, want, raw[:300])
+        self.assertEqual(calls, [])
+
+    def test_every_push_route_and_a_pass_answer_without_the_sessions_database(self):
+        walked = {(m, p) for m, p, _fn, _a in push.ROUTES}
+        self.assertEqual(walked - set(PUSH_SAMPLES), set(), "add a sample for each new push route")
+        self.cfg.platform = "none"   # a journal that pushes: the pass below reads its slots
+        calls = []
+
+        def refuse(*a, **k):
+            calls.append(a)
+            raise AssertionError("journal serve reached for the chat transcript on a push")
+        with mock.patch.object(sqlite3, "connect", refuse), mock.patch.object(privacy, "view", refuse):
+            for (method, _pattern), samples in PUSH_SAMPLES.items():
+                for body, path, want in samples:
+                    with self.subTest(method=method, path=path):
+                        code, _h, raw = self.request(method, path, body, headers={"Origin": self.origin})
+                        self.assertEqual(code, want, raw[:300])
+            (self.cfg.state_dir / push.STATE).write_text(json.dumps(
+                {"vapid": {"private": "k", "public": "p"}, "subscriptions": [PHONE]}), "utf-8")
+            sent = []
+            pushed = push.run_once(self.cfg, datetime(2026, 10, 15, 6, 5, tzinfo=IST),
+                                   send=lambda sub, body, **k: sent.append(body) or push.webpush.Result("sent", 201))
+        self.assertEqual(pushed, ["2026-10-15-morning"])
         self.assertEqual(calls, [])
 
     def test_the_status_route_leaves_out_what_the_privacy_pass_knows(self):

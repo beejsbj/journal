@@ -23,7 +23,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable
 
-from .. import audio, capture, entries, images, ledger, library, location, reflect, status, today, version
+from .. import actions, audio, capture, entries, images, ledger, library, location, reflect, slots, status, today, version
 from .. import settings as settings_
 from ..config import Config, effective_today, profile_from_home
 from . import auth, document
@@ -176,24 +176,21 @@ def logout(req: Request):
 
 # ── today, entries, days ─────────────────────────────────────────────────────
 
-def _sent_prompts(cfg: Config) -> list[dict]:
-    """The ledger's sent prompts of the structured practices (a /j note or a freeform capture is no prompt, and
-    neither is a program phase: ``/skip`` records on the run, not the ledger, so a skipped or passed-over phase
-    would read as missed; Today's rows leave program prompts out too, ``today.collect``)."""
-    return [p for p in ledger.snapshot(cfg.ledger_path)["prompts"]
-            if p.get("message_id") and p.get("sent_at") and p.get("kind") not in entries.FREEFORM_IDS
-            and not p.get("program")]
+OUTCOMES = {slots.ANSWERED: "answered", slots.MISSED: "missed", slots.OPEN: "open", slots.DUE: "open"}
 
 
-def _prompt_outcome(cfg: Config, p: dict, now: datetime) -> str | None:
-    """``answered`` (it has a capture), ``missed`` (its window has closed with none), ``open`` (still waiting) or None
-    (a record the engine would not have written)."""
-    if p.get("captures"):
-        return "answered"
-    try:
-        return "missed" if now - datetime.fromisoformat(p["sent_at"]) >= capture.window(cfg, p) else "open"
-    except (TypeError, ValueError):
-        return None
+def _outcomes(cfg: Config, now: datetime, first: date, last: date) -> dict[str, list[str]]:
+    """local date → the outcome of each slot of the structured practices that day (``slots.history``): ``answered``
+    (on any face), ``missed`` (its window closed with none, delivered or not), ``open`` (still waiting: delivered and
+    open, or due). Upcoming slots are no outcome yet. A /j note is no slot, and neither is a program phase: ``/skip``
+    records on the run, not the ledger, so a skipped or passed-over phase would read as missed (Today's rows leave
+    program prompts out too, ``today.collect``)."""
+    out: dict[str, list[str]] = {}
+    end = min(last, now.astimezone(cfg.tz).date())
+    for s in slots.history(cfg, first, end, now) if first <= end else []:
+        if s.state in OUTCOMES:
+            out.setdefault(s.local_date, []).append(OUTCOMES[s.state])
+    return out
 
 
 def week_strip(cfg: Config, now: datetime, days_: int = 7) -> list[dict]:
@@ -202,11 +199,11 @@ def week_strip(cfg: Config, now: datetime, days_: int = 7) -> list[dict]:
     day's prompts, none waiting), ``partial`` (some answered, some missed or still waiting), ``missed`` (none answered)
     or ``none`` (nothing sent, or only open prompts)."""
     end = now.astimezone(cfg.tz).date()
-    prompts = _sent_prompts(cfg)
+    found = _outcomes(cfg, now, end - timedelta(days=days_ - 1), end)
     out = []
     for back in range(days_ - 1, -1, -1):
         day = end - timedelta(days=back)
-        outcomes = [_prompt_outcome(cfg, p, now) for p in prompts if p.get("local_date") == day.isoformat()]
+        outcomes = found.get(day.isoformat(), [])
         answered, missed, waiting = outcomes.count("answered"), outcomes.count("missed"), outcomes.count("open")
         state = ("none" if not answered and not missed else "missed" if not answered
                  else "answered" if not missed and not waiting else "partial")
@@ -239,6 +236,8 @@ def today_(req: Request):
                 log.exception("journal serve: today: the prompt of %s could not be built", r.get("id"))
     return {**data, "week": week_strip(req.cfg, req.now),
             "voices": {"his": req.cfg.names.user or "You", "hers": req.cfg.names.companion},
+            # whether there is a chat to send to (``channel.platform: none`` is a journal without one): Send to chat
+            "chat": req.cfg.has_channel,
             # the header shows the place: when OpenStreetMap named it, the page credits it there (Nominatim's policy)
             "location_source": location.place_source(req.cfg)}
 
@@ -423,8 +422,8 @@ def insights_weeks(req: Request):
     cfg = req.cfg
     end_day = reflect.week_end_day(cfg)
     last = end + timedelta(days=(end_day - end.weekday()) % 7)
-    prompts = _sent_prompts(cfg)
     found = document.all_entries(cfg)
+    outcomes_by_day = _outcomes(cfg, req.now, start - timedelta(days=6), last)  # (every day of every week shown)
     out = []
     try:
         from .. import programs
@@ -437,7 +436,7 @@ def insights_weeks(req: Request):
         first = week_end - timedelta(days=6)
         lo, hi = first.isoformat(), week_end.isoformat()
         mine = [path for path, _ in found if lo <= path.stem[:10] <= hi]
-        outcomes = [_prompt_outcome(cfg, p, req.now) for p in prompts if lo <= (p.get("local_date") or "") <= hi]
+        outcomes = [o for d, os in outcomes_by_day.items() if lo <= d <= hi for o in os]
         answered, missed = outcomes.count("answered"), outcomes.count("missed")
         review = entries.analyses_on(cfg.root, hi, "week")
         out.append({"week_end": hi, "entries": len(mine), "words": sum(document.words_count(p) for p in mine),
@@ -577,6 +576,15 @@ def library_one(req: Request):
     return {**out, "override": override, "problems": out["problems"] + problems}
 
 
+def library_open(req: Request):
+    """``GET /library/{id}/open``: the practice as the web app's Write now shows it (``actions.view``: its opener and
+    questions, or the prompt the chat has, and the slot words saved now would fill). A view: nothing is written."""
+    try:
+        return actions.view(req.cfg, req.params["id"], now=req.now)
+    except actions.Refused:
+        raise HTTPError(404, "not-found", "no practice by that id") from None
+
+
 def library_default(req: Request):
     """``GET /library/{id}/default``: the shipped definition of a built-in, in ``GET /library/{id}``'s shape (whatever
     is in force), with ``diff``: ``since`` (what changed in the default since his edit began; null when nothing did or
@@ -636,8 +644,9 @@ def run_json(req: Request, run: dict) -> dict:
 
 def _open_phase(req: Request, run: dict) -> dict | None:
     """The run's open phase as data: ``compose.phase_json`` of the definition (his earlier answers filled into its
-    prose slots), plus ``sent_text`` (what Telegram was sent: a reflect phase's construction is only in that),
-    ``open`` (it takes an answer), ``answered`` and ``skipped``. None when the run is over or its session has not begun; ``delivered`` is False while a send is owed."""
+    prose slots), plus ``sent_text`` (the phase as the engine built it: a reflect phase's construction is only in that),
+    ``delivered`` (current for this visit: opened, in the chat or not), ``in_chat`` (the chat has it too), ``open``
+    (it takes an answer), ``answered`` and ``skipped``. None when the run is over or its session has not begun."""
     from .. import compose, programs
     prog = _program_of(req, run)
     cur = run.get("current")
@@ -656,9 +665,12 @@ def _open_phase(req: Request, run: dict) -> dict | None:
     except (IndexError, KeyError, ValueError):   # the definition was edited under a run in progress
         return None
     prompt = ledger.find(ledger.snapshot(req.cfg.ledger_path), ph["prompt_id"]) if ph.get("prompt_id") else None
-    delivered = bool(prompt) and not ph.get("send_due")   # a re-send owed (a /back, a jump) leaves the old prompt there
+    # ``delivered``: the phase is current for this visit (opened: in the chat, or made current with no delivery);
+    # until then a /back or a jump leaves the old prompt there. ``in_chat``: its message is in the chat as well.
+    delivered = bool(prompt) and programs.phase_opened(ph)
     out.update(sent_text=(prompt or {}).get("phase_text"), delivered=delivered,
-               open=delivered and capture.open_phase(prompt) and run.get("status") == "active",
+               in_chat=delivered and bool(prompt.get("message_id")) and not ph.get("send_due"),
+               open=delivered and programs.face_open(prompt) and run.get("status") == "active",
                answered=bool(ledger.answers(prompt)), skipped=bool(ph.get("skipped")),
                phases_total=len(session.phases))
     return out
@@ -805,6 +817,7 @@ ROUTES: list[tuple[str, str, Callable, str]] = [
     ("GET", r"/api/v1/library", library_list, TOKEN),
     ("GET", r"/api/v1/library/(?P<id>[^/]+)", library_one, TOKEN),
     ("GET", r"/api/v1/library/(?P<id>[^/]+)/default", library_default, TOKEN),
+    ("GET", r"/api/v1/library/(?P<id>[^/]+)/open", library_open, TOKEN),
     ("GET", r"/api/v1/runs", runs, TOKEN),
     ("GET", r"/api/v1/runs/(?P<id>[^/]+)", run_one, TOKEN),
     ("GET", r"/api/v1/runs/(?P<id>[^/]+)/insights", run_insights, TOKEN),

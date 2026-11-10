@@ -124,6 +124,33 @@ def entry_path(root: Path, stem: str) -> Path:
     return root / f"{stem}.md"
 
 
+STEM = re.compile(r"^\d{4}-\d{2}-\d{2}-[a-z][a-z0-9-]*$")  # what an entry's name can be (no path, no dots)
+
+
+def entry_file(root: Path, stem: str) -> Path | None:
+    """The engine entry for ``stem``, or None (a bad name, a missing file, a file the engine did not write)."""
+    if not isinstance(stem, str) or not STEM.match(stem):
+        return None
+    path = entry_path(root, stem)
+    if not path.is_file() or is_analysis(path):
+        return None
+    return path if entry_key(path) else None
+
+
+def engine_file(root: Path, stem: str) -> Path | None:
+    """``entry_file`` narrowed to a file the engine wrote: its front matter has the engine's ``type`` and claims an
+    id the name can mean (``capture.entry_stem``'s own test). A hand-written ``2026-10-13-evening.md`` is readable
+    but is his: no face writes to it."""
+    path = entry_file(root, stem)
+    if path is None:
+        return None
+    fm = front_matter_of(path)
+    claimed = {fm.get("practice"), fm.get("kind")}
+    if fm.get("type") != ENGINE_TYPE or not claimed & {c[0] for c in name_candidates(path.name)}:
+        return None
+    return path
+
+
 def next_stem(root: Path, local_date: str, kind: str) -> str:
     """First unused stem for a kind that can repeat in a day (/j notes)."""
     n = 1
@@ -153,6 +180,9 @@ def _prompt_md(prompt: dict, names: Names, practice=None) -> str:
         return f"_Started by {names.companion}'s note._"
     sent = prompt.get("sent_at_local") or ""
     meta = f"_Sent {sent} · opener: {prompt.get('opener_source', '')}_\n\n" if sent else ""
+    if prompt.get("opened_via") and prompt.get("opened_at_local"):  # his first words on a face made the record
+        where = FACES.get(prompt["opened_via"], str(prompt["opened_via"]))
+        meta = f"_Written {prompt['opened_at_local']} in {where} · opener: {prompt.get('opener_source', '')}_\n\n"
     if prompt.get("asked"):
         meta += "_Woven in: " + "; ".join(f"[{a['id']}] {a['question']}" for a in prompt["asked"]) + "_\n\n"
 
@@ -847,6 +877,7 @@ _ENTRY_STEM = re.compile(r"^\d{4}-\d{2}-\d{2}-([a-z][a-z0-9-]*)\.md$")
 _REPEAT = re.compile(r"^(.+)-(\d+)$")
 _SESSION = re.compile(r"^(.+)-s(\d{2})$")
 FREEFORM_IDS = ("j", "note")  # a /j note; an entry the companion started with a note
+FACES = {"web": "the web app", "cli": "the CLI", "mcp": "MCP"}  # a record's ``opened_via`` → where he wrote, said aloud
 ENGINE_TYPE = "journal"  # the ``type:`` value every engine-written entry carries
 
 
