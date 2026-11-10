@@ -168,7 +168,8 @@ shows (missed, or due), and the web app is served a due row as upcoming. `channe
 no chat: nothing is sent, written, counted or alerted; an annotation reply or reflection that would have been sent is
 marked skipped (`no chat`) and never sent, also after a chat is set, and the pack and today block count them (owner's
 decision 3, 2026-11-09). New setting `windows.day_ends_at` (default `04:00`); a deliberate send before it takes
-today's date (`/start morning` at 03:30 delivers today's morning; owner's decision 1). `agent`
+today's date (`/start morning` at 03:30 delivers today's morning; owner's decision 1), or last night's slot when
+that is the nearer one (`/start evening` at 00:30). `agent`
 no longer imports the Hermes adapter for its failure copy; `status` does not need `serve/` for doctor. A no-chat
 install should not start a program run yet: phases with no chat come with OPEN-PROGRAMS.
 
