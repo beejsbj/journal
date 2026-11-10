@@ -3,6 +3,13 @@ this adapter only loads the configuration, names the turn and hands the call to 
 writes in an off-the-record turn. (``hooks.on_tool_call`` turns them away earlier with the same ``tools.refusal``;
 ``call`` checks again, so a hook that failed open does not let a write through.)
 
+The read-only tools (``tools.READ_ONLY``: ``journal_search``) go in a toolset of their own, ``journal_read``
+(``tools.READ_TOOLSET``), so the reflection's one-shot can be given them and nothing else (``-t journal_read``). A
+new plugin toolset is on in her chat too, even where the platform's toolsets were saved, unless the last save
+already knew it and left it out (Hermes' ``tools_config._enabled_plugin_toolsets``: ``known_plugin_toolsets``). To
+keep search out of her chat, switch ``journal_read`` off for that platform in ``hermes tools``; the reflection names
+the toolset itself and keeps it. ``agent.disabled_toolsets`` would take it from the reflection as well.
+
 Hermes passes the handler the session (and, when it has one, the turn) as keyword arguments; a handler never raises.
 """
 from __future__ import annotations
@@ -32,10 +39,13 @@ journal_add_note = _handler("journal_add_note")
 journal_set_location = _handler("journal_set_location")
 journal_notebook = _handler("journal_notebook")
 journal_program = _handler("journal_program")
-HANDLERS = {h.__name__: h for h in (journal_notebook, journal_set_location, journal_add_note, journal_program)}
+journal_search = _handler("journal_search")
+HANDLERS = {h.__name__: h for h in (journal_notebook, journal_set_location, journal_add_note, journal_program,
+                                    journal_search)}
 
 
 def register(ctx, names) -> None:
     for spec in tools.specs(names):
-        ctx.register_tool(name=spec.name, toolset=TOOLSET, schema=spec.schema, handler=HANDLERS[spec.name],
+        toolset = tools.READ_TOOLSET if spec.name in tools.READ_ONLY else TOOLSET
+        ctx.register_tool(name=spec.name, toolset=toolset, schema=spec.schema, handler=HANDLERS[spec.name],
                           description=spec.description, emoji=spec.emoji)

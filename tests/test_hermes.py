@@ -339,8 +339,9 @@ class RegisterTest(HermesHome):
         ctx = FakeCtx({"config_file": str(self.conf)})
         load_wrapper().register(ctx)
         self.assertEqual([t[0] for t in ctx.tools], ["journal_notebook", "journal_set_location", "journal_add_note",
-                                                  "journal_program"])  # WP6
-        self.assertEqual({t[1] for t in ctx.tools}, {"journal"})
+                                                  "journal_program",  # WP6
+                                                  "journal_search"])  # CONTINUITY: read-only, a toolset of its own
+        self.assertEqual({t[0]: t[1] for t in ctx.tools if t[1] != "journal"}, {"journal_search": "journal_read"})
         self.assertEqual(ctx.hooks, ["pre_gateway_dispatch", "pre_llm_call", "pre_tool_call"])
         self.assertEqual(ctx.commands, ["j", "x", "morning", "evening", "midweek", "weekly", "morning-journal",
                                         "evening-journal", "journal-start",  # WP2: /start <id>, routed by the hook
@@ -399,7 +400,7 @@ class RegisterTest(HermesHome):
         os.environ.pop("JOURNAL_CONFIG")
         ctx = FakeCtx({})
         load_wrapper().register(ctx)
-        self.assertEqual(len(ctx.tools), 4)
+        self.assertEqual(len(ctx.tools), 5)
         text = ctx.skills["journal-system"].read_text()
         self.assertIn("How Companion converses when the user answers", text)
         self.assertIn("**Fix your entire life in 1 day** (`/start fix-life`)", text)  # the built-in programs

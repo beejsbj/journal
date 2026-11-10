@@ -40,6 +40,97 @@ and the paper or the night room; the installed PWA shows "Update available" once
 The device keeps its ink and its theme; the new keys (`journal:theme`, `journal:sidebar`, `journal:room-focus`) start
 at their defaults. **Rollback.** The CLI at the previous sha and the same restart; the browser takes the old build at
 the next "Update available".
+## CONTINUITY — reflections read what came before, `journal_search`, only his words in quotes, one voice (2026-11-09; tick and hook side; **gateway restart needed**; **plugin pin before the CLI**; no config change; three new optional state fields)
+
+**What changes.** The day reflection and week review read the opening and the question of her last few analyses,
+what he wrote back to each, and the notebook threads the engine filed from the journal; their one-shot runs with
+`-t journal_read`, the new read-only `journal_search` tool (his words in the journal's files), with a 480 s budget.
+Quotes are checked against his words only (the period's entries, his replies, his words in any file); a quote
+that is not his, or a stray double quote mark of any kind, is a bad answer and retried, and a reflection that never
+passes is not written, as before. The catch-up and program checks run the same check against their one source (the
+catch-up's: his lines only). One voice description goes into the opener, annotation, reflection and week
+requests. The engine's own one-shots carry `JOURNAL_MODEL_STEP=1`, and the journal's `pre_llm_call` hook adds
+nothing to them (it used to append the whole notebook; the off-the-record mark and voice capture run as before).
+The reflection's one-shot also carries `JOURNAL_SEARCH_UPTO=<its period's last day>`: its search, its quotes and its
+notebook threads stop there, so one written late reads the journal as it stood at the end of its period. New state:
+`origin` on annotation and reflection follow-ups in `notebook.json`; `answers` on the capture of a note that replies
+to a reflection; `rejected_quote` on a reflection's ledger record (the first 60 characters of a quote that was not
+his, shown nowhere, gone once the reflection is written). Older code ignores all three.
+
+**Side and restart.** The tick is a fresh process (reflections, prompts, the follow-ups' `origin`): new code from the
+next tick. Each one-shot `hermes chat` is a fresh process that loads the plugin, so it registers `journal_read` and
+skips the hook as soon as the plugin pin moves. The gateway has imported `tools.py`, `hermes/tools.py`,
+`hermes/hooks.py`, `notebook.py`, `entries.py`, `context.py`, `conversations.py`, `prompts.py`, `plugin.yaml` and the
+skill, so **restart the gateway** for her chat to have `journal_search`, the skill's line about it and the
+conversation writer's `answers`. Ride a restart window, at least an hour from a ritual.
+
+**Order: the plugin pin first, then the CLI.** No process may run the new code (which files a follow-up with an
+on-the-record `origin`) while its one-shots still load the old plugin (whose hook appends the whole notebook,
+chat-made threads included, to the annotation's query): a chat paraphrase could then be filed as on the record. The
+tick described above imports the plugin's own `src/`, so it and its one-shots move together with the pin; a
+deployment whose tick runs the CLI install instead would hit exactly that between the two steps. The old CLI with
+the new plugin is safe, so pin first; if the order cannot be kept, pause the tick across both steps.
+
+1. Move the plugin pin (`hermes -p <profile> plugins install beejsbj/journal --force --ref <sha>`), then install the
+   CLI at `<sha>`, then `hermes -p <profile> gateway restart` in a window; restart `journal-serve` so doctor's version
+   rows agree. Nothing is sent.
+2. First checks, without sending: `journal doctor` as before. A new plugin toolset is on in her chat even when the
+   platform's toolsets were saved, unless the last save already knew it and left it out, so her next chat turn has
+   `journal_search` without a config change. To keep search out of her chat, switch `journal_read` off for that
+   platform in `hermes tools` (the reflection names the toolset itself and keeps it); `agent.disabled_toolsets` would
+   take it from the reflection too.
+3. After the next reflection: the file reads **What I notice** / **What moved** / **To carry forward**; the tick log
+   says `wrote <date>-reflection.md (…)`. A quote that is not his shows as `reflection attempt N/3 failed (a quote not
+   in his words at character 96 (line 3), 23 characters long)`, a stray or odd double quote mark as `… failed
+   (irregular quote mark U+201D at character 216 (line 3))`; after three, the usual alert with the same reason, and
+   no file. Neither line holds a word of the reflection; the quote's first 60 characters are in the ledger record's
+   `rejected_quote`. A run that searches is longer (budget 480 s; the tick waits for it); a timeout after another
+   model step answered in the tick uses an attempt instead of counting as an outage, and the try after a timeout
+   that was deferred goes without the search on 300 s.
+4. Rollback: the CLI and the plugin pin at the previous sha, and a gateway restart. The new state fields are
+   ignored by the old code; nothing needs undoing.
+## NOTEBOOK-NEWEST — the companion sees her newest notes, and a repeated note is not added (2026-11-09; `notebook.py`, `tools.py`, `tick.py`, `reflect.py`; gateway restart needed; no config or state change)
+
+**What changes.** The notebook block in the companion's chat turn (and in the opener pack) listed the 15 oldest open
+items, so at the cap of 40 it hid every recent note and showed the ones about to be pruned. It now lists the items
+that are due (`bring_up_after` reached; oldest due first), then the rest newest first, still with "(+N more)". Adding
+an item whose text equals an open one's (case, spacing and trailing punctuation ignored) adds nothing: the
+`journal_notebook` result carries `"duplicate": true` and the open item, raised again (its stale clock restarts, a
+date given replaces its date, with `"date_changed": true`), and the annotation and reflection passes log it and count
+only what they added. State files are unchanged in shape; open items already stored are read as before.
+
+**Side and restart.** `notebook.py` and `tools.py` are imported by the gateway (`journal.hermes` loads both through
+`tools`, `turncontext` and `context`; check with the import probe in *What needs what*), and the chat turn's block
+and the tool's add are the gateway's own paths, so **a gateway restart is needed**; until it the companion keeps the
+old order and the old add. The tick (`tick.py`, `reflect.py`, `context.py`) is a fresh process and runs the new code
+from the next tick after the pin moves. Serve side: untouched (serve never reads the notebook).
+
+1. Install the CLI at `<sha>`, move the plugin pin (`hermes -p <profile> plugins install beejsbj/journal --force
+   --ref <sha>`), then `hermes gateway restart` in the next window. Nothing is sent.
+2. First check, without sending: `journal doctor` is as before. In the companion's next chat turn the notebook block
+   starts with any due item and then the newest; asking her to note something already open answers "duplicate".
+3. Rollback: the plugin pin and the CLI at the previous sha, and a gateway restart. No state needs undoing: nothing
+   written under the new rules differs from what the old code would have written.
+## MD-ITALICS — `*italic*` renders as italic in Telegram messages (2026-11-09; `compose.py` only; hook side too: a gateway restart; no config or state change)
+
+**What changes.** The companion's Markdown italics written with single asterisks (`*"…"*`, as reflections and
+annotations quote him) now reach Telegram as `<i>…</i>` instead of showing the asterisks. `compose.md_to_html` and
+`compose.md_block_html` (which calls it) do it; `**bold**` still wins, a lone `*` (`5 * 3`, `2*3*4`, a `* ` bullet)
+stays literal, and an italic that would cross another tag stays literal so the HTML is never refused. The plain-text
+forms (`compose._md_plain`, `compose.plain` for a platform without HTML) lose the stars too. Nothing already sent is
+edited, except that a fold of an older opener (`folded_html`) re-renders its stored text with the new rule.
+
+**Side and restart.** `compose.py` is imported by the gateway (the import probe in *What needs what* lists
+`journal.compose`; `inbound`, `tools` and the commands reach it), so this is hook side as well as tick side: the tick
+sends the new rendering from the next tick after the pin moves, and the **gateway restart** brings the companion's own
+paths (annotation and reflection replies, program phases it sends) to it. Until the restart the gateway keeps the old
+rendering; nothing breaks in between. Serve side: untouched (the web app already renders `*italic*`).
+
+1. Install the CLI at `<sha>` and move the plugin pin (`hermes -p <profile> plugins install beejsbj/journal --force
+   --ref <sha>`), then `hermes gateway restart` in the next window. Nothing is sent.
+2. First check, without sending: `python3 -c "from journal import compose; print(compose.md_to_html('*\"a line\"* and 5 * 3'))"`
+   prints `<i>"a line"</i> and 5 * 3`. The next reflection or annotation reply shows its quotes in italic.
+3. Rollback: the plugin pin and the CLI at the previous sha, and a gateway restart.
 
 ## OPEN-PUSH — Web Push from `journal serve` to the installed PWA (2026-11-09; serve side only; **no gateway restart**; a new optional extra `journal[push]`; a new setting `push.*`; no state migration)
 

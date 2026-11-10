@@ -16,6 +16,11 @@ Anything that looks like the agent's failure text is never returned as an answer
 one-shot chat in the configured profile (``journal.hermes.companion``), and with ``agent.command`` any other command
 (``CommandCompanion``: an argv list; ``{query_file}``, ``{budget}`` and ``{toolsets}`` are filled in).
 ``agent.enabled: false`` turns model steps off entirely.
+
+Every run carries ``JOURNAL_MODEL_STEP=1`` in its environment: the journal's own hook in that process
+(``hermes.hooks.on_llm_call``) then adds nothing to the turn, so a model step sees only the query the engine wrote
+(the context pack an opener is given already holds what it should; the notebook and the today block are for her chat).
+A step may add variables of its own (``env``): the reflection's carries ``search.UPTO_ENV``, its period's last day.
 """
 from __future__ import annotations
 
@@ -28,6 +33,7 @@ from .config import Config
 from .ports import CompanionUnavailable
 
 DETAIL_CAP = 200
+MODEL_STEP_ENV = "JOURNAL_MODEL_STEP"  # set in every run's environment: the engine's own model step, not a turn of his
 _answered = False  # a model answered in this process (one tick): it is reachable again
 
 
@@ -126,10 +132,11 @@ class CommandCompanion:
         """Whether a picture can be attached to a question: a custom ``agent.command`` says so with ``{image}``."""
         return any("{image}" in str(part) for part in self.cfg.agent.get("command") or [])
 
-    def ask(self, query: str, budget: int, toolsets: str | None = None, image: str | None = None) -> str | None:
+    def ask(self, query: str, budget: int, toolsets: str | None = None, image: str | None = None,
+            env: dict[str, str] | None = None) -> str | None:
         """The agent's text, or None for an empty answer; raises ``AgentUnavailable`` on an outage. With ``image``
         (a path) the picture goes with the question; a companion that cannot take one answers None, never a
-        description of something it has not seen."""
+        description of something it has not seen. ``env``: more variables for this run's environment."""
         cfg = self.cfg
         if image and not self.takes_image():
             return None
@@ -139,8 +146,8 @@ class CommandCompanion:
             qpath = Path(fh.name)
         try:
             argv = self.argv(qpath, budget, toolsets, image) if image else self.argv(qpath, budget, toolsets)
-            out = subprocess.run(argv, capture_output=True, text=True,
-                                 timeout=budget + 60, cwd=str(cfg.state_dir), env=cfg.hermes_env())
+            out = subprocess.run(argv, capture_output=True, text=True, timeout=budget + 60, cwd=str(cfg.state_dir),
+                                 env={**cfg.hermes_env(), **(env or {}), MODEL_STEP_ENV: "1"})
         except subprocess.TimeoutExpired as e:
             raise AgentUnavailable(f"timed out after {e.timeout:.0f}s") from e
         except OSError as e:
@@ -164,20 +171,24 @@ class NoCompanion:
     def __init__(self, cfg: Config):
         self.cfg = cfg
 
-    def ask(self, query: str, budget: int, toolsets: str | None = None, image: str | None = None) -> str | None:
+    def ask(self, query: str, budget: int, toolsets: str | None = None, image: str | None = None,
+            env: dict[str, str] | None = None) -> str | None:
         raise AgentUnavailable("could not run the agent: adapter is none and agent.command is not set")
 
 
-def ask(cfg: Config, query: str, budget: int, toolsets: str | None = None, image: str | None = None) -> str | None:
+def ask(cfg: Config, query: str, budget: int, toolsets: str | None = None, image: str | None = None,
+        env: dict[str, str] | None = None) -> str | None:
     """The agent's text; None when it is off or answered with nothing; raises ``AgentUnavailable`` on an outage.
-    ``image``: a picture to attach (only when given, so a companion that predates it is called as before)."""
+    ``image``: a picture to attach; ``env``: variables for the run's environment (each passed on only when given, so
+    a companion that predates it is called as before)."""
     if cfg.agent.get("enabled") is False:
         return None
     companion = cfg.companion()
     takes = getattr(companion, "takes_image", None)
     if image and callable(takes) and not takes():
         return None  # nothing ran, so nothing answered: this is no evidence that the model is reachable
-    text = companion.ask(query, budget, toolsets, **({"image": image} if image else {}))
+    text = companion.ask(query, budget, toolsets, **({"image": image} if image else {}),
+                         **({"env": env} if env else {}))
     global _answered
     _answered = True
     return text

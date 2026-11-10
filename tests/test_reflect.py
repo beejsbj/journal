@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 
 from helpers import CHAT, add_prompt, make_cfg
 
-from journal import capture, context, entries, ledger, reflect, telegram, tick, validate
+from journal import capture, context, entries, ledger, notebook, reflect, telegram, tick, validate
 
 IST = ZoneInfo("Asia/Kolkata")
 GOOD = ('**What stood out** — The rain, and a walk in it anyway.\n\n'
@@ -50,8 +50,9 @@ class Base(unittest.TestCase):
             p.stop()
         self.tmp.cleanup()
 
-    def ask(self, cfg, query, budget, toolsets=None):
+    def ask(self, cfg, query, budget, toolsets=None, env=None):
         self.asked.append((query, toolsets))
+        self.env = env  # (what the run's environment gains: the search's bound, the period's last day)
         return self.answer
 
     def prompt(self, kind, day, hour, mid, opener):
@@ -102,7 +103,7 @@ class DayReflectionTest(Base):
         self.assertNotIn("how was the night?", body)
         self.assertTrue(body.rstrip().endswith("on your terms?"))
         query, toolsets = self.asked[0]
-        self.assertEqual(toolsets, "none")
+        self.assertEqual(toolsets, "journal_read")  # journal_search, and nothing that writes (test_continuity)
         self.assertIn("rain all day, walked anyway", query)
         self.assertIn("- He walked in the rain.", query)
         self.assertNotIn("[!question]", query)  # the question bank is not an input
@@ -141,20 +142,21 @@ class DayReflectionTest(Base):
         self.assertEqual(self.reflect(datetime(2026, 10, 15, 4, 5, tzinfo=IST)), ([], []))
         self.assertEqual(self.asked, [])
 
-    def test_invented_quote_writes_nothing_retries_then_alerts(self):
+    def test_a_bad_answer_writes_nothing_retries_then_alerts(self):
         sent = self.day()
         self.answer_prompt("evening", "2026-10-14", "rain all day, walked anyway", sent + timedelta(minutes=10), "11")
-        self.answer = GOOD.replace("rain all day, walked anyway", "I miss the lake house")
+        self.answer = '{"opener": "not a reflection at all, but JSON from a confused model, long enough to count"}'
         for n in (1, 2):
             alerts, log = self.reflect(datetime(2026, 10, 14, 23, 45, tzinfo=IST))
             self.assertEqual(alerts, [])
-            self.assertIn(f"attempt {n}/3 failed (quote not in the entries: 'I miss the lake house')", log[0])
+            self.assertIn(f"attempt {n}/3 failed (not prose)", log[0])
         alerts, _ = self.reflect(datetime(2026, 10, 14, 23, 50, tzinfo=IST))
         self.assertEqual(len(alerts), 1)
         self.assertIn("2026-10-14-reflection was not written after 3 attempts", alerts[0])
         self.assertEqual(self.reflect(datetime(2026, 10, 15, 4, 5, tzinfo=IST)), ([], []))  # alerted once, then quiet
         self.assertFalse(list(self.cfg.root.glob("*-reflection*.md")))
         self.assertEqual(self.bot.calls, [])
+        # (any bad answer does this; an invented quote is one too: test_continuity, QuotesTest)
 
     def test_failed_agent_degrades_to_no_reflection(self):
         sent = self.day()
@@ -228,7 +230,10 @@ class WeekReviewTest(Base):
         wk = self.prompt("weekly", "2026-10-18", "20", "20", "End of the week.")
         self.answer_prompt("weekly", "2026-10-18", "a soft week", wk + timedelta(minutes=10), "20")
         alerts, log = self.reflect(datetime(2026, 10, 18, 20, 40, tzinfo=IST))
-        self.assertIn("wrote 2026-10-18-week.md (annotated) (+1 notebook)", log)
+        # the day reflection's follow-up is the same words and still open: the week review adds nothing
+        self.assertIn("wrote 2026-10-18-week.md (annotated)", log)
+        self.assertNotIn("(+1 notebook)", " ".join(log))
+        self.assertEqual(len(notebook.open_items(self.cfg)), 1)
         body = (self.cfg.root / "2026-10-18-week.md").read_text()
         self.assertIn("kind: week\n", body)
         self.assertIn("# Iris's week review — 12–18 Oct 2026", body)
