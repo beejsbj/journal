@@ -29,7 +29,10 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   neither is a state derived from the schedule, a practice can be done any time on any face, `channel.platform:
   none` means no delivery by intent, and Web Push from `journal serve` nudges the PWA. Nothing a face writes, and no
   push, is a chat boundary, so neither can end a `/x` window. The owner took choices A–E on 2026-11-09 (recorded
-  there). To close: packages OPEN-CORE, OPEN-FACES, OPEN-PUSH and OPEN-PROGRAMS land.
+  there). To close: packages OPEN-CORE, OPEN-FACES, OPEN-PUSH and OPEN-PROGRAMS land. *OPEN-CORE built*: see
+  "OPEN-CORE" under *Taken*, which records where it read the doc. *OPEN-FACES built*: see "OPEN-FACES" under *Taken*.
+  *OPEN-PROGRAMS built*: see "OPEN-PROGRAMS" under *Taken*, with its follow-ups for OPEN-FACES and OPEN-PUSH.
+  *OPEN-PUSH built*: see "OPEN-PUSH" under *Taken*.
 
 - **SCRUB-PERSONAL — the source adapters and `brain:` (open, the owner's).** The built-in context sources (tududi,
   chat-scrobbler, listenbrainz, storyteller, audiobookshelf, grimmory) are optional features, but together they
@@ -3031,3 +3034,444 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   situational session interrupts a program's open phase, the program does not resend that phase by itself;
   `/start <word>` brings it back. Manual by design. Closes the open point in ONE-PROGRAM-RUN, review fixes (6) ("whether
   the engine should re-send it on its own").
+- **OPEN-CORE (2026-11-09) — slot states, slot resolution, the engine's write of his words, attach-only delivery and
+  `channel.platform: none`** (docs/OPEN-PROMPTS.md, package 1; issue #17). What the package built, and what it
+  decided where the doc left room:
+  - **One module, `slots.py`.** `slots.day` gives every slot of a date in its state (upcoming, due, open, answered,
+    missed) from the schedule and the ledger; `slots.resolve(cfg, practice, at, *, now, data, delivery)` is the four
+    steps of the doc; `slots.history` serves the web history. **A slot's window before anything was delivered** is
+    the one a delivery at the slot's time would have had: the practice's `collapse_hours`, else
+    `windows.collapse_hours` (not `grace_hours`, which stays the tick's sending window only). So a slot never sent on
+    a chat install reads *due* for that window, then *missed*.
+  - **`windows.day_ends_at`** (default `04:00`) is the doc's `day_ends_at`, under `windows` beside the other times; an
+    unusable value is 04:00 and doctor names it.
+  - **Step 4, "slot 1's id when the practice has no schedule"** is read as *when no slot of the practice falls on that
+    day*: `/start weekly` on a Wednesday is still `<date>-weekly` (the goldens freeze exactly that send, and a weekday
+    slot's id is never used on another day), and the next free number after the scheduled slots otherwise. A number
+    is free when neither a ledger record nor an entry file has it (a record pruned after 120 days leaves its file).
+  - **A deliberate delivery uses `resolve` with `delivery=True`**: `at` is now, so the "sent at or before `at`" check
+    is left out (it is true by construction, and a check against a send time from another clock would turn a re-send
+    into an extra entry). `scheduled` on a deliberate send's record is still the moment it was asked for, as before.
+  - **`actions.answer` / `actions.note`** hold the three refusals (`Refused.code`: `off-the-record`, `reserved-line`,
+    `placeholder`, plus `empty`, `not-a-practice` and `bad-time`: a time with no offset, or more than five
+    minutes ahead of the server's clock, as `serve/writes._at` refuses; no past limit here, since words before the
+    previous journal day make an extra entry and fill no old slot), take the ledger lock once for the record and the capture, and
+    write through `capture._web_record` (the web app's path), so rule, source and via are the face's (`web`, `cli`,
+    `mcp`). A face-made record: `message_id: None`, `sent_at` and `opened_at` the time of his words,
+    `opened_at_local`, `opened_via`, the plain opener (`opener_source: plain:<face>`), the question snapshot and the
+    practice's record fields. Its entry header reads `_Written 05:40 IST in the web app · opener: plain:web_`. The
+    faces still call `capture.capture_web` until OPEN-FACES moves them; nothing here is reachable from a face yet.
+  - **Attach-only delivery** happens only in the race of rule 3 (a scheduled send that goes out after he answered on
+    a face): the record keeps its fields and gains `message_id`, `sent_at`, `sent_at_local`, `chat_id`, `platform`,
+    `sent_opener` (and `sent_opener_source`), `sent_html`, `sent_plain_text` and `needs_edit`. The issue's
+    "deliberate send: the record's own opener, failure not alerting" has no path of its own: `resolve` never gives a
+    deliberate send an answered record, and **a deliberate send resolves again** under the ledger lock once its
+    opener is built if he answered its slot meanwhile, on a face or in the chat (`tick._resolve_again`; review
+    rounds 1 and 2), so it goes to the next slot that fits or an extra entry rather than attaching to his record or
+    re-sending a prompt he has just answered (on `main`, `/start` always re-sent). It can attach only in the instant between that check and the send,
+    as a scheduled send can. What remains of the issue's wording: **a failed send onto a record that has captures
+    counts no attempt and raises no alert** (it is logged): nothing is owed.
+  - **The web app as built reads four states** (`web/src/types.ts`), so `GET /today` serves a *due* row as
+    *upcoming* (with its `at`, and Send now) until OPEN-FACES teaches the PWA *due*; `today.collect`, the block and
+    MCP's today text have *due*. A row now also appears for a past slot with no record (*missed*, or *due*), where it
+    was absent before; `tests/fixtures/api/today.json` changes by that row.
+  - **The web history (`week_strip`, `insights/weeks`) counts slots** (`slots.history`): a slot delivered to the chat
+    or answered on any face, as before plus the face. A slot with neither counts (as missed, or waiting while due)
+    **only on a no-chat install**, where the due slot is the prompt; on a chat install a slot the chat never got (the
+    tick was down) was never before him and stays out of his history, as it always did (the doc's map says "slot
+    states" here; this keeps the chat install's history as the tests pin it, and is the same line `standing` draws:
+    slots he saw). A derived slot counts only from its practice's first record in the ledger on, so a newly added
+    practice, or the days before the ledger kept anything, read as nothing rather than as a row of misses; a no-chat
+    install's history therefore starts at his first answer of each practice.
+  - **`standing.unanswered`** counts delivered prompts and face-made records (`opened_via`); a backfilled record and
+    a failed send's record are not counted (as before). `her_messages` stays delivered-only.
+  - **`channel.platform: none`** is `Config.has_channel` false: `send_due` returns before writing anything (a
+    `journal send` logs one line, exit 0), and annotation replies, reflection sends, program summaries and their
+    retries, program notes and `cli._notify` attempt nothing; status shows no *undelivered* or reply rows; doctor's
+    channel row is ok. `Config.channel()` with `none` is `NoChannel` (a send that slipped through fails loudly).
+    **Left open** (decided since: *Owner's decisions 2026-11-09*, 3, below): an annotation or reflection written
+    while there was no chat stays unsent; if a chat is configured later, the tick sends the backlog (annotation
+    replies and reflections have no age limit).
+  - **Rules 9 and 10 key on a face's `via`** (`capture.by_face`: `web`, `cli`, `mcp`), not on a missing
+    `platform_message_id` (rule 9's parenthesis) or on any `via` (rule 10's "Fix"): chat captures without a message
+    id exist (a gateway event with none, the conversation writer's notes) and so do the sweep's and the writer's own
+    `via`s, and those keep reading as before (review round 1). Face captures get no alignment text and are not legacy
+    chat captures, which is what the doc's two rules are for.
+  - **Engine alone:** `agent.is_failure_text` holds Hermes' failure copy itself (the adapter re-exports it), and
+    `status.serve_rows` answers one row when `serve/` is not installed; a test runs `today`, `status`, `doctor` and
+    `tick` from a copy of the package without `hermes/`, `serve/` and `mcp/`.
+  - **Built against the doc as merged (#16, `c7ab632`).** Step 3 of `resolve` also takes a later slot whose only
+    record is a failed send's (no delivery, no captures), and `actions.answer` fills that record in; choosing a
+    practice again after an answer fills the next slot that fits (a 09:30 answer, then `/start water` or words at
+    10:00, take the unrecorded 15:00 slot, and the tick skips its send) before any extra entry.
+  - **"A second write staying with its slot on a multi-slot practice"** (the doc's test list) is read through its
+    paragraph *Adding more words to an entry already written goes through that entry*: more words for a slot already
+    answered go through the entry (the web app's `POST …/blocks` today, `journal write --entry` in OPEN-FACES), and
+    `actions.answer`, which is "choosing the practice", fills the next slot that fits. So OPEN-CORE has no entry-level
+    write in `actions`; the two sentences of the doc only agree read this way.
+  - **Tests changed.** `tests/test_serve.py`'s `GET /today` equality maps a *due* row to *upcoming* before comparing
+    with `today.collect` (the served mapping above), and `tests/fixtures/api/today.json` gains the 06:00 morning row,
+    *due* at 09:12 and served *upcoming*. `tests/fixtures/today.json` (the block's fixture) does not change, unlike
+    the doc's test list expects: its fixed day has neither a due slot nor a face answer, and the new lines are pinned
+    in `tests/test_open_readers.py`. No other existing test changed: the pre-send check holds the opener's pack back
+    through a context variable in `tick` rather than a new `_opener` parameter, so the tests that stand in for
+    `_opener` with its five-argument signature keep working.
+  - **Left for OPEN-PROGRAMS:** with `channel.platform: none`, a program phase (`programs._send_phase`) and an
+    interrupt still go to the channel, which refuses them, so they count and alert as before. The doc puts phases
+    and interrupts with no chat in package 4. Until then a no-chat install should not start a program run: its
+    first phase would fail and alert as on any install whose channel refuses a send.
+  - **Review round 1** (an independent Opus pass over the branch): no blocker, no privacy leak. Fixed, each in its
+    own commit naming it: slots before `day_ends_at` resolved by calendar date (major); an extra entry taking another
+    practice's id; a deliberate send attaching when he answered during its opener; the engine-only test not
+    exercising `agent.is_failure_text`; the no-chat tests passing with the guards off; rules 9 and 10 catching chat
+    captures; `actions` accepting a naive or future time; docs overstating rule 6. **Declined, left open for the
+    owner** (decided since: *Owner's decisions 2026-11-09*, 1, below): in the small hours the journal day sends practices back to yesterday, also a morning practice: at 03:30
+    words for *morning* go to yesterday's missed morning (step 2), and `/start morning` re-sends yesterday's
+    delivered morning while today's 06:00 still goes out (on `main` it delivered today's). That is the doc's rule as
+    written (steps 2–4 on the journal day; `/start` through `resolve`); a practice-level "my day starts here" would
+    be a doc change, not this package's. Nits declined: on a no-chat install `status` still says reflections are
+    "written, not sent" (true, and harmless); `failure_target` reads `none:<id>` when a chat id is set beside
+    platform `none` (nothing is sent to it); a deliberate re-send of yesterday's slot carries today's date in its
+    header, as a re-send always did.
+  - **Review round 2** (a second independent Opus pass): no blocker, no privacy leak, the round-1 fixes hold. Fixed:
+    a deliberate send answered *in the chat* during its opener re-sent onto that prompt (now it resolves again, as for
+    a face); `her_messages` after a lost race named the face's plain opener instead of the one the chat message has;
+    `capture.by_face` raised on a damaged `via`; a slot was put on a journal day by its delivery time, so a late tick
+    could move it (now by its scheduled time); the today block called a slot the chat never got "missed" with no
+    word that it was never sent (now `<id> at HH:MM, not sent to the chat (missed)`); DEPLOY's first check named a
+    log line an answered slot does not write. **Left open for the owner** (decided since: *Owner's decisions 2026-11-09*, 2, below: as built): a practice scheduled between midnight and
+    `day_ends_at` (say *night* at 00:30) done in the daytime fills *tonight's* slot, whose id and entry are dated
+    tomorrow (`2026-10-16-night` on the 15th), and the tick then skips that send; on `main` a `/start night` at 09:00
+    re-sent the 15th's. This is the doc's journal day applied as written (an evening chosen at 15:00 fills tonight's
+    evening), and `tests/test_open_slots.py` pins it; none of the built-ins is scheduled before 04:00. Today's rows
+    stay by calendar date, so that 15th row reads missed while the words wait in the 16th's slot. If the owner wants
+    such a practice's daytime words in last night's slot instead, step 2 would also take the missed slots of `at`'s
+    calendar date: a doc change.
+- **OPEN-PROGRAMS (2026-11-09) — programs and interrupts with no chat** (docs/OPEN-PROMPTS.md, package 4 and its
+  constraints; issue #20; stacked on OPEN-CORE). What the package built, and what it decided where the doc left room:
+  - **A phase is opened, then delivered.** `_send_phase` is now `_build` (the record and its messages; a reflect
+    phase's construction and a bridge are asked for here, in the tick or a spawned `journal program …`, never in
+    serve), `_open` (the ledger record with `message_id: None`, `sent_at` the moment it became current, `phase_open`
+    and an open span; the run's phase gets `prompt_id` and `opened_at`; the run's other phases close) and `_deliver`
+    (the old send, through `tick.send_prompt`). `send_due` means "owed a delivery": `_arrive` still sets it (so a
+    transition that dies before opening is picked up by the step, as `test_restart_mid_transition…` pins) and `_open`
+    sets it to `Config.has_channel`. `programs.phase_opened(ph)` is the one reader of what that means: a prompt and
+    `opened_at`, or (a run from before this package) a prompt and no send owed. Opening writes nothing to `sent.jsonl`,
+    `send-times.json` or the thread stamps and mirrors nothing, so it is never a chat boundary; everything that reads
+    the chat still requires `message_id`. A record the chat already has (a `/back`, `/start` taking the phase up
+    again) keeps its message and send times when opened; the re-send that follows brings the new text, as before.
+  - **The `/x` hold covers the delivery only**, as the doc asks; two readings of it. *The settle*: a settle on an
+    answer made on a face (`capture.by_face` of the newest capture) no longer asks `_off_the_record`; a settle on an
+    answer in the chat still waits for the window (`test_programs_review`'s `test_a_settle_waits…` pins that, and
+    keeps the chat as it was: the phase he is answering there stays the open one in the chat until the window closes).
+    On a face's answer the next phase is opened at once and its delivery is held. *The engine's notes from a settle* (a schedule phase's "interrupts timed" and "send a
+    day and time") are held back too (`_say(auto=True)`); one held back is not said later (the schedule is in the run,
+    `journal program status` and the web app). A phase opened inside a window still has its reflect construction built
+    (the old code skipped that model call while held); a delivery that waited builds the phase again, as the old
+    owed send did.
+  - **Nothing owed for what he has answered.** An automatic delivery (the tick's step, a settle) of a phase answered
+    since it was opened is not made (`send_due` cleared, logged); an interrupt answered on a face before its
+    delivery is not sent (item `answered`). His own `/next` or `/skip` in the chat on a phase that is current,
+    unanswered and owed to the chat still delivers it rather than moving on (`test_an_owed_send_that_keeps_failing…`
+    pins that); given on a face, or on a no-chat install where nothing is ever owed, Next moves on (review round 1). A delivery given up on (`SEND_ATTEMPTS`, alerted once)
+    is not tried again by the step, as before, and the phase still settles on a face's answer.
+  - **Interrupts open at their time on every install** (`_open_interrupts`, from `send_interrupts`): each due one,
+    the older ones a late tick records as missed included, gets its ledger record with no `message_id`. With no chat
+    its item reads `open` and nothing is attempted; with one it stays `pending` until delivered (`sent`), answered on
+    a face (`answered`) or missed, and the `/x` hold, the grace window and the alerts are as before. The insights
+    document reads his words for an interrupt that is `sent`, `open` or `answered`.
+  - **The web app.** `POST /entries/{stem}/blocks` takes `interrupt: N` (instead of `phase`) for an interrupt that
+    has opened: any age, any run status but a cancelled item, nothing moves on (no `advance`), `409
+    interrupt-not-open` otherwise; the refusals are `_Words`' as for every block. `GET /runs/{id}`'s `delivered` now
+    means "current for this visit" (the PWA as built shows the answer box on it, as OPEN-CORE served *due* as
+    *upcoming* to the same PWA), and a new `in_chat` says whether the chat has it. Serve still reads no chat and calls
+    no model: a phase's construction is made by the spawned child, and the route walk and a new test run an interrupt
+    answer with `sqlite3.connect` and `privacy.view` failing.
+  - **Where the issue and the doc differ** (the doc wins): the issue lists `journal write` on the CLI for
+    interrupts; the doc's table says phases and interrupts on the CLI and MCP come later, and `journal write` is
+    OPEN-FACES's (not built yet). So the faces here are the web app's API; **follow-up for OPEN-FACES**: `journal
+    write` (and MCP, if it takes program answers) answers the open phase or an opened interrupt through
+    `capture.add_web_block(phase_prompt=|interrupt_prompt=)` behind `actions.refuse`, and the PWA gets a control for
+    an interrupt (a web change, so a CI build of `static/`; the API is ready; the owner's decision 6, 2026-11-09: a
+    small separate package after #28 and #29 merge). **Follow-up for OPEN-PUSH** (not
+    landed): push a phase made current with no delivery and an interrupt that opens, under `push.when` and rule 12
+    (no ledger write, never a boundary).
+  - **Tests changed.** `tests/test_serve_programs.py`'s `test_a_phase_that_is_owed_a_send_is_not_open` now also
+    takes the phase's `opened_at` away: a phase owed only its delivery is open (the issue's "`_phase_target` stops
+    reading `send_due` as not delivered"), one a transition has not yet made current is not.
+    `tests/fixtures/api/run-one.json` gains `in_chat`; `tests/test_serve_privacy.py` gains an interrupt sample. No
+    golden changes. New: `tests/test_open_programs.py` (the ten sessions from the web app alone with no chat, extending
+    `test_ten_sessions_with_no_model`; phases and interrupts with no chat; the hold on a chat install; the web
+    routes and their refusals).
+  - **Rollback** (DEPLOY.md): old code reads an opened, undelivered phase with no send owed (no chat) as delivered and
+    never sends it; `journal program start <id>` sends the open phase again. Old code reads an interrupt item `open`
+    or `answered` as not pending and never sends it.
+  - **Review round 1** (an independent Opus pass, read-only, with probes in temporary copies): no blocker, no leak of
+    words said off the record; opening a phase or an interrupt is never a chat boundary. Fixed, each test-first:
+    (major) Next or Skip in the web app on a phase whose chat send was held sent it and ended his `/x` window: the web
+    app's `journal program …` now runs `programs.on_a_face()` (inferred from a missing `--notify` in round 1, made an
+    explicit `--face` in round 2), so the chat send it causes is held as an automatic one is, and Next or Skip there
+    moves on from a phase still owed to the chat (in the chat, `/next` still delivers what was owed);
+    a session finished on a face or by a settle inside a window held its summary in no way (now held, uncounted, and
+    sent by the step once the window closes); a phase whose message the chat already had (`/back`, `/start`) took his
+    next chat message again before it was re-sent (now `face_open`: current on the faces only until the re-send, as
+    before this package); a delivery that waited rebuilt a reflect phase and sent a different construction from the
+    one the web app showed (now the record keeps `construction` and `bridge`, reused without a model call); a phase
+    owed when the chat was set to `none` kept being attempted (nothing is owed with no chat); a web answer to an
+    interrupt `missed` in the chat was left out of the insights, and one answered on the web was cancelled by an
+    abandon (now `answered`); a second confirmation could reuse an opened interrupt's id (`_batch`). Nits fixed: the
+    docstrings of `serve/api._open_phase`, `serve/writes._phase_target`, `capture.open_phase`, DEPLOY's rollback
+    wording, `describe`'s line. **Kept:** `_answered_this_visit` counts any capture since the phase was opened, a
+    direct reply to an older message of it included (the reviewer suggested faces only): a reply in the chat is an
+    answer to the phase, and re-sending a phase he has just answered is what the rule avoids.
+  - **Review round 2** (a second independent Opus pass): no blocker, no leak; the round-1 fixes hold for their cases.
+    Fixed, test-first: (major) inferring a face from a missing `--notify` made a shell's `journal program next` move
+    past a phase he never saw, and the settle the chat's hook spawns ran as a face: serve now passes `--face` on
+    `start`, `next`, `skip`, `back` and `resume`, and only that flag makes a face (the serve spawn-argument tests in
+    `test_serve_programs.py` and `test_one_program.py` gain it); a phase left behind kept its failed attempts, so it
+    stayed in `status`'s undelivered rows and a later visit read as given up (`_left` drops them when the run moves
+    off a phase the chat never got); a reopened phase showed the old text on the web while the chat got the new
+    (`phase_text` and the intro are kept per visit); summaries of sessions done with no chat went out in a burst when
+    a chat was set (`summary_unsent: no chat`); an answer showed under an earlier confirmation's interrupt of the same
+    number; a second confirmation dropped an interrupt answered on a face (it reconciles first); a first phase whose
+    send waited lost the program's intro. **Left open, for the owner** (decided since: *Owner's decisions 2026-11-09*, 5,
+    below: as built): when a chat is set on an install that ran a program with none, the phase that is current is not sent by itself (nothing was owed when it opened): `/start
+    <program>` sends it, and until then the chat takes nothing for it (README *No chat* says so). A summary held by a
+    window is not sent if the run is abandoned before the window closes (as a summary whose sends failed). On a chat
+    install an interrupt opened while its send is held still reads `pending`, so the PWA lists it as still to come.
+- **OPEN-FACES (2026-11-09) — a practice done and answered on the web app, the CLI and MCP** (docs/OPEN-PROMPTS.md,
+  package 2; issue #18; stacked on OPEN-CORE). What the package built, and what it decided where the doc or the issue
+  left room:
+  - **Opening is a view: `actions.view`.** One function gives what *Write now*, `journal open <id>` and MCP's
+    `journal_start` show: the practice's title, `prompt` in the entry document's shape (the plain opener and every
+    question), and the slot words written now would fill (`slots.resolve` on a snapshot: `slot` with its step, and
+    `fills`, the same in words: "Fills the 23:00 slot early; it will not be sent."). Nothing is written. **Where the
+    slot is a prompt the chat already has** (step 1 open, or step 2 a delivered miss), the view shows that prompt as
+    it was sent (`capture.stored_opener`, its question snapshot, `asked`) rather than the plain opener: his words will
+    answer that message, and showing him different words would be wrong. The doc's "the practice's plain opener" is
+    read as the opener of a slot nothing was delivered for. The slot a view names can change before he saves (a tick
+    sends meanwhile); the save resolves again under the lock, and `journal write` repeats the view's line only when
+    the slot it filled is the one named.
+  - **The answer route is `POST /entries`.** The issue's "an answer route over `actions.answer` (practice, text, at,
+    client_id, media as `POST /entries` has)" is read as `POST /entries` with `practice` becoming that route, not a
+    second write route beside it: the body is the same, the PWA's Reply already posts there, and two routes for one
+    act would be two places for the refusals and the upload handling to drift. With `practice` it is
+    `actions.answer` (never a `/j` note: Decision D), without one (or `j`, `note`) `actions.note`. The response adds
+    `slot` (the record's id), not the step: a retry is answered from the ledger, which does not keep the step. The
+    new route is the view, `GET /library/{id}/open` (a sample in `test_serve_privacy.py`).
+  - **A practice turned off is refused** by `actions` (`Refused.code` `disabled`; serve `409 disabled`, the CLI exit
+    2, an MCP refusal), as `/start` and `journal send` refuse it. The doc's "a practice can be done at any time" says
+    nothing about one he switched off; refusing matches the chat, and a practice turned on again takes words at once.
+    **Reversed by the owner** (*Owner's decisions 2026-11-09*, 4, below): `enabled: false` is "not scheduled" only.
+  - **More words for an entry: `actions.add`** (`journal write --entry <stem>`), the doc's *Adding more words to an
+    entry already written goes through that entry*: the three refusals, only an entry the engine wrote
+    (`entries.engine_file`, moved there from `serve/document.py` so the CLI has it without `serve/`), not a program
+    session's (its answers belong to a phase: OPEN-PROGRAMS), and not dated before the entry's day; it writes through
+    `capture.add_web_block`, which now takes the face's `via`. The web app's *Add* (`POST …/blocks`) stays on
+    `add_web_block` directly, since it carries the program-phase rules; its refusals are `actions.refuse` now.
+  - **One set of refusals.** `serve/writes._his_words` and MCP's checks (for `journal_add_note` too) call
+    `actions.refuse` instead of holding copies (rule 7): the codes are the same (`off-the-record`, `reserved-line`,
+    `placeholder`), the words are `actions`' (the web adds that what he typed is still in the browser). `actions`
+    answers a repeated `client_id` before its empty check, so a retry whose upload the first request consumed is the
+    first result, as `POST /entries` always answered it.
+  - **The web app.** *Write now* on every Today card, whatever the state (the doc's table and the issue: answered
+    starts the next slot that fits or an extra entry, the server says which), replacing *Reply*: both were the same
+    act, and the card shows the prompt the chat has above it already. It fetches the view only when he opens it, and
+    shows the view's prompt only when the card has none. *Send now* is called **Send to chat**, the doc's name, on
+    Today and in the Library: beside *Write now*, "Send now" read as the same thing. The Library gains a *Write now*
+    link (`/today?write=<id>`), so a practice with no slot today can be done too. **`/today`** is Today's second path
+    (the doc's link, which a push notification will carry in OPEN-PUSH); `?write=<id>` opens that practice's first
+    row still to answer, else its first row, else the practice alone. The PWA reads the fifth state, `due` ("due since
+    09:00"), so `GET /today` serves it as `collect` has it.
+  - **The CLI.** `journal write` takes its words from stdin when stdin is not a terminal or `-` is given, else from
+    `$VISUAL` / `$EDITOR` (else `vi`) on a temporary file, as git commit asks for a message, with **git's scissors
+    line** (`# ---- >8 ----`) above the practice shown as a template: everything from it down is left out and nothing
+    else is, so a line of his starting with `#` (a Markdown heading) is kept, which git's comment stripping would
+    lose. Empty words or an editor that fails save nothing (exit 1); refusals exit 1; an argument the journal cannot
+    use (an unknown practice, a bad `--at`, an id with `--entry`, an unknown entry) exits 2. `--at` takes an ISO time
+    and, unlike the web's API, also one without an offset or a bare `HH:MM` (the latest such time not more than five
+    minutes ahead: at 00:30, `23:30` is last night's), both read in the journal's time
+    zone (a person typing at a terminal); there is no 31-day limit here (serve keeps its own): words before the
+    previous journal day make an extra entry and fill no old slot (OPEN-CORE). `hermes journal` does not gain `open`
+    and `write` (it mirrors the chat-side subset); `journal` has them.
+  - **MCP.** `journal_start` returns the view plus a `next` line naming `journal_save`, spawns nothing, and is
+    annotated read-only (choice C). So the hold inside a bare-`/x` window it had (a spawned `journal send
+    --hold-off-record`) has nothing left to hold: it cannot end a window or take his next private message at all.
+    `journal send --hold-off-record` stays for a script that asks for a send. `server.build` loses its `spawn`
+    argument. `journal_save` with `practice` is `actions.answer` and answers with `slot` and `step`.
+  - **The chat.** The two chat changes the doc names (`/start` and `journal send` take their slot from
+    `slots.resolve`) were built in OPEN-CORE (`tick.send_due` with `only`; `/start` spawns `journal send`), with its
+    tests (`test_start_takes_the_slot_that_is_due_not_always_slot_one`,
+    `test_a_deliberate_start_after_a_face_answer_makes_an_extra_entry`); this package adds nothing there.
+  - **`capture.capture_web`** is called by no face now (`actions` replaced it in serve and MCP). It stays, with its
+    tests, for a later cleanup rather than as part of this package.
+  - **Tests changed.** `tests/test_mcp.py`: `journal_start` returns the view and spawns nothing (was: spawns `journal
+    send … --hold-off-record`), a practice with no open prompt fills its slot (was: a `/j` note), the SDK's read-only
+    tool set gains `journal_start`, `build` takes no `spawn`. `tests/test_serve_writes.py`: the evening with no open
+    prompt fills its slot (was: a `/j` note; that half of the test moved to a test of its own). `tests/test_serve.py`
+    and `tests/test_open_readers.py`: `GET /today` serves `due` (OPEN-CORE's mapping to `upcoming` is gone).
+    `tests/fixtures/api/today.json`: the 06:00 morning row reads `due`. `tests/test_privacy_seams_d.py`: the
+    `journal_start` window test now pins that nothing is spawned or written inside a window (was: the spawned send
+    carries `--hold-off-record`). `web/tests`: *Reply* is *Write now* and *Send now* is *Send to chat*.
+  - **Review round 1** (an independent Opus pass over the branch): no blocker, no privacy leak (refusals before any
+    write, no face write a chat boundary, serve and MCP reach no database, chat or model; the fences and the route
+    walk hold). Fixed, each in a commit naming it: `journal write` checked `--at` and `--entry` only after the editor
+    and then deleted the file, losing his words (major: now checked before, and words refused after it are kept in
+    the editor's file unless off the record); the CLI's clock was read before the editor, so a prompt delivered
+    while he wrote was not the one answered (major: read again at the save); the template was saved as his words,
+    her opener with it, when the scissors line was removed, and a scissors string inside a line of his cut it;
+    `--at` in year 1 was a traceback (now `bad-time` in `actions.when`, every face); after a save from
+    `/today?write=`, the reload opened Write now again (now `?write` is used once and leaves the address); *Send to
+    chat* on a journal with no chat said "On its way…" for good (now `GET /today` says `chat`, Today leaves the
+    button out, and the send route is `409 no-chat`); nits (a note's template, `journal write j` as a note, a
+    missing editor, the slot of another day named plainly, a privacy sample for a delivered prompt's view). `HH:MM`
+    is now the latest such time not ahead of now. **Recorded rather than changed:** the installed PWA's old build
+    refuses a `due` row until it takes the update (DEPLOY's first checks say to tap *Update available*; keeping
+    OPEN-CORE's mapping for old clients would need the server to tell builds apart, for a window of minutes);
+    `--at` has no lower bound beyond what the calendar can place (a typo years back makes an extra entry on that
+    day, which is visible and his to move; serve's 31-day limit is the web's).
+  - **Review round 2** (a second independent Opus pass, over the whole branch and the round-1 fixes): one major, a
+    privacy one in a round-1 fix: the editor's file was removed only on `journal write`'s normal returns, so an
+    interrupt while the editor ran (Emacs's C-g, a Ctrl-C at `code --wait`), an unreadable file or an exception at the
+    save left it on disk, `/x` words included. Fixed: the file lives in a 0700 directory of its own (the editor's
+    swap and auto-save files go with it), this process ignores SIGINT and SIGQUIT while the editor runs (as git
+    does), and every way out settles it: removed when nothing of his is in it or any line of it is off the record,
+    else kept and named (`_Draft`). Also fixed: words written below the scissors, or saved before the editor failed,
+    were deleted (now kept and named); an `OSError` at the save was a traceback; `HH:MM` a few minutes ahead was
+    yesterday's (now within the five-minute slack it is today's, as the ISO time is); the template ignored `--at`
+    (`actions.view` takes `at`); `fills` called a 00:30 slot "tomorrow's" (journal days now); `?write` opened an
+    earlier missed card while the words filled a due one (`writeTarget` follows `resolve`'s order); a practice the
+    view refuses still showed a composer; DEPLOY's temporary-journal write check ran with `HERMES_HOME` set, whose
+    plugin settings would have pointed it at the vault and the live ledger (now `env -u HERMES_HOME` and a doctor
+    check first); stale docs. The editor now runs through the shell, as git runs it (`code --wait`, `~`, quoting).
+- **OPEN-PUSH (2026-11-09) — Web Push from `journal serve` to the installed PWA** (docs/OPEN-PROMPTS.md *Push
+  notifications* and rule 12; issue #19; stacked on OPEN-FACES; the RFC 8291/8292 module `serve/webpush.py` came from
+  the first slice on branch `open-push`). What the package built, and what it decided where the doc or the issue left
+  room:
+  - **Where the issue and the doc differ, the doc.** The issue's thread reads "slot states once a minute, each slot
+    turning due pushed once"; the doc says eligibility comes "from the schedule and that marker, never from catching
+    the slot in the *due* state, which a tick delivering it a moment earlier would hide". Built as the doc says
+    (`push.due`): a scheduled slot of today or yesterday (a late evening's grace runs past midnight) whose time has
+    come, still within `windows.grace_hours`, with no captures, and not in `push-sent.json`. A practice turned off has
+    no slot (`slots.day`), so it is not pushed.
+  - **The payload carries the practice's id** beside its title and "due now" (`{"title", "body", "practice"}`): the
+    tap opens `/today?write=<id>`, which needs it. Nothing else, and the service worker builds the address from the id
+    alone, never from a URL in the payload.
+  - **`GET /api/v1/push`** (not in the issue) gives Settings what it needs: whether the server can push (and why not),
+    the public key to subscribe with, `push.when`, whether this journal pushes, and the device count. It makes the
+    keys if the first start could not, so a browser is never left without one.
+  - **Subscriptions are signed-in routes, not `api.WRITE`.** They change no entry, ledger or definition, so a
+    read-only server (`serve.allow_write: false`) still nudges, as logout is a signed-in POST today. They still need
+    the site's `Origin`.
+  - **Serve posts only to the browsers' push services.** The doc's "its outbound calls go to the push services only"
+    is held at the door: a subscription's endpoint must be `https` on `fcm.googleapis.com`, `android.googleapis.com`,
+    `updates.push.services.mozilla.com`, `*.push.apple.com` or `*.notify.windows.com` (no user info, port 443), else
+    `422 bad-subscription`; otherwise a signed-in request could make serve POST to any address. A browser using
+    another service would need the list widened. At most ten devices; a new one past that replaces the oldest.
+  - **Once means at least one device took it.** A slot is marked pushed when one device's push service accepted it;
+    when every device failed (the network down), the next pass tries again, within the slot's grace. A device that
+    failed while another succeeded misses that slot. The push service keeps a push until the slot's grace ends
+    (`TTL`, at least a minute), so a phone that comes back online late is not nudged for a slot already over.
+  - **`push-sent.json` is pruned by age** (three days), in the pass itself, rather than "with the ledger": a pass
+    looks at today and yesterday only, and serve does not run the ledger's prune.
+  - **`push.subject`**, a setting the doc does not name: the VAPID `sub` claim is sent to the push service with every
+    push. Defaulting it to the site (`https://<serve.host>`) would hand Apple, Google or Mozilla his private site's
+    name; the default is the project's URL, which names the software. An operator can set a `mailto:` of their own.
+  - **`push.when`** takes `no-chat` and `always`; anything else (or a `push` that is not an object) is a config
+    warning and means `no-chat`. It is not on the web's settings allow-list (`WEB_WRITABLE`): it is set in the config
+    file or Hermes settings, like `serve.*`. `plugin.yaml` documents it with no default, as it does `serve`.
+  - **The thread** is started by `journal serve` (`cli.serve`, after `prime`), not by `app.run`, so the tests that run
+    a server start none. It makes the keys, then a pass at once and one a minute until the server stops; a pass that
+    fails is logged and the next one runs. It never takes `tick.lock`.
+  - **The PWA.** Settings gains *Notifications*, in the current design's style (a section with a panel, as pairing
+    has): permission is asked from the tap only; on an iPhone or iPad outside the Home Screen app it says to add it
+    there first; a subscription made with another key (the server's keys were lost) reads as off, and one the device
+    has is posted again on opening Settings (idempotent), so a server that dropped it gets it back. A push shows one
+    notification per practice (`tag`).
+  - **Program phases are not pushed:** OPEN-PROGRAMS (PR #29) has not merged into this base. Recorded as its
+    follow-up: once a phase can be current with no delivery, the pass should push it as it does a slot.
+  - **Tests changed.** None of the existing tests; `tests/test_serve_privacy.py` gains the push routes' samples and a
+    pass, under the same refusal of `sqlite3.connect` and the privacy pass.
+  - **Review round 1** (an independent Opus pass over the branch): no blocker and no privacy leak (a push writes only
+    its own two files, reads no chat, calls no model, never takes `tick.lock`; the payload never reads a record; the
+    routes and a pass run with `sqlite3.connect` and the privacy pass refused). Fixed, each in a commit naming it: a
+    marker that could not be written re-sent the push every minute for the whole grace, and two passes at once (a
+    second serve on the same state dir) sent twice (now the slot is claimed in `push-sent.json` before anything is
+    sent, and released only when no device took it and the failure may pass); a lasting refusal (a 403) was retried
+    every minute (now only no answer, a 429 or a 5xx is; another 4xx is logged once); an endpoint with spaces or
+    control characters was kept and failed for ever (refused now); a payload's size told one title from another
+    (padded to 256 bytes); Settings could say "On" for a device the server had refused (the browser's subscription is
+    ended then); a replacing notification was silent (`renotify`); a subscription the browser rotated stopped pushes
+    until Settings was opened (`pushsubscriptionchange`); Settings read "Off" while it was still checking, said nothing
+    when the server had no key, and left a replaced subscription counted. From its suspicions: `Urgency: high` (a phone
+    saving power gets the nudge at once), the tap focuses before it navigates, and the docs now say what the push
+    service learns besides the payload's size: the server's address, the one VAPID key, and, since the browser
+    registers the site when it subscribes, possibly the site's address whatever `push.subject` says.
+- **Owner's decisions 2026-11-09 (OPEN-PROMPTS)** — the owner's answers to the points the OPEN-CORE reviews left
+  open, and to three more from OPEN-FACES and OPEN-PROGRAMS (PRs #27–#30). Applied where they need code; 5 and 6 are
+  recorded only.
+  1. **A deliberate delivery before `day_ends_at` takes today's calendar date** (`/start <id>`, `journal send <id>`,
+     the web's *Send to chat*). Words he writes before `day_ends_at` still count toward the previous journal day (an
+     evening answered at 00:30 fills last night's evening). So at 03:30 `/start morning` delivers today's morning (its
+     06:00 slot, early: step 3), and the tick's 06:00 send is then done. Built as `slots._by_calendar`: with
+     `delivery=True` and `at` before `day_ends_at`, `resolve`'s steps run over today's calendar date only (a due or
+     open slot; the newest missed; the next later one with no record or a failed send's; an extra entry dated today).
+     **Read to the letter** this sent tonight's evening early for `/start evening` at 00:30; amended 2026-11-10 to
+     the nearest slot (*Decision 1's evening case*, under 3 below). Faces never pass `delivery=True`, so a face write cannot move by this, and a delivery
+     stays the only thing that makes a chat boundary. Tests: `tests/test_open_slots.py`
+     (`a_delivery_before_day_ends_at…`, `…after_day_ends_at…`), `tests/test_open_core.py`
+     (`start_before_day_ends_at…`).
+  2. **No change:** a practice slotted before `day_ends_at`, done in the daytime, fills tonight's slot, as built and
+     pinned (`test_the_night_practice_done_in_the_day_fills_tonights_slot`).
+  3. **No chat: annotation replies and reflection sends are skipped, not left pending.** With `channel.platform:
+     none`, each that would have been sent is marked `skipped: "no chat"` (`annotation_reply` and the reflection's
+     `telegram` record, with `skipped_at`), so a chat configured later never sends it, as OPEN-PROGRAMS does for a
+     summary (`summary_unsent: "no chat"`). A reply is marked whatever `telegram.annotation_replies` says, so
+     turning replies on with a chat later sends no backlog. `status` lists no skipped reply as pending and reads a
+     skipped reflection "written, not sent: no chat". Instead the companion is told: `standing.collect` gains
+     `no_chat`, the count of annotations and reflections written (by `annotated_at` / `written_at`) after the last
+     prompt delivered before the newest skip, and the pack's *Where things stand* and the today block's standing
+     lines carry one line, e.g. "While there was no chat: 12 annotations and 3 reflections were written; they are in
+     the entries, never sent to the chat." Counts only, never their words. A reply still owed from before the chat
+     was set to none is skipped too but not counted (it was written with a chat). Once the chat delivers again the
+     line stays a day (`standing.NO_CHAT_SHOWN`), so a plain opener's delivery does not take it away before an
+     opener's pack or the first thread's today block has carried it. MCP's `journal_today`
+     does not get it: its today text does not take standing (`today.collect` without `with_standing`), so nothing
+     there changed. Tests: `NoChannelTest` in `tests/test_open_core.py` (nothing pending or sent after a chat is set;
+     the line in standing, the pack and the today lines, with no word of the annotation or reflection).
+     **Decision 1's evening case (2026-11-10).** Read to the letter, decision 1 also covered a practice that closes
+     the day: at 00:30, `/start evening` delivered tonight's evening early, the tick's 23:00 send was then done, and
+     the day's reflection was written from words meant for last night. The owner's example was a morning, and he was
+     asked "nearest slot, or always today?" without answering before the work changed hands; the orchestrator took
+     nearest, which keeps his 03:30 morning and is the smaller surprise at 00:30. He can still say "always today":
+     it is one condition in `slots.resolve`. The rule: before `day_ends_at`, a deliberate delivery takes today's
+     calendar date unless the practice's scheduled slot nearest to now belongs to the journal day before
+     (`slots._last_night_is_nearer`); then it resolves as words do (last night's slot while it is due, open or
+     missed; an extra entry of last night once it is answered). A tie, a slot that is both, and a practice with no
+     schedule are today's; with no slot on today's date, last night's counts when under twelve hours behind. The
+     rule is not evening-only: a 13:00 practice started at 00:30 is yesterday's, as its words then would be. A
+     delivery of last night's slot after midnight is headed with today's date (declined for re-sends above; the
+     same here). Tests: the four `test_a_delivery_before_day_ends_at_…` cases after the 03:30 one in
+     `tests/test_open_slots.py`.
+  4. **`enabled: false` means "not scheduled" only.** Every face can still open, write and deliver a disabled
+     practice (the web app, `journal open`/`journal write`, MCP, `/start` and `journal send`); the schedule never
+     sends it. Applied on OPEN-FACES (#28): `actions` no longer refuses one (the `disabled` code is gone, with serve's
+     `409 disabled` on `POST /entries`, `GET /library/{id}/open` and `POST /library/{id}/send`, and the CLI's), and
+     `commands.start` and `journal send` take it; the PWA keeps *Write now* and *Send to chat* on its Today card and
+     Library page. A turned-off practice has no slot (`slots.scheduled_on` is empty for it), so words or a send make
+     an extra entry of the day (`<date>-<id>` first, then the next number past its schedule's slots: a two-slot
+     practice's second is `-3`), and the Today rows show it only once it has a record. **Kept, from the review of
+     these changes:** `library.closer` still takes enabled practices only, so a turned-off evening does not close
+     the day (`test_the_day_closes_on_a_renamed_evening_in_a_fork` pins that: turning it off is how a fork hands
+     `closes: day` to another practice; written on a face, its day reflection waits for the 04:00 fallback); and
+     `/start`'s menu and the skill's *Kinds* list name enabled practices only (what is offered; one turned off is
+     still taken when named). The PWA's comment in `today.tsx` that still says "turned off or unknown" waits for
+     the next web change (a comment alone would cost a CI build).
+     A program turned off is still refused (the decision names practices). The tests that pinned the refusal now pin
+     the opposite: `test_open_faces.py` (`…turned_off_is_not_scheduled_but_every_face…`), `test_serve_writes.py`,
+     `test_mcp.py`, `test_practices_engine.py` (`…not_due_and_still_starts`), `test_cli.py`, and the web's
+     `writes.test.tsx`.
+  5. **A program started with no chat sends nothing when a chat is configured later;** the owner resumes it with
+     `/start` (as built in OPEN-PROGRAMS, #29). Recorded only.
+  6. **The PWA control for answering an interrupt** comes as a small separate package after #28 and #29 merge.
+     Recorded only.

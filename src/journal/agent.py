@@ -34,11 +34,24 @@ _answered = False  # a model answered in this process (one tick): it is reachabl
 AgentUnavailable = CompanionUnavailable  # the engine's name for it (one class)
 
 
+# Hermes' user-facing failure copy (locales/en.yaml ``gateway.*``: generic_failed, unreachable,
+# connection_interrupted, provider_kept_failing, no_credentials, no_response …) opens with a warning
+# sign and points at /retry, `hermes doctor` or `hermes logs`; provider rejections add "Provider said:". Kept here, not
+# in the Hermes adapter, so the engine runs (and recognises an agent's failure printed with exit 0) without it.
+FAILURE_MARKS = ("⚠", "⏱")
+FAILURE_PHRASES = ("(`hermes logs`)", "`hermes doctor` on the host", "use /retry", "provider said:",
+                   "couldn't finish this reply")
+
+
 def is_failure_text(text: str | None) -> bool:
-    """Whether ``text`` is the agent reporting a failure rather than a model answer (the Hermes adapter knows the
-    copy: ``journal.hermes.companion``)."""
-    from .hermes.companion import is_failure_text as failure
-    return failure(text)
+    """Whether ``text`` is the agent reporting a failure rather than a model answer (Hermes' failure copy)."""
+    t = (text or "").strip()
+    if not t:
+        return False
+    if t.startswith(FAILURE_MARKS):
+        return True
+    low = t.lower()
+    return len(t) < 800 and any(p in low for p in FAILURE_PHRASES)
 
 
 def __getattr__(name: str):

@@ -7,6 +7,11 @@
   "practices": {
     "rows": [
       {
+        "id": "morning",
+        "state": "due",
+        "at": "06:00"
+      },
+      {
         "id": "gratitude",
         "state": "upcoming",
         "at": "21:30"
@@ -92,5 +97,6 @@
     "his": "Sam",
     "hers": "Ada"
   },
+  "chat": true,
   "location_source": null
 }

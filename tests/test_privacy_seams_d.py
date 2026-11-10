@@ -548,14 +548,19 @@ class UnusableQuietTest(ReceiveBase):
 
 
 class McpStartWindowTest(McpCase):
-    """journal_start is a model acting for him, so it holds while a bare-/x window is open, as the automatic sends do.
-    The MCP face does not read the chat (its fence), so the spawned send asks the privacy pass and holds itself, and
-    the tool's answer says so."""
+    """journal_start is a model acting for him. Until OPEN-FACES it spawned a send that held inside a bare-/x window;
+    now it sends nothing at all (a view, OPEN-PROMPTS choice C), so it cannot end a window or take his next private
+    message, inside one or not: nothing is spawned, and the ledger and the send logs are untouched."""
 
-    def test_the_send_is_spawned_to_hold_inside_a_window(self):
-        got = mcp_handlers.start(self.cfg, "evening", spawn=self.spawn)
-        self.assertEqual(self.spawned, [["send", "evening", "--hold-off-record"]])
-        self.assertIn("off the record", got["note"])
+    def test_opening_a_practice_inside_a_window_sends_and_writes_nothing(self):
+        conversations.note_off(self.cfg, None, datetime.now(timezone.utc) - timedelta(minutes=1), thread_start=True)
+        ledger_before = self.cfg.ledger_path.read_bytes()
+        with mock.patch("subprocess.Popen", side_effect=AssertionError("a spawn")):
+            got = mcp_handlers.start(self.cfg, "evening", SERVE_NOW)
+        self.assertEqual((got["practice"], self.spawned), ("evening", []))
+        self.assertEqual(self.cfg.ledger_path.read_bytes(), ledger_before)
+        for name in ("sent.jsonl", "send-times.json"):
+            self.assertFalse((self.cfg.state_dir / name).exists(), name)
 
     def test_the_cli_takes_the_flag(self):
         from journal import cli

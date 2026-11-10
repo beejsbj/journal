@@ -3,8 +3,9 @@ sends and program steps that are spawned rather than run here.
 
 What keeps these safe is what they call, not what they check:
 
-* **The engine only appends his words; he can change them.** A reply or a block goes through
-  ``capture.capture_web`` / ``capture.add_web_block`` (``entries.record_reply``, under the ledger lock like the hook's
+* **The engine only appends his words; he can change them.** Words for a practice, or a note, go through
+  ``actions.answer`` / ``actions.note``, and a block through ``capture.add_web_block`` (``entries.record_reply``,
+  under the ledger lock like the hook's
   and the tick's writes). The routes that change a file he already has are his own acts, each carrying the state he was
   looking at and refused on drift (409, never an overwrite): ``PATCH …/meta`` replaces the front matter alone
   (``entries.set_meta``), ``PATCH``/``DELETE …/blocks/<key>`` replace or remove one block of his and nothing else
@@ -33,7 +34,7 @@ from functools import wraps
 from pathlib import Path
 from typing import Callable
 
-from .. import audio, capture, entries, ledger, library, settings
+from .. import actions, audio, capture, entries, ledger, library, settings
 from .. import config as jconfig
 from . import api, blocks, document, uploads
 from .api import HTTPError, Reply, Request
@@ -76,23 +77,24 @@ def _text(body: dict, key: str = "text") -> str | None:
     return value.replace("\r\n", "\n").replace("\r", "\n")
 
 
+# The refusals' words on this face, which speaks to him (the rule is ``actions.refuse``, the same for every face)
+SAID = {"off-the-record": "this, or a line of it, starts with the off-the-record command, so it is not saved; what you "
+                          "typed is still in your browser",
+        "reserved-line": "a line shaped like `%% journal … %%` is the engine's own marker and cannot be part of your "
+                         "words; nothing was saved",
+        "placeholder": f"“{audio.TRANSCRIBING}” is the journal's line for a recording still being transcribed and "
+                       "cannot be part of your words; nothing was saved"}
+
+
 def _his_words(req: Request, text: str | None) -> str | None:
-    """His text, if he sent any, after the refusals: off the record, the engine's own marker lines, and the engine's
-    transcript-pending placeholder."""
+    """His text, if he sent any, after the refusals every face has (``actions.refuse``): off the record, the engine's
+    own marker lines, and the engine's transcript-pending placeholder. 422 with the refusal's code."""
     if text is None:
         return None
-    if capture.opt_out(req.cfg, text) is not None:
-        raise HTTPError(422, "off-the-record", "this starts with the off-the-record command, so it is not saved; "
-                                               "what you typed is still in your browser")
-    if capture.opt_out_inside(req.cfg, text):  # as the chat takes a merged burst: a /x on any line covers all of it
-        raise HTTPError(422, "off-the-record", "a line of this starts with the off-the-record command, so none of it "
-                                               "is saved; what you typed is still in your browser")
-    if entries.ENGINE_MARK.search(text):
-        raise HTTPError(422, "reserved-line", "a line shaped like `%% journal … %%` is the engine's own marker and "
-                                              "cannot be part of your words")
-    if audio.TRANSCRIBING in text:  # the tick would fill it as a recording's block, and the editor would lock it
-        raise HTTPError(422, "placeholder", f"“{audio.TRANSCRIBING}” is the journal's line for a recording still "
-                                            "being transcribed and cannot be part of your words")
+    try:
+        actions.refuse(req.cfg, text)
+    except actions.Refused as e:
+        raise HTTPError(422, e.code, SAID.get(e.code, str(e))) from None
     return text
 
 
@@ -189,9 +191,22 @@ def _engine_entry(req: Request) -> Path:
     return path
 
 
+REFUSED = {"off-the-record": 422, "reserved-line": 422, "placeholder": 422, "empty": 400, "bad-time": 400,
+           "not-a-practice": 404}   # ``actions.Refused.code`` → the status a write answers
+
+
+def _refused(e: actions.Refused) -> HTTPError:
+    status = REFUSED.get(e.code, 400)
+    return HTTPError(status, "bad-request" if status == 400 else "not-found" if status == 404 else e.code,
+                     SAID.get(e.code, str(e)))
+
+
 @bounded
 def entry_create(req: Request):
-    """A reply to a practice's open prompt (``practice``), else a /j note of its own. ``at`` stamps the heading."""
+    """His words from the web app, through ``actions``: with ``practice``, that practice's entry (``actions.answer``:
+    the slot ``slots.resolve`` gives, its open prompt, its due or missed slot, the next one later today, else an
+    extra entry; never a /j note); without one (or ``j``), a /j note of its own (``actions.note``). ``at`` stamps the
+    heading."""
     body = req.json()
     practice = body.get("practice")
     if practice is not None:
@@ -199,22 +214,33 @@ def entry_create(req: Request):
             raise HTTPError(400, "bad-request", "practice must be a practice id")
         if practice not in req.lib().practices and practice not in entries.FREEFORM_IDS:
             raise HTTPError(404, "not-found", "no practice by that id")
+    if practice in entries.FREEFORM_IDS:
+        practice = None
     cid = _client_id(body)
     words, when = _Words(req, body, cid), _at(req, body)
     with words:
-        info = capture.capture_web(req.cfg, practice, words.text or "", req.now, at=when, client_id=cid, **words.args)
+        try:
+            if practice is None:
+                info = actions.note(req.cfg, words.text or "", when, via=capture.WEB_VIA, now=req.now, client_id=cid,
+                                    **words.args)
+            else:
+                info = actions.answer(req.cfg, practice, words.text or "", when, via=capture.WEB_VIA, now=req.now,
+                                      client_id=cid, **words.args)
+        except actions.Refused as e:
+            raise _refused(e) from None
     path = Path(info["path"])
-    done = {"stem": path.stem, "path": str(path), "rule": info["rule"]}
+    done = {"stem": path.stem, "path": str(path), "rule": info["rule"], **({"slot": info["slot"]} if practice else {})}
     return Reply(200 if info.get("duplicate") else 201, done)
 
 
-def _phase_target(req: Request, stem: str, body: dict) -> tuple[dict, str] | None:
+def _phase_target(req: Request, stem: str, body: dict) -> tuple[dict, str, str] | None:
     """The run and phase prompt a block on entry ``stem`` answers, or None for an entry that is not a program's.
 
     A program session's entry does not exist before its first answer, so the run (not the file) says what ``stem``
     is: some run's session has it as its entry. (If a file of his already sits at that name, the engine files the
     answer under the next free one, ``capture.entry_stem``, and the reply says which; his file is never written.) A block must name the phase it answers, and that phase must be the
-    run's open one, delivered, with the run active: the rule a Telegram message follows, made explicit because a
+    run's open one, current for this visit (``programs.phase_opened``: delivered to the chat or not), with the run
+    active: the rule a Telegram message follows, made explicit because a
     browser cannot rely on "the newest prompt in the chat". 409 ``phase-not-open`` otherwise."""
     from .. import programs
     found = None
@@ -228,10 +254,12 @@ def _phase_target(req: Request, stem: str, body: dict) -> tuple[dict, str] | Non
         if fm.get("program"):
             raise HTTPError(409, "phase-not-open", "this entry belongs to a program run that is no longer there, so "
                                                    "no phase of it is open")
-        if body.get("phase") is not None:
-            raise HTTPError(400, "bad-request", "phase is for the entries of a program session")
+        if body.get("phase") is not None or body.get("interrupt") is not None:
+            raise HTTPError(400, "bad-request", "phase and interrupt are for the entries of a program session")
         return None
     run, s = found
+    if body.get("interrupt") is not None:
+        return _interrupt_target(req, run, s, body)
     if req.lib().programs.get(run["program"]) is None:   # as ``api.wrong_state``: no definition, no open phase
         raise HTTPError(409, "phase-not-open", "the program's definition is missing, so no phase of this run is open",
                         run=run["id"], run_status=run.get("status"))
@@ -244,10 +272,30 @@ def _phase_target(req: Request, stem: str, body: dict) -> tuple[dict, str] | Non
         raise HTTPError(409, "phase-not-open", why, run=run["id"], run_status=run.get("status"))
     cur = run.get("current") or {}
     ph = ((run.get("sessions") or {}).get(str(s)) or {}).get("phases", {}).get(str(phase)) or {}
-    if (cur.get("session"), cur.get("phase")) != (s, phase) or not ph.get("prompt_id") or ph.get("send_due"):
+    # (current for this visit: opened, whether or not the chat has it yet; a delivery owed is not "not open")
+    if (cur.get("session"), cur.get("phase")) != (s, phase) or not programs.phase_opened(ph):
         raise HTTPError(409, "phase-not-open", f"phase {phase} of this session is not the open phase",
                         run=run["id"], where=programs.where(run))
-    return run, ph["prompt_id"]
+    return run, ph["prompt_id"], "phase"
+
+
+def _interrupt_target(req: Request, run: dict, s: int, body: dict) -> tuple[dict, str, str]:
+    """The run and interrupt prompt a block answers (``interrupt``: its number in session ``s``): one that has opened
+    (its time came and the engine wrote its record, ``programs._open_interrupts``), delivered to the chat or not, of
+    the newest confirmation of the session that has one. As a reply to it in the chat, it may come at any age and the
+    run may have finished. 409 ``interrupt-not-open`` otherwise."""
+    n = body.get("interrupt")
+    if isinstance(n, bool) or not isinstance(n, int) or body.get("phase") is not None:
+        raise HTTPError(400, "bad-request", "interrupt must be the number of one of this session's interrupts "
+                                            "(and a block answers a phase or an interrupt, not both)")
+    snap = ledger.snapshot(req.cfg.ledger_path)
+    opened = [i for i in run.get("scheduled") or [] if i.get("session") == s and i.get("n") == n
+              and i.get("status") != "cancelled" and ledger.find(snap, f"{run['id']}-{i['id']}") is not None]
+    if not opened:
+        raise HTTPError(409, "interrupt-not-open", f"interrupt {n} of this session has not opened (its time has not "
+                                                   "come, or it was never sent)", run=run["id"])
+    item = max(opened, key=lambda i: i.get("batch", 1))
+    return run, f"{run['id']}-{item['id']}", "interrupt"
 
 
 def _after_phase_block(req: Request, info: dict) -> str:
@@ -275,6 +323,7 @@ def block_add(req: Request):
     # A retry of a block already written is answered from the ledger, even after the run moved on and wherever the
     # answer was filed (`stem` may be the planned name while a file of his holds it: the answer sits one name on).
     target = None if dup else _phase_target(req, stem, body)
+    interrupt = target is not None and target[2] == "interrupt"
     of_program = target is not None or bool(dup and dup[0].get("run"))
     if not of_program:
         _engine_entry(req)
@@ -284,9 +333,12 @@ def block_add(req: Request):
     with words:
         try:
             info = capture.add_web_block(req.cfg, stem, words.text or "", when, client_id=cid,
-                                         phase_prompt=target[1] if target else None,
+                                         phase_prompt=target[1] if target and not interrupt else None,
+                                         interrupt_prompt=target[1] if interrupt else None,
                                          key_of=lambda p: _last_words_key(req, p), **words.args)
         except capture.PhaseClosed:
+            if interrupt:
+                raise HTTPError(409, "interrupt-not-open", "that interrupt has not opened; reload it") from None
             raise HTTPError(409, "phase-not-open", "the run moved on from that phase; reload it") from None
     path = Path(info["path"])
     # the key the block got when it was written (kept with the capture); a record from before that was kept has
@@ -294,7 +346,7 @@ def block_add(req: Request):
     done = {"key": info.get("block") or _last_words_key(req, path)}
     if of_program:   # (the stem too: the answer goes where the engine files the session, not always at `stem`)
         done["stem"] = path.stem
-        if not info.get("duplicate"):
+        if not info.get("duplicate") and not info["prompt"].get("interrupt"):  # (an interrupt's answer moves nothing)
             done["advance"] = _after_phase_block(req, info)
     return Reply(200 if info.get("duplicate") else 201, done)
 
@@ -700,8 +752,10 @@ def library_send(req: Request):
     pid, current = _practice_or_404(req)
     if current is None:
         raise HTTPError(404, "not-found", "no practice by that id")
-    if not current.enabled:
-        raise HTTPError(409, "disabled", "this practice is turned off (enabled: false)")
+    # (``enabled: false`` is "not scheduled" only: a practice turned off is still sent when asked; the owner, 2026-11-09)
+    if not req.cfg.has_channel:   # (``journal send`` would log that nothing was sent; say it here instead)
+        raise HTTPError(409, "no-chat", "this journal has no chat (channel.platform: none), so nothing is sent to "
+                                        "one: use Write now")
     return _spawned(req, ["send", pid])
 
 
@@ -747,7 +801,7 @@ def run_start(req: Request):
         raise HTTPError(409, "active-run", "this program has a run in progress: carry on with it, or abandon it first",
                         run=run["id"], run_status=run["status"])
     _one_at_a_time(req, prog.id)
-    args = ["program", "start", prog.id, "--new"] + (["--session", str(session)] if session else [])
+    args = ["program", "start", prog.id, "--new"] + (["--session", str(session)] if session else []) + ["--face"]
     return _spawned(req, args)
 
 
@@ -773,6 +827,8 @@ def run_action(req: Request):
             raise HTTPError(409, "moved-on", "the run is not at that phase any more; reload it",
                             run=run["id"], where=programs.where(run))
         args += ["--expect", expect]
+    if action in ("next", "skip", "back", "resume"):  # (asked for here, not in the chat: ``programs.on_a_face``)
+        args.append("--face")
     # (a run's own transitions are never refused for another program: an unfinished run already holds its slot)
     return _spawned(req, args)
 

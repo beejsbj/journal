@@ -69,7 +69,7 @@ def her_messages(cfg: Config, now_local: datetime) -> list[tuple[datetime, str]]
     """What the journal sent as the companion over the last ``MINE_DAYS`` days: prompts (with whether they
     were answered), annotation replies, reflections, catch-ups after an outage. Newest kept within
     ``MINE_CAP``. Lines start with ``validate.MINE``: her words, not his."""
-    from . import ledger, library, reflect
+    from . import capture, ledger, library, reflect
     cutoff = now_local - timedelta(days=MINE_DAYS)
     data = ledger.snapshot(cfg.ledger_path)
     rows: list[tuple[datetime, str]] = []
@@ -87,8 +87,10 @@ def her_messages(cfg: Config, now_local: datetime) -> list[tuple[datetime, str]]
     for p in data["prompts"]:
         at = when(p.get("sent_at")) if p.get("message_id") else None
         if at and p.get("kind") not in entries.FREEFORM_IDS:
-            plain = str(p.get("opener_source") or "").startswith("plain")
-            opener = "(the stock opener)" if plain else (p.get("opener") or "").strip()
+            # (what the chat message says: a delivery that attached to his record from a face keeps its own opener
+            # in ``sent_opener``, OPEN-PROMPTS rule 3)
+            plain = str(p.get("sent_opener_source", p.get("opener_source")) or "").startswith("plain")
+            opener = "(the stock opener)" if plain else (capture.sent_opener(p) or "").strip()
             title = library.for_prompt(cfg, p).title
             add(at, f"{title} prompt · {prompt_state(cfg, p, now_local)}", opener or "(no opener)")
         reply = p.get("annotation_reply") or {}

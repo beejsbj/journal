@@ -48,7 +48,7 @@ from urllib.parse import parse_qsl, unquote
 from .. import config as jconfig
 from .. import version
 from ..config import Config
-from . import api, auth, sse, static, writes
+from . import api, auth, push, sse, static, writes
 
 # worker-src and manifest-src name what default-src already implies, so the PWA's service worker and manifest are
 # allowed (and only from this origin) on purpose, not by the fallback chain a browser may or may not follow.
@@ -78,7 +78,8 @@ class App:
         self._key: tuple | None = None     # (signature, key)
         self.log = log or (lambda line: print(line, file=sys.stderr, flush=True))
         self.spawn = spawn or writes.spawn_journal   # (cfg, argv tail) -> log path; tests substitute a recorder
-        self._routes = [(m, re.compile(p + r"\Z"), fn, a) for m, p, fn, a in [*api.ROUTES, *writes.ROUTES]]
+        self._routes = [(m, re.compile(p + r"\Z"), fn, a) for m, p, fn, a in [*api.ROUTES, *writes.ROUTES,
+                                                                                       *push.ROUTES]]
         self._routes.append(("GET", re.compile(r"/api/v1/events\Z"), self._events, api.TOKEN))
 
     # ── configuration, token, cookie key ─────────────────────────────────────

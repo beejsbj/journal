@@ -74,7 +74,7 @@ the `Channel` port (CHANNELS).
 
 ```
 plugin.yaml, __init__.py             repo root = Hermes plugin (wrapper → journal.hermes.register)
-pyproject.toml                       console script `journal`; extras: hermes = [pyyaml]; no extra for serve
+pyproject.toml                       console script `journal`; extras: hermes = [pyyaml], mcp, push = [cryptography] (Web Push only)
 web/                                 PWA source (Preact + TypeScript + Vite); not a Python package
 deploy/example-overlay.json          an overlay's shape (names, paths, serve.*); real overlays live outside the repo
 deploy/journal-serve.service.example rendered by `journal serve --print-unit` from config
@@ -94,6 +94,13 @@ src/journal/
   hookstate.py        NEW  pending voice / pending pack / off-record turns, persisted under ledger.locked_state
   questions.py        (removed in WP13: the goldens and tools ask the Practice)
   schedule.py         due() over every scheduled practice + runs' one-off scheduled steps
+  slots.py            NEW  slot states (upcoming, due, open, answered, missed) from the schedule and the ledger; the
+                           journal day (`windows.day_ends_at`); resolve(): which slot words or a deliberate send go to
+                           (OPEN-PROMPTS)
+  actions.py          NEW  his words from a face: answer() into the slot resolve() gives, note(), add() to an entry;
+                           the refusals (`/x`, marker lines, the transcript placeholder) for every face; view(): a
+                           practice opened on a face (Write now, `journal open`, `journal_start`), a read; never a
+                           chat boundary
   capture.py, entries.py, compose.py, prompts.py, validate.py, reflect.py   keyed by Practice, not `kind in KINDS`
   privacy.py, conversations.py, sweep.py, recovery.py, context.py, mirror.py   consume ports.Row via cfg.transcript()
   agent.py            ask() facade + CommandCompanion (argv template); raises AgentUnavailable
@@ -104,7 +111,9 @@ src/journal/
     programs/fix-life/program.md  programs/fix-life/sessions/01-anti-vision.md … 10-one-day-reset.md
     situational/conversation-prep.md  situational/post-session-debrief.md
   serve/              `journal serve`: app.py (ThreadingHTTPServer + router), api.py (one function per route),
-                      auth.py (token, pairing, cookie, Origin), static.py, sse.py, unit.py (--print-unit)
+                      auth.py (token, pairing, cookie, Origin), static.py, sse.py, unit.py (--print-unit),
+                      push.py (Web Push: keys, subscriptions, the pass-a-minute thread, its routes) over
+                      webpush.py (RFC 8291 aes128gcm, RFC 8292 VAPID; `cryptography` from the extra journal[push])
     static/           committed PWA build (index.html, assets/, sw.js, manifest.webmanifest)
   hermes/             the Hermes adapter (thin): __init__ (register), hooks, tools (registration only), commands,
                       cron, runtime, transcript.py (HermesTranscript: state.db → Row), companion.py (HermesCompanion),
@@ -289,9 +298,11 @@ New keys (all names generic; a deployment's overlay supplies its values):
 | `serve.trusted_proxies` | `[]` | CIDRs whose `X-Forwarded-*` are believed (e.g. the reverse proxy's subnet, `10.0.0.0/24`). |
 | `serve.public_port` | none (443) | The HTTPS port the site is published on when not 443 (SERVEPORT). |
 | `serve.socket` | none | A Unix socket served as well as TCP (0600), for `tailscale serve … unix:<path>` (TSAUTH). |
+| `push.when`, `push.subject` | `no-chat`, none (the project's URL) | Web Push from serve (OPEN-PUSH): `no-chat` pushes only with `channel.platform: none`, `always` on a chat install too; the VAPID contact the push services see. |
 | `serve.tailscale_users` | `[]` | Logins signed in by `Tailscale-User-Login` on the socket only, from tailscaled (root peer) only, for a client that is not this host and not marked cross-site (TSAUTH). |
 | `adapter` | `auto` | `hermes` / `none` / `plainchat`; auto = hermes when `hermes_home` is set. |
-| `channel.platform`, `channel.chat_id`, `channel.user_ids` | `telegram`, `telegram.chat_id`, `[]` | The journal's chat (CHANNELS): any Hermes gateway platform, the chat as Hermes names it, and his ids there (empty: the chat is his, as a DM is). |
+| `channel.platform`, `channel.chat_id`, `channel.user_ids` | `telegram`, `telegram.chat_id`, `[]` | The journal's chat (CHANNELS): any Hermes gateway platform, the chat as Hermes names it, and his ids there (empty: the chat is his, as a DM is). `channel.platform: none` is a journal with no chat (OPEN-PROMPTS rule 6, `Config.has_channel`): prompts, annotation replies, reflections, program summaries and notes are not sent, attempted, counted or alerted; slots go upcoming → due → missed by derivation. Program phases and interrupts are opened with no delivery and answered on a face (OPEN-PROGRAMS). An empty chat id on any other platform still fails and alerts. |
+| `windows.day_ends_at` | `04:00` | The journal day (`slots.journal_day`): words written before it belong to the day before, so an evening answered at 00:30 takes last night's slot; a deliberate send before it takes today's calendar date (`/start morning` at 03:30 delivers today's morning) unless the practice's nearest scheduled slot is last night's (`/start evening` at 00:30). An unusable value is 04:00, and doctor names it. |
 
 Storage, by owner:
 
@@ -314,16 +325,29 @@ Four processes may touch the journal; locks and order are fixed:
 | Gateway (Hermes) with the plugin loaded | hooks, tools, slash commands | `ledger.locked`, `ledger.locked_state(hook-state.json / conversations.json)`; never `tick.lock` |
 | Tick (`journal tick`, every 5 min, fresh process) | send → privacy → sweep → conversations → programs → fold → audio → annotate → reply → reflect → recover → mirror → cache → prune → notebook | `tick.lock` (non-blocking: skips the round if held), then `ledger.locked` per write |
 | Spawned one-shots (`journal send <id>`, `journal program <action> <run>`) | one send or one program transition | `tick.lock` blocking, then `ledger.locked` |
-| `journal serve` (long-running, user unit) | reads; small locked writes; spawns for anything that sends | `ledger.locked` / `locked_state` for writes; **never** `tick.lock` |
+| `journal serve` (long-running, user unit) | reads; small locked writes; spawns for anything that sends; a Web Push thread (a pass a minute) | `ledger.locked` / `locked_state` for writes (the push thread: `locked_state` on `serve-push.json` and `push-sent.json` only); **never** `tick.lock` |
+
+His words from a face (`actions.answer`, `actions.note`, `actions.add`: serve's `POST /entries`, `journal write`, MCP's
+`journal_save`) are one `ledger.locked` call each: the slot is resolved, its record made or filled in, and the capture
+written under the same lock, never under `tick.lock`. Opening a practice (`actions.view`) takes no lock and writes
+nothing. The tick's scheduled
+send re-reads its record under `ledger.locked` just before `chat.send` (OPEN-PROMPTS rule 2), so a face answer made
+during the opener's model call stops the send; one made between that check and the send attaches the delivery to the
+face's record (rule 3) instead of overwriting it.
 
 Lock order is always `tick.lock` → `ledger.lock` → `<state>.lock`; no process takes them in another order
 (`tests/test_locks.py` runs a hook write, a tick and a serve write concurrently in-process and asserts no
 deadlock and no lost update). Reads are lock-free: every engine write is an atomic `os.replace`.
 
 The `programs` tick step re-checks every active run: a phase whose settle has elapsed but whose advance spawn was
-lost (gateway restart mid-spawn) is advanced here, at most five minutes late. Program sends reuse
-`tick.send_prompt(cfg, record, log)`, extracted from `send_due`, so prompts, phases and one-off interrupts share
-retries, `sent.jsonl`, mirroring and folding.
+lost (gateway restart mid-spawn) is advanced here, at most five minutes late. A phase is current once it is
+**opened** (`programs._open`: its ledger record with `message_id: None`, `sent_at` the moment it became current,
+`phase_open`; the run's `opened_at`), with or without a chat; `send_due` then means "owed a delivery" (only with a
+chat), and `programs.phase_opened` is the one reader of the two. An interrupt opens at its time
+(`programs._open_interrupts`). Opening writes nothing to `sent.jsonl`, `send-times.json` or the thread stamps, so it
+is never a chat boundary; a `/x` window holds the delivery only. Deliveries reuse `tick.send_prompt(cfg, record,
+log)`, extracted from `send_due`, so prompts, phases and one-off interrupts share retries, `sent.jsonl`, mirroring
+and folding.
 
 ## 5. Plugin and CLI installs coexisting
 
