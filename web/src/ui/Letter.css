@@ -33,6 +33,9 @@
 .letter-qsec li.asked .letter-qt { font-weight: 500; }
 .letter-asked-tag { font-weight: 400; color: var(--her-soft); }
 
+@media (max-width: 760px), (pointer: coarse) {
+  .letter-questions > .disclosure-head { min-height: var(--tap); }   /* 44 px on touch (web/e2e/mobile.spec.ts) */
+}
 @media (max-width: 760px) {
   .letter { padding: 22px 18px 16px; }
   .letter-qlist { columns: 1; }

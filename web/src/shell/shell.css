@@ -89,6 +89,14 @@
     display: flex; gap: 10px; overflow: hidden; background: none; box-shadow: none; outline: 0; border-radius: 0;
   }
   .shell[data-stage="panes"] .main-pane > .lamp-light { display: none; }
+  /* the pane gives up its view-transition name while a route lays panes: a pane of the route's takes "page" (the
+     entries list becomes the sidebar beside an entry), and two elements may not share one name */
+  .shell[data-stage="panes"] .main-pane { view-transition-name: none; }
+  /* the offline ribbon floats over the route's panes instead of taking a column of its own */
+  .shell[data-stage="panes"] .main-pane > .ribbon {
+    position: absolute; z-index: var(--z-pop); top: 18px; left: 50%; transform: translateX(-50%); border-radius: var(--r-pill);
+    box-shadow: var(--elev-pop);
+  }
 }
 @media (min-width: 761px) and (max-width: 1100px) {
   .rail { width: var(--rail-compact); }

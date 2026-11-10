@@ -100,8 +100,3 @@
   .passage-notes { margin-top: var(--s4); max-width: none; }
   .document > .phase-divider, .document > .summary, .document > .empty { margin-left: 0; }
 }
-
-/* touch: the fold under her letter reaches 44 px (ui/Letter draws it at 40; raised for the foundation) */
-@media (max-width: 760px), (pointer: coarse) {
-  .doc-letter .letter-questions > .disclosure-head { min-height: var(--tap); }
-}
