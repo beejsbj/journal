@@ -3,8 +3,9 @@ import { api } from "../api";
 import { useLive } from "../events";
 import { useAction } from "../hooks";
 import type { Run } from "../types";
+import { Button, ButtonLink, ErrorLine, ProgressStrip } from "../ui";
 import { ConfirmButton } from "./ConfirmButton";
-import { ErrorLine } from "./Status";
+import "./RunCard.css";
 
 /** Whether a run still has a one-off question to send. Session 10 is the last session, and its questions go out
  *  the day after it: by then the run is `completed`, and `programs.pending_interrupts` still counts it. */
@@ -20,6 +21,14 @@ export function sessionsDone(run: Pick<Run, "sessions">): number {
   return run.sessions.filter((s) => s.status === "completed").length;
 }
 
+/** How far into the session that is open the run is (0-1), for the strip's current segment. */
+export function sessionShare(run: Pick<Run, "sessions" | "current">): number | undefined {
+  if (!run.current) return undefined;
+  const total = run.sessions[run.current.session - 1]?.phases_total ?? 0;
+  return total > 0 ? Math.max(0.08, (run.current.phase - 0.5) / total) : undefined;
+}
+
+/** The old thin bar (the Library's cards still draw it until their own rebuild). */
 export function Progress({ done, total }: { done: number; total: number }) {
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   return (
@@ -30,9 +39,18 @@ export function Progress({ done, total }: { done: number; total: number }) {
   );
 }
 
+/** A program's way through, as Today and the run screen draw it: its sessions as segments, the open one filling. */
+export function RunStrip({ run }: { run: Run }) {
+  return (
+    <ProgressStrip label={`${run.title}: ${sessionsDone(run)} of ${run.sessions.length} sessions done`} done={sessionsDone(run)}
+      total={run.sessions.length} current={sessionShare(run)} />
+  );
+}
+
 /**
- * A run in progress, on Today: where it is, Continue (the run screen) and Pause or Resume. A transition is spawned
- * by the server (`202`) and happens a moment later: the card says so and clears when the stream reports the change.
+ * A run in progress, on Today: its name and where it is, the strip of its sessions, Continue (the run screen) and Pause
+ * or Resume. A transition is spawned by the server (`202`) and happens a moment later: the card says so and clears
+ * when the stream reports the change.
  */
 export function RunCard({ run }: { run: Run }) {
   const act = useAction();
@@ -43,22 +61,23 @@ export function RunCard({ run }: { run: Run }) {
     const done = await act.run(() => api.runAction(run.id, action));
     if (done) setWait(action === "pause" ? "Pausing…" : "Resuming…");
   };
+  const at = run.current?.session ?? sessionsDone(run);
   return (
-    <li class="card run">
-      {run.emoji && <span class="emoji" aria-hidden="true">{run.emoji}</span>}
-      <div class="main">
+    <li class="run-card run">
+      <div class="run-card-head">
         <h3>{run.title}</h3>
-        <p class="meta">{run.text}</p>
-        {run.sessions.length > 1 && <Progress done={sessionsDone(run)} total={run.sessions.length} />}
-        {paused && <p class="pill warn">On a break</p>}
+        {run.sessions.length > 1 && <p class="run-card-at num">{at} of {run.sessions.length}</p>}
       </div>
-      <div class="actions">
-        <a class="button primary" href={`/runs/${run.id}`}>
+      {run.sessions.length > 1 && <RunStrip run={run} />}
+      <p class="run-card-text">{run.text}</p>
+      {paused && <p class="run-card-state">On a break</p>}
+      <div class="run-card-actions">
+        <ButtonLink href={`/runs/${run.id}`} size="small" data-vt="push">
           Continue
-        </a>
-        <button type="button" class="button" disabled={act.busy || wait !== null} onClick={() => void go(paused ? "resume" : "pause")}>
+        </ButtonLink>
+        <Button variant="quiet" size="small" disabled={act.busy || wait !== null} onClick={() => void go(paused ? "resume" : "pause")}>
           {wait ?? (paused ? "Resume" : "Pause")}
-        </button>
+        </Button>
       </div>
       {act.error && <ErrorLine error={act.error} />}
     </li>
@@ -78,17 +97,16 @@ export function HeldRunCard({ run }: { run: Run }) {
     if (done) setWait(true);
   };
   return (
-    <li class="card run">
-      {run.emoji && <span class="emoji" aria-hidden="true">{run.emoji}</span>}
-      <div class="main">
+    <li class="run-card run held">
+      <div class="run-card-head">
         <h3>{run.title}</h3>
-        <p class="meta">Finished. Its last questions are still on their way.</p>
       </div>
-      <div class="actions">
-        <a class="button" href={`/runs/${run.id}`}>
+      <p class="run-card-text">Finished. Its last questions are still on their way.</p>
+      <div class="run-card-actions">
+        <ButtonLink href={`/runs/${run.id}`} size="small" variant="quiet" data-vt="push">
           Open
-        </a>
-        <ConfirmButton question="Cancel its questions?" yes="Cancel them" disabled={act.busy || wait} onConfirm={() => void stop()}>
+        </ButtonLink>
+        <ConfirmButton size="small" question="Cancel its questions?" yes="Cancel them" disabled={act.busy || wait} onConfirm={() => void stop()}>
           {wait ? "Cancelling…" : "Stop the questions"}
         </ConfirmButton>
       </div>

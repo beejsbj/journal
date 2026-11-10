@@ -1,0 +1,94 @@
+/* The run screen (routes/run.tsx): a program session. Not drawn in round 02; built from its parts: the page title,
+   Night Room's strip for the sessions, the phase as a strip of its own, her phase text as a letter, his box under it,
+   the controls after. His column is the measure. */
+
+.run-page { max-width: calc(var(--measure) + 10rem); margin: 0 auto; padding: var(--s4) var(--gutter) var(--s8); }
+.run-page > .crumb { margin: 0 0 var(--s4); }
+.run-page .crumb a {
+  display: inline-flex; align-items: center; gap: 2px; min-height: 36px; padding-right: var(--s2);
+  font: 500 var(--t-small) / 1 var(--f-ui); color: var(--text-3); text-decoration: none;
+}
+.run-page .crumb a:hover { color: var(--text); }
+.run-page .crumb a > svg { width: 16px; height: 16px; }
+
+/* ── the head: status, title, where the run is, its sessions ── */
+.run-head { margin-bottom: var(--s7); }
+.run-head .kicker { margin: 0 0 var(--s2); }
+.run-head .display { font-size: clamp(2rem, 4.2vw, var(--t-h1)); }
+.run-emoji { font-size: 0.8em; }
+.run-head .lede { margin: var(--s3) 0 0; font-size: 1.0625rem; }
+.run-sessions-strip { margin-top: var(--s5); max-width: 30rem; }
+.run-sessions-strip .strip-meta { margin: 0 0 6px; }
+
+/* ── the phase ── */
+.phase { margin-bottom: var(--s5); }
+.phase-where { display: grid; gap: 8px; margin-bottom: var(--s4); }
+.phase-count { margin: 0; font-size: var(--t-small); color: var(--text-3); }
+.phase-strip { list-style: none; display: flex; gap: 4px; margin: 0; padding: 0; max-width: 30rem; }
+.phase-strip li {
+  flex: 1; height: 4px; border-radius: 2px; background: var(--hair-2); position: relative; overflow: hidden;
+  animation: seg-in 500ms var(--e-out) both; animation-delay: calc(var(--k, 0) * 40ms);
+}
+.phase-strip li.done { background: var(--text); }
+.phase-strip li.now::after {
+  content: ""; position: absolute; inset: 0; background: var(--text); transform-origin: left; transform: scaleX(0.45);
+  animation: seg-fill 1.4s var(--e-out) 0.3s both;
+}
+.phase-title::after { content: none; }   /* (the legacy sheet still rules every section > h2) */
+.phase-title { display: block; margin: 0 0 var(--s4); font: 400 var(--t-h2) / 1.15 var(--f-his); font-optical-sizing: auto; color: var(--text); text-wrap: balance; }
+.phase-sent > .hint { margin: 0 0 var(--s2); }
+.phase > .hint { margin: 0 0 var(--s2); }
+.phase-letter { margin-bottom: var(--s4); }
+.phase-letter .md > :first-child { margin-top: 0; }
+.phase-letter .md > :last-child { margin-bottom: 0; }
+.phase-letter blockquote { margin: 0 0 0.9em; padding-left: 14px; border-left: 1px dashed var(--her-edge); font-style: italic; }
+.phase-block + .phase-block { margin-top: 0.9em; }
+.phase-block h3 { margin: 0 0 6px; font: italic 400 1rem / 1.3 var(--f-his); color: var(--her-soft); }
+.phase-state { margin: 0 0 var(--s2); font: italic 400 1rem / 1.3 var(--f-his); color: var(--text-2); }
+.phase .saved { margin: var(--s3) 0 0; font-size: var(--t-small); color: var(--text-2); }
+
+/* ── the controls: Next is the lamp; Abandon stands apart and asks first ── */
+.controls { margin: var(--s5) 0 var(--s7); padding-top: var(--s4); border-top: 1px solid var(--hair); }
+.run-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
+.run-abandon { margin-left: auto; }
+.controls > .hint { margin: var(--s2) 0 0; }
+.controls > .error-line { margin-top: var(--s3); }
+.controls p.error-line { font-size: var(--t-small); color: var(--text); }
+
+/* ── insights and sessions ── */
+.run-sec { margin-bottom: var(--s7); }
+.run-sec > .book-head { margin: 0 0 var(--s3); }
+.run-sec > .empty { margin: 0 0 var(--s3); }
+.sessions { list-style: none; margin: 0; padding: 0; }
+.sessions li { border-bottom: 1px solid var(--hair); }
+.sessions .row {
+  display: grid; grid-template-columns: 2.2rem minmax(0, 1fr) auto; align-items: baseline; gap: var(--s3); min-height: var(--tap);
+  padding: 10px 6px; color: var(--text-2); text-decoration: none; border-radius: var(--r-s);
+}
+.sessions a.row:hover { background: var(--raised); color: var(--text); }
+.sessions .n { font: 300 1.375rem / 1 var(--f-his); color: var(--text-3); text-align: right; }
+.sessions .t { font: 400 1.0625rem / 1.35 var(--f-his); }
+.sessions .kind { font: italic 400 0.9375rem / 1.3 var(--f-his); color: var(--text-3); }
+.sessions .completed .t { color: var(--text); }
+.sessions .completed .n { color: var(--text-2); }
+.sessions .in_progress .t { color: var(--text); }
+.sessions .in_progress .kind { color: var(--text-2); }
+.run-foot { margin-top: var(--s5); }
+
+@media (max-width: 760px) {
+  .run-page { padding-top: var(--s1); }
+  .run-head { margin-bottom: var(--s6); }
+  .phase-title { font-size: 1.5rem; }
+  /* the thumb writes and sends: the answer box stays above the bar at the foot and grows when it is used */
+  .phase > .composer {
+    position: sticky; z-index: var(--z-sticky); bottom: calc(var(--bar-h) + env(safe-area-inset-bottom));
+    margin: var(--s3) calc(-1 * var(--gutter)) 0; padding: var(--s2) var(--gutter); background: var(--pane);
+    border-top: 1px solid var(--hair); box-shadow: 0 -12px 24px -18px rgb(0 0 0 / 0.25);
+  }
+  .phase > .composer .composer-box { min-height: var(--tap); height: 3.4rem; resize: none; }
+  .phase > .composer:focus-within .composer-box { height: min(30vh, 10rem); }
+  .run-abandon { margin-left: 0; }
+}
+@media (max-width: 760px), (pointer: coarse) {
+  .run-page .crumb a { min-height: var(--tap); min-width: var(--tap); }
+}

@@ -2,8 +2,8 @@ import { ErrorBoundary, LocationProvider, Route, Router, lazy, useLocation } fro
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { session } from "./api";
 import { useAuthLost, useLastVia } from "./auth";
-import { QuickAdd } from "./components/QuickAdd";
 import { UpdateToast } from "./components/UpdateToast";
+import { WriteRoom } from "./components/WriteRoom";
 import { Entries, Insights, Library, Mark, Pen, Plus, Settings, Today } from "./icons";
 import { forgetReads } from "./offline";
 import { EditorRoute, NewPracticeRoute } from "./routes/editor";
@@ -18,7 +18,7 @@ import { TodayRoute } from "./routes/today";
 import { useShellState } from "./shell/mode";
 import { NextFrom, useNext } from "./shell/NextFrom";
 import { useLinkTransitions } from "./shell/transition";
-import { closeWrite, openWrite, useWriteRequest } from "./shell/write";
+import { openWrite, useWriteRequest } from "./shell/write";
 import "./shell/shell.css";
 import { useTitle } from "./title";
 import { OfflineRibbon } from "./ui/OfflineRibbon";
@@ -195,8 +195,8 @@ function Shell() {
           </ErrorBoundary>
         </main>
       </div>
-      {/* the write surface (WEB-UX: the room replaces this sheet; shell/write.ts is its seam) */}
-      {writing && <QuickAdd onClose={closeWrite} />}
+      {/* the write room, while something asked for it (shell/write.ts is its seam) */}
+      {writing && <WriteRoom req={writing} />}
       <UpdateToast />
     </div>
   );

@@ -56,38 +56,47 @@ describe("Today", () => {
     expect(host.querySelector("li.practice h3")?.textContent).toBe("morning");
   });
 
-  it("shows every prompt sent today in full, whatever its state, in her voice, in the order of the day", async () => {
+  it("shows every prompt sent today as her letter, waiting first, then the day as it went", async () => {
+    // WEB-UX (round 02, #today): what waits comes first ("Waiting for you"), then the prompts that came and went
+    // ("Earlier today"), then what is still to come (in the right-hand column on a wide page). Each is her letter
+    // (ui Letter: the opener, the question she asked, the practice's questions folded at its foot); the hour that hung
+    // in the margin is the letter's "sent" now, and the state is quiet words beside the title.
     visit("/");
     stubFetch({ ...base, "/api/v1/today": fixtures.todayPrompts });
     const host = mount(<App />);
-    await until(() => must(host.querySelector("li.practice .prompt")));
+    await until(() => must(host.querySelector("li.practice .letter")));
     const cards = [...host.querySelectorAll<HTMLElement>("li.practice")];
-    expect(cards.map((c) => c.classList[2])).toEqual(["missed", "open", "answered", "upcoming"]);   // 06:00, 20:05, 21:30, 23:00
+    expect(cards.map((c) => c.classList[2])).toEqual(["open", "missed", "answered", "upcoming"]);   // 20:05; then 06:00, 21:30; 23:00
     expect(cards.map((c) => c.querySelector(".pill")?.textContent)).toEqual(
-      ["came at 06:00", "waiting since 20:05", "answered 21:38", "at 23:00"]);   // a missed prompt says when it came, no more
-    // the hour in the margin is left to the eye when the line under the title says the same time, and read out when it
-    // says another (answered at 21:38, sent at 21:30)
-    expect(cards.map((c) => c.querySelector(".practice-when")?.getAttribute("aria-hidden"))).toEqual(["true", "true", null, "true"]);
-    expect(cards[2]?.querySelector(".practice-when time")?.textContent).toBe("21:30");
-    const [missed, open, answered, upcoming] = cards as [HTMLElement, HTMLElement, HTMLElement, HTMLElement];
-    // the whole message: the opener and every question, never folded on the web
-    expect(missed.querySelector(".prompt .opener")?.textContent).toContain("Morning, Sam.");
-    expect(missed.querySelectorAll(".prompt li")).toHaveLength(11);
-    expect(missed.querySelector(".prompt details")).toBeNull();
-    expect(missed.querySelector(".prompt li.asked")?.textContent).toContain("How did you sleep?");
-    expect(missed.querySelector(".prompt-meta .who")?.textContent).toBe("Ada");
-    expect(open.querySelector(".prompt .opener")).toBeNull();   // sent with the plain opener: nothing recorded, the questions stand
-    expect(open.querySelectorAll(".prompt li").length).toBeGreaterThan(0);
-    expect(answered.querySelector(".prompt .opener")?.textContent).toBe("Three small things tonight, Sam. The walk to the harbour counts.");
-    expect(answered.querySelectorAll(".prompt li")).toHaveLength(2);
-    // his reply under her message, in his own type, linked to the entry
+      ["waiting since 20:05", "came at 06:00", "answered 21:38", "at 23:00"]);   // a missed prompt says when it came, no more
+    expect(host.querySelector("#waiting-h")?.textContent).toBe("Waiting for yousince 20:05");
+    const [open, missed, answered, upcoming] = cards as [HTMLElement, HTMLElement, HTMLElement, HTMLElement];
+    // her letter: from her, sent at its hour, the opener, the question she asked, every question kept at the foot
+    expect(missed.querySelector(".letter-from")?.textContent).toBe("From Adasent 06:00 IST");
+    expect(missed.querySelector(".letter-body")?.textContent).toContain("Morning, Sam.");
+    expect(missed.querySelector(".letter-asked")?.textContent).toBe("How did you sleep?");
+    expect(missed.querySelectorAll(".letter-qlist li")).toHaveLength(11);
+    expect(missed.querySelector(".letter-qlist li.asked")?.textContent).toContain("How did you sleep?");
+    // sent with the plain opener: nothing recorded, so the questions are the letter and stand open
+    expect(open.querySelector(".letter-asked")).toBeNull();
+    expect(open.querySelectorAll(".today-questions li").length).toBeGreaterThan(0);
+    expect(open.querySelector(".letter-qlist")).toBeNull();
+    expect(answered.querySelector(".letter-body p")?.textContent).toBe("Three small things tonight, Sam. The walk to the harbour counts.");
+    expect(answered.querySelectorAll(".letter-qlist li")).toHaveLength(2);
+    // his reply under her letter, in his own type, linked to the entry
     const reply = must(answered.querySelector<HTMLAnchorElement>("a.his-reply"));
     expect(reply.getAttribute("href")).toBe("/entries/2026-10-15-gratitude");
     expect(reply.querySelector(".who")?.textContent).toBe("Sam · 21:38");
     expect(reply.querySelector(".words")?.textContent).toContain("The ferry was late");
-    expect(answered.querySelector(".prompt")?.contains(reply)).toBe(false);   // never inside her message
-    expect(upcoming.querySelector(".prompt")).toBeNull();   // not sent yet: nothing to show
-    expect([...missed.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Reply", "Send now"]);
+    expect(answered.querySelector(".letter")?.contains(reply)).toBe(false);   // never inside her letter
+    expect(upcoming.querySelector(".letter")).toBeNull();   // not sent yet: nothing to show
+    // what can be done, on the letter's crease: Answer and Speak it while it waits; Reply and Send now once it came and went
+    expect([...open.querySelectorAll(".letter-actions button")].map((b) => b.textContent)).toEqual(["Answer", "Speak it"]);
+    expect([...missed.querySelectorAll(".letter-actions button")].map((b) => b.textContent)).toEqual(["Reply", "Send now"]);
+    expect([...upcoming.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Send now"]);
+    // no capitals: the day is a numeral, the weekday and month words
+    expect(host.querySelector(".today-num")?.textContent).toBe("15");
+    expect(host.querySelector(".today-num")?.getAttribute("aria-hidden")).toBe("true");
   });
 
   it("credits OpenStreetMap under the place while it named it, quietly, and not otherwise", async () => {
@@ -112,11 +121,11 @@ describe("Today", () => {
     const rows = fixtures.todayPrompts.practices.rows.map((r) => (r.id === "morning" ? { ...r, prompt: undefined } : r));
     stubFetch({ ...base, "/api/v1/today": { ...fixtures.todayPrompts, practices: { ...fixtures.todayPrompts.practices, rows } } });
     const host = mount(<App />);
-    await until(() => must(host.querySelector("li.practice.answered .prompt")));
+    await until(() => must(host.querySelector("li.practice.answered .letter")));
     const missed = must(host.querySelector<HTMLElement>("li.practice.missed"));
     expect(missed.querySelector(".pill")?.textContent).toBe("came at 06:00");
-    expect(missed.querySelector(".prompt")).toBeNull();
-    expect([...missed.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Reply", "Send now"]);
+    expect(missed.querySelector(".letter")).toBeNull();
+    expect([...missed.querySelectorAll(".today-actions button")].map((b) => b.textContent)).toEqual(["Reply", "Send now"]);
   });
 
   it("falls back to the pairing screen on a 401", async () => {

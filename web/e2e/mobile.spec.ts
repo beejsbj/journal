@@ -29,7 +29,10 @@ async function small(page: Page): Promise<string[]> {
     const MIN = 43.5;
     const out: string[] = [];
     const sel = 'a[href], button, input:not([type="hidden"]), select, textarea, summary, [role="tab"], [role="button"]';
-    for (const el of Array.from(document.querySelectorAll<HTMLElement>(sel))) {
+    // behind a modal (the write room, a sheet) nothing can be touched, and the page there recedes (scaled down): measure
+    // what is in the modal
+    const modal = Array.from(document.querySelectorAll("dialog[open]")).find((d) => d.matches(":modal"));
+    for (const el of Array.from((modal ?? document).querySelectorAll<HTMLElement>(sel))) {
       const cs = getComputedStyle(el);
       if (cs.visibility === "hidden" || cs.display === "none") continue;
       if (el.closest(".visually-hidden")) continue;
@@ -92,7 +95,7 @@ test("at 360 px nothing scrolls sideways on any route", async ({ page }) => {
 });
 
 // WEB-UX: the entry's Analysis tab is gone; her readings unfold at the end of the entry (DECISIONS.md WEB-UX-ENTRY-TABS)
-test("the entry's readings and its passage sheet, the raw editor and the + sheet are as large", async ({ page }) => {
+test("the entry's readings and its passage sheet, the raw editor and the write room are as large", async ({ page }) => {
   await page.goto("/entries/2026-10-14-evening");
   await page.getByRole("button", { name: /What she noticed/ }).click();
   await page.getByRole("button", { name: /reflection/ }).click();
@@ -109,7 +112,8 @@ test("the entry's readings and its passage sheet, the raw editor and the + sheet
   await page.getByRole("button", { name: "Write", exact: true }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   expect(await small(page)).toEqual([]);
-  await page.getByRole("button", { name: "Quick note" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Start a program" }).click();   // the room's start: its programs
+  await expect(page.getByRole("dialog").locator(".room-program-list button, .empty").first()).toBeVisible();
   expect(await small(page)).toEqual([]);
 });
 

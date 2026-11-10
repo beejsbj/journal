@@ -136,11 +136,8 @@ a.card:hover { border-color: var(--ink-3); }
 .card .meta { color: var(--ink-2); font-size: var(--text-sm); margin: 0; }
 .card .badges { display: flex; flex-direction: column; align-items: flex-end; gap: var(--s1); }
 .card.off { opacity: 0.6; }
-.card.program { display: block; }
-.card.run { flex-wrap: wrap; }
 .card .actions { flex-basis: 100%; }
-.card .error-line, .card .saved, .card .inline-composer { flex-basis: 100%; margin: 0; }
-.card.run .progress-bar { margin-top: var(--s2); }
+.card .error-line, .card .saved { flex-basis: 100%; margin: 0; }
 
 .plain-list { gap: 0; }
 .plain-list a { display: grid; gap: 0.1rem; color: var(--ink); text-decoration: none; padding: var(--s3) 0; border-bottom: 1px solid var(--rule-2); }
@@ -149,7 +146,6 @@ a.card:hover { border-color: var(--ink-3); }
 }
 .plain-list .first-line { font-family: var(--serif); font-size: 1.125rem; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .actions { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
-.confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
 
 /* ── her letter: the prompt, as he was sent it ─────────────────────── */
 
@@ -190,94 +186,11 @@ summary::-webkit-details-marker { display: none; }
 .chev { transition: transform var(--dur) var(--ease); flex: none; color: currentColor; }
 details[open] > summary .chev { transform: rotate(90deg); }
 
-/* ── Today ─────────────────────────────────────────────────────────── */
-
-/* the day in the book's roman; the date typed beneath it, as at the head of a letter */
-.today-head h1 .dow { display: block; }
-.today-head h1 .dmy {
-  display: block; margin-top: var(--s3); font-family: var(--type); font-size: 0.95rem; font-weight: 400;
-  letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-2); line-height: 1.3;
-}
-.today-head .sub { font-size: var(--text-sm); color: var(--ink-2); }
-.weather { color: var(--ink-3); font-size: var(--text-sm); margin: var(--s1) 0 0; }
+/* ── OsmCredit (Today has its own; Settings still reads these) ── */
 /* the credit a place named by OpenStreetMap carries wherever it is shown: a caption, the quietest type on the page */
 .credit { color: var(--ink-3); font-size: var(--text-xs); margin: var(--s1) 0 0; }
 .credit a { color: inherit; }
 .credit a:hover { color: var(--ink-2); }
-
-/* the week: typed initials, the days in Fraunces' soft figures, a dot of his ink for a day he wrote in. Nothing else
-   is marked: a day without an answer is not a red mark */
-.week-strip { margin: 0 0 var(--s2); }
-.week-strip ol { list-style: none; display: grid; grid-template-columns: repeat(7, 1fr); gap: var(--s1); padding: 0; }
-.week-strip .day {
-  display: grid; justify-items: center; gap: 0.3rem; padding: var(--s2) 0; border-radius: 0;
-  color: var(--ink-3); text-decoration: none; font-family: var(--type); font-size: 0.625rem; letter-spacing: 0.14em;
-}
-.week-strip .day:hover { background: var(--sunk); }
-.week-strip .dom {
-  font-family: var(--figure); font-size: 1.2rem; font-weight: 400; line-height: 1.1; letter-spacing: 0; color: var(--ink-2);
-  font-variation-settings: "opsz" 24, "SOFT" 100;
-}
-.week-strip .dot { order: 3; width: 0.4rem; height: 0.4rem; border-radius: 50%; background: transparent; }
-.week-strip .answered .dot { background: var(--ink); }
-.week-strip .partial .dot { background: var(--ink-3); }
-.week-strip .today .dom {
-  color: var(--ink); font-weight: 600; text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 0.25em;
-}
-.week-strip .today .dow { color: var(--ink); }
-
-/* a prompt of the day: a passage of the book. The hour hangs in the margin; then his title and the state, her letter,
-   his reply under it in his own type */
-.today .cards { gap: 0; }
-.card.practice {
-  display: grid; grid-template-columns: var(--legacy-gutter) minmax(0, 1fr); column-gap: var(--s5); row-gap: 0; align-items: start;
-  padding: var(--s5) 0 var(--s6); border: 0; border-top: 1px solid var(--rule); border-radius: 0; background: none;
-}
-.card.practice:first-child { border-top: 0; padding-top: var(--s2); }
-.card.practice > * { grid-column: 2; }
-.card.practice > .practice-when {
-  display: grid; align-content: start; gap: 0.15rem; grid-column: 1; grid-row: 1 / span 6; margin: 0; align-self: stretch;
-  text-align: right; padding-right: var(--s4); border-right: 1px solid var(--rule);
-}
-.practice-when time { font-weight: 700; font-size: 1.15rem; line-height: 1.2; color: var(--ink); letter-spacing: 0.02em; }
-.practice-when span { font-family: var(--type); font-size: 0.6875rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); }
-.practice-head { display: flex; align-items: center; gap: var(--s3); min-width: 0; }
-.practice-head .emoji { display: none; }
-.practice-title { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem; }
-.practice-head h3 {
-  font-family: var(--serif); font-size: 1.55rem; font-weight: 420; letter-spacing: -0.012em; line-height: 1.15;
-  font-variation-settings: "opsz" 36;
-}
-/* the space between the parts of a passage is margins, not a row gap: the margin's hour spans rows that may be empty */
-.card.practice > :is(.prompt, .his-reply, .actions, .error-line, .saved, .inline-composer) { margin: var(--s4) 0 0; }
-.his-reply { display: grid; gap: 0.2rem; padding: var(--s3) 0 0; border-top: 1px solid var(--rule-2); color: var(--ink); text-decoration: none; }
-.his-reply .who {
-  font-family: var(--type); font-size: var(--text-xs); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3);
-}
-.his-reply .words {
-  font-family: var(--serif); font-size: var(--text-lg); line-height: 1.5; font-variation-settings: "opsz" 20;
-  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
-}
-.his-reply:hover .words { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.2em; }
-.inline-composer { display: grid; gap: var(--s2); }
-.inline-composer > .link { justify-self: start; }
-
-/* a program in progress, on Today: a passage too, not a box */
-.cards > .card.run { border: 0; border-top: 1px solid var(--rule); border-radius: 0; padding: var(--s5) 0; align-items: flex-start; }
-.cards > .card.run:first-child { border-top: 0; padding-top: var(--s2); }
-.cards > .card.run .emoji { display: none; }
-.cards > .card.run h3 { font-size: 1.45rem; font-weight: 420; font-variation-settings: "opsz" 36; }
-
-.written .written-row { display: grid; gap: 0.15rem; }
-/* what the day's reflection asked him to carry: her words, so typed in her ink */
-.carry blockquote {
-  margin: 0 0 var(--s2); padding: 0; font-family: var(--type); font-size: 1.05rem; line-height: 1.55; color: var(--accent);
-  word-spacing: -0.15em;
-}
-.tasks li { padding: var(--s2) 0; border-bottom: 1px solid var(--rule-2); }
-.tasks .more { color: var(--ink-3); border: 0; }
-.interrupts li { padding: var(--s2) 0; border-bottom: 1px solid var(--rule-2); color: var(--ink-2); }
-.interrupts time { color: var(--ink); font-weight: 700; margin-right: var(--s2); }
 
 /* ── the entry: his page, her letter at its head, her notes beside his words ── */
 
@@ -290,44 +203,14 @@ details[open] > summary .chev { transform: rotate(90deg); }
 .tabs button.on { color: var(--ink); box-shadow: inset 0 -2px 0 var(--ink); }
 
 
-/* the composer: his words, so the box is his page: a ruled line in his roman */
-.composer { display: grid; gap: var(--s2); margin-top: var(--s3); }
-.composer textarea {
-  width: 100%; border: 0; border-bottom: 1px solid var(--ink-3); border-radius: 0; background: transparent;
-  padding: var(--s3) 0; color: var(--ink); font-family: var(--serif); font-size: 1.2rem; line-height: 1.55;
-  resize: vertical; min-height: 6rem;
-}
-.composer textarea::placeholder { font-style: italic; color: var(--ink-3); }
-.composer textarea:focus { outline: none; border-color: var(--ink); box-shadow: 0 1px 0 var(--ink); }
-.composer-actions { display: flex; flex-wrap: wrap; gap: var(--s2); justify-content: space-between; align-items: center; }
-.composer-kept { background: var(--sunk); border-radius: var(--radius-s); padding: var(--s3) var(--s4); margin-top: var(--s4); font-size: var(--text-sm); color: var(--ink-2); }
-.composer-kept p { margin: 0 0 var(--s2); }
-.composer-closed { color: var(--ink-2); font-size: var(--text-sm); margin-top: var(--s5); padding-top: var(--s4); border-top: 1px solid var(--rule-2); }
-.clip { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3); }
-.clip audio { flex: 1 1 14rem; height: 2.5rem; }
-.recorder { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
-.rec-dot { width: 0.65rem; height: 0.65rem; border-radius: 50%; background: var(--bad); animation: pulse 1.2s ease-in-out infinite; }
-@keyframes pulse { 50% { opacity: 0.3; } }
 .offline-note { margin: 0; font-size: var(--text-sm); color: var(--warn); }
 
-/* ── sheets ────────────────────────────────────────────────────────── */
-
-.quick-menu { display: grid; gap: var(--s2); }
-.button.wide-left { width: 100%; justify-content: flex-start; padding: var(--s3) var(--s4); border-radius: var(--radius); font-size: var(--text-md); }
-.picks { display: grid; gap: var(--s2); margin-bottom: var(--s3); }
-.back { margin-bottom: var(--s2); }
 /* ── the run's compiled document (Library's own rules moved to routes/library.css) ── */
 .raw { margin-top: var(--s5); }
 .raw pre { margin-top: var(--s2); padding: var(--s3) var(--s4); background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius-s); }
 .progress-bar { height: 3px; border-radius: 0; background: var(--rule); overflow: hidden; margin-top: var(--s2); }
 .progress-bar span { display: block; height: 100%; background: var(--ink); }
 .page-head .progress-bar { max-width: 20rem; }
-/* a run's head ends on its progress, and the phase strip under it is the rule */
-.run > .page-head { border-bottom: 0; padding-bottom: var(--s2); }
-.sessions li { border-bottom: 1px solid var(--rule-2); padding: var(--s2) 0; }
-.sessions .row { display: grid; gap: 0.1rem; align-items: start; }
-.sessions .n { font-family: var(--type); font-weight: 700; font-size: 0.9375rem; margin-right: 0.15em; }
-.sessions .completed .kind { color: var(--ink); }
 
 /* ── forms: the meta sheet (the editor and Settings have their own sheets) ── */
 
@@ -346,23 +229,8 @@ details[open] > summary .chev { transform: rotate(90deg); }
 .meta-form { display: grid; gap: var(--s2); }
 
 /* ── Run (Insights has its own sheet) ─────────────────────────────── */
+/* ── Insights ──────────────────────────────────────────────────────── */
 
-.phase { margin-top: var(--s5); }
-.phase h2 { font-family: var(--serif); font-style: normal; font-size: var(--text-xl); font-weight: 420; margin: 0 0 var(--s3); color: var(--ink); font-variation-settings: "opsz" 36; }
-.phase h2::after { display: none; }
-/* a phase's text is hers: typed in her ink under the fold */
-.phase-block, .phase-sent {
-  margin-bottom: var(--s3); padding: var(--s3) 0 var(--s1); border-top: 1px dashed var(--edge);
-  font-family: var(--type); font-size: 0.97rem; color: var(--accent); line-height: 1.6; word-spacing: -0.15em;
-}
-.phase-block h3 { font-family: var(--type); font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin: 0 0 var(--s2); word-spacing: normal; }
-.phase-sent .hint { font-family: var(--sans); word-spacing: normal; }
-.phase-questions { padding-left: 1.5rem; display: grid; gap: var(--s2); margin-bottom: var(--s3); color: var(--accent); font-family: var(--type); }
-.phase-strip { list-style: none; display: flex; gap: var(--s1); margin: 0 0 var(--s4); }
-.phase-strip li { flex: 1; height: 3px; border-radius: 0; background: var(--rule); }
-.phase-strip li.done { background: var(--ink-3); }
-.phase-strip li.now { background: var(--ink); }
-.controls { margin: var(--s2) 0 var(--s4); }
 
 
 /* ── offline and updates (the PWA layer) ───────────────────────────── */
@@ -373,29 +241,14 @@ details[open] > summary .chev { transform: rotate(90deg); }
    the rest keep the reading width. */
 @media (min-width: 1024px) {
   .page.today { max-width: var(--legacy-spread); }
+  .page.entry { max-width: var(--legacy-spread); }
 
-  /* Today: each prompt is a row of the spread; her letter stands in the right-hand column, level with his title */
-  .card.practice {
-    grid-template-columns: var(--legacy-gutter) minmax(0, 1fr) var(--legacy-note); grid-template-rows: repeat(6, auto) 1fr;
-    column-gap: var(--s6);
-  }
-  .card.practice > .practice-when { grid-row: 1 / -1; }
-  .card.practice > .practice-head { grid-column: 2; grid-row: 1; }
-  .card.practice > .his-reply { grid-column: 2; grid-row: 2; margin-top: var(--s4); padding-top: 0; border-top: 0; }
-  .card.practice > .actions { grid-column: 2; grid-row: 3; margin-top: var(--s4); }
-  .card.practice > .error-line { grid-column: 2; grid-row: 4; margin-top: var(--s3); }
-  .card.practice > .saved { grid-column: 2; grid-row: 5; margin-top: var(--s3); }
-  .card.practice > .inline-composer { grid-column: 2; grid-row: 6; margin-top: var(--s3); }
-  .card.practice > .prompt { grid-column: 3; grid-row: 1 / -1; margin-top: 0; }
-  .card.practice .his-reply .words { -webkit-line-clamp: 5; }
-
-  /* her letter and notes in the margin column are set a size smaller, as notes are */
-  .today > :not(.page-head, .practices) { max-width: calc(var(--legacy-gutter) + var(--legacy-measure) + var(--s6)); }
-
+  .document > .prompt, .document > .block.hers { font-size: 0.9375rem; }
+  .document > .prompt .opener { font-size: 0.9375rem; }
+  .document > .prompt .questions { font-size: 0.875rem; }
   .card.practice > .prompt { font-size: 0.9375rem; }
   .card.practice > .prompt .opener { font-size: 0.9375rem; }
   .card.practice > .prompt .questions { font-size: 0.875rem; }
-  .card.practice > .prompt .question-section ol { padding-left: 1.7rem; }
 
 }
 
@@ -405,19 +258,17 @@ details[open] > summary .chev { transform: rotate(90deg); }
    them on every route. Inline links inside a sentence are exempt, as in WCAG 2.5.8; rows and cards are big already. */
 @media (max-width: 640px), (pointer: coarse) {
   input, select, textarea { font-size: max(1rem, 16px) !important; }   /* below 16 px iOS zooms the page on focus */
-  .crumb a, .carry a, .quiet-link { display: inline-flex; align-items: center; min-height: var(--tap); min-width: var(--tap); }
+  .crumb a, .quiet-link { display: inline-flex; align-items: center; min-height: var(--tap); min-width: var(--tap); }
   /* a link that stands on its own line (not inside a sentence) is a target too */
   :is(main, .sheet) :is(li, div, section, article, header) > a:not([class]) { display: inline-flex; align-items: center; min-height: var(--tap); }
   .crumb { margin: var(--s1) 0 0; }
   .tabs button { min-height: var(--tap); min-width: var(--tap); }
   summary { min-height: var(--tap); }
-  .week-strip .day { min-height: var(--tap); align-content: center; }
   .composer textarea, .field input[type="text"], .field input[type="number"], .field input[type="time"], .field select { min-height: var(--tap); }
+  .field input[type="text"], .field input[type="number"], .field input[type="time"], .field select,
   .check { min-height: var(--tap); }
   .check input { width: 1.5rem; height: 1.5rem; }
   .plain-list a { min-height: var(--tap); align-content: center; }
-  .tasks li { min-height: var(--tap); display: flex; align-items: center; }
-  .his-reply { min-height: var(--tap); }
 }
 
 @media (max-width: 640px) {
@@ -427,35 +278,23 @@ details[open] > summary .chev { transform: rotate(90deg); }
   .page-head h1 { font-size: 2.6rem; }
   .hint, .card .meta, .sub { font-size: 0.9375rem; }
 
-  /* a prompt of the day: one column; the margin folds into a running head above the title */
-  .card.practice { grid-template-columns: minmax(0, 1fr); column-gap: 0; padding: var(--s5) 0; }
-  .card.practice > * { grid-column: 1; }
-  .card.practice > .practice-when {
-    grid-column: 1; grid-row: auto; display: flex; gap: var(--s2); align-items: baseline; text-align: left; padding: 0; border: 0;
-    margin-bottom: var(--s3);
-  }
-  .practice-when time { font-size: 1.05rem; }
-  .practice-head h3 { font-size: 1.5rem; }
   .prompt .opener { font-size: 0.97rem; }
   .questions { font-size: 0.92rem; }
   .question-section ol { padding-left: 1.7rem; }
-  .card.practice .actions .button { flex: 1 1 auto; }
 
 
   /* the thumb writes and sends: the run's answer box stays above the bar at the foot (the entry's own: routes/entry.css),
      the box grows when it is used, and Voice and Add are full-height beside each other */
   .phase > .composer {
+  /* the thumb writes and sends: the entry's box stays above the bar at the foot, and grows when it is used (the run's
+     answer box does the same in routes/run.css; the composer's own phone rules are in components/Composer.css) */
+  .add {
     position: sticky; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom)); z-index: 5; background: var(--bg);
     padding: var(--s2) 0; margin-top: var(--s4); border-top: 1px solid var(--rule);
   }
-  .phase > .composer { margin-top: var(--s3); }
-  .composer { margin-top: 0; }
+  .add .composer textarea { min-height: var(--tap); height: 3.4rem; resize: none; }
+  .add .composer:focus-within textarea { height: min(30vh, 10rem); }
   .phase > .composer textarea { min-height: var(--tap); height: 3.4rem; resize: none; }
   .phase > .composer:focus-within textarea { height: min(30vh, 10rem); }
-  .composer-actions { flex-wrap: nowrap; gap: var(--s2); }
-  .composer-actions .recorder { flex: 0 0 auto; }
-  .composer-actions .button { min-height: 3rem; }
-  .composer-actions .button.primary { flex: 1; }
-  .quick-menu .button.wide-left, .picks .button { min-height: 3.25rem; }
 }
 

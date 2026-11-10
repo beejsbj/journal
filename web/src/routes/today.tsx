@@ -1,17 +1,19 @@
+import type { ComponentChildren } from "preact";
 import { useState } from "preact/hooks";
 import { api } from "../api";
-import { Composer } from "../components/Composer";
 import { HeldRunCard, RunCard, holdsQuestions } from "../components/RunCard";
 import { OSM, OsmCredit } from "../components/OsmCredit";
-import { PromptMessage } from "../components/Prompt";
-import { Await, Empty, ErrorLine } from "../components/Status";
 import { WeekStrip } from "../components/WeekStrip";
 import { useLive } from "../events";
-import { dayPart, longDay } from "../format";
+import { longDay, parseDay } from "../format";
 import { useAction, useResource } from "../hooks";
+import { Chevron, Mic, Pen } from "../icons";
 import { kindLabel, kindOfStem } from "../labels";
+import { openWrite } from "../shell";
 import { useTitle } from "../title";
-import type { Created, LibraryItem, PracticeRow, Run, Today } from "../types";
+import type { LibraryItem, PracticeRow, Prompt, Run, Today } from "../types";
+import { Await, Button, ButtonLink, Empty, ErrorLine, Letter, TextButton } from "../ui";
+import "./today.css";
 
 /**
  * The row's state in words, as the line under its title says it: quietly, in the page's own voice, and the time those
@@ -38,52 +40,118 @@ export function rowTime(r: PracticeRow): string {
 
 const NO_TIME = "99:99";
 
+/** The state, as quiet words with their time (no pill: DESIGN.md, "Don't"). */
+function StateWords({ row }: { row: PracticeRow }) {
+  const [words, when] = rowState(row);
+  return (
+    <p class={`pill ${row.state}`}>
+      {words}
+      {when && (
+        <>
+          {" "}
+          <time>{when}</time>
+        </>
+      )}
+    </p>
+  );
+}
+
 /**
- * One prompt of the day. Once it is sent the card carries the whole message, her opener and every question, in her
- * voice, whatever its state: answered, still open or missed (only Telegram folds a finished prompt). Under it, in
- * his serif, the first line of his reply when there is one. Then what can be done: reply (a new entry, or a `/j`
- * note when the prompt is no longer open: the server says which with `rule`), send it now, open the entry.
+ * Her letter on Today, as he was sent it: the opener, the question she asked in her italic, the practice's questions
+ * folded at the foot. When nothing was recorded but the questions (the plain opener), the questions are the letter,
+ * so they stand open.
  */
-function PracticeCard({ row, today, library, slot }: { row: PracticeRow; today: Today; library: LibraryItem[]; slot: number }) {
-  const p = library.find((x) => x.id === row.id);
-  // by the row's own entry: a practice with two slots has two rows with one id, and an id prefix names the first slot's entry
-  const entry = row.stem ? today.entries.find((e) => e.stem === row.stem) : undefined;
-  const [replying, setReplying] = useState(false);
-  const [saved, setSaved] = useState<Created | null>(null);
+function TodayLetter({ prompt, hers, actions }: { prompt: Prompt; hers: string; actions?: ComponentChildren }) {
+  const asked = prompt.asked.map((q) => q.question);
+  const bare = !prompt.opener && asked.length === 0;
+  return (
+    <Letter from={hers} at={prompt.sent_at_local ?? undefined} opener={prompt.opener ?? undefined} asked={asked}
+      questions={bare ? [] : prompt.questions} askedIds={prompt.asked.map((q) => q.id)} actions={actions}>
+      {bare && prompt.questions.length > 0 && (
+        <ol class="today-questions">
+          {prompt.questions.map((q) => (
+            <li key={q.id}>{q.text}</li>
+          ))}
+        </ol>
+      )}
+    </Letter>
+  );
+}
+
+interface CardProps {
+  row: PracticeRow;
+  today: Today;
+  library: LibraryItem[];
+  slot: number;
+}
+
+/** Send it now: the server spawns the send; the line says it is on its way until the ledger reports it. */
+function useSendNow(row: PracticeRow) {
   const [onItsWay, setOnItsWay] = useState(false);
   const send = useAction();
   useLive(["ledger-changed"], () => setOnItsWay(false));
-  const canReply = row.state === "open" || row.state === "missed";
-  const canSend = (row.state === "upcoming" || row.state === "missed") && (p?.enabled ?? true);
+  const run = async () => {
+    const done = await send.run(() => api.sendNow(row.id));
+    if (done) setOnItsWay(true);
+  };
+  return { onItsWay, busy: send.busy, error: send.error, run };
+}
+
+/**
+ * A prompt that was sent today: her letter, whatever its state (only Telegram folds a finished prompt), with what can
+ * be done on its crease: Answer and Speak it while it waits (the write room blooms from the button), Reply and Send
+ * now when it came and went unanswered. Under it, in his serif, the first line of his reply when there is one.
+ */
+function SentCard({ row, today, library, slot }: CardProps) {
+  const p = library.find((x) => x.id === row.id);
+  // by the row's own entry: a practice with two slots has two rows with one id, and an id prefix names the first slot's entry
+  const entry = row.stem ? today.entries.find((e) => e.stem === row.stem) : undefined;
+  const send = useSendNow(row);
+  const canSend = row.state === "missed" && (p?.enabled ?? true);
   const title = p?.title ?? row.id;
   const his = today.voices?.his ?? "You";
-  const [words, when] = rowState(row);
-  return (
-    <li class={`card practice ${row.state}`}>
-      {/* the hour in the margin, as a book page hangs it; when the line under the title names the same time the margin is
-          left to the eye, otherwise (no time there, or another one: answered later than sent) it is read out too */}
-      {rowTime(row) !== NO_TIME && (
-        <p class="practice-when" aria-hidden={when === rowTime(row) ? "true" : undefined}>
-          <time>{rowTime(row)}</time>
-          <span>{dayPart(rowTime(row))}</span>
-        </p>
+  const hers = today.voices?.hers ?? "the companion";
+  const answer = (e: Event, voice = false) =>
+    openWrite({ for: { kind: "answer", practice: row.id, slot }, from: e.currentTarget as HTMLElement, voice });
+  const open = entry && (
+    <ButtonLink href={`/entries/${entry.stem}`} variant="quiet" size="small" class="open-entry">
+      Open the entry
+    </ButtonLink>
+  );
+  const actions = row.state === "open" ? (
+    <>
+      <Button variant="primary" icon={<Pen />} onClick={(e) => answer(e)}>
+        Answer
+      </Button>
+      <Button variant="quiet" icon={<Mic />} onClick={(e) => answer(e, true)}>
+        Speak it
+      </Button>
+      {open}
+    </>
+  ) : row.state === "missed" ? (
+    <>
+      <Button size="small" icon={<Pen />} onClick={(e) => answer(e)}>
+        Reply
+      </Button>
+      {canSend && (
+        <Button variant="quiet" size="small" disabled={send.busy || send.onItsWay} onClick={() => void send.run()}>
+          {send.onItsWay ? "On its way…" : "Send now"}
+        </Button>
       )}
+      {open}
+    </>
+  ) : null;
+  return (
+    <li class={`today-card practice ${row.state}`}>
       <header class="practice-head">
-        {p?.emoji && <span class="emoji" aria-hidden="true">{p.emoji}</span>}
-        <div class="practice-title">
-          <h3>{title}</h3>
-          <p class={`pill ${row.state}`}>
-            {words}
-            {when && (
-              <>
-                {" "}
-                <time>{when}</time>
-              </>
-            )}
-          </p>
-        </div>
+        <h3>{title}</h3>
+        <StateWords row={row} />
       </header>
-      {row.prompt && <PromptMessage prompt={row.prompt} hers={today.voices?.hers} />}
+      {row.prompt ? (
+        <TodayLetter prompt={row.prompt} hers={hers} actions={actions ?? undefined} />
+      ) : (
+        actions && <div class="today-actions">{actions}</div>
+      )}
       {entry && (
         <a class="his-reply" href={`/entries/${entry.stem}`}>
           <span class="who">
@@ -93,55 +161,30 @@ function PracticeCard({ row, today, library, slot }: { row: PracticeRow; today: 
           <span class="words">{entry.first_line}</span>
         </a>
       )}
-      {(canReply || canSend || onItsWay || entry) && !replying && (
-        <div class="actions">
-          {canReply && !saved && (
-            <button type="button" class="button primary" onClick={() => setReplying(true)}>
-              Reply
-            </button>
-          )}
-          {canSend && (
-            <button
-              type="button"
-              class="button"
-              disabled={send.busy || onItsWay}
-              onClick={async () => {
-                const done = await send.run(() => api.sendNow(row.id));
-                if (done) setOnItsWay(true);
-              }}
-            >
-              {onItsWay ? "On its way…" : "Send now"}
-            </button>
-          )}
-          {entry && (
-            <a class="button open-entry" href={`/entries/${entry.stem}`}>
-              Open the entry
-            </a>
-          )}
-        </div>
+      {row.state === "answered" && open && <div class="today-actions">{open}</div>}
+      {send.error && <ErrorLine error={send.error} />}
+    </li>
+  );
+}
+
+/** A prompt still to come today: its name, a dotted leader to its hour, and Send now. */
+function LaterRow({ row, library }: CardProps) {
+  const p = library.find((x) => x.id === row.id);
+  const send = useSendNow(row);
+  const canSend = p?.enabled ?? true;
+  return (
+    <li class="today-card practice upcoming">
+      <div class="later-line">
+        <h3>{p?.title ?? row.id}</h3>
+        <span class="lead" aria-hidden="true" />
+        <StateWords row={row} />
+      </div>
+      {canSend && (
+        <TextButton class="later-send" disabled={send.busy || send.onItsWay} onClick={() => void send.run()}>
+          {send.onItsWay ? "On its way…" : "Send now"}
+        </TextButton>
       )}
       {send.error && <ErrorLine error={send.error} />}
-      {saved && (
-        <p class="saved">
-          {saved.rule === "/j" ? "Saved as a note. " : "Saved. "}
-          <a href={`/entries/${saved.stem}`}>Open the entry</a>
-        </p>
-      )}
-      {replying && (
-        <div class="inline-composer">
-          <Composer
-            draftKey={`reply:${row.id}:${slot}`}
-            label={`Reply to ${title}`}
-            placeholder="Reply in your own words"
-            submitLabel="Reply"
-            onSubmit={async (words) => setSaved(await api.createEntry({ practice: row.id, ...words }))}
-            onDone={() => setReplying(false)}
-          />
-          <button type="button" class="link" onClick={() => setReplying(false)}>
-            Not now
-          </button>
-        </div>
-      )}
     </li>
   );
 }
@@ -157,6 +200,26 @@ function dueToday(runs: Run[], day: string): { key: string; time: string; text: 
     });
   }
   return out.sort((a, b) => a.time.localeCompare(b.time));
+}
+
+/** A section of the page: a book head with a rule running out, rising in after the one before it. */
+function Sec({ id, title, count, i, class: cls, children }: {
+  id: string;
+  title: string;
+  count?: string | undefined;
+  i: number;
+  class?: string;
+  children: ComponentChildren;
+}) {
+  return (
+    <section class={["today-sec rise", cls].filter(Boolean).join(" ")} style={{ "--i": i }} aria-labelledby={id}>
+      <h2 class="book-head" id={id}>
+        {title}
+        {count && <span class="count">{count}</span>}
+      </h2>
+      {children}
+    </section>
+  );
 }
 
 export function TodayRoute() {
@@ -178,117 +241,143 @@ export function TodayRoute() {
   useLive(["ledger-changed", "entries-changed", "runs-changed", "library-changed", "tick"], reload);
 
   return (
-    <Await res={res} reload={reload} rows={4}>
-      {({ today, library, runs }) => {
-        // in the order the day went: sent (or due) earliest first; the server lists the schedule, then the on-demand sends
-        const rows = today.practices.rows
-          .map((r, slot) => ({ r, slot }))
-          .sort((a, b) => rowTime(a.r).localeCompare(rowTime(b.r)) || a.slot - b.slot);
-        const live = (runs ?? []).filter((r) => r.status === "active" || r.status === "paused");
-        const held = (runs ?? []).filter((r) => r.status === "completed" && holdsQuestions(r));
-        const interrupts = dueToday((runs ?? []).filter(holdsQuestions), today.date);
-        const nothing = rows.length === 0 && !today.program && live.length === 0 && held.length === 0 && today.entries.length === 0;
-        return (
-          <div class="page today">
-            <header class="page-head today-head">
-              <p class="eyebrow">Today</p>
-              <h1>
-                <span class="dow">{longDay(today.date).split(" ")[0]}</span>{" "}
-                <span class="dmy">{longDay(today.date).split(" ").slice(1).join(" ")}</span>
-              </h1>
-              <p class="sub">{[`${today.time} ${today.timezone}`, today.location].filter(Boolean).join(" · ")}</p>
-              {today.weather && <p class="weather">{today.weather}</p>}
-              {today.location && today.location_source === OSM && <OsmCredit />}
-            </header>
-            <WeekStrip week={today.week} today={today.date} />
-            {nothing && <Empty>Nothing scheduled today.</Empty>}
-            {rows.length > 0 && (
-              <section class="practices" aria-labelledby="practices-h">
-                <h2 id="practices-h">Practices</h2>
-                <ul class="cards">
-                  {rows.map(({ r, slot }) => (
-                    <PracticeCard key={`${r.id}#${slot}`} row={r} today={today} library={library} slot={slot} />
-                  ))}
-                </ul>
-              </section>
-            )}
-            {live.length + held.length > 0 && (
-              <section aria-labelledby="program-h">
-                <h2 id="program-h">Programs</h2>
-                <ul class="cards">
-                  {live.map((r) => (
-                    <RunCard key={r.id} run={r} />
-                  ))}
-                  {held.map((r) => (
-                    <HeldRunCard key={r.id} run={r} />
-                  ))}
-                </ul>
-              </section>
-            )}
-            {interrupts.length > 0 && (
-              <section aria-labelledby="interrupts-h">
-                <h2 id="interrupts-h">Questions coming later today</h2>
-                <ul class="plain-list interrupts">
-                  {interrupts.map((i) => (
-                    <li key={i.key}>
-                      <time>{i.time}</time> <span>{i.title} · {i.text}</span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-            {runs === null && today.program && (
-              <section aria-labelledby="program-h">
-                <h2 id="program-h">Program</h2>
-                <p class="card program">{today.program.text}</p>
-              </section>
-            )}
-            {runs !== null && live.length + held.length === 0 && (
-              <section aria-labelledby="program-h">
-                <h2 id="program-h">Programs</h2>
-                <Empty>
-                  No program running. <a href="/library">Start one from the Library.</a>
-                </Empty>
-              </section>
-            )}
-            {today.entries.length > 0 && (
-              <section aria-labelledby="written-h">
-                <h2 id="written-h">Written today</h2>
-                <ul class="plain-list written">
-                  {today.entries.map((e) => (
-                    <li key={e.stem}>
-                      <a class="written-row" href={`/entries/${e.stem}`}>
-                        <span class="kind">{kindLabel(kindOfStem(e.stem), library)}</span>
-                        <span class="first-line">{e.first_line}</span>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-            {today.reflection && (
-              <section aria-labelledby="carry-h" class="carry">
-                <h2 id="carry-h">To carry forward</h2>
-                <blockquote>{today.reflection.asked}</blockquote>
-                <a class="quiet-link" href={`/insights#${today.reflection.stem ?? `${today.reflection.date}-reflection`}`}>Read the reflection</a>
-              </section>
-            )}
-            {today.tasks && (
-              <section aria-labelledby="tasks-h">
-                <h2 id="tasks-h">Due today</h2>
-                <ul class="plain-list tasks">
-                  {today.tasks.names.map((n) => (
-                    <li key={n}>{n}</li>
-                  ))}
-                  {today.tasks.count > today.tasks.names.length && (
-                    <li class="more">and {today.tasks.count - today.tasks.names.length} more</li>
-                  )}
-                </ul>
-              </section>
-            )}
-          </div>
-        );
-      }}
-    </Await>
+    <div class="today-page">
+      <Await res={res} reload={reload} rows={4}>
+        {({ today, library, runs }) => {
+          // in the order the day went: sent (or due) earliest first; the server lists the schedule, then the on-demand sends
+          const rows = today.practices.rows
+            .map((r, slot) => ({ r, slot }))
+            .sort((a, b) => rowTime(a.r).localeCompare(rowTime(b.r)) || a.slot - b.slot);
+          const waiting = rows.filter(({ r }) => r.state === "open");
+          const earlier = rows.filter(({ r }) => r.state === "answered" || r.state === "missed");
+          const later = rows.filter(({ r }) => r.state === "upcoming");
+          const live = (runs ?? []).filter((r) => r.status === "active" || r.status === "paused");
+          const held = (runs ?? []).filter((r) => r.status === "completed" && holdsQuestions(r));
+          const interrupts = dueToday((runs ?? []).filter(holdsQuestions), today.date);
+          const nothing = rows.length === 0 && !today.program && live.length === 0 && held.length === 0 && today.entries.length === 0;
+          const [dow = "", d = "", month = "", year = ""] = longDay(today.date).split(" ");
+          const card = ({ r, slot }: { r: PracticeRow; slot: number }) => (
+            <SentCard key={`${r.id}#${slot}`} row={r} today={today} library={library} slot={slot} />
+          );
+          let i = 0;
+          return (
+            <div class="today-grid">
+              <div class="today-main">
+                <header class="today-head">
+                  <span class="numeral today-num" aria-hidden="true">{parseDay(today.date)?.d ?? d}</span>
+                  <div class="today-dl">
+                    <h1>
+                      <span class="today-dow">{dow}</span>
+                      <span class="sr-only"> {d}</span> <span class="today-month">{month}</span>
+                      <span class="sr-only"> {year}</span>
+                    </h1>
+                    <p class="sub">{[`${today.time} ${today.timezone}`, today.location].filter(Boolean).join(" · ")}</p>
+                    {today.weather && <p class="weather">{today.weather}</p>}
+                    {today.location && today.location_source === OSM && <OsmCredit />}
+                  </div>
+                </header>
+                <WeekStrip week={today.week} today={today.date} />
+                {nothing && <Empty>Nothing scheduled today.</Empty>}
+                {waiting.length > 0 && (
+                  <Sec id="waiting-h" title="Waiting for you" i={i++} class="waiting"
+                    count={waiting[0]?.r.sent ? `since ${waiting[0].r.sent}` : undefined}>
+                    <ul class="today-cards">{waiting.map(card)}</ul>
+                  </Sec>
+                )}
+                {earlier.length > 0 && (
+                  <Sec id="earlier-h" title="Earlier today" i={i++}>
+                    <ul class="today-cards">{earlier.map(card)}</ul>
+                  </Sec>
+                )}
+                {today.entries.length > 0 && (
+                  <Sec id="written-h" title="Written today" i={i++} class="written">
+                    <ul class="written-list">
+                      {today.entries.map((e) => (
+                        <li key={e.stem}>
+                          <a class="written-row" href={`/entries/${e.stem}`}>
+                            <span class="kind">{kindLabel(kindOfStem(e.stem), library)}</span>
+                            <span class="first-line">{e.first_line}</span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </Sec>
+                )}
+              </div>
+              <aside class="today-side" aria-label="The rest of the day">
+                {later.length > 0 && (
+                  <Sec id="later-h" title="Later today" i={i++}>
+                    <ul class="today-later">
+                      {later.map(({ r, slot }) => (
+                        <LaterRow key={`${r.id}#${slot}`} row={r} today={today} library={library} slot={slot} />
+                      ))}
+                    </ul>
+                  </Sec>
+                )}
+                {live.length + held.length > 0 && (
+                  <Sec id="program-h" title="Programs" i={i++}>
+                    <ul class="today-runs">
+                      {live.map((r) => (
+                        <RunCard key={r.id} run={r} />
+                      ))}
+                      {held.map((r) => (
+                        <HeldRunCard key={r.id} run={r} />
+                      ))}
+                    </ul>
+                  </Sec>
+                )}
+                {runs === null && today.program && (
+                  <Sec id="program-h" title="Program" i={i++}>
+                    <p class="program-line">{today.program.text}</p>
+                  </Sec>
+                )}
+                {runs !== null && live.length + held.length === 0 && (
+                  <Sec id="program-h" title="Programs" i={i++}>
+                    <Empty>
+                      No program running. <a href="/library">Start one from the Library.</a>
+                    </Empty>
+                  </Sec>
+                )}
+                {interrupts.length > 0 && (
+                  <Sec id="interrupts-h" title="Questions coming later" i={i++}>
+                    <ul class="interrupts">
+                      {interrupts.map((q) => (
+                        <li key={q.key}>
+                          <span>{q.title} · {q.text}</span>
+                          <span class="lead" aria-hidden="true" />
+                          <time>{q.time}</time>
+                        </li>
+                      ))}
+                    </ul>
+                  </Sec>
+                )}
+                {today.reflection && (
+                  <section class="today-sec carry rise" style={{ "--i": i++ }} aria-labelledby="carry-h">
+                    <h2 class="kicker" id="carry-h">Carry forward</h2>
+                    <blockquote class="her">{today.reflection.asked}</blockquote>
+                    <a class="carry-link" href={`/insights#${today.reflection.stem ?? `${today.reflection.date}-reflection`}`}>
+                      From {longDay(today.reflection.date).split(" ")[0]}'s reflection
+                      <Chevron />
+                    </a>
+                  </section>
+                )}
+                {today.tasks && (
+                  <Sec id="tasks-h" title="Due today" i={i++}>
+                    <ul class="tasks">
+                      {today.tasks.names.map((n) => (
+                        <li key={n}>{n}</li>
+                      ))}
+                      {today.tasks.count > today.tasks.names.length && (
+                        <li class="more">and {today.tasks.count - today.tasks.names.length} more</li>
+                      )}
+                    </ul>
+                  </Sec>
+                )}
+              </aside>
+            </div>
+          );
+        }}
+      </Await>
+    </div>
   );
 }
