@@ -103,10 +103,12 @@ test.describe("paired", () => {
     await page.screenshot({ path: `${at}-toast.png` });
   });
 
-  test("entry with her note open", async ({ page }, info) => {
+  // WEB-UX: her notes stand in the margin unfolded; what opens now is her readings at the end of the entry
+  test("entry with her readings open", async ({ page }, info) => {
     await page.goto("/entries/2026-10-14-evening");
     await settle(page);
-    await page.locator(".block.hers summary").first().click();
+    await page.getByRole("button", { name: /What she noticed/ }).click();
+    await page.waitForTimeout(800);
     await page.screenshot({ path: `${OUT}/${info.project.name}-light-entry-open.png`, fullPage: true });
   });
 

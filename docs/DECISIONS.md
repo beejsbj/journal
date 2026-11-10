@@ -3055,3 +3055,21 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   - **Still open, for the route builders of this pass:** the entry's Analysis and Reflection unfolding at the end
     (replacing FRONTEND §1.3's tabs), the write room replacing the + sheet, the sidebar beside an entry. Each is
     recorded with its route when it lands.
+- **WEB-UX-ENTRY-TABS (2026-11-09) — the entry has no Entry/Analysis tabs; her readings unfold at its end.** FRONTEND
+  §1.3 put an entry's analysis on a second tab. Round 02 drew it as her readings at the foot of the entry instead, and
+  the owner accepted round 02 with this call left uncontested (`design/state.md`, *Round 02 result*: "Calls he did not
+  contest (stand, reversible): … Analysis and Reflection unfold at the end of the entry, no tabs"). So the entry page
+  (`web/src/routes/entry.tsx`) ends with "Her readings": *What she noticed* (her annotations and her notes) and *her
+  reflection on the day*, each a disclosure (`ui/Disclosure`) that unfolds in place; the reflection is read when its
+  fold first opens. The data and the empty text are as they were ("Nothing here yet: Ada adds notes after the entry
+  settles."); the program summary stays at the end of the document, where it was already shown. Nothing hides the
+  composer any more (it was hidden while the Analysis tab was open). The tests that clicked the tab now open the
+  folds (`web/tests/routes.test.tsx`, `web/e2e/smoke.spec.ts`, `web/e2e/mobile.spec.ts`).
+  The same pass, recorded here as they land with the entry: her chat replies in an entry, folded `<details>` callouts
+  until now, stand **in the right margin beside the passage they follow** (`ui/MarginNote`; under the passage when the
+  page is under 840 px wide), shown in full, still read-only; the list slides into a **sidebar beside an open entry**
+  on a wide screen, in one of three modes the reader picks in the entry bar (titles, dates and dots, none; default
+  titles) and that this device keeps (`localStorage["journal:sidebar"]`, never sent); the Entries filters are a
+  sentence with menus and a month calendar (`/days`), on the same address as before. **Not done:** Delete keeps its
+  question in place and has no Undo, since the server has no undo for a block and a delayed delete would change
+  when the file is written.

@@ -45,8 +45,8 @@ describe("Edit and Delete on his blocks", () => {
       expect(byText(article, ".block-actions button", "Edit")).toBeDefined();
       expect(byText(article, ".block-actions button", "Delete")).toBeDefined();
     }
-    expect(host.querySelectorAll("details.block.hers .block-actions")).toHaveLength(0);
-    expect(host.querySelectorAll("details.block.hers button")).toHaveLength(0);
+    expect(host.querySelectorAll(".block.hers .block-actions")).toHaveLength(0);
+    expect(host.querySelectorAll(".block.hers button")).toHaveLength(0);
   });
 
   it("never appear on her callouts (README Guarantees: the companion's words are never editable)", async () => {
@@ -54,14 +54,15 @@ describe("Edit and Delete on his blocks", () => {
     stubApi({ ...reads, [`GET /api/v1/entries/${STEM}`]: fixtures.entryEvening });
     const host = mount(<App />);
     await until(() => must(host.querySelector(".document article.block.his")));
-    const hers = [...host.querySelectorAll<HTMLElement>("details.block.hers")];
+    // (WEB-UX: her words stand in the margin as aside.block.hers, ui/MarginNote; they were folded <details>)
+    const hers = [...host.querySelectorAll<HTMLElement>(".block.hers")];
     // the fixture carries her note: a page with none would pass this test for nothing
     expect(hers.length).toBeGreaterThan(0);
     expect(hers.length).toBe(fixtures.entryEvening.blocks.filter((b) => b.kind === "hers").length);
-    for (const details of hers) {
-      // (a closed <details> still has its content in the DOM, so this covers the callout open and shut)
-      expect(details.querySelectorAll("button, input, textarea, [contenteditable], [role=button]")).toHaveLength(0);
-      expect(details.querySelector(".block-actions")).toBeNull();
+    for (const note of hers) {
+      expect(note.querySelectorAll("button, input, textarea, [contenteditable], [role=button]")).toHaveLength(0);
+      expect(note.querySelector(".block-actions")).toBeNull();
+      expect(note.closest("article.his")).toBeNull();   // never inside his passage, where his tools are
     }
   });
 

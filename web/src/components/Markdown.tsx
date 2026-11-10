@@ -1,5 +1,6 @@
 import { Fragment } from "preact";
 import { parseMarkdown, type Inline } from "../markdown";
+import "./Markdown.css";
 
 function Run({ parts }: { parts: Inline[] }) {
   return (

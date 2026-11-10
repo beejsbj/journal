@@ -1,0 +1,189 @@
+/* Entry (routes/entry.tsx): an entry open beside its list. Wide screens: the side pane (titles, or dates and dots, or
+   none; the reader's choice, kept on this device) and the entry pane raised above it, each scrolling on its own. Phones:
+   the entry alone, pushed over the list. The page inside is a spread (components/Document.css) that answers to its own
+   width: the frame is the container "entry". */
+
+/* ---------- the panes (wide screens) ---------- */
+@media (min-width: 761px) {
+  /* the side pane takes the view-transition name "page" (the shell's pane gives it up while a route lays panes:
+     shell.css), so the list morphs into the sidebar */
+  .side-pane { flex: none; width: var(--side-list); background: color-mix(in oklab, var(--raised) 70%, var(--pane)); box-shadow: none; }
+  .side-pane.rail { width: var(--side-rail); }
+  .entry-pane { flex: 1; }
+  @supports not (view-transition-name: none) {
+    .side-pane { transition: width var(--spring-soft-dur) var(--spring-soft); }
+  }
+}
+[data-theme="dark"] .side-pane { background: var(--sunk); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .side-pane { background: var(--sunk); } }
+
+/* the titled sidebar (Folio): a head, the mini month, the weeks */
+.side-head {
+  position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 2px; padding: 12px 8px 8px 18px;
+  background: inherit;
+}
+.side-pane.list .side-head { background: color-mix(in oklab, var(--raised) 70%, var(--pane)); }
+[data-theme="dark"] .side-pane.list .side-head { background: var(--sunk); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .side-pane.list .side-head { background: var(--sunk); } }
+.side-head h2 { flex: 1; margin: 0; font: italic 400 21px / 1 var(--f-his); color: var(--text); }
+.side-body { padding: 0 12px 60px; }
+.side-calendar { margin: 2px 4px 6px; border-top-width: 1px; }
+.side-calendar .calendar-month { font-size: 20px; }
+.side-calendar .calendar-grid td > span, .side-calendar .calendar-grid td > button { height: 30px; font-size: 13px; }
+.side-note { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 8px 8px 0; font: 400 var(--t-small) / 1.4 var(--f-ui); color: var(--text-3); }
+.side-note .link { font-size: var(--t-small); }
+.side-week h3 { margin: 0; padding: 18px 10px 6px; font: 500 var(--t-micro) / 1 var(--f-ui); color: var(--text-3); }
+.side-week { display: grid; gap: 2px; }
+.side-more { margin-top: var(--s3); }
+.side-body .skeletons { margin-top: var(--s4); }
+
+/* the dates and dots (Night Room) */
+.side-dots { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 0 30px; }
+.dots-week { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.dots-week h3 { margin: 14px 0 4px; font: 500 11px / 1.2 var(--f-ui); color: var(--text-3); text-align: center; }
+.dots-day { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 72px; padding: 6px 0; border-radius: 12px; }
+.dots-n { font: 300 19px / 1 var(--f-his); font-variant-numeric: lining-nums; color: var(--text-2); }
+.dots-w { font: 500 10.5px / 1.2 var(--f-ui); color: var(--text-3); }
+.dots-day.on .dots-n { color: var(--text); font-weight: 450; }
+.dots-row { display: flex; flex-wrap: wrap; justify-content: center; margin-top: 2px; }
+.side-dots .dot { position: relative; display: grid; place-items: center; width: 22px; height: 26px; border-radius: 50%; }
+.side-dots .dot::after { content: ""; position: absolute; inset: -6px -1px; }
+.side-dots .dot::before {
+  content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--text-3);
+  transition: transform var(--spring-dur) var(--spring), background var(--d-1);
+}
+.side-dots .dot:hover::before, .side-dots .dot:focus-visible::before { transform: scale(1.4); background: var(--text-2); }
+.side-dots .dot.on::before { background: var(--lamp); box-shadow: 0 0 0 3px color-mix(in oklab, var(--lamp) 18%, transparent); }
+.dots-tip {
+  position: fixed; inset: auto; z-index: var(--z-pop); margin: 0; max-width: 260px; padding: 10px 12px; border: 0; border-radius: 12px;
+  display: grid; gap: 3px; transform: translateY(-50%); pointer-events: none;
+  background: var(--frost); color: var(--text); box-shadow: var(--elev-pop);
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); animation: tip-in var(--d-3) var(--e-out) both;
+}
+.dots-tip-1 { font: 400 12.5px / 1.3 var(--f-ui); color: var(--text-3); }
+.dots-tip-2 { font: 400 15px / 1.4 var(--f-his); }
+@keyframes tip-in { from { opacity: 0; transform: translate(-4px, -50%); } }
+
+/* ---------- the entry ---------- */
+.entry-frame { container: entry / inline-size; min-height: 100%; }
+.entry-sentinel { height: 1px; margin-bottom: -1px; }
+
+/* the bar: back, the sidebar switch, newer and older; the date slides in once the head has gone; his marks at the end */
+.entry-bar {
+  position: sticky; top: 0; z-index: var(--z-sticky); display: flex; align-items: center; gap: 4px; padding: 10px 14px;
+  transition: box-shadow var(--d-2), background var(--d-2);
+}
+.entry-bar.scrolled {
+  background: color-mix(in oklab, var(--pane) 86%, transparent); box-shadow: 0 1px 0 var(--hair);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+}
+.entry-bar-sep { width: 1px; height: 22px; margin: 0 6px; background: var(--hair-2); }
+.entry-bar-grow { flex: 1; }
+.entry-bar-title {
+  margin-left: 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font: italic 400 16px / 1 var(--f-his); color: var(--text-2);
+  opacity: 0; transform: translateY(4px); transition: opacity var(--d-2), transform var(--d-2) var(--e-out);
+}
+.entry-bar.scrolled .entry-bar-title { opacity: 1; transform: none; }
+.entry-back {
+  display: inline-flex; align-items: center; gap: 4px; min-height: var(--tap); padding: 0 10px 0 4px; border-radius: var(--r-m);
+  font: 500 var(--t-ui) / 1 var(--f-ui); color: var(--text-2); text-decoration: none;
+}
+.entry-back:hover { color: var(--text); background: var(--raised); }
+.entry-back > svg { width: 20px; height: 20px; }
+
+.entry-doc {
+  --doc-gap: 24px;
+  max-width: calc(var(--margin-l) + var(--measure) + var(--margin-r) + 56px + 96px); margin: 0 auto; padding: 18px 48px 140px;
+}
+@container entry (min-width: 840px) { .entry-doc { --doc-gap: 28px; } }
+.entry-doc > .empty, .entry-doc > .skeletons, .entry-doc > .error-line { margin: var(--s7) 0 0 calc(var(--margin-l) + var(--doc-gap)); max-width: var(--measure); }
+
+/* the head: the day as Almanac's numeral in the margin, the practice as a kicker, the weekday, the meta line */
+.entry-head.page-head {
+  display: grid; grid-template-columns: var(--margin-l) minmax(0, 1fr); column-gap: var(--doc-gap); align-items: end;
+  margin: 0; padding: 6px 0 34px; border: 0;
+}
+.entry-numeral { text-align: right; font-size: 76px; padding: 0 4px 4px 0; color: var(--text); }
+.entry-kicker { margin: 0 0 10px; }
+.entry-kicker::before { content: ""; width: 18px; height: 1px; background: var(--text-3); }
+.entry-head h1 { margin: 0; }
+.entry-meta { display: flex; flex-wrap: wrap; gap: 4px 0; margin: 12px 0 0; font: 400 var(--t-small) / 1.4 var(--f-ui); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.entry-meta > span:not(:last-child)::after { content: "·"; margin: 0 10px; opacity: 0.6; }
+.entry-tags { display: flex; flex-wrap: wrap; gap: 2px 14px; margin: 8px 0 0; font: italic 400 16px / 1.4 var(--f-his); color: var(--text-2); }
+.entry-tag { display: inline-flex; align-items: center; gap: 5px; }
+.entry-tag > svg { width: 14px; height: 14px; color: var(--text-3); }
+
+/* his column's own parts after the document: adding to it, her readings, a closed composer */
+.entry-doc > .add, .entry-doc > .readings, .entry-doc > .composer-closed {
+  margin-left: calc(var(--margin-l) + var(--doc-gap)); max-width: var(--measure);
+}
+.entry-doc > .add { margin-top: 44px; padding-top: var(--s3); border-top: 1px solid var(--hair); }
+.add-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s2); margin: 0 0 var(--s1); }
+.add-head > span { font: italic 400 var(--t-h3) / 1.2 var(--f-his); color: var(--text-3); }
+.add-head .link { gap: 6px; font-size: var(--t-small); }
+.add-head .link > svg { width: 15px; height: 15px; }
+.entry-doc > .composer-closed { margin-top: 44px; }
+
+/* her readings: Analysis and her reflection unfold at the end (no tabs) */
+.readings { margin-top: 56px; }
+.readings > .book-head { margin: 0 0 8px; }
+.readings > .empty { margin: var(--s3) 0 0; }
+.reading { border-top: 1px solid var(--hair-2); }
+.reading:last-child { border-bottom: 1px solid var(--hair-2); }
+.reading > .disclosure-head { min-height: 76px; padding: 14px 4px; border-radius: 0; }
+.reading > .disclosure-head:hover { background: color-mix(in oklab, var(--raised) 60%, transparent); }
+.reading-env { flex: none; width: 34px; height: 26px; color: var(--her); }
+.reading-title { font: 400 20px / 1.2 var(--f-his); color: var(--text); }
+.reading-sub { font: 400 var(--t-small) / 1.3 var(--f-ui); color: var(--text-3); }
+.reading .disclosure-peek .her { font-size: 13px; }
+.reading-body { padding: 4px 4px 30px 50px; }
+.analysis-section + .analysis-section { margin-top: var(--s5); }
+.analysis-section h3 { margin: 6px 0 10px; font: 500 var(--t-small) / 1.3 var(--f-ui); color: var(--text-3); }
+.her-notes { list-style: none; margin: 0; padding: 0; }
+.her-notes .note { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 10px; padding: 12px 0; border-bottom: 1px dashed var(--her-edge); }
+.her-notes .note:first-child { padding-top: 0; }
+.her-notes .note time { font: 500 12px / 1.9 var(--f-ui); color: var(--her-soft); }
+.reflection-body .refl-title { margin: 0 0 10px; font: 400 21px / 1.3 var(--f-his); color: var(--text); }
+.reflection-body .refl-link { display: inline-flex; align-items: center; min-height: 32px; margin-top: 8px; font-size: var(--t-small); color: var(--text-2); }
+@media (max-width: 760px), (pointer: coarse) { .reflection-body .refl-link { min-height: var(--tap); } }
+
+/* ---------- a narrow page: no margin; on a phone the entry is the page, the composer above the tab bar ---------- */
+@container entry (max-width: 559px) {
+  .entry-doc { padding: 6px var(--gutter) 40px; }
+  .entry-head.page-head { grid-template-columns: auto minmax(0, 1fr); column-gap: 16px; padding-bottom: 22px; align-items: end; }
+  .entry-numeral { font-size: 64px; padding: 0 0 2px; }
+  .entry-doc > .add, .entry-doc > .readings, .entry-doc > .composer-closed,
+  .entry-doc > .empty, .entry-doc > .skeletons, .entry-doc > .error-line { margin-left: 0; }
+  .reading-body { padding-left: 4px; }
+  .her-notes .note { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+}
+@media (max-width: 760px) {
+  .entry-bar { padding: 4px 8px 4px 6px; }
+  .entry-bar.scrolled { background: color-mix(in oklab, var(--pane) 90%, transparent); }
+  /* the thumb writes and sends: the box stays above the tab bar, grows when it is used */
+  .entry-doc > .add {
+    position: sticky; bottom: calc(var(--bar-h) + env(safe-area-inset-bottom)); z-index: var(--z-sticky);
+    margin: var(--s5) calc(-1 * var(--gutter)) 0; padding: var(--s2) var(--gutter); border-top: 1px solid var(--hair);
+    background: var(--pane);
+  }
+  .add .composer { margin-top: 0; }
+  .add .composer textarea { min-height: var(--tap); height: 5.5rem; resize: none; }   /* opens at once: mobile.spec measures it on the tap */
+  .add .composer:focus-within textarea { height: min(30vh, 10rem); }
+  .readings { margin-top: var(--s7); }
+
+  /* At rest the box is one quiet line ("Add more, in your own words" and a mic), so it never covers his words. It is
+     the whole composer again the moment it is used: focused, holding words or a recording, recording, offline, or
+     saying something (an error, words kept from another box). Composer itself is unchanged: this reads its state
+     from the page (the textarea's placeholder shows only while it is empty). Without :has() the box stays whole. */
+  .entry-doc > .add:not(:focus-within):has(.composer textarea:placeholder-shown):not(:has(.clip, .error-line, .composer-kept, .offline-note, .recording)) { padding-top: 4px; padding-bottom: 4px; }
+  .entry-doc > .add:not(:focus-within):has(.composer textarea:placeholder-shown):not(:has(.clip, .error-line, .composer-kept, .offline-note, .recording)) .composer { display: flex; align-items: center; gap: var(--s2); }
+  .entry-doc > .add:not(:focus-within):has(.composer textarea:placeholder-shown):not(:has(.clip, .error-line, .composer-kept, .offline-note, .recording)) .composer textarea {
+    flex: 1; height: var(--tap); padding: 11px 0; border: 0; box-shadow: none; overflow: hidden; white-space: nowrap;
+  }
+  .entry-doc > .add:not(:focus-within):has(.composer textarea:placeholder-shown):not(:has(.clip, .error-line, .composer-kept, .offline-note, .recording)) .composer-actions { flex: none; }
+  .entry-doc > .add:not(:focus-within):has(.composer textarea:placeholder-shown):not(:has(.clip, .error-line, .composer-kept, .offline-note, .recording)) .composer-actions .button.primary, .entry-doc > .add:not(:focus-within):has(.composer textarea:placeholder-shown):not(:has(.clip, .error-line, .composer-kept, .offline-note, .recording)) .recorder .hint { display: none; }
+  .entry-doc > .add:not(:focus-within):has(.composer textarea:placeholder-shown):not(:has(.clip, .error-line, .composer-kept, .offline-note, .recording)) .recorder .button { width: var(--tap); padding: 0; gap: 0; font-size: 0; border-radius: 50%; }
+  .entry-doc > .add:not(:focus-within):has(.composer textarea:placeholder-shown):not(:has(.clip, .error-line, .composer-kept, .offline-note, .recording)) .recorder .button > svg { width: 20px; height: 20px; }
+
+}
