@@ -24,5 +24,14 @@
 .error-line p + p { margin-top: var(--s2); }
 .error-line ul { padding-left: 1.2rem; }
 
+/* a write that is done says what happened ("Saved as a note."); a write that cannot go says so (offline): a
+   half-filled mark, since status has no hue */
+.saved { margin: var(--s3) 0 0; font-size: var(--t-small); line-height: 1.45; color: var(--text-2); }
+.offline-note { display: flex; align-items: baseline; gap: var(--s2); margin: 0; font-size: var(--t-small); line-height: 1.45; color: var(--text-2); }
+.offline-note::before {
+  content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; transform: translateY(-1px);
+  background: linear-gradient(90deg, var(--text-2) 50%, transparent 50%); box-shadow: inset 0 0 0 1.2px var(--text-2);
+}
+
 .empty { margin: 0; padding: var(--s6) 0; font: italic 400 1.1875rem / 1.5 var(--f-his); color: var(--text-3); }
 .empty a { color: var(--text-2); }

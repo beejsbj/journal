@@ -53,10 +53,7 @@
   margin: 0; font-size: 1.3125rem; white-space: pre-wrap; overflow-wrap: anywhere; text-wrap: pretty;
 }
 /* a transcript that has not come: a quiet word in the book's italic, not a box */
-.block.his .badge.pending {
-  display: block; margin: 0; padding: 0; border: 0; border-radius: 0; background: none;
-  font: italic 400 17px / 1.5 var(--f-his); letter-spacing: 0; text-transform: none; color: var(--text-3);
-}
+.block.his .transcript-pending { margin: 0; font: italic 400 17px / 1.5 var(--f-his); color: var(--text-3); }
 .replying { display: flex; align-items: baseline; gap: var(--s2); margin: 0 0 6px; font: 400 var(--t-small) / 1.45 var(--f-ui); color: var(--text-3); }
 .replying svg { flex: none; width: 15px; height: 15px; transform: translateY(3px); }
 .replying q { font-size: 13px; font-style: italic; }

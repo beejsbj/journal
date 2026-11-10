@@ -118,13 +118,13 @@ describe("Document: two voices, one page", () => {
     expect(host.querySelector(".words")?.textContent).toBe("The lake.");
   });
 
-  it("shows a badge, not the engine's marker, for a transcript that has not arrived", () => {
+  it("shows a quiet word, not the engine's marker, for a transcript that has not arrived", () => {
     const doc = EntryDoc({
       ...fixtures.entryEvening,
       blocks: [{ kind: "his", key: "words:0", at: "23:40 IST", source: "voice", text: "_(audio file — transcript pending)_", audio: "a.ogg", phase: null }],
     });
     const host = mount(<Document doc={doc} />);
-    expect(host.querySelector(".badge.pending")?.textContent).toBe("transcript pending");
+    expect(host.querySelector(".transcript-pending")?.textContent).toBe("transcript pending");
     expect(host.querySelector(".words")).toBeNull();
   });
 });

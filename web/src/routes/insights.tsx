@@ -196,7 +196,7 @@ function WeekBody({ week, index, focus, her, titles }: { week: Week; index: numb
             return (
               <>
                 <section class="ins-review" aria-labelledby="review-h">
-                  <h2 id="review-h" class="kicker">Her review of the week</h2>
+                  <h2 id="review-h" class="book-head">Her review of the week</h2>
                   {review ? (
                     <Review r={review} her={her} open={opened.has(review.stem)} onToggle={toggle(review.stem)} />
                   ) : (

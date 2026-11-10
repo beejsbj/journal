@@ -196,7 +196,7 @@ function HisBlock({ block, name, target }: { block: Block; name: string; target?
         {editing && target ? (
           <BlockEditor target={target} onClose={() => setEditing(false)} />
         ) : pending ? (
-          <p class="badge pending">{trimmed === PENDING ? "transcript pending" : "not transcribed"}</p>
+          <p class="transcript-pending">{trimmed === PENDING ? "transcript pending" : "not transcribed"}</p>
         ) : (
           trimmed && <p class="words read">{block.text}</p>
         )}

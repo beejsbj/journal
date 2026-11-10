@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, api } from "../src/api";
 import { setAuthLost } from "../src/auth";
-import { OfflineRibbon } from "../src/components/OfflineRibbon";
+import { OfflineRibbon } from "../src/ui";
 import {
   OFFLINE_WRITE, clearOfflineData, forgetReads, keptAt, noteRead, ribbonText, staleAsOf,
 } from "../src/offline";

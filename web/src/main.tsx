@@ -1,8 +1,7 @@
-// the styles first, in this order: the tokens, the base, then the old sheet the unconverted routes still read; every
-// component's own sheet comes after them (imported by its TSX), so the design system wins a tie with the old sheet
+// the styles first: the tokens, then the base; every component's and route's own sheet comes after them (imported by
+// its TSX), so a component's rule wins a tie with the base
 import "./tokens.css";
 import "./styles/base.css";
-import "./styles/legacy.css";
 import { render } from "preact";
 import { App } from "./app";
 import { applyInk, savedInk } from "./ink";

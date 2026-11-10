@@ -28,4 +28,11 @@
 
 @media (max-width: 760px), (pointer: coarse) {
   .menu > button { min-height: var(--tap); }
+  /* a choice in a sentence reaches 44 px without opening the lines up: the hit box grows into the leading, and the
+     dotted rule moves onto the words */
+  .choice {
+    padding: 12px 1px; margin: -12px 0; border-bottom: 0; align-items: center;
+    text-decoration: underline dotted 1.5px var(--text-3); text-underline-offset: 5px;
+  }
+  .choice[aria-expanded="true"] { text-decoration-color: var(--text); }
 }

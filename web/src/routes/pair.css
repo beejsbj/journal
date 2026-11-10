@@ -33,9 +33,7 @@
 }
 
 /* "Not here": a page with nothing at its address */
-.not-found { max-width: 40rem; margin: 0 auto; padding: 72px var(--gutter) var(--s8); }
+.not-found { max-width: 40rem; margin: 0 auto; padding: calc(var(--page-top) + var(--s7)) var(--gutter) var(--page-foot); }
 .not-found .kicker { margin: 0 0 8px; }
 .not-found .lede { margin: 14px 0 var(--s5); }
-@media (max-width: 760px) {
-  .not-found { padding: 24px 20px var(--s6); }
-}
+

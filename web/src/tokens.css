@@ -104,6 +104,8 @@
   --s9: 96px;
   --tap: 44px;             /* the smallest target, everywhere */
   --gutter: 56px;          /* page padding, desktop (20 on a phone) */
+  --page-top: 40px;        /* from the pane's top to a page's first line (its back link or its head); 8 on a phone */
+  --page-foot: var(--s8);  /* under a page's last line (32 on a phone, where the tab bar's room is added) */
   --measure: 35rem;        /* his column */
   --margin-l: 72px;        /* the hours */
   --margin-r: 200px;       /* her notes */
@@ -283,5 +285,5 @@ html { transition: --her var(--d-ink) var(--e-inout); }
 
 /* ---- phone ---- */
 @media (max-width: 760px) {
-  :root { --gutter: 20px; --t-h1: 2.3rem; }
+  :root { --gutter: 20px; --t-h1: 2.3rem; --page-top: 8px; --page-foot: var(--s6); }
 }

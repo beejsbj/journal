@@ -13,11 +13,11 @@ import { definitionFromForm, formFromDefinition } from "../editorModel";
 import { useLive } from "../events";
 import { cadence, dayLabel, plural } from "../format";
 import { useAction, useResource } from "../hooks";
-import { ChevronLeft, ChevronRight, Plus } from "../icons";
+import { ChevronRight, Plus } from "../icons";
 import { GROUP_ORDER, groupOf, isProgramBacked, sourceLabel } from "../labels";
 import { useTitle } from "../title";
 import type { LibraryItem, LibraryOne, Run, Slot } from "../types";
-import { Await, Button, ButtonLink, Clock, Disclosure, Empty, ErrorLine, ProgressStrip, Ribbon } from "../ui";
+import { Await, Button, ButtonLink, Clock, Disclosure, Empty, ErrorLine, PageBack, ProgressStrip, Ribbon } from "../ui";
 import "./library.css";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -383,13 +383,6 @@ function kickerOf(one: LibraryOne): string {
   return capital(`${from} · ${cadenceOf(one)}${d.enabled ? "" : " · off"}`);
 }
 
-function Crumb({ href, children }: { href: string; children: string }) {
-  return (
-    <p class="crumb">
-      <a href={href} data-vt="pop"><ChevronLeft aria-hidden="true" />{children}</a>
-    </p>
-  );
-}
 
 export function LibraryDetailRoute({ id = "" }: { id?: string }) {
   const [res, reload] = useResource(async (signal) => {
@@ -406,7 +399,7 @@ export function LibraryDetailRoute({ id = "" }: { id?: string }) {
   useTitle(res.state === "ready" ? res.data.one.definition.title : "Library");
   return (
     <div class="library-page library-detail">
-      <Crumb href="/library">Library</Crumb>
+      <PageBack href="/library">Library</PageBack>
       {res.state === "error" && res.error.status === 404 ? (
         <Empty>No practice or program by that name.</Empty>
       ) : (
@@ -424,7 +417,7 @@ export function LibraryDetailRoute({ id = "" }: { id?: string }) {
                     {kickerOf(one)}
                   </p>
                   <h1 class="display">{d.title}</h1>
-                  {d.opener.plain && <p class="lede sub">{d.opener.plain}</p>}
+                  {d.opener.plain && <p class="lede">{d.opener.plain}</p>}
                 </div>
               </header>
               {program ? (
@@ -506,7 +499,7 @@ export function LibraryDefaultRoute({ id = "" }: { id?: string }) {
   const { route } = useLocation();
   return (
     <div class="library-page library-detail library-default">
-      <Crumb href={`/library/${id}`}>{res.state === "ready" ? res.data.definition.title : "Library"}</Crumb>
+      <PageBack href={`/library/${id}`}>{res.state === "ready" ? res.data.definition.title : "Library"}</PageBack>
       {res.state === "error" && res.error.status === 404 ? (
         <Empty>Nothing ships under that name: only a built-in has a default.</Empty>
       ) : (
@@ -520,7 +513,7 @@ export function LibraryDefaultRoute({ id = "" }: { id?: string }) {
                   <div>
                     <p class="kicker">The default · {cadenceOf(one)}</p>
                     <h1 class="display">{d.title}</h1>
-                    <p class="lede sub">As it ships with the journal{diff.yours !== null ? "; your edit is used in its place" : ""}.</p>
+                    <p class="lede">As it ships with the journal{diff.yours !== null ? "; your edit is used in its place" : ""}.</p>
                   </div>
                 </header>
                 {diff.yours !== null && (

@@ -85,12 +85,6 @@
   opacity: 0; transform: translateY(4px); transition: opacity var(--d-2), transform var(--d-2) var(--e-out);
 }
 .entry-bar.scrolled .entry-bar-title { opacity: 1; transform: none; }
-.entry-back {
-  display: inline-flex; align-items: center; gap: 4px; min-height: var(--tap); padding: 0 10px 0 4px; border-radius: var(--r-m);
-  font: 500 var(--t-ui) / 1 var(--f-ui); color: var(--text-2); text-decoration: none;
-}
-.entry-back:hover { color: var(--text); background: var(--raised); }
-.entry-back > svg { width: 20px; height: 20px; }
 
 .entry-doc {
   --doc-gap: 24px;
@@ -119,34 +113,34 @@
   margin-left: calc(var(--margin-l) + var(--doc-gap)); max-width: var(--measure);
 }
 .entry-doc > .add { margin-top: 44px; padding-top: var(--s3); border-top: 1px solid var(--hair); }
-.add-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s2); margin: 0 0 var(--s1); }
-.add-head > span { font: italic 400 var(--t-h3) / 1.2 var(--f-his); color: var(--text-3); }
-.add-head .link { gap: 6px; font-size: var(--t-small); }
-.add-head .link > svg { width: 15px; height: 15px; }
+.entry-doc .add-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s2); margin: 0 0 var(--s1); }
+.entry-doc .add-head > span { font: italic 400 var(--t-h3) / 1.2 var(--f-his); color: var(--text-3); }
+.entry-doc .add-head .link { gap: 6px; font-size: var(--t-small); }
+.entry-doc .add-head .link > svg { width: 15px; height: 15px; }
 .entry-doc > .composer-closed { margin-top: 44px; }
 
 /* her readings: Analysis and her reflection unfold at the end (no tabs) */
-.readings { margin-top: 56px; }
-.readings > .book-head { margin: 0 0 8px; }
-.readings > .empty { margin: var(--s3) 0 0; }
-.reading { border-top: 1px solid var(--hair-2); }
-.reading:last-child { border-bottom: 1px solid var(--hair-2); }
-.reading > .disclosure-head { min-height: 76px; padding: 14px 4px; border-radius: 0; }
-.reading > .disclosure-head:hover { background: color-mix(in oklab, var(--raised) 60%, transparent); }
-.reading-env { flex: none; width: 34px; height: 26px; color: var(--her); }
-.reading-title { font: 400 20px / 1.2 var(--f-his); color: var(--text); }
-.reading-sub { font: 400 var(--t-small) / 1.3 var(--f-ui); color: var(--text-3); }
-.reading .disclosure-peek .her { font-size: 13px; }
-.reading-body { padding: 4px 4px 30px 50px; }
-.analysis-section + .analysis-section { margin-top: var(--s5); }
-.analysis-section h3 { margin: 6px 0 10px; font: 500 var(--t-small) / 1.3 var(--f-ui); color: var(--text-3); }
-.her-notes { list-style: none; margin: 0; padding: 0; }
-.her-notes .note { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 10px; padding: 12px 0; border-bottom: 1px dashed var(--her-edge); }
-.her-notes .note:first-child { padding-top: 0; }
-.her-notes .note time { font: 500 12px / 1.9 var(--f-ui); color: var(--her-soft); }
-.reflection-body .refl-title { margin: 0 0 10px; font: 400 21px / 1.3 var(--f-his); color: var(--text); }
-.reflection-body .refl-link { display: inline-flex; align-items: center; min-height: 32px; margin-top: 8px; font-size: var(--t-small); color: var(--text-2); }
-@media (max-width: 760px), (pointer: coarse) { .reflection-body .refl-link { min-height: var(--tap); } }
+.entry-doc .readings { margin-top: 56px; }
+.entry-doc .readings > .book-head { margin: 0 0 8px; }
+.entry-doc .readings > .empty { margin: var(--s3) 0 0; }
+.entry-doc .reading { border-top: 1px solid var(--hair-2); }
+.entry-doc .reading:last-child { border-bottom: 1px solid var(--hair-2); }
+.entry-doc .reading > .disclosure-head { min-height: 76px; padding: 14px 4px; border-radius: 0; }
+.entry-doc .reading > .disclosure-head:hover { background: color-mix(in oklab, var(--raised) 60%, transparent); }
+.entry-doc .reading-env { flex: none; width: 34px; height: 26px; color: var(--her); }
+.entry-doc .reading-title { font: 400 20px / 1.2 var(--f-his); color: var(--text); }
+.entry-doc .reading-sub { font: 400 var(--t-small) / 1.3 var(--f-ui); color: var(--text-3); }
+.entry-doc .reading .disclosure-peek .her { font-size: 13px; }
+.entry-doc .reading-body { padding: 4px 4px 30px 50px; }
+.entry-doc .analysis-section + .analysis-section { margin-top: var(--s5); }
+.entry-doc .analysis-section h3 { margin: 6px 0 10px; font: 500 var(--t-small) / 1.3 var(--f-ui); color: var(--text-3); }
+.entry-doc .her-notes { list-style: none; margin: 0; padding: 0; }
+.entry-doc .her-notes .note { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 10px; padding: 12px 0; border-bottom: 1px dashed var(--her-edge); }
+.entry-doc .her-notes .note:first-child { padding-top: 0; }
+.entry-doc .her-notes .note time { font: 500 12px / 1.9 var(--f-ui); color: var(--her-soft); }
+.entry-doc .reflection-body .refl-title { margin: 0 0 10px; font: 400 21px / 1.3 var(--f-his); color: var(--text); }
+.entry-doc .reflection-body .refl-link { display: inline-flex; align-items: center; min-height: 32px; margin-top: 8px; font-size: var(--t-small); color: var(--text-2); }
+@media (max-width: 760px), (pointer: coarse) { .entry-doc .reflection-body .refl-link { min-height: var(--tap); } }
 
 /* ---------- a narrow page: no margin; on a phone the entry is the page, the composer above the tab bar ---------- */
 @container entry (max-width: 559px) {
@@ -155,8 +149,8 @@
   .entry-numeral { font-size: 64px; padding: 0 0 2px; }
   .entry-doc > .add, .entry-doc > .readings, .entry-doc > .composer-closed,
   .entry-doc > .empty, .entry-doc > .skeletons, .entry-doc > .error-line { margin-left: 0; }
-  .reading-body { padding-left: 4px; }
-  .her-notes .note { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .entry-doc .reading-body { padding-left: 4px; }
+  .entry-doc .her-notes .note { grid-template-columns: minmax(0, 1fr); gap: 2px; }
 }
 @media (max-width: 760px) {
   .entry-bar { padding: 4px 8px 4px 6px; }
@@ -167,23 +161,10 @@
     margin: var(--s5) calc(-1 * var(--gutter)) 0; padding: var(--s2) var(--gutter); border-top: 1px solid var(--hair);
     background: var(--pane);
   }
-  .add .composer { margin-top: 0; }
-  .add .composer textarea { min-height: var(--tap); height: 5.5rem; resize: none; }   /* opens at once: mobile.spec measures it on the tap */
-  .add .composer:focus-within textarea { height: min(30vh, 10rem); }
-  .readings { margin-top: var(--s7); }
+  .entry-doc > .add .composer-box { min-height: var(--tap); height: 5.5rem; resize: none; }   /* opens at once: mobile.spec measures it on the tap */
+  .entry-doc > .add .composer:focus-within .composer-box { height: min(30vh, 10rem); }
+  .entry-doc .readings { margin-top: var(--s7); }
 
-  /* At rest the box is one quiet line ("Add more, in your own words" and a mic), so it never covers his words. It is
-     the whole composer again the moment it is used: focused, holding words or a recording, recording, offline, or
-     saying something (an error, words kept from another box). Composer itself is unchanged: this reads its state
-     from the page (the textarea's placeholder shows only while it is empty). Without :has() the box stays whole. */
-  .entry-doc > .add:not(:focus-within):has(.composer textarea:placeholder-shown):not(:has(.clip, .error-line, .composer-kept, .offline-note, .recording)) { padding-top: 4px; padding-bottom: 4px; }
-  .entry-doc > .add:not(:focus-within):has(.composer textarea:placeholder-shown):not(:has(.clip, .error-line, .composer-kept, .offline-note, .recording)) .composer { display: flex; align-items: center; gap: var(--s2); }
-  .entry-doc > .add:not(:focus-within):has(.composer textarea:placeholder-shown):not(:has(.clip, .error-line, .composer-kept, .offline-note, .recording)) .composer textarea {
-    flex: 1; height: var(--tap); padding: 11px 0; border: 0; box-shadow: none; overflow: hidden; white-space: nowrap;
-  }
-  .entry-doc > .add:not(:focus-within):has(.composer textarea:placeholder-shown):not(:has(.clip, .error-line, .composer-kept, .offline-note, .recording)) .composer-actions { flex: none; }
-  .entry-doc > .add:not(:focus-within):has(.composer textarea:placeholder-shown):not(:has(.clip, .error-line, .composer-kept, .offline-note, .recording)) .composer-actions .button.primary, .entry-doc > .add:not(:focus-within):has(.composer textarea:placeholder-shown):not(:has(.clip, .error-line, .composer-kept, .offline-note, .recording)) .recorder .hint { display: none; }
-  .entry-doc > .add:not(:focus-within):has(.composer textarea:placeholder-shown):not(:has(.clip, .error-line, .composer-kept, .offline-note, .recording)) .recorder .button { width: var(--tap); padding: 0; gap: 0; font-size: 0; border-radius: 50%; }
-  .entry-doc > .add:not(:focus-within):has(.composer textarea:placeholder-shown):not(:has(.clip, .error-line, .composer-kept, .offline-note, .recording)) .recorder .button > svg { width: 20px; height: 20px; }
-
+  /* At rest the box is one quiet line (Composer's `rest`, drawn by Composer.css); its strip at the foot slims with it */
+  .entry-doc > .add:has(> .composer[data-rest]:not(:focus-within)) { padding-top: 4px; padding-bottom: 4px; }
 }

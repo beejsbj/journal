@@ -2,7 +2,7 @@ import { useLocation } from "preact-iso";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { api, type ApiError, type DefinitionBody } from "../api";
 import { QuestionSet } from "../components/QuestionSet";
-import { Check, ChevronLeft } from "../icons";
+import { Check } from "../icons";
 import {
   ID_RULE, addSlot, blankForm, definitionFromForm, formFromDefinition, freeId, removeSlot, setSlot, sortProblems,
   type Form,
@@ -11,7 +11,7 @@ import { asApiError, useAction, useResource } from "../hooks";
 import { isProgramBacked } from "../labels";
 import { useTitle } from "../title";
 import type { LibraryOne } from "../types";
-import { Await, Button, ButtonLink, Disclosure, Empty, ErrorLine, Field, Switch, TextButton, TextField } from "../ui";
+import { Await, Button, ButtonLink, Disclosure, Empty, ErrorLine, Field, PageBack, Switch, TextButton, TextField } from "../ui";
 import "./library.css";
 import "./editor.css";
 
@@ -406,13 +406,6 @@ export function FilesEditor({ one }: { one: LibraryOne }) {
   );
 }
 
-function Crumb({ href, children }: { href: string; children: string }) {
-  return (
-    <p class="crumb">
-      <a href={href} data-vt="pop"><ChevronLeft aria-hidden="true" />{children}</a>
-    </p>
-  );
-}
 
 /** `/library/:id/edit`: any definition, a built-in included: the first save of a built-in makes his version of it, in
  *  its place (same id, same /start word, same times); Reset to default on its page brings the shipped one back. A
@@ -422,7 +415,7 @@ export function EditorRoute({ id = "" }: { id?: string }) {
   useTitle(res.state === "ready" ? `Edit ${res.data.definition.title}` : "Edit");
   return (
     <div class="library-page editor-page">
-      <Crumb href={`/library/${id}`}>{res.state === "ready" ? res.data.definition.title : "Library"}</Crumb>
+      <PageBack href={`/library/${id}`}>{res.state === "ready" ? res.data.definition.title : "Library"}</PageBack>
       {res.state === "error" && res.error.status === 404 ? (
         <Empty>No practice or program by that name.</Empty>
       ) : (
@@ -471,9 +464,9 @@ export function NewPracticeRoute() {
   const [res, reload] = useResource((signal) => api.library(signal), []);
   return (
     <div class="library-page editor-page">
-      <Crumb href="/library">Library</Crumb>
+      <PageBack href="/library">Library</PageBack>
       <header class="page-head editor-head">
-        <p class="kicker">Library</p>
+        <p class="kicker">Yours</p>
         <h1 class="display">New practice</h1>
         <p class="sub">A title, a time and a question is enough: it is sent from the next tick.</p>
       </header>

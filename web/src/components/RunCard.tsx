@@ -28,17 +28,6 @@ export function sessionShare(run: Pick<Run, "sessions" | "current">): number | u
   return total > 0 ? Math.max(0.08, (run.current.phase - 0.5) / total) : undefined;
 }
 
-/** The old thin bar (the Library's cards still draw it until their own rebuild). */
-export function Progress({ done, total }: { done: number; total: number }) {
-  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-  return (
-    <div class="progress-bar" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done}
-      aria-label={`${done} of ${total} sessions done`}>
-      <span style={{ width: `${pct}%` }} />
-    </div>
-  );
-}
-
 /** A program's way through, as Today and the run screen draw it: its sessions as segments, the open one filling. */
 export function RunStrip({ run }: { run: Run }) {
   return (

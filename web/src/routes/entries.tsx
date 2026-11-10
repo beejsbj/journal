@@ -2,7 +2,6 @@ import { useLocation } from "preact-iso";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { api, get, query } from "../api";
 import { EntryRow, dayParts } from "../components/EntryRow";
-import { Await, Empty, ErrorLine } from "../components/Status";
 import { useLive } from "../events";
 import { dayLabel, weekHeader, weekStart } from "../format";
 import { useResource, asApiError } from "../hooks";
@@ -11,7 +10,7 @@ import { arr, obj, str } from "../schema";
 import { useTitle } from "../title";
 import type { ApiError } from "../api";
 import type { EntrySummary, LibraryItem } from "../types";
-import { Button, Calendar, Menu, TextButton, type MenuItem } from "../ui";
+import { Await, Button, Calendar, Empty, ErrorLine, Menu, TextButton, type MenuItem } from "../ui";
 import "./entries.css";
 
 const PAGE = 40;

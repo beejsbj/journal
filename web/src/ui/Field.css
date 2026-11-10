@@ -2,12 +2,13 @@
 .text-field { display: grid; gap: 6px; min-width: 0; }
 .field-label { font: 500 var(--t-ui) / 1.35 var(--f-ui); color: var(--text); }
 .field-hint { margin: 0; font-size: var(--t-small); line-height: 1.45; color: var(--text-3); }
-.text-field .field-error {
+/* the error under a field (TextField's, a setting's, a schedule slot's): a filled mark says "this is wrong" without a
+   hue (status has none) */
+.field-error {
   display: flex; align-items: baseline; gap: var(--s2); margin: 0;
   font: 500 var(--t-small) / 1.45 var(--f-ui); color: var(--text);
 }
-/* a filled mark says "this is wrong" without a hue (status has none) */
-.text-field .field-error::before {
+.field-error::before {
   content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--text);
   box-shadow: 0 0 0 2px var(--pane), 0 0 0 3px var(--text); transform: translateY(-1px);
 }

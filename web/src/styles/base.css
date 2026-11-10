@@ -41,9 +41,13 @@ legend { padding: 0; }
 :focus:not(:focus-visible) { outline: none; }
 [tabindex="-1"]:focus { outline: none; }
 
-/* inputs are 16 px or more where a finger types: below that iOS zooms the page when a field takes focus */
+/* inputs are 16 px or more where a finger types: below that iOS zooms the page when a field takes focus (a component
+   that sets its own size on touch keeps it 16 or more: web/e2e/mobile.spec.ts measures the pairing field) */
 @media (max-width: 760px), (pointer: coarse) {
   input, select, textarea { font-size: max(1rem, 16px); }
+  /* a link that stands on its own line (not inside a sentence) is a 44 px target too (WCAG 2.5.8 exempts the ones in
+     a sentence); a link with a class of its own sizes itself */
+  :is(main, dialog) :is(li, div, section, article, header) > a:not([class]) { display: inline-flex; align-items: center; min-height: var(--tap); }
 }
 
 /* scrollbars that belong to the paper */
