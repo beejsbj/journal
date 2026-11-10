@@ -2,7 +2,7 @@
 
 The single written source for how the web app looks, moves and reads. The tokens are `web/src/tokens.css`; the parts
 are `web/src/ui/` (and the shell's seams in `web/src/shell/`); every part is drawn, with its states, at **`/design`**
-in the running app (linked from Settings). When this file, the tokens and `/design` disagree, the owner's words in
+in the running app (linked from Settings). When this file, the tokens and `/design` disagree, the owner's verdicts in
 `design/state.md` win, then this file; fix the one that is wrong. A gap here is raised, not invented around.
 
 Accepted: round 02, "Folio × Night Room" (`design/rounds/02-combined/`), with the owner's changes of 2026-11-09: no
@@ -86,9 +86,9 @@ readings' envelopes. Never his buttons, links, focus or progress. Chosen per dev
 | Ink | Paper | Night |
 | --- | --- | --- |
 | Blue-black (default) | `#28367f` | `#b6c0ff` |
-| Brown | `#7a4519` | `#dcab78` |
+| Brown | `#6e3c14` | `#dcab78` |
 | Violet | `#4b2a8a` | `#d2b4ff` |
-| Green | `#1b5642` | `#8fd3b4` |
+| Green | `#1a523f` | `#8fd3b4` |
 
 Grades made from it, on `:root, [data-ink], [data-theme]`: `--her-soft` (82 % into the pane, oklab: her labels and
 times), `--her-edge` (34 %: the letter's crease, dashed rules in her letters), `--her-line` (50 %: the rule beside a
@@ -163,17 +163,24 @@ never offered for editing. The interface (labels, buttons, meta) is Instrument S
 
 ## 4. Motion
 
-Purposeful and short; the tokens name every duration and curve. With `prefers-reduced-motion` every duration token is
-1 ms, View Transitions are skipped, folds open without lift or blur, and `base.css` stops everything else.
+Purposeful and short; the tokens name every duration and curve: a component's sheet writes `var(--d-…)`, never a raw
+`ms` (the only literals left are `0s` for a switch with no time, and the reduced-motion `1ms`; the timers in TSX, the
+room's bloom and fold, keep their own numbers beside the CSS they follow). With `prefers-reduced-motion` every
+duration token is 1 ms (a delay 0), View Transitions are skipped, folds open without lift or blur, and `base.css` stops
+everything else.
 
 | Token | Value | Use |
 | --- | --- | --- |
+| `--d-0` | 60 ms | a beat: a delay behind something else, a stagger step |
 | `--d-1` | 120 ms | press and hover |
 | `--d-2` | 200 ms | colour, small fades |
 | `--d-3` | 340 ms | chevrons, knobs, peeks |
 | `--d-4` | 480 ms | push, recede |
 | `--d-bloom` | 640 ms | the write room opening |
 | `--d-ink` | 700 ms | her ink flowing to a new colour |
+| `--d-5` | 1.2 s | a long settle: a strip filling, a ring passing |
+| `--d-loop` | 1.6 s | a quiet loop: the skeleton's shimmer, the caret's blink |
+| `--d-breath` | 2.8 s | the room's orb breathing while it waits |
 | `--stagger` | 28 ms | rows rising in (`.rise` with `--i`) |
 | `--e-out` | `cubic-bezier(.16,1,.3,1)` | arrivals |
 | `--e-inout` | `cubic-bezier(.65,0,.35,1)` | both ends matter: the ink flow, a passage folding away |
@@ -215,7 +222,7 @@ All in `web/src/ui/` (TSX plus a CSS file each), exported from `web/src/ui/index
 | `Menu` | a trigger (`.choice` in a sentence, or any button) and a frosted list, radio or actions, counts | the filter sentence, a row's More | top layer, keyboard, Escape returns focus |
 | `Disclosure` | head (icon, title, peek), chevron in a well, body | readings, the week's review, a day's slip, health | animated height; closed body is inert |
 | `Sheet` (`Dialog`) | scrim, panel, head with title and Close | a short task over the page (mood, people, star) | native modal dialog: top layer, real trap, Escape, focus returns |
-| `Toast` | message, up to two actions, on the lamp | "The passage is gone. Undo"; the update prompt | foot of a wide screen, top on a phone; `role=status` |
+| `Toast` | message, up to two actions, on the lamp | "The passage is gone from the entry." (no Undo); "Copied your words."; "Update available · Later · Reload" | foot of a wide screen, top on a phone; `role=status` |
 | `Letter` | From line with her dot and the time; opener; the asked question in italic; questions folded by part (44 px on touch), "asked" marked; actions on a crease | her prompt anywhere: entry head, Today, the room, her week review, a run's phase | **no fastening**; read-only; her Markdown inside goes through `components/Markdown` (paragraphs, lists, quotes, bold, italic) |
 | `MarginNote` | "Ada · 08:02" with her dot; her words behind a hairline of her ink | her note beside a passage | the entry's grid places it |
 | `AudioPlayer` | lamp play disc, 54 bars (34 on a phone), time, speed (hidden on a phone) | his recording | a real `<audio>` underneath; the bars are a slider |
@@ -241,13 +248,17 @@ The shell's own parts (`web/src/shell/`): `Pane` (a pane on the desk, `glow`, `e
 
 - **Navigation.** Places are links (`<a href>`), actions are buttons. The rail and the tab bar mark the current place
   with `aria-current="page"`. Filters live in the URL (replace, not push). A link deeper says `data-vt="push"`, a way
-  back `data-vt="pop"`. The `N` key opens Write anywhere but a field.
+  back `data-vt="pop"`. The `N` key opens Write anywhere but a field (not with a modifier, while composing, on the pairing screens, or while
+  the room is already open). On a wide screen `[` cycles an entry's sidebar (titles, dates and dots, none): a
+  convenience beside the entry bar's three buttons, which are the way on every keyboard; a layout that needs AltGr or
+  Option for `[` sends a modifier and is left alone, as is typing.
 - **Forms.** A visible label (or `hideLabel` when the page already says it), the hint under it, the error in words
   with `role=alert`. Inputs are 16 px or more on touch. Save is the lamp; a form with several changes shows a save bar
   ("2 changes not saved · Discard · Save"). Defaults show as hints, never as placeholders. Cmd/Ctrl+Enter sends what
   he wrote.
 - **Feedback.** A write in flight says so on its button ("Saving…"); a done write says what happened ("Saved as a
-  note.") or offers Undo in a toast. Destructive actions ask in place ("Delete this passage? Delete / Keep").
+  note."). There is no Undo (the server has no undo for a block): destructive actions ask in place, once ("Delete
+  this block from the entry? Delete / Keep"; "Delete this practice?").
 - **States.** Every read has its loading (Skeleton, the shape of what comes), error (ErrorLine with Retry), empty
   (Empty) and offline (the ribbon; writes say they will not be saved) state. Keep showing what is there during a
   reload.
@@ -285,7 +296,7 @@ Don't (the owner's vetoes and the system's):
    (`design/rounds/02-combined/index.html`) and its behaviour in `design/inventory.md` §1 and §4.
 2. Put the route in `web/src/routes/<name>.tsx` with its own `web/src/routes/<name>.css`, imported by the TSX.
    Build from `web/src/ui` (`import { Button, Letter } from "../ui"`). If a part is missing, it belongs in `ui/` (raise
-   it; the foundation owns `ui/`, `tokens.css`, `styles/base.css`, `icons.tsx`, `app.tsx`).
+   it; `ui/`, `tokens.css`, `styles/base.css`, `icons.tsx` and `app.tsx` are shared by every screen, so change them for all).
 3. Scope every rule of your sheet under the route's root class (`.today-page .practice-head`, not `.practice-head`):
    every route's sheet is loaded on every page, so an unscoped class restyles another route that happens to use it.
    A rule two routes need belongs to a component, not to either route. (The old sheet, `legacy.css`, is gone.)
@@ -311,7 +322,7 @@ copy of a token. An inline `style="…"` string (the CSP drops it).
 `Pane.tsx`, `NextFrom.tsx`). Theme and ink: `web/src/theme.ts`, `web/src/ink.ts`. Icons and mark:
 `web/src/icons.tsx`, `web/public/icons/`. Faces: `web/public/fonts/` (sources in `tools/web_fonts.py`). The style
 guide: `web/src/routes/design.tsx` (`/design`). The accepted prototype and its notes: `design/rounds/02-combined/`.
-The owner's words: `design/state.md`.
+The owner's verdicts, paraphrased: `design/state.md`.
 
 **CSS convention.** One sheet per component or route, beside its TSX and imported by it; class names are the
 component's own (kebab case: `.letter`, `.num-stepper`, `.calendar-grid`); a route scopes under its root class.

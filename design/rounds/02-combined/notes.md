@@ -310,7 +310,7 @@ bar / toast / sheet in the accessibility tree when hidden, her letter's dot rend
 dots rail), the mark specimen wrapping, ink options misaligned when a note wraps, a 38 px overflow from a segmented
 control on a phone, and the ink sticking across hash changes.
 
-Screenshots: `/tmp/webux/r02/` (`d-*` desktop, `p-*` phone, `-dark` suffix).
+Screenshots of the prototype were shown to the owner at the time (desktop and phone, light and dark); they are not kept in the repository.
 
 ## Known gaps
 

@@ -133,7 +133,8 @@ composer's own (`useCompose`). `/design` (linked from Settings) draws every part
   her notes standing in the right margin beside the passage they follow (under it when the pane is under 840 px); her
   letter at the head (questions folded, "All 24 questions, in 10 parts"); "Her readings" unfold at the end (*What she
   noticed*, her reflection on the day). On a wide screen the list slides into a sidebar beside the entry (titles,
-  dates and dots, or none; kept on the device), with newer/older in the entry bar; on a phone the entry is pushed over
+  dates and dots, or none; kept on the device; the entry bar's switch, or `[` as a shortcut), with newer/older in the
+  entry bar; on a phone the entry is pushed over
   the list. A passage's tools stand in the left margin on hover or focus, and in a sheet on a long press. "Keep
   writing" over the composer leads into the write room (wide screens); on a phone the composer rests as one line above
   the tab bar until it is used (Composer's `rest`).
@@ -228,7 +229,7 @@ composer's own (`useCompose`). `/design` (linked from Settings) draws every part
 **The language is [`design/DESIGN.md`](../design/DESIGN.md)**: intent, type, colour, her inks, the mark, layout,
 motion, components, web rules and the owner's vetoes (no letter-spaced capitals, no stamps or fastenings, no pill rows,
 no boxed badges, no emoji labels, no gamification). Its tokens are `web/src/tokens.css`, its parts `web/src/ui/`, and
-`/design` in the running app draws every part with its states. The owner's words behind it are in `design/state.md`;
+`/design` in the running app draws every part with its states. The owner's verdicts behind it are in `design/state.md` (paraphrased);
 the decision is DECISIONS.md, WEB-UX-IDENTITY (round 02, "Folio × Night Room": Folio's warm paper by day, Night Room's
 cool room at night, the reader's choice of theme on the device).
 

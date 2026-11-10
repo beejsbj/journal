@@ -11,16 +11,15 @@ a writing app he wants to open, not an admin console.
 
 Read for content and states: `docs/FRONTEND.md` (§1–2, §5), `web/src/routes/*.tsx`, `web/src/components/Document.tsx`,
 `tests/fixtures/api/*.json` (realistic payloads: entries, an entry document, today, library, insights, settings).
-Baseline as built: `/tmp/webux/baseline/*.png` (look at them; the owner calls them lame).
+Baseline as built: the screenshots of the web app before this pass (not kept in the repository).
 
-## The owner's verdict (verbatim)
-"its currently like lame, and feels like a typical 'cli served dashboard app' vibes. like i want it to have proper ui/ux
-feel. i want its settings menu to not look so ugly. immersive and inviting typing(literally a writing webapp). insight
-page text could be more interestingly placed? reviews and reflections collapsing more beautifully presented instead of
-the sudden collapsing and jumping. i want it to be inviting. good subtle animations. cohesive, interesting and useful
-layouting. better type. like that 'built-in' box is so amatuer. ugly write modal. amatuer pills in entries. cant entries
-slide into a sidebar when we enter one ? analysis page better presented. better page transitions. flex your visual/ux
-design muscles."
+## The owner's verdict (paraphrased; his exact words are in the deployment's private notes)
+The app felt dull, like a dashboard served by a command-line tool; he wanted a proper UI and UX feel. Settings looked
+ugly. The writing should be immersive and inviting (it is a writing app). Insights' text could be placed more
+interestingly, and the analysis presented better. Reviews and reflections should open gracefully, not collapse and
+jump. He wanted it inviting, with good subtle animations, cohesive, interesting and useful layouts, better type and
+better page transitions. The "built-in" box, the pills in Entries and the write modal looked amateur. Could the entries
+list slide into a sidebar when an entry is opened? And: show what a strong visual and UX design can do.
 
 Diagnosis of the baseline (ours): four competing families; letter-spaced typewriter capitals on every label (the CLI
 feel); inconsistent page alignment; native audio/select/time controls; Edit/Delete as bare text under every block;

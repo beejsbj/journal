@@ -1,28 +1,33 @@
 # Web app design: state
 
-The resume point for design passes on the PWA (`web/`). The language itself will live in `design/DESIGN.md` once a
-direction is chosen; FRONTEND.md §2 and DECISIONS.md *IDENTITY* record the identity it replaces or refines.
+The resume point for design passes on the PWA (`web/`). The language is `design/DESIGN.md`; FRONTEND.md §2 and
+DECISIONS.md *IDENTITY* and *WEB-UX-IDENTITY* record the identity it replaces and refines.
 
-## Current pass: WEB-UX (2026-10-28)
+The owner gave his verdicts by voice. This file keeps them as faithful paraphrases (what he liked, disliked and asked
+for, in the third person); his exact words are kept in the deployment's private notes, not in this public repository.
 
-- **Stage:** 5–6, build. Round 02 (the Folio × Night Room combination) is accepted with two changes (below); the
-  system is being written (DESIGN.md, tokens, components) and adopted across every screen on branch `web-ux`.
-- **Why:** the owner's verdict on the built app (2026-10-28, verbatim): "its currently like lame, and feels like a
-  typical 'cli served dashboard app' vibes. like i want it to have proper ui/ux feel. i want its settings menu to not
-  look so ugly. immersive and inviting typing(literally a writing webapp). insight page text could be more
-  interestingly placed? reviews and reflections collapsing more beautifully presented instead of the sudden collapsing
-  and jumping. i want it to be inviting. good subtle animations. cohesive, interesting and useful layouting. better
-  type. like that 'built-in' box is so amatuer. ugly write modal. amatuer pills in entries. cant entries slide into a
-  sidebar when we enter one ? analysis page better presented. better page transitions. flex your visual/ux design
-  muscles. have a ground up design system so future agents dont have trouble."
-- **Key applications** (inferred, to confirm): (1) Entries → an entry, the list sliding into a sidebar; (2) Write,
-  the immersive writing surface. Secondary, shown in every direction because they were named: Insights, Settings,
-  a Library card.
+## Current pass: WEB-UX (2026-10-28 to 2026-11-10)
+
+- **Stage:** built. Round 02 (the Folio × Night Room combination) was accepted with the changes below; the system is
+  written (DESIGN.md, tokens, components) and every screen is on it.
+- **Why:** the owner's verdict on the app as it was built (2026-10-28), in substance:
+  - it felt dull, like a typical dashboard served by a command-line tool, without a proper sense of UI and UX;
+  - he wanted it to be inviting, cohesive, with interesting and useful layouts, better type, good subtle animations
+    and better page transitions;
+  - the writing should be immersive and inviting: it is a writing app; the write modal looked bad;
+  - Settings looked ugly; the "built-in" box and the pills in Entries looked amateur;
+  - Insights' text could be placed more interestingly, and the analysis presented better;
+  - reviews and reflections should open gracefully instead of collapsing and jumping;
+  - could the entries list slide into a sidebar when an entry is opened;
+  - a design system from the ground up, so that later work does not struggle.
+- **Key applications** (inferred, then confirmed by the rounds): (1) Entries → an entry, the list sliding into a
+  sidebar; (2) Write, the immersive writing surface. Secondary, drawn in every direction because he named them:
+  Insights, Settings, a Library card.
 - **Preserved (not reopened):** his words and hers are two visibly different voices; her ink is the only hue and the
   reader chooses it (4 inks, AA light and dark); no streaks, confetti or gamification; works with no model; offline
   reads; 44 px targets; reduced motion; self-hosted OFL faces in production.
-- **Reopened by the owner's words:** type, layout, motion, components, chrome. Margin × Letters is a candidate among
-  the directions (Folio refines it), not a given.
+- **Reopened by his verdict:** type, layout, motion, components, chrome. Margin × Letters was a candidate among the
+  directions (Folio refined it), not a given.
 
 ## Directions (round 01)
 
@@ -33,31 +38,25 @@ direction is chosen; FRONTEND.md §2 and DECISIONS.md *IDENTITY* record the iden
 | C | Almanac | editorial: display type, a strict grid, the week as a magazine spread |
 
 Files: `design/rounds/01-directions/<id>/index.html` (self-contained, interactive) and `notes.md` (tokens sketch,
-rationale, tradeoffs). Baseline screenshots: the `screenshots` artifact of CI web run 40765879806.
+rationale, tradeoffs).
 
-## Round 01 result (2026-11-09, the owner's words, verbatim, on the screenshot comparison)
+## Round 01 result (2026-11-09, his verdict on the screenshot comparison, paraphrased)
 
-"I like folio a lot to be honest. I like folio as well. I like night as well. I think almanac is the least one I like,
-but I think a combination of folio and rhinitroom is the best, but I do prefer folio colors. I like the gradient
-textures of the nightroom. For example, the entry sidebar I think could be collapsible. It could be optional. So we
-could have both nightrooms and folio entries. This thing I like that next from Ada thing from folio I like the journal
-icon it could be combined with the J that is currently the Fabicon. I like the paperclip stuff that's happening in this
-thing. But overall I do like the writing in the margin in the night room, yeah, so now I'm looking at the right
-section. I definitely like the vibe, the graying out vibe of the night room, but I also like the paper clip. It doesn't
-need to be a paper clip, but this section that is from Ada at the top I like that a lot as well in the from folio
-insights. I like the Folios Insights page as well. I like her review of the week and the day-by-day sidebar. I like the
-look and style of the nightroom overall, though. I like that the programs that loading thing is there, that's really
-cool. I also like the look of Almanac. It feels very cool if it could be incorporated into the others, it'd be nice.
-Settings page: most of the settings are all good. Overall, I do like the color of the folio, the warmth of folio, and I
-like the ink design for the that comes from folio over the more digitaliness of nitro. Though I love the settings of
-Almanarc to be honest. Like the layout. I like the layout of Almanac. Otherwise, I think for settings-wise, I lean more
-towards folio. The library I think most of the libraries kind of are lame. They're just this list. I think they could
-be better, but I think they're fine for now. A comb I think I like the clocks of Nightroom. I overall like the look of
-nightroom, then I'd like the look of folio for library entries. I love the look of nightroom, but I love the calendar of
-almanac. I do like the night room's dark version being this really nice. Cool, maybe the day version can be the folio
-warmth, and the night version can be the night room's cool dark, i.e., the dark page."
-
-(Voice transcript: "rhinitroom", "nitro", "Nightroom" = Night Room; "Almanarc" = Almanac; "Fabicon" = favicon.)
+- **Overall:** he liked Folio a lot and Night Room as well; Almanac least, though he found its look appealing and
+  wanted it worked into the others where it fits. The best, to him, was a combination of Folio and Night Room.
+- **Look:** Night Room's overall look and style; its gradient (glow) textures; its dark version, which he found
+  especially good. Folio's colours and warmth, and Folio's ink design over Night Room's more digital feel. So: the
+  light version Folio's warmth, the dark version Night Room's cool dark page.
+- **The entry sidebar:** could be collapsible and optional, so both Night Room's and Folio's versions of it can be had.
+- **Liked in Folio:** "Next from" the companion in the rail; the journal icon, to be combined with the `j` of the
+  current favicon; the sectioned letter from her at the top of the entry; the fastening detail on it (it need not be a
+  paper clip); its Insights page, her review of the week and the day-by-day column; the warmth and ink picker in
+  Settings; Folio's look for Library entries.
+- **Liked in Night Room:** the writing in the margin (read as her notes in the right margin); the greying out of all
+  but the current paragraph while writing; the programs' progress strip; its clocks (for the Library).
+- **Liked in Almanac:** its Settings layout (he loved it), and its calendar.
+- **Settings:** most of it was fine; Almanac's layout with Folio's feel.
+- **Library:** most versions felt like plain lists; better later, fine for now.
 
 **Selected (user-accepted direction, a combination):** Night Room's look, style, motion and glow textures, with
 Folio's warmth. Light = Folio's warm paper; dark = Night Room's cool dark. Almanac's influence where it fits.
@@ -69,36 +68,36 @@ Folio's warmth. Light = Folio's warm paper; dark = Night Room's cool dark. Alman
 | Dark palette | B | |
 | Entry sidebar | A + B, collapsible | Choose titled list (A) or date rail (B), or hide it |
 | "Next from Ada" in the rail | A | |
-| Mark | A's notebook + the favicon's `j` (branch `favicon`, 24359f7) | |
-| Her letter at the top, a fastening detail | A | "doesn't need to be a paper clip" |
-| Notes in the right margin | B | Agent's reading of "writing in the margin… the right section" |
+| Mark | A's notebook + the favicon's `j` | |
+| Her letter at the top, a fastening detail | A | not necessarily a paper clip |
+| Notes in the right margin | B | the reading of "writing in the margin" |
 | Write: everything but the current paragraph greyed | B, with A's letter at the top | |
 | Insights | A (prose figures, her week review, day-by-day column) + B's programs progress strip | |
 | Calendar | C (the month calendar on Entries) | |
 | Settings | A's warmth and ink picker in C's layout (numbered index, "at a glance") | |
 | Library | A's rows + B's clocks | Lists "fine for now"; a later pass |
 
-**Agent calls, unconfirmed (reversible):** her voice stays typed as in A's letter (IBM Plex Mono). Analysis and her
-reflection unfold at the end of the entry, with no tabs. Today follows A. Both are logged for his check on round 02.
+**Calls made in the design, unconfirmed then (reversible):** her voice stays typed as in A's letter (IBM Plex Mono).
+Analysis and her reflection unfold at the end of the entry, with no tabs. Today follows A. All were put to him with
+round 02.
 
-## Round 02 result (2026-11-09, the owner's words, verbatim, on the round-02 screenshots and live prototype)
+## Round 02 result (2026-11-09, his verdict on the round-02 screenshots and the live prototype, paraphrased)
 
-"I don't like the stamps. Rumruther stamps. They look kinda lame. Okay, I'm just looking through everything. So that
-time in the entry sidebar, couldn't the time on the right be just below the date or something like that? They could
-all the time and date related things in the same place, so I don't like the stamp. Now I'm looking at entry date
-rail. Entry date rail looks nice. Two good job. Entry no sidebar. Looks good. Entry dark looks beautiful, right? Looks
-good. I like the sectioned out from Ada, but I don't like that stamp and the wavy thing. One thing is missing in the
-right is the margins, but I guess you just not have not demonstrated that in your screenshots. Today page is very
-nice. I like your mother today page. Entries is beautiful. Though I think the entries no entries looks good. It's
-good. Insights looks good as well. Settings looks great, good job. I like margin J for the mark. look amazong
-otherwise, great job"
+- **Disliked:** the stamps on her letter (the postmark and the wavy cancel lines); they looked cheap to him.
+- **Asked for:** in the entry sidebar, the time under the date instead of at the right of the row, so everything about
+  date and time sits in one place.
+- **Noticed missing:** her notes in the right margin in the dark screenshot (he took it that they were simply not
+  shown there).
+- **Approved by name:** the entry date rail, the entry with no sidebar, the entry in dark (beautiful, to him), the
+  sectioned letter from her (without the stamp), Today (very nice), Entries (beautiful) and its empty state, Insights,
+  Settings (great), and the "margin j" for the mark. Otherwise, he found it all very good.
 
 **Accepted (user-accepted, 2026-11-09):** round 02 as the system, with:
 - **No fastening on her letter:** no postmark stamp, no wavy cancel lines, no clip, no tape. Keep the sectioned "From
   Ada" letter itself.
 - **Entry sidebar rows:** the time goes under the date, with the date and time together in the left column, instead
   of at the right of the row.
-- **Her margin notes must show in dark too** (he missed them in the dark screenshot).
+- **Her margin notes must show in dark too.**
 - **The mark is the "margin j"** (option 01 on `#mark`).
 - Today, Entries, Entry (all three sidebar modes), dark, Insights and Settings were each approved by name.
 - Calls he did not contest (stand, reversible): her voice typed in IBM Plex Mono; Analysis and Reflection unfold at
@@ -107,6 +106,4 @@ otherwise, great job"
 
 ## Next
 
-1. Owner picks/combines (gate). 2. Write `design/DESIGN.md` + rebuild `tokens.css` as the system. 3. Primitives and
-compounds (Button, Field, Toggle, Disclosure, Sheet, Badge, Player, Toast). 4. Adopt across routes, transitions.
-5. Rendered review (phone + desktop, light + dark), CI build, PR.
+A later pass: the Library beyond "fine for now", and whatever his use of the built app asks for.

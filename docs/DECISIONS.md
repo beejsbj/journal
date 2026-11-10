@@ -3686,9 +3686,9 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     quote (#26); the summaries in a synthesis's source; from the review fixes: a retry that tells the model what was
     rejected, and main's quote excerpt in the catch-up's and the programs' log lines (#26 for the first).
 - **WEB-UX-IDENTITY (2026-11-09) — the web app's design system: round 02, "Folio × Night Room".** The owner accepted
-  the round-02 prototype (`design/rounds/02-combined/`) with four changes; his words are in `design/state.md`, *Round 02
-  result* ("I like the sectioned out from Ada, but I don't like that stamp and the wavy thing"; "I like margin J for
-  the mark"; Today, Entries, the entry in all three sidebar modes, dark, Insights and Settings each approved by name).
+  the round-02 prototype (`design/rounds/02-combined/`) with four changes; his verdict is in `design/state.md`, *Round 02
+  result*, paraphrased (he liked the sectioned letter from her but not its stamp and wavy lines; he chose the "margin j"
+  for the mark; Today, Entries, the entry in all three sidebar modes, dark, Insights and Settings each approved by name).
   `design/DESIGN.md` is now the written language, `web/src/tokens.css` its tokens, `web/src/ui/` its components and
   `/design` draws them. What changes from IDENTITY (2026-10-27), and why:
   - **Her voice moves from Courier Prime to IBM Plex Mono** (400, 400 italic, 500): typed still, but a quieter, more
@@ -3715,8 +3715,8 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     recorded with its route when it lands.
 - **WEB-UX-ENTRY-TABS (2026-11-09) — the entry has no Entry/Analysis tabs; her readings unfold at its end.** FRONTEND
   §1.3 put an entry's analysis on a second tab. Round 02 drew it as her readings at the foot of the entry instead, and
-  the owner accepted round 02 with this call left uncontested (`design/state.md`, *Round 02 result*: "Calls he did not
-  contest (stand, reversible): … Analysis and Reflection unfold at the end of the entry, no tabs"). So the entry page
+  the owner accepted round 02 with this call left uncontested (`design/state.md`, *Round 02 result*: among the calls he
+  did not contest, which stand and are reversible, Analysis and Reflection unfold at the end of the entry, with no tabs). So the entry page
   (`web/src/routes/entry.tsx`) ends with "Her readings": *What she noticed* (her annotations and her notes) and *her
   reflection on the day*, each a disclosure (`ui/Disclosure`) that unfolds in place; the reflection is read when its
   fold first opens. The data and the empty text are as they were ("Nothing here yet: Ada adds notes after the entry
@@ -3732,8 +3732,8 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   question in place and has no Undo, since the server has no undo for a block and a delayed delete would change
   when the file is written.
 - **WEB-UX-WRITE-ROOM (2026-11-09) — Write opens a room, not the "+" sheet.** FRONTEND §1 put a sheet behind the tab
-  bar's +: Quick note, Voice, Answer today's prompt, Start. The owner asked for "immersive and inviting typing
-  (literally a writing webapp)" and called the write modal ugly (`design/state.md`, WEB-UX); round 02 drew a room, and
+  bar's +: Quick note, Voice, Answer today's prompt, Start. The owner asked for immersive, inviting writing (it is
+  a writing app) and found the write modal ugly (`design/state.md`, WEB-UX); round 02 drew a room, and
   he accepted it with focus greying on by default left uncontested. So everything that says Write (the rail's lamp, the
   tab bar's disc, the `N` key, Today's *Write now* and *Speak it*, `/today?write=<id>`, an entry's *In the writing room*) calls
   `openWrite` (`web/src/shell/write.ts`), and the shell draws `components/WriteRoom.tsx`: a native modal dialog that
@@ -3814,3 +3814,42 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   it blocked (headless Chromium's default) and off with the permission not asked yet (`settings-push-blocked`, `-off`).
   Main's docs carried conflict markers from its own merge (AGENTS.md, DEPLOY.md, README.md); they are resolved here
   as open PR #32 resolves them, with its `tests/test_no_conflict_markers.py`.
+- **WEB-UX-REVIEW (2026-11-10) — the independent review of the WEB-UX pull request, and what changed.** One blocker,
+  eight code points, four of docs and housekeeping, and nits; all taken, with these calls:
+  - **One draft, two boxes.** The entry's box and the write room on that entry share `entry:<stem>`; `drafts.ts` now
+    tells every box on a key what another box wrote or sent (`onDraft`, same tab), and a box takes it up unless it is
+    sending, so neither overwrites the other's words nor sends them twice. While the room is open on an entry its box
+    is hidden (kept mounted: a recording in it stays) with a line saying so, and what the room saves there makes the
+    page read the entry again (`shell/write.ts`, `onWritten`).
+  - **His voice is not dropped by a key.** Escape or Close while recording stops the recording and keeps it (the room
+    stays); with a recording not sent the room asks in place (*Keep writing* / *Discard the recording*); while a save
+    settles, closing waits. Typed words are kept as the draft, as before. *Speak it* starts the microphone once (the
+    room owns it, so a discard or *Write another* does not start it again), and a microphone granted after the room
+    closed is let go at once. Only one room at a time: a stray `N`, or a link, while it stands is ignored; `N` does
+    nothing on the pairing screens or while composing.
+  - **The room's reads are quiet** (`todayQuiet`, `libraryQuiet`, `entryQuiet`, `runsQuiet`, the practice view): they
+    never change the offline ribbon or the kept-copy rules of the page behind it.
+  - **Today never folds a prompt** (FRONTEND §1.1): her questions stand open on every card, by part, as main had them;
+    the test that forbade a fold is back. The entry keeps its fold (`FOLD_ENTRY_QUESTIONS`).
+  - **The entry sidebar's "Load more"** keeps a page with the first page it followed, aborts on a newer one, and says
+    a failed page with Retry, as Entries does.
+  - **Her letter in the room on a phone** rests at three lines with *Read all of her letter* to open it.
+  - **Colour.** `--her-soft` is held at AA on every ground, as the ink is; light brown and light green were a touch
+    too pale for that on the darkest grounds and are deepened (`#6e3c14`, `#1a523f`). A swatch that names its own
+    scheme (a light one on a dark page) now carries that scheme's ink. Every duration in a component's sheet is a
+    token (`--d-0`, `--d-5`, `--d-loop` and `--d-breath` are new).
+  - **Settings.** A value stepped back to what it was, or to the default while unset, is no change (a default is never
+    written into the file by accident); an edit in a row that folded away under its switch is not sent; a locked
+    switch is described by its line; a stepper with an open lower bound ("more than 0") can step to any value above
+    it. (The test that ties the page's defaults to `config.DEFAULTS` was already there.)
+  - **Smaller:** Keep in a question in place gives focus back to its button; Edit from a passage's sheet puts the caret
+    in the editor; a sheet leaves on Android's back; the run card says "session 3 of 10" beside a strip that counts
+    sessions done; the player says when a recording cannot be played, and its seek bar is 44 px on touch (the mobile
+    pass now measures sliders); the room's program list says a failed read instead of offering a program already
+    running; a note's words carried into an answer leave no copy in the next note; the Library waits for the chat
+    flag before it offers *Send to chat*.
+  - **Housekeeping.** The build brief for this pass named one operator's tooling and is gone from the repository; the
+    owner's verdicts in `design/` are paraphrased (his exact words are in the deployment's private notes).
+  - **Tests changed on purpose:** the read-only document test allows exactly the player's two buttons and the fold's
+    head, and asserts no field in her letter; Today's card test asserts no fold; the Library's turned-off test waits
+    for *Send to chat*. New tests cover each point above.

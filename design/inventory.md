@@ -428,7 +428,7 @@ Vitest runs on jsdom, so it never loads `app.css`. Only the e2e specs see layout
   - "/x…" yields `.composer .error-line` containing "not saved".
   - "Mood, people, star"; `getByLabel("Mood",{exact})`; `getByLabel("Starred",{exact})`; `.chips .chip` ["starred","calm"].
 
-### 3c. `shots/` (design screenshots, not CI)
+### 3c. `shots/` (design screenshots, not CI; as it stood before WEB-UX: it is now one suite, `screens`, `entries`, `pages`, `write` and `shell` over `shots/lib.ts`)
 - **Files:** `shots/shots.spec.ts` and `shots/pair.setup.ts`; config `playwright.shots.config.ts` (phone 390×844 @2x, desktop 1280×860, service workers blocked, `--demo` fixture server on port 8792).
 - **Screens, light:** `/`, `/entries/2026-10-14-evening`, `/runs/2026-10-15-run1`, `/settings`, `/entries`, `/library`, `/library/morning`, `/library/gratitude/edit`, `/library/midweek` (edited), `/library/midweek/default`, `/library/morning/edit`, `/library/fix-life/edit`, `/insights`. **Dark:** today, entry, run, settings, insights.
 - **Waits:** `.skeleton` count 0 (L216).
