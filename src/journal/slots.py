@@ -294,16 +294,19 @@ def _step3(cfg, p, at, now, data, jday: date) -> Slot | None:
 def _last_night_is_nearer(cfg, p, at, now, data, jday: date, today: date) -> bool:
     """Before ``day_ends_at``, whether the practice's scheduled slot nearest to ``at`` belongs to the journal day
     before and not to today's date: ``/start evening`` at 00:30 means last night's 23:00, 1.5 hours ago, not
-    tonight's, 22.5 hours ahead; ``/start morning`` at 03:30 means today's 06:00. A tie, a slot that is both (00:30
-    on today's date) and a practice with no schedule are today's."""
-    def scheduled(found):
-        return [s for s in found if s.n is not None and s.at is not None]
-    todays = scheduled(day(cfg, today.isoformat(), now, data=data, practice=p))
+    tonight's, 22.5 hours ahead; ``/start morning`` at 03:30 means today's 06:00. Nearness only picks the day; the
+    steps of ``resolve`` then pick the slot. A tie, a slot that is both (00:30 on today's date) and a practice with no
+    schedule are today's; with no slot on today's date (a weekday practice on Saturday), last night's is nearer
+    when it is under twelve hours behind."""
+    def gaps(found):  # in UTC: elapsed time, not wall-clock, on a night the clocks change
+        return [abs(s.at.astimezone(timezone.utc) - at.astimezone(timezone.utc)) for s in found]
+    todays = [s for s in day(cfg, today.isoformat(), now, data=data, practice=p) if s.n is not None and s.at is not None]
     mine = {s.id for s in todays}
-    before = [s for s in scheduled(_of_journal_day(cfg, p, now, data, jday)) if s.id not in mine]
+    before = [s for s in _of_journal_day(cfg, p, now, data, jday)
+              if s.n is not None and s.at is not None and s.id not in mine]
     if not before:
         return False
-    return not todays or min(abs(s.at - at) for s in before) < min(abs(s.at - at) for s in todays)
+    return min(gaps(before)) < (min(gaps(todays)) if todays else timedelta(hours=12))
 
 
 def _by_calendar(cfg, p, at, now, data, today: date) -> Slot:
