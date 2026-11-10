@@ -18,10 +18,11 @@ One engine in `src/journal`, four faces over the same config, state and entry fi
 | `journal mcp` | `mcp/` (optional extra `journal[mcp]`) | The engine's calls as MCP tools over stdio, under serve's rules. |
 
 Adapters stay thin: the seam is `inbound`, `turncontext`, `tools`, `commands` and the two ports in `ports.py`
-(README *Adapters* and *Ports*; `docs/ARCHITECTURE.md` §2). His words from a face go through `actions.py` (`answer`,
-`note`: the refusals of `/x`, marker lines and the transcript placeholder live there), which takes its slot from
-`slots.py` (`docs/OPEN-PROMPTS.md`; serve and MCP still call `capture.capture_web` until package OPEN-FACES moves
-them onto it).
+(README *Adapters* and *Ports*; `docs/ARCHITECTURE.md` §2). His words from a face (serve's `POST /entries`, `journal
+write`, MCP's `journal_save`) go through `actions.py` (`answer`, `note`, `add`: the refusals of `/x`, marker lines and
+the transcript placeholder live there, `actions.refuse`), which takes its slot from `slots.py`
+(`docs/OPEN-PROMPTS.md`). Opening a practice on a face (the web app's *Write now*, `journal open`, MCP's
+`journal_start`) is `actions.view`: a read, never a send or a record.
 
 ## How a prompt flows
 

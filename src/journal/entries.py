@@ -124,6 +124,33 @@ def entry_path(root: Path, stem: str) -> Path:
     return root / f"{stem}.md"
 
 
+STEM = re.compile(r"^\d{4}-\d{2}-\d{2}-[a-z][a-z0-9-]*$")  # what an entry's name can be (no path, no dots)
+
+
+def entry_file(root: Path, stem: str) -> Path | None:
+    """The engine entry for ``stem``, or None (a bad name, a missing file, a file the engine did not write)."""
+    if not isinstance(stem, str) or not STEM.match(stem):
+        return None
+    path = entry_path(root, stem)
+    if not path.is_file() or is_analysis(path):
+        return None
+    return path if entry_key(path) else None
+
+
+def engine_file(root: Path, stem: str) -> Path | None:
+    """``entry_file`` narrowed to a file the engine wrote: its front matter has the engine's ``type`` and claims an
+    id the name can mean (``capture.entry_stem``'s own test). A hand-written ``2026-10-13-evening.md`` is readable
+    but is his: no face writes to it."""
+    path = entry_file(root, stem)
+    if path is None:
+        return None
+    fm = front_matter_of(path)
+    claimed = {fm.get("practice"), fm.get("kind")}
+    if fm.get("type") != ENGINE_TYPE or not claimed & {c[0] for c in name_candidates(path.name)}:
+        return None
+    return path
+
+
 def next_stem(root: Path, local_date: str, kind: str) -> str:
     """First unused stem for a kind that can repeat in a day (/j notes)."""
     n = 1

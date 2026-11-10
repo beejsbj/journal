@@ -3,8 +3,9 @@ sends and program steps that are spawned rather than run here.
 
 What keeps these safe is what they call, not what they check:
 
-* **The engine only appends his words; he can change them.** A reply or a block goes through
-  ``capture.capture_web`` / ``capture.add_web_block`` (``entries.record_reply``, under the ledger lock like the hook's
+* **The engine only appends his words; he can change them.** Words for a practice, or a note, go through
+  ``actions.answer`` / ``actions.note``, and a block through ``capture.add_web_block`` (``entries.record_reply``,
+  under the ledger lock like the hook's
   and the tick's writes). The routes that change a file he already has are his own acts, each carrying the state he was
   looking at and refused on drift (409, never an overwrite): ``PATCH …/meta`` replaces the front matter alone
   (``entries.set_meta``), ``PATCH``/``DELETE …/blocks/<key>`` replace or remove one block of his and nothing else
@@ -33,7 +34,7 @@ from functools import wraps
 from pathlib import Path
 from typing import Callable
 
-from .. import audio, capture, entries, ledger, library, settings
+from .. import actions, audio, capture, entries, ledger, library, settings
 from .. import config as jconfig
 from . import api, blocks, document, uploads
 from .api import HTTPError, Reply, Request
@@ -76,23 +77,24 @@ def _text(body: dict, key: str = "text") -> str | None:
     return value.replace("\r\n", "\n").replace("\r", "\n")
 
 
+# The refusals' words on this face, which speaks to him (the rule is ``actions.refuse``, the same for every face)
+SAID = {"off-the-record": "this, or a line of it, starts with the off-the-record command, so it is not saved; what you "
+                          "typed is still in your browser",
+        "reserved-line": "a line shaped like `%% journal … %%` is the engine's own marker and cannot be part of your "
+                         "words; nothing was saved",
+        "placeholder": f"“{audio.TRANSCRIBING}” is the journal's line for a recording still being transcribed and "
+                       "cannot be part of your words; nothing was saved"}
+
+
 def _his_words(req: Request, text: str | None) -> str | None:
-    """His text, if he sent any, after the refusals: off the record, the engine's own marker lines, and the engine's
-    transcript-pending placeholder."""
+    """His text, if he sent any, after the refusals every face has (``actions.refuse``): off the record, the engine's
+    own marker lines, and the engine's transcript-pending placeholder. 422 with the refusal's code."""
     if text is None:
         return None
-    if capture.opt_out(req.cfg, text) is not None:
-        raise HTTPError(422, "off-the-record", "this starts with the off-the-record command, so it is not saved; "
-                                               "what you typed is still in your browser")
-    if capture.opt_out_inside(req.cfg, text):  # as the chat takes a merged burst: a /x on any line covers all of it
-        raise HTTPError(422, "off-the-record", "a line of this starts with the off-the-record command, so none of it "
-                                               "is saved; what you typed is still in your browser")
-    if entries.ENGINE_MARK.search(text):
-        raise HTTPError(422, "reserved-line", "a line shaped like `%% journal … %%` is the engine's own marker and "
-                                              "cannot be part of your words")
-    if audio.TRANSCRIBING in text:  # the tick would fill it as a recording's block, and the editor would lock it
-        raise HTTPError(422, "placeholder", f"“{audio.TRANSCRIBING}” is the journal's line for a recording still "
-                                            "being transcribed and cannot be part of your words")
+    try:
+        actions.refuse(req.cfg, text)
+    except actions.Refused as e:
+        raise HTTPError(422, e.code, SAID.get(e.code, str(e))) from None
     return text
 
 
@@ -189,9 +191,22 @@ def _engine_entry(req: Request) -> Path:
     return path
 
 
+REFUSED = {"off-the-record": 422, "reserved-line": 422, "placeholder": 422, "empty": 400, "bad-time": 400,
+           "not-a-practice": 404}   # ``actions.Refused.code`` → the status a write answers
+
+
+def _refused(e: actions.Refused) -> HTTPError:
+    status = REFUSED.get(e.code, 400)
+    return HTTPError(status, "bad-request" if status == 400 else "not-found" if status == 404 else e.code,
+                     SAID.get(e.code, str(e)))
+
+
 @bounded
 def entry_create(req: Request):
-    """A reply to a practice's open prompt (``practice``), else a /j note of its own. ``at`` stamps the heading."""
+    """His words from the web app, through ``actions``: with ``practice``, that practice's entry (``actions.answer``:
+    the slot ``slots.resolve`` gives, its open prompt, its due or missed slot, the next one later today, else an
+    extra entry; never a /j note); without one (or ``j``), a /j note of its own (``actions.note``). ``at`` stamps the
+    heading."""
     body = req.json()
     practice = body.get("practice")
     if practice is not None:
@@ -199,12 +214,22 @@ def entry_create(req: Request):
             raise HTTPError(400, "bad-request", "practice must be a practice id")
         if practice not in req.lib().practices and practice not in entries.FREEFORM_IDS:
             raise HTTPError(404, "not-found", "no practice by that id")
+    if practice in entries.FREEFORM_IDS:
+        practice = None
     cid = _client_id(body)
     words, when = _Words(req, body, cid), _at(req, body)
     with words:
-        info = capture.capture_web(req.cfg, practice, words.text or "", req.now, at=when, client_id=cid, **words.args)
+        try:
+            if practice is None:
+                info = actions.note(req.cfg, words.text or "", when, via=capture.WEB_VIA, now=req.now, client_id=cid,
+                                    **words.args)
+            else:
+                info = actions.answer(req.cfg, practice, words.text or "", when, via=capture.WEB_VIA, now=req.now,
+                                      client_id=cid, **words.args)
+        except actions.Refused as e:
+            raise _refused(e) from None
     path = Path(info["path"])
-    done = {"stem": path.stem, "path": str(path), "rule": info["rule"]}
+    done = {"stem": path.stem, "path": str(path), "rule": info["rule"], **({"slot": info["slot"]} if practice else {})}
     return Reply(200 if info.get("duplicate") else 201, done)
 
 
@@ -700,8 +725,10 @@ def library_send(req: Request):
     pid, current = _practice_or_404(req)
     if current is None:
         raise HTTPError(404, "not-found", "no practice by that id")
-    if not current.enabled:
-        raise HTTPError(409, "disabled", "this practice is turned off (enabled: false)")
+    # (``enabled: false`` is "not scheduled" only: a practice turned off is still sent when asked; the owner, 2026-11-09)
+    if not req.cfg.has_channel:   # (``journal send`` would log that nothing was sent; say it here instead)
+        raise HTTPError(409, "no-chat", "this journal has no chat (channel.platform: none), so nothing is sent to "
+                                        "one: use Write now")
     return _spawned(req, ["send", pid])
 
 

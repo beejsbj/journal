@@ -23,7 +23,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable
 
-from .. import audio, capture, entries, images, ledger, library, location, reflect, slots, status, today, version
+from .. import actions, audio, capture, entries, images, ledger, library, location, reflect, slots, status, today, version
 from .. import settings as settings_
 from ..config import Config, effective_today, profile_from_home
 from . import auth, document
@@ -221,12 +221,6 @@ def today_(req: Request):
     prompt is labelled with the companion's name."""
     data = today.collect(req.cfg, req.now, stems=True)
     rows = (data.get("practices") or {}).get("rows") or []
-    for r in rows:
-        # The PWA as built reads four states (``web/src/types.ts``); until OPEN-FACES teaches it ``due``, a slot that
-        # is due with no chat message is served as it read before: still to come, with Send now (DECISIONS.md,
-        # OPEN-CORE)
-        if r.get("state") == slots.DUE:
-            r["state"] = slots.UPCOMING
     if any(r.get("stem") for r in rows):
         try:
             records = document.prompt_records(req.cfg)
@@ -242,6 +236,8 @@ def today_(req: Request):
                 log.exception("journal serve: today: the prompt of %s could not be built", r.get("id"))
     return {**data, "week": week_strip(req.cfg, req.now),
             "voices": {"his": req.cfg.names.user or "You", "hers": req.cfg.names.companion},
+            # whether there is a chat to send to (``channel.platform: none`` is a journal without one): Send to chat
+            "chat": req.cfg.has_channel,
             # the header shows the place: when OpenStreetMap named it, the page credits it there (Nominatim's policy)
             "location_source": location.place_source(req.cfg)}
 
@@ -580,6 +576,15 @@ def library_one(req: Request):
     return {**out, "override": override, "problems": out["problems"] + problems}
 
 
+def library_open(req: Request):
+    """``GET /library/{id}/open``: the practice as the web app's Write now shows it (``actions.view``: its opener and
+    questions, or the prompt the chat has, and the slot words saved now would fill). A view: nothing is written."""
+    try:
+        return actions.view(req.cfg, req.params["id"], now=req.now)
+    except actions.Refused:
+        raise HTTPError(404, "not-found", "no practice by that id") from None
+
+
 def library_default(req: Request):
     """``GET /library/{id}/default``: the shipped definition of a built-in, in ``GET /library/{id}``'s shape (whatever
     is in force), with ``diff``: ``since`` (what changed in the default since his edit began; null when nothing did or
@@ -808,6 +813,7 @@ ROUTES: list[tuple[str, str, Callable, str]] = [
     ("GET", r"/api/v1/library", library_list, TOKEN),
     ("GET", r"/api/v1/library/(?P<id>[^/]+)", library_one, TOKEN),
     ("GET", r"/api/v1/library/(?P<id>[^/]+)/default", library_default, TOKEN),
+    ("GET", r"/api/v1/library/(?P<id>[^/]+)/open", library_open, TOKEN),
     ("GET", r"/api/v1/runs", runs, TOKEN),
     ("GET", r"/api/v1/runs/(?P<id>[^/]+)", run_one, TOKEN),
     ("GET", r"/api/v1/runs/(?P<id>[^/]+)/insights", run_insights, TOKEN),

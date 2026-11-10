@@ -25,7 +25,7 @@ from pathlib import Path
 from .. import audio, capture, entries, images, ledger, library, today
 from ..config import Config
 
-STEM = re.compile(r"^\d{4}-\d{2}-\d{2}-[a-z][a-z0-9-]*$")
+STEM = entries.STEM
 _GLOB = "[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-*.md"
 _WORDS_HEAD = re.compile(
     r"^### (\d{1,2}:\d{2})(?: ([^\s·]+))? · (text|photo|voice transcript[^\n]*|audio file[^\n]*)[ \t]*$", re.M)
@@ -47,26 +47,13 @@ _NO_WORDS = re.compile(r"^_Nothing (?:from .+ )?yet\._$")
 
 def entry_file(cfg: Config, stem: str) -> Path | None:
     """The engine entry for ``stem``, or None (a bad name, a missing file, a file the engine did not write)."""
-    if not isinstance(stem, str) or not STEM.match(stem):
-        return None
-    path = entries.entry_path(cfg.root, stem)
-    if not path.is_file() or entries.is_analysis(path):
-        return None
-    return path if entries.entry_key(path) else None
+    return entries.entry_file(cfg.root, stem)
 
 
 def engine_file(cfg: Config, stem: str) -> Path | None:
-    """``entry_file`` narrowed to a file the engine wrote: its front matter has the engine's ``type`` and claims an
-    id the name can mean (``capture.entry_stem``'s own test). A hand-written ``2026-10-13-evening.md`` is readable
-    but is his: the web app never writes to it."""
-    path = entry_file(cfg, stem)
-    if path is None:
-        return None
-    fm = entries.front_matter_of(path)
-    claimed = {fm.get("practice"), fm.get("kind")}
-    if fm.get("type") != entries.ENGINE_TYPE or not claimed & {c[0] for c in entries.name_candidates(path.name)}:
-        return None
-    return path
+    """``entry_file`` narrowed to a file the engine wrote (``entries.engine_file``): a hand-written
+    ``2026-10-13-evening.md`` is readable but is his, and the web app never writes to it."""
+    return entries.engine_file(cfg.root, stem)
 
 
 def all_entries(cfg: Config) -> list[tuple[Path, tuple]]:

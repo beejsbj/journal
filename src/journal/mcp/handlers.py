@@ -7,13 +7,15 @@ Each tool is a call into what the engine and the other faces already do, never a
   client sees what the web app sees, and nothing the web app may not: no chat transcript, no privacy results, no
   packs, no notebook (``tests/test_mcp_fence.py`` fences the imports; ``tests/test_mcp.py`` runs every tool with
   ``sqlite3.connect`` made to fail);
-* his words are only appended, through ``capture.capture_web`` under the ledger lock (the web app's path, with
-  ``via="mcp"``), so a reply to an open prompt folds the chat's prompt as the web's does, and anything else becomes
-  a /j note of its own;
+* his words are only appended, through ``actions`` (``answer`` for a practice, ``note`` otherwise; ``via="mcp"``)
+  under the ledger lock, as the web app's and the CLI's are: words for a practice fill the slot ``slots.resolve``
+  gives (its open prompt, which then folds in the chat, its due or missed slot, the next one later today, else an
+  extra entry of that practice), never a /j note;
 * ``/x`` holds: text that starts with the off-the-record command, or has a line that does, is refused and nothing
   is written (as the chat takes it); a line shaped like the engine's own marker (``%% journal … %%``) is refused
-  too, since it could pass for the companion's voice;
-* a send is a spawned ``journal send <id>`` (what ``/start <id>`` and the web app's Send do), never run here;
+  too, since it could pass for the companion's voice, and so is the transcript placeholder (``actions.refuse``);
+* nothing here posts into the chat: ``journal_start`` returns the practice to answer (``actions.view``), the view
+  the web app's Write now shows, and spawns nothing (OPEN-PROMPTS, choice C);
 * the companion's voice stays hers: ``journal_entry`` labels every block with whose it is, and ``journal_add_note``
   files a note under the companion's notes heading (``capture.add_companion_note``), never among his words.
 
@@ -26,10 +28,10 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Callable
 
-from .. import audio, capture, commands, entries, ledger, library, programview, today
+from .. import actions, audio, capture, commands, entries, ledger, library, programview, today
 from ..config import Config
 from ..serve import api, document
-from ..serve.writes import TEXT_LIMIT, spawn_journal
+from ..serve.writes import TEXT_LIMIT
 
 LOCK_WAIT = 5.0      # seconds a write waits for the ledger lock (as a web write), then it is refused as busy
 TODAY_CHARS = 100_000   # the today block here is not cut to ``today.max_chars``: that is the chat's turn budget
@@ -53,28 +55,14 @@ def _text(value, what: str) -> str:
     return value.replace("\r\n", "\n").replace("\r", "\n")
 
 
-def _not_off_record(cfg: Config, text: str) -> None:
-    """``/x`` holds here as in the chat: text that starts with the command, or has a line that does (the chat takes a
-    merged burst with a ``/x`` on a later line as off the record, ``capture.opt_out_inside``), is refused whole."""
-    if capture.opt_out(cfg, text) is not None:
-        raise Refused("this starts with the off-the-record command, so it stays out of the journal: nothing was saved")
-    if capture.opt_out_inside(cfg, text):
-        raise Refused("a line of this starts with the off-the-record command, so none of it goes into the journal: "
-                      "nothing was saved")
-
-
-def _no_placeholder(text: str, what: str) -> None:
-    """The engine's transcript-pending line is not his words (the web refuses it too): no recording will fill it,
-    and the editor would lock the block for good as one still being transcribed."""
-    if audio.TRANSCRIBING in text:
-        raise Refused(f"{what} has the journal's line for a recording still being transcribed, which cannot be part "
-                      "of his words: nothing was saved")
-
-
-def _no_marker(text: str, what: str) -> None:
-    if entries.ENGINE_MARK.search(text):
-        raise Refused(f"{what} has a line shaped like `%% journal … %%`, the engine's own marker (it could pass for "
-                      "the other voice or a program's phase): nothing was saved")
+def _his_or_hers(cfg: Config, text: str) -> None:
+    """The refusals every face has (``actions.refuse``): ``/x`` holds here as in the chat (text that starts with the
+    command, or has a line that does, is refused whole), a line shaped like the engine's own marker could pass for
+    the other voice or a program's phase, and the transcript-pending line is no one's words."""
+    try:
+        actions.refuse(cfg, text)
+    except actions.Refused as e:
+        raise Refused(str(e)) from None
 
 
 def _date(value, name: str) -> date | None:
@@ -232,24 +220,29 @@ def program_status(cfg: Config, now: datetime) -> dict:
 # ── writes ───────────────────────────────────────────────────────────────────
 
 def save(cfg: Config, now: datetime, text: str, practice: str | None = None) -> dict:
-    """Append his words, verbatim. With ``practice``, as his reply to that practice's open prompt (the chat's prompt
-    then folds to "answered", as for a reply from the web app); without one, or when that practice has no open
-    prompt, as a /j note of its own. Returns where it went (``stem``, ``path``) and how (``rule``: ``mcp`` for a
-    reply, ``/j`` for a note)."""
+    """Append his words, verbatim, through ``actions``. With ``practice``, into that practice's slot
+    (``actions.answer``: its open prompt, which then folds in the chat as a reply from the web app does; its due or
+    missed slot; the next one later today, filled early; else an extra entry of that practice), never a /j note;
+    without one, a /j note of its own (``actions.note``). Returns where it went (``stem``, ``path``), how (``rule``:
+    ``mcp`` for a practice, ``/j`` for a note), and for a practice the slot and the step of ``slots.resolve`` that
+    chose it."""
     words = _text(text, "text")
-    _not_off_record(cfg, words)
-    _no_marker(words, "text")
-    _no_placeholder(words, "text")
     pid = (practice or "").strip() or None
-    if pid is not None:
-        lib = library.load(cfg)
-        if pid not in lib.practices and pid not in entries.FREEFORM_IDS:
+    if pid in entries.FREEFORM_IDS:
+        pid = None
+    try:
+        if pid is None:
+            info = _bounded(lambda: actions.note(cfg, words, via=capture.MCP_VIA, now=now))
+        else:
+            info = _bounded(lambda: actions.answer(cfg, pid, words, via=capture.MCP_VIA, now=now))
+    except actions.Refused as e:
+        if e.code == "not-a-practice":
             raise Refused(f"no practice {pid!r} (journal_practices lists them; programs are answered in the chat or "
-                          "the web app)")
-    info = _bounded(lambda: capture.capture_web(cfg, pid, words, now, via=capture.MCP_VIA))
+                          "the web app): nothing was saved") from None
+        raise Refused(str(e)) from None
     path = Path(info["path"])
-    return {"stem": path.stem, "path": str(path), "rule": info["rule"],
-            "answered": pid if info["rule"] == capture.MCP_VIA else None}
+    return {"stem": path.stem, "path": str(path), "rule": info["rule"], "answered": pid,
+            **({"slot": info["slot"], "step": info["step"]} if pid else {})}
 
 
 def _not_his_page(cfg: Config) -> Callable[[Path], None]:
@@ -268,9 +261,7 @@ def add_note(cfg: Config, now: datetime, note: str, day: str | None = None, kind
     ``kind`` picks the entry (a practice id, or ``note``). Off the record holds as for ``save``: this face cannot see
     a chat turn's state, so a note that starts with the command is refused."""
     text = _text(note, "note")
-    _not_off_record(cfg, text)
-    _no_marker(text, "note")
-    _no_placeholder(text, "note")
+    _his_or_hers(cfg, text)
     if day not in (None, ""):
         _date(day, "date")
     try:
@@ -281,19 +272,13 @@ def add_note(cfg: Config, now: datetime, note: str, day: str | None = None, kind
     return {"stem": Path(path).stem, "path": path, "voice": "companion"}
 
 
-HELD_NOTE = ("It goes out in the background unless the chat is off the record right now (a bare /x is holding the "
-             "conversation, or the journal cannot tell): then nothing is sent, as with the journal's own automatic "
-             "sends, and the log says so. Ask again once the conversation has gone quiet.")
-
-
-def start(cfg: Config, practice: str, spawn: Callable[[Config, list[str]], str] = spawn_journal) -> dict:
-    """Send a practice now: ``journal send <id> --hold-off-record`` spawned, as ``/start <id>`` does from the chat (ids
-    and the legacy aliases resolved by ``commands.start``), except that it holds while a bare ``/x`` window is open:
-    a model asks for it, not he, and a prompt send would end the window and take his next private message as the
-    answer, which is why the automatic sends hold too. This face does not read the chat (its fence), so the spawned
-    send asks the privacy pass and the answer says what it will do. A program is not started from here: its runs
-    move on his own words, from the chat or the web app (PRACTICES.md decision 9), so the answer is the line he can
-    send."""
+def start(cfg: Config, practice: str, now: datetime) -> dict:
+    """The practice to answer, as the web app's Write now shows it (``actions.view``): its title, its opener and
+    questions (``prompt``), and the slot words saved now would fill (``slot``, ``fills``). Nothing is sent, spawned or
+    written: this face never posts into the chat (OPEN-PROMPTS, choice C), and opening a practice is a view. His
+    answer goes through ``journal_save`` with ``practice``. Ids and the legacy aliases are resolved as ``/start``
+    resolves them (``commands.start``); a program is not done from here (its runs move on his own words, in the chat
+    or the web app: PRACTICES.md decision 9), so the answer is the line he can send."""
     word = (practice or "").strip() if isinstance(practice, str) else ""
     if len(word.split()) != 1:
         raise Refused("name one practice by its id (journal_practices lists them)")
@@ -305,11 +290,11 @@ def start(cfg: Config, practice: str, spawn: Callable[[Config, list[str]], str] 
     if found.practice is None:
         raise Refused(found.reply)
     try:
-        log = spawn(cfg, ["send", found.practice.id, "--hold-off-record"])
-    except OSError as e:
-        raise Refused(f"could not start the send ({type(e).__name__}); `journal doctor` says why") from None
-    return {"spawned": True, "practice": found.practice.id, "title": found.practice.title, "log": log,
-            "note": HELD_NOTE}
+        shown = actions.view(cfg, found.practice, now=now)
+    except actions.Refused as e:
+        raise Refused(str(e).replace(": nothing was saved", "")) from None
+    return {**shown, "next": f"When {cfg.names.user or 'he'} has answered, save the words, verbatim, with "
+                             f"journal_save(text=…, practice=\"{shown['practice']}\")."}
 
 
 # ── resources ────────────────────────────────────────────────────────────────

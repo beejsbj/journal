@@ -323,7 +323,7 @@ class PhaseClosed(Exception):
 
 def add_web_block(cfg: Config, stem: str, text: str, now: datetime, *, media: str | None = None, ext: str = ".ogg",
                   meta: dict | None = None, client_id: str | None = None, phase_prompt: str | None = None,
-                  key_of: Callable[[Path], str | None] | None = None) -> dict:
+                  key_of: Callable[[Path], str | None] | None = None, via: str = WEB_VIA) -> dict:
     """Append a block of his words to the engine entry ``stem`` (the caller has checked it is the engine's own
     file). Through the entry's ledger prompt when it still has one, so the tick sees the reply (annotations wait on
     the first one); otherwise straight into the file. Nothing already in the file is touched. A repeated
@@ -337,7 +337,9 @@ def add_web_block(cfg: Config, stem: str, text: str, now: datetime, *, media: st
     ``PhaseClosed`` and nothing is written. Moving the run on is the caller's: the settle or ``/next``.
 
     ``key_of(path)`` names the block just written (the web document's key for it); it is called under the lock and
-    its answer kept with the capture, so a retry returns the first block's key even after others were added."""
+    its answer kept with the capture, so a retry returns the first block's key even after others were added.
+
+    ``via``: the face writing (``web``; ``cli`` for ``journal write --entry``), the block's rule, source and via."""
     with ledger.locked(cfg.ledger_path) as data:
         done = ledger.capture_of_client(data, client_id)
         if done:
@@ -347,22 +349,22 @@ def add_web_block(cfg: Config, stem: str, text: str, now: datetime, *, media: st
         for cid in [k for k, v in seen.items() if _stale(v)]:
             del seen[cid]
         if client_id and client_id in seen:
-            return {"path": str(entries.entry_path(cfg.root, seen[client_id]["stem"])), "rule": WEB_RULE,
+            return {"path": str(entries.entry_path(cfg.root, seen[client_id]["stem"])), "rule": via,
                     "untracked": True, "duplicate": True, "block": seen[client_id].get("block")}
         if phase_prompt is not None:
             prompt = ledger.find(data, phase_prompt)
             if prompt is None or not open_phase(prompt):
                 raise PhaseClosed(phase_prompt)
-            return _web_record(cfg, data, prompt, WEB_RULE, text, now, client_id, media, ext, meta, key_of)
+            return _web_record(cfg, data, prompt, via, text, now, client_id, media, ext, meta, key_of, via=via)
         prompt = prompt_of_entry(data, stem)
         if prompt is not None:
-            return _web_record(cfg, data, prompt, WEB_RULE, text, now, client_id, media, ext, meta, key_of)
+            return _web_record(cfg, data, prompt, via, text, now, client_id, media, ext, meta, key_of, via=via)
         path = entries.entry_path(cfg.root, stem)
         kept = jaudio.keep(cfg, media, str(path), ext) if media else None
         # no ledger prompt, so no capture for the tick to find: an audio file here is kept but not transcribed
         words = text.strip() or (jaudio.NOT_TRANSCRIBED if kept else "")
         try:
-            entries.record_reply(cfg.root, {"stem": stem}, words, now.astimezone(cfg.tz), "audio" if kept else "web",
+            entries.record_reply(cfg.root, {"stem": stem}, words, now.astimezone(cfg.tz), "audio" if kept else via,
                                  kept, cfg.names, meta)
         except BaseException:
             if kept:
@@ -371,7 +373,7 @@ def add_web_block(cfg: Config, stem: str, text: str, now: datetime, *, media: st
         key = block_key(key_of, path)
         if client_id:
             seen[client_id] = {"stem": stem, "at": datetime.now(timezone.utc).isoformat(), **({"block": key} if key else {})}
-        return {"path": str(path), "rule": WEB_RULE, "untracked": True, **({"block": key} if key else {})}
+        return {"path": str(path), "rule": via, "untracked": True, **({"block": key} if key else {})}
 
 
 def client_seen(data: dict, client_id: str, blocks: bool = True) -> bool:

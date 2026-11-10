@@ -161,7 +161,7 @@ button.chip:hover { border-color: var(--ink-3); color: var(--ink); }
   font-family: var(--serif); font-style: italic; font-weight: 400; font-size: 1rem; color: var(--ink-3);
 }
 .pill time { font-style: normal; font-size: 0.875em; color: var(--ink-2); }
-.pill.open { color: var(--ink); }
+.pill.open, .pill.due { color: var(--ink); }
 .pill.answered, .pill.missed { color: var(--ink-2); }
 /* the doctor's and a run's states keep a word of colour where it matters */
 .pill.ok { color: var(--good); }
@@ -347,6 +347,7 @@ details[open] > summary .chev { transform: rotate(90deg); }
 .his-reply:hover .words { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.2em; }
 .inline-composer { display: grid; gap: var(--s2); }
 .inline-composer > .link { justify-self: start; }
+.write-now .fills { margin: 0; color: var(--ink-2); font-size: var(--text-sm); }
 
 /* a program in progress, on Today: a passage too, not a box */
 .cards > .card.run { border: 0; border-top: 1px solid var(--rule); border-radius: 0; padding: var(--s5) 0; align-items: flex-start; }
