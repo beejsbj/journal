@@ -3178,13 +3178,17 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
      does not get it: its today text does not take standing (`today.collect` without `with_standing`), so nothing
      there changed. Tests: `NoChannelTest` in `tests/test_open_core.py` (nothing pending or sent after a chat is set;
      the line in standing, the pack and the today lines, with no word of the annotation or reflection).
-     **Left open for the owner** (review of these changes): read to the letter, decision 1 also covers a practice
-     that closes the day. At 00:30, `/start evening` delivers tonight's evening (the 15th's, early): the tick's
-     23:00 send on the 15th is then done, words he writes at 00:35 answer that message (step 1, it is open), and
-     once they are annotated the 15th's day reflection is written from them at about 01:05 and not again. `main`
-     did the same (it sent the calendar date's evening), and the owner's example was a morning. If an evening
-     `/start` before `day_ends_at` should re-send or fill last night's instead, `_by_calendar` would keep step 1's
-     yesterday (a due or open slot) or leave `closes: day` practices on the journal day: a one-line rule change.
+     **Decision 1's evening case (2026-11-10).** Read to the letter, decision 1 also covered a practice that closes
+     the day: at 00:30, `/start evening` delivered tonight's evening early, the tick's 23:00 send was then done, and
+     the day's reflection was written from words meant for last night. The owner's example was a morning, and he was
+     asked "nearest slot, or always today?" without answering before the work changed hands; the orchestrator took
+     nearest, which keeps his 03:30 morning and is the smaller surprise at 00:30. He can still say "always today":
+     it is one condition in `slots.resolve`. The rule: before `day_ends_at`, a deliberate delivery takes today's
+     calendar date unless the practice's scheduled slot nearest to now belongs to the journal day before
+     (`slots._last_night_is_nearer`); then it resolves as words do (last night's slot while it is due, open or
+     missed; an extra entry of last night once it is answered). A tie, a slot that is both, and a practice with no
+     schedule are today's. Tests: the four `test_a_delivery_before_day_ends_at_…` cases after the 03:30 one in
+     `tests/test_open_slots.py`.
   4. **`enabled: false` means "not scheduled" only.** Every face can still open, write and deliver a disabled
      practice (the web app, `journal open`/`journal write`, MCP, `/start` and `journal send`); the schedule never
      sends it. Applied on OPEN-FACES (#28), recorded there.

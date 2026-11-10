@@ -223,15 +223,17 @@ def resolve(cfg: Config, practice: Practice | str, at: datetime, *, now: datetim
 
     Words dated before the previous journal day go straight to step 4: an old miss stays a miss. A deliberate
     delivery before ``day_ends_at`` takes today's calendar date instead of the journal day before
-    (``_by_calendar``). The slot returned is never an answered one, so a delivery never lands on words he wrote on a
+    (``_by_calendar``), unless the practice's nearest scheduled slot is last night's (``_last_night_is_nearer``):
+    then it resolves as words do. The slot returned is never an answered one, so a delivery never lands on words he wrote on a
     face, and choosing a practice always starts something. Raises ``library.UnknownDefinition`` for an id the
     library does not have."""
     p = library.resolve(practice, cfg)
     now = now or datetime.now(timezone.utc)
     data = data if data is not None else ledger.snapshot(cfg.ledger_path)
     jday = journal_day(cfg, at)
-    if delivery and jday != at.astimezone(cfg.tz).date():
-        return _by_calendar(cfg, p, at, now, data, at.astimezone(cfg.tz).date())
+    today = at.astimezone(cfg.tz).date()
+    if delivery and jday != today and not _last_night_is_nearer(cfg, p, at, now, data, jday, today):
+        return _by_calendar(cfg, p, at, now, data, today)
     if jday >= journal_day(cfg, now) - timedelta(days=1):
         today = now.astimezone(cfg.tz).date()
         found = _step1(cfg, p, at, now, data, today, delivery) or _step2(cfg, p, at, now, data, jday, delivery) \
@@ -289,9 +291,25 @@ def _step3(cfg, p, at, now, data, jday: date) -> Slot | None:
     return _with_step(later[0], 3) if later else None
 
 
+def _last_night_is_nearer(cfg, p, at, now, data, jday: date, today: date) -> bool:
+    """Before ``day_ends_at``, whether the practice's scheduled slot nearest to ``at`` belongs to the journal day
+    before and not to today's date: ``/start evening`` at 00:30 means last night's 23:00, 1.5 hours ago, not
+    tonight's, 22.5 hours ahead; ``/start morning`` at 03:30 means today's 06:00. A tie, a slot that is both (00:30
+    on today's date) and a practice with no schedule are today's."""
+    def scheduled(found):
+        return [s for s in found if s.n is not None and s.at is not None]
+    todays = scheduled(day(cfg, today.isoformat(), now, data=data, practice=p))
+    mine = {s.id for s in todays}
+    before = [s for s in scheduled(_of_journal_day(cfg, p, now, data, jday)) if s.id not in mine]
+    if not before:
+        return False
+    return not todays or min(abs(s.at - at) for s in before) < min(abs(s.at - at) for s in todays)
+
+
 def _by_calendar(cfg, p, at, now, data, today: date) -> Slot:
     """A deliberate delivery (``/start``, ``journal send``, *Send to chat*) made before ``day_ends_at`` takes today's
-    calendar date for its slot, not the journal day before (the owner, 2026-11-09): the same steps over today's
+    calendar date for its slot, not the journal day before (the owner, 2026-11-09), when today's scheduled slot is
+    the nearer one (``_last_night_is_nearer``): the same steps over today's
     slots only. A due or open one; else the newest missed one; else the next later one with no record, or only a
     failed send's; else an extra entry dated today. So ``/start morning`` at 03:30 delivers today's morning, and the
     tick's 06:00 send is then done. Words written at 03:30 still belong to the journal day before (``resolve``)."""

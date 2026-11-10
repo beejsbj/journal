@@ -303,14 +303,29 @@ class ResolveTest(SlotCase):
         got = self.resolve("morning", at(3, 30))
         self.assertEqual((got.id, got.step), ("2026-10-13-morning", 2))
 
-    def test_a_delivery_before_day_ends_at_leaves_last_nights_slot_alone(self):
-        """Decision 1, read to the letter: at 00:30 last night's dusk is still open, yet /start dusk takes today's
-        date (tonight's 21:00 slot, early), while words at 00:30 answer last night's."""
+    def test_a_delivery_before_day_ends_at_takes_last_nights_slot_when_it_is_nearer(self):
+        """Decision 1's evening case: at 00:30 last night's 21:00 dusk is 3.5 hours behind and tonight's 20.5 ahead,
+        so /start dusk means last night's (still open here), as words at 00:30 do; tonight's slot is left alone."""
         self.delivered("2026-10-14-dusk", "dusk", "2026-10-14", at(23))
         got = self.resolve("dusk", at(0, 30, day=THU), delivery=True)
-        self.assertEqual((got.id, got.step), ("2026-10-15-dusk", 3))
+        self.assertEqual((got.id, got.step), ("2026-10-14-dusk", 1))
         got = self.resolve("dusk", at(0, 30, day=THU))
         self.assertEqual((got.id, got.step), ("2026-10-14-dusk", 1))
+
+    def test_a_delivery_before_day_ends_at_never_sent_last_night_takes_its_missed_slot(self):
+        got = self.resolve("dusk", at(0, 30, day=THU), delivery=True)
+        self.assertEqual((got.id, got.local_date, got.step), ("2026-10-14-dusk", "2026-10-14", 2))
+
+    def test_a_delivery_before_day_ends_at_after_last_nights_answer_is_an_extra_of_last_night(self):
+        """Last night's dusk is answered: /start dusk at 00:30 is a second one of that night, not tonight's early."""
+        self.delivered("2026-10-14-dusk", "dusk", "2026-10-14", at(21), captures=[{"at": at(21, 5).isoformat()}])
+        got = self.resolve("dusk", at(0, 30, day=THU), delivery=True)
+        self.assertEqual((got.id, got.local_date, got.step), ("2026-10-14-dusk-2", "2026-10-14", 4))
+
+    def test_a_delivery_before_day_ends_at_takes_the_nearer_of_two_slots_a_day(self):
+        """Water, 09:00 and 15:00: at 02:00 yesterday's 15:00 is 11 hours behind and today's 09:00 seven ahead."""
+        got = self.resolve("water", at(2, 0, day=THU), delivery=True)
+        self.assertEqual((got.id, got.step), ("2026-10-15-water", 3))
 
     def test_a_delivery_before_day_ends_at_takes_todays_slot_due_or_missed_before_then(self):
         """Today's own slots before the hour still count for a delivery: the 00:30 night slot, due at 00:45, is the
