@@ -65,6 +65,48 @@ the new plugin is safe, so pin first; if the order cannot be kept, pause the tic
    that was deferred goes without the search on 300 s.
 4. Rollback: the CLI and the plugin pin at the previous sha, and a gateway restart. The new state fields are
    ignored by the old code; nothing needs undoing.
+## NOTEBOOK-NEWEST — the companion sees her newest notes, and a repeated note is not added (2026-11-09; `notebook.py`, `tools.py`, `tick.py`, `reflect.py`; gateway restart needed; no config or state change)
+
+**What changes.** The notebook block in the companion's chat turn (and in the opener pack) listed the 15 oldest open
+items, so at the cap of 40 it hid every recent note and showed the ones about to be pruned. It now lists the items
+that are due (`bring_up_after` reached; oldest due first), then the rest newest first, still with "(+N more)". Adding
+an item whose text equals an open one's (case, spacing and trailing punctuation ignored) adds nothing: the
+`journal_notebook` result carries `"duplicate": true` and the open item, raised again (its stale clock restarts, a
+date given replaces its date, with `"date_changed": true`), and the annotation and reflection passes log it and count
+only what they added. State files are unchanged in shape; open items already stored are read as before.
+
+**Side and restart.** `notebook.py` and `tools.py` are imported by the gateway (`journal.hermes` loads both through
+`tools`, `turncontext` and `context`; check with the import probe in *What needs what*), and the chat turn's block
+and the tool's add are the gateway's own paths, so **a gateway restart is needed**; until it the companion keeps the
+old order and the old add. The tick (`tick.py`, `reflect.py`, `context.py`) is a fresh process and runs the new code
+from the next tick after the pin moves. Serve side: untouched (serve never reads the notebook).
+
+1. Install the CLI at `<sha>`, move the plugin pin (`hermes -p <profile> plugins install beejsbj/journal --force
+   --ref <sha>`), then `hermes gateway restart` in the next window. Nothing is sent.
+2. First check, without sending: `journal doctor` is as before. In the companion's next chat turn the notebook block
+   starts with any due item and then the newest; asking her to note something already open answers "duplicate".
+3. Rollback: the plugin pin and the CLI at the previous sha, and a gateway restart. No state needs undoing: nothing
+   written under the new rules differs from what the old code would have written.
+## MD-ITALICS — `*italic*` renders as italic in Telegram messages (2026-11-09; `compose.py` only; hook side too: a gateway restart; no config or state change)
+
+**What changes.** The companion's Markdown italics written with single asterisks (`*"…"*`, as reflections and
+annotations quote him) now reach Telegram as `<i>…</i>` instead of showing the asterisks. `compose.md_to_html` and
+`compose.md_block_html` (which calls it) do it; `**bold**` still wins, a lone `*` (`5 * 3`, `2*3*4`, a `* ` bullet)
+stays literal, and an italic that would cross another tag stays literal so the HTML is never refused. The plain-text
+forms (`compose._md_plain`, `compose.plain` for a platform without HTML) lose the stars too. Nothing already sent is
+edited, except that a fold of an older opener (`folded_html`) re-renders its stored text with the new rule.
+
+**Side and restart.** `compose.py` is imported by the gateway (the import probe in *What needs what* lists
+`journal.compose`; `inbound`, `tools` and the commands reach it), so this is hook side as well as tick side: the tick
+sends the new rendering from the next tick after the pin moves, and the **gateway restart** brings the companion's own
+paths (annotation and reflection replies, program phases it sends) to it. Until the restart the gateway keeps the old
+rendering; nothing breaks in between. Serve side: untouched (the web app already renders `*italic*`).
+
+1. Install the CLI at `<sha>` and move the plugin pin (`hermes -p <profile> plugins install beejsbj/journal --force
+   --ref <sha>`), then `hermes gateway restart` in the next window. Nothing is sent.
+2. First check, without sending: `python3 -c "from journal import compose; print(compose.md_to_html('*\"a line\"* and 5 * 3'))"`
+   prints `<i>"a line"</i> and 5 * 3`. The next reflection or annotation reply shows its quotes in italic.
+3. Rollback: the plugin pin and the CLI at the previous sha, and a gateway restart.
 
 ## OPEN-PUSH — Web Push from `journal serve` to the installed PWA (2026-11-09; serve side only; **no gateway restart**; a new optional extra `journal[push]`; a new setting `push.*`; no state migration)
 

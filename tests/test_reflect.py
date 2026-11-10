@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 
 from helpers import CHAT, add_prompt, make_cfg
 
-from journal import capture, context, entries, ledger, reflect, telegram, tick, validate
+from journal import capture, context, entries, ledger, notebook, reflect, telegram, tick, validate
 
 IST = ZoneInfo("Asia/Kolkata")
 GOOD = ('**What stood out** — The rain, and a walk in it anyway.\n\n'
@@ -230,7 +230,10 @@ class WeekReviewTest(Base):
         wk = self.prompt("weekly", "2026-10-18", "20", "20", "End of the week.")
         self.answer_prompt("weekly", "2026-10-18", "a soft week", wk + timedelta(minutes=10), "20")
         alerts, log = self.reflect(datetime(2026, 10, 18, 20, 40, tzinfo=IST))
-        self.assertIn("wrote 2026-10-18-week.md (annotated) (+1 notebook)", log)
+        # the day reflection's follow-up is the same words and still open: the week review adds nothing
+        self.assertIn("wrote 2026-10-18-week.md (annotated)", log)
+        self.assertNotIn("(+1 notebook)", " ".join(log))
+        self.assertEqual(len(notebook.open_items(self.cfg)), 1)
         body = (self.cfg.root / "2026-10-18-week.md").read_text()
         self.assertIn("kind: week\n", body)
         self.assertIn("# Iris's week review — 12–18 Oct 2026", body)

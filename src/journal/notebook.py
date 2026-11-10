@@ -15,7 +15,10 @@ carry every open item, as before. DECISIONS.md, CONTINUITY.
 from __future__ import annotations
 
 import json
+import re
 import secrets
+import string
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -41,9 +44,26 @@ def _archive(cfg: Config, items: list[dict]) -> None:
             fh.write(json.dumps(it, ensure_ascii=False) + "\n")
 
 
+_QUOTES = str.maketrans({"\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"'})
+
+
+def _same(text: str) -> str:
+    """``text`` as the duplicate check compares it: NFKC, curly quotes made straight, case folded, whitespace
+    collapsed, a leading list marker and trailing punctuation gone."""
+    t = unicodedata.normalize("NFKC", text).translate(_QUOTES)
+    t = re.sub(r"\s+", " ", t).casefold().strip()
+    t = re.sub(r"^[-*•]\s+", "", t)
+    return t.rstrip(string.punctuation + "…").rstrip()
+
+
 def add(cfg: Config, text: str, source: str = "", bring_up_after: str | None = None,
         now: datetime | None = None, origin: str | None = None) -> dict:
-    """``origin``: only the engine passes it, for a follow-up it files from a journal file (``ON_RECORD``)."""
+    """Add an open item. A text the same as an open item's (``_same``) adds no item: the open item is raised again
+    instead (``touched_at`` now, so the stale sweep and the cap count from the repeat; a ``bring_up_after`` given
+    replaces its date, the latest ask winning; a ``source`` given replaces its source) and comes back with
+    ``"duplicate": True``, plus ``"date_changed": True`` when its date moved, so a caller can say so.
+    ``origin``: only the engine passes it, for a follow-up it files from a journal file (``ON_RECORD``); a repeat
+    never gives an open item an origin it did not have (one she added in chat stays off the record's side)."""
     text = (text or "").strip()
     if not text:
         raise ValueError("empty notebook item")
@@ -56,7 +76,18 @@ def add(cfg: Config, text: str, source: str = "", bring_up_after: str | None = N
         item["origin"] = origin
     path, _ = _paths(cfg)
     with ledger.locked(path) as data:
-        data.setdefault("items", []).append(item)
+        items = data.setdefault("items", [])
+        same = _same(item["text"])
+        dup = next((i for i in items if _same(i.get("text", "")) == same), None) if same else None
+        if dup is not None:
+            dup["touched_at"] = now.isoformat()
+            if source:
+                dup["source"] = source
+            moved = bool(bring_up_after) and dup.get("bring_up_after") != bring_up_after
+            if moved:
+                dup["bring_up_after"] = bring_up_after
+            return {**dup, "duplicate": True, **({"date_changed": True} if moved else {})}
+        items.append(item)
         data.pop("prompts", None)
     return item
 
@@ -127,15 +158,16 @@ def sweep(cfg: Config, now: datetime | None = None) -> int:
 
 
 def render(cfg: Config, today: str, limit: int = INJECT) -> str:
-    """Compact block of open items for the companion's context; due items first."""
+    """Compact block of open items for the companion's context: the due ones first (oldest due first), then the
+    rest newest first, so what is cut at ``limit`` is the oldest, the next to go stale, never a recent note."""
     items = open_items(cfg)
     if not items:
         return ""
-    def key(i):
-        due = i.get("bring_up_after")
-        return (0 if due and due <= today else 1, i["created_at"])
+    is_due = lambda i: bool(i.get("bring_up_after")) and i["bring_up_after"] <= today  # noqa: E731
+    first = sorted(filter(is_due, items), key=lambda i: (i["bring_up_after"], i["created_at"]))
+    rest = sorted((i for i in items if not is_due(i)), key=lambda i: i["created_at"], reverse=True)
     lines = []
-    for it in sorted(items, key=key)[:limit]:
+    for it in (first + rest)[:limit]:
         due = it.get("bring_up_after")
         tag = f" (bring up after {due})" if due else ""
         src = f" [from {it['source']}]" if it.get("source") else ""
