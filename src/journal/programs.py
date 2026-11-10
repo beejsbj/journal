@@ -5,8 +5,11 @@ entry and status, and each phase's send and transitions. It never holds his word
 entry per session (``YYYY-MM-DD-<program>-sNN.md``, dated the day the session started; a situational run writes
 ``YYYY-MM-DD-<id>.md``), each block of his words under a hidden ``%% journal phase:N %%`` key.
 
-**A phase send is a ledger prompt** (``<run>-sNN-pM``, ``collapse_hours: 3``), delivered by ``tick.send_prompt``, so
-capture, the sweep, folding, threading, the mirror and annotation are the existing code paths. The phase that is
+**A phase is a ledger prompt** (``<run>-sNN-pM``, ``collapse_hours: 3``). It becomes current by being *opened*
+(``_open``: the record written with ``message_id: None``, ``sent_at`` the moment it became current, ``phase_open``),
+so a face can answer it with no chat at all (OPEN-PROGRAMS); with a chat it is then delivered by
+``tick.send_prompt``, so capture, the sweep, folding, threading, the mirror and annotation are the existing code
+paths. ``send_due`` on the run's phase means "owed a delivery"; ``phase_opened`` says whether it is current. The phase that is
 open (``phase_open`` on its record) takes every message while it is visible and the newest prompt in the chat, not
 only the first (``capture.open_phase``, ``capture.superseded``); a break closes it.
 
@@ -15,7 +18,8 @@ one at a time under the tick's lock: in the tick's ``step``, or in a spawned ``j
 takes the lock first (``locked``). They are idempotent: an advance is keyed ``<run>:<session>:<phase>:<last capture
 id>`` (``cmd<visit>`` for a command), and a key the phase has already used is a no-op, so a sweep re-capture, a
 redelivered update, a lost-then-retried spawn or the tick racing a spawn all collapse to one send. A transition
-writes the run file *before* it sends (``send_due``); if the process dies in between, the next ``step`` sends.
+writes the run file *before* it opens and sends (``send_due``); if the process dies in between, the next ``step``
+opens and sends.
 
 **Advance** (Decision 1): ``advance: settle`` (fix-life) moves on once the newest capture on the open phase is
 ``programs.settle_minutes`` (2) old; the hook spawns ``journal program settle <run>`` on each capture, and the
@@ -25,7 +29,8 @@ tick's ``step`` catches a lost spawn. ``advance: next`` waits for ``/next``. ``/
 phase, the settle looks for a reply that is ``YYYY-MM-DD HH:MM`` or ``HH:MM`` (``parse_confirmation``), times the
 phase's interrupt lines from it (``confirm_schedule``) and moves on; anything else is kept as his words, asked about
 once more, and schedules nothing. The interrupts live in ``run["scheduled"]`` as wall-clock times, the tick's ``step``
-sends them (``send_interrupts``: ledger prompts a reply answers, under the interrupt's key in the session's entry) and
+opens them at their time and sends them (``send_interrupts``: ledger prompts a chat reply or a face's block answers,
+under the interrupt's key in the session's entry) and
 a synthesis, when the program asks for one, is appended to the insights document there too (``synthesize``).
 
 **No model needed.** A ``reflect`` phase asks the model for its construction (validated: quotes only from his
@@ -36,6 +41,7 @@ waits on a model.
 from __future__ import annotations
 
 import contextlib
+import contextvars
 import fcntl
 import hashlib
 import html
@@ -46,7 +52,7 @@ from datetime import date, datetime, timedelta, timezone
 from datetime import time as dtime
 from pathlib import Path
 
-from . import agent, audio, compose, entries, ledger, library, mirror, notebook, outage, programdefs, prompts, validate
+from . import agent, audio, capture, compose, entries, ledger, library, mirror, notebook, outage, programdefs, prompts, validate
 from .config import Config, settle_minutes
 from .ports import ChannelError
 from .programdefs import Program
@@ -65,6 +71,28 @@ REFLECT_BUDGET = 120  # seconds of model time for a reflect phase's construction
 SLOT_WORDS = 140  # a prose slot takes his answer only when it is one short line
 SKIPPED = "_(skipped)_"
 ABOVE = "_(in the answer above)_"
+
+
+_FACE = contextvars.ContextVar("journal_programs_face", default=False)
+
+
+@contextlib.contextmanager
+def on_a_face():
+    """The transitions inside were asked for on a face (the web app spawns ``journal program … --face``), not in the
+    chat: a chat send they cause is held while a bare ``/x`` window is open, as an automatic one is, since a tap in the
+    web app is not his act in the chat. Next and Skip given there move on from a phase that is current and still owed
+    to the chat (he has it in front of him). A shell's ``journal program …`` is not a face's: it acts as the chat's
+    commands do."""
+    token = _FACE.set(True)
+    try:
+        yield
+    finally:
+        _FACE.reset(token)
+
+
+def _held_for_chat(auto: bool) -> bool:
+    """A send that a ``/x`` window holds: the engine's own (``auto``), or one a face's command causes."""
+    return auto or _FACE.get()
 
 
 class ProgramError(ValueError):
@@ -421,7 +449,8 @@ def _arrive(run: dict, s: int, p: int, renewed: datetime | None = None) -> None:
     again would otherwise settle the phase at once, on an answer he gave before going back)."""
     run["current"] = {"session": s, "phase": p}
     ph = _phase(run, s, p)
-    ph["send_due"] = True
+    ph["send_due"] = True  # (owed until ``_open`` says whether a delivery is: none with no chat)
+    ph.pop("opened_at", None)  # not current for this visit until it is opened
     ph["visit"] = ph.get("visit", 0) + 1
     if renewed is not None and ph["visit"] > 1:
         ph["reopened_at"] = _iso(renewed)
@@ -471,40 +500,47 @@ def _bridge(cfg: Config, prog: Program, run: dict, s: int, p: int, log: list[str
     return raw.strip()
 
 
-def _send_phase(cfg: Config, prog: Program, run: dict, s: int, p: int, now: datetime, log: list[str],
-                intro: str = "", auto: bool = False) -> bool:
-    """Deliver the open phase (``tick.send_prompt``: retries, ``sent.jsonl``, re-send semantics, the mirror) and
-    record it on the run. A phase is never deferred for want of a model: a reflect phase without usable model text
-    goes out with the template at once.
+def phase_opened(ph: dict) -> bool:
+    """Whether the run's phase ``ph`` is current for this visit: its ledger record is written (``_open``), so it takes
+    an answer on a face, whether or not the chat has it yet. ``_arrive`` leaves a phase unopened until ``_open``. A
+    phase from a run before OPEN-PROGRAMS has no ``opened_at``: it was opened by its delivery, so it is opened when it
+    has a prompt and no send is owed."""
+    return bool(ph.get("prompt_id")) and (bool(ph.get("opened_at")) or not ph.get("send_due"))
 
-    ``auto``: the engine is sending on its own (a settle, or the tick delivering a phase it owed), not because he
-    asked. Such a send never closes a bare ``/x`` window (``_held_off``): it is held, ``send_due`` stays set, and the
-    tick's step tries again once the window has closed. The window is asked before the model calls (a tick inside a
-    long window does not spend one on a phase it will not send) and again just before the first message goes, since
-    a reflect construction can take minutes and a ``/x`` sent meanwhile is his."""
-    from . import tick
-    if auto and _held_off(cfg, run, s, p, now, log):
-        return False
+
+def _build(cfg: Config, prog: Program, run: dict, s: int, p: int, now: datetime, log: list[str],
+           intro: str = "", made: dict | None = None) -> tuple[dict, list[str]]:
+    """The phase's ledger record and its messages (the last one is ``record["html"]``; a phase over Telegram's limit
+    goes in two or more). A reflect phase asks the model for its construction here, and a bridge is asked for when
+    ``programs.bridges`` is on: this runs in the tick or a spawned ``journal program …``, never in serve. ``made``:
+    the record as it was opened; what the model wrote then (``construction``, ``bridge``) is used again, so a delivery
+    that waited says what the web app showed, and asks no model."""
     session = prog.session(s)
     phase = session.phase(p)
     sess = _session(run, s)
     lead = session.phase(p - 1).transition if p > 1 else ""
+    made = made or {}
     note = ""
     construction = None
     if phase.type == "reflect":
-        construction, note = _construction(cfg, prog, run, s, p, log)
+        if "construction" in made:
+            construction, note = made["construction"], made.get("reflect", "")
+        else:
+            construction, note = _construction(cfg, prog, run, s, p, log)
     fallback = (f"_({cfg.names.companion} would normally build this from your answers; write it yourself if you "
                 "like.)_")
-    bridge = _bridge(cfg, prog, run, s, p, log) if phase.type == "ask" else ""
+    bridge = ""
+    if phase.type == "ask":
+        bridge = made["bridge"] if "bridge" in made else _bridge(cfg, prog, run, s, p, log)
     parts = compose.phase_parts(prog, s, p, lead=lead, construction=construction, fallback=fallback, intro=intro,
                                 fill=filler(cfg, prog, run, s),
                                 ask=confirm_request(cfg, phase, now) if phase.type == "schedule" else "")
     if bridge:
         parts.insert(0, (None, bridge))
     messages = compose.phase_messages(prog, s, p, parts, cfg.names)
-    pid = prompt_id(run["id"], s, p)
     record = {
-        "id": pid, "stem": sess["entry"], "kind": prog.id, "practice": prog.id, "program": prog.id, "run": run["id"],
+        "id": prompt_id(run["id"], s, p), "stem": sess["entry"], "kind": prog.id, "practice": prog.id,
+        "program": prog.id, "run": run["id"],
         "session": s, "phase": p, "local_date": sess.get("local_date") or now.astimezone(cfg.tz).date().isoformat(),
         "scheduled": _iso(now), "chat_id": cfg.chat_id, "title": prog.title, "session_title": session.title,
         "phase_title": phase.title, "phase_count": len(session.phases), "advance": prog.advance,
@@ -515,9 +551,148 @@ def _send_phase(cfg: Config, prog: Program, run: dict, s: int, p: int, now: date
         **({"emoji": prog.emoji} if prog.emoji else {}),
         **({"annotate": False} if not prog.annotate else {}),
         **({"reflect": note} if phase.type == "reflect" and note else {}),
+        # (what the model wrote for this visit, kept so a delivery that waits sends the same text: ``made``)
+        **({"construction": construction} if phase.type == "reflect" else {}),
+        **({"bridge": bridge} if phase.type == "ask" else {}),
+        **({"intro": intro} if intro else {}),
     }
-    if auto and _held_off(cfg, run, s, p, now, log):
+    return record, messages
+
+
+def _open(cfg: Config, run: dict, s: int, p: int, record: dict, now: datetime) -> None:
+    """Phase ``p`` of session ``s`` becomes current with no delivery (OPEN-PROGRAMS): its ledger record is written
+    with ``message_id: None`` and ``sent_at`` the moment it became current (``capture.sent_by``, ``superseded`` and
+    ``interrupted`` read it; nothing that reads the chat reads a record without ``message_id``), it is the run's one
+    open phase, and a face can answer it. Nothing goes to ``sent.jsonl``, ``send-times.json`` or the thread stamps, so
+    opening a phase is never a chat boundary. ``send_due`` is then "owed a delivery": only with a chat.
+
+    A record the chat already has (a ``/back``, a ``/start`` that takes the phase up again) keeps its message and its
+    send times; the delivery that follows (``tick.send_prompt``'s re-send) brings the new text. With no chat it gets
+    the new text now."""
+    pid = record["id"]
+    at = _iso(datetime.now(timezone.utc))
+    with ledger.locked(cfg.ledger_path) as data:
+        q = ledger.find(data, pid)
+        if q is None:
+            q = {**record, "message_id": None, "sent_at": at}
+            data["prompts"].append(q)
+        elif not q.get("message_id") or not cfg.has_channel:
+            q.update({k: v for k, v in record.items() if k not in ("id", "message_id", "sent_at")
+                      and not (k == "stem" and q.get("stem"))})
+            if not q.get("message_id"):
+                q["sent_at"] = at
+        else:  # (what this visit says, for the faces and for a delivery that waits: ``_build``'s ``made``)
+            for k in ("construction", "bridge", "reflect", "intro", "phase_text"):
+                if k in record:
+                    q[k] = record[k]
+                else:
+                    q.pop(k, None)
+        for other in data["prompts"]:  # one open phase per run
+            if other.get("run") == run["id"] and other is not q and (other.get("phase_open") or other.get("face_open")):
+                _close_one(other, at)
+        q.pop("advanced_at", None)
+        if q.get("message_id") and cfg.has_channel:
+            # its old message is in the chat: it takes his chat messages again only once it has been sent again
+            # (``_deliver``), as before; until then the phase is current on the faces alone
+            q["face_open"] = True
+        else:
+            q["phase_open"] = True
+            _span(q, True, at)
+    ph = _phase(run, s, p)
+    ph.update(prompt_id=pid, opened_at=at, send_due=cfg.has_channel)
+    run["last_activity_at"] = _iso(now)
+    _save(cfg, run)
+
+
+def _close_one(q: dict, at: str) -> None:
+    """The phase record ``q`` is no longer the run's open phase (in the chat, or on the faces)."""
+    if q.get("phase_open"):
+        q["phase_open"] = False
+        _span(q, False, at)
+    _left(q)
+
+
+def _left(q: dict) -> None:
+    """The run has moved off the phase record ``q``: it is no longer current on the faces, and a delivery the chat
+    never got is owed no more (its failed attempts would otherwise keep it in ``status``'s undelivered rows, and make a
+    later visit's delivery look given up)."""
+    q.pop("face_open", None)
+    if not q.get("message_id"):
+        q.pop("send_attempts", None)
+        q.pop("send_error", None)
+
+
+def face_open(prompt: dict | None) -> bool:
+    """A phase record a face can answer: the run's open phase (``capture.open_phase``), or one made current again
+    whose message the chat has not been sent again yet (``face_open``)."""
+    return bool(prompt) and (capture.open_phase(prompt) or bool(prompt.get("face_open")))
+
+
+def _answered_this_visit(cfg: Config, run: dict, s: int, p: int) -> bool:
+    """He has answered phase ``p`` since it was last opened (on a face: the chat cannot answer a phase it has not
+    been sent)."""
+    ph = _phase(run, s, p)
+    since = ph.get("opened_at") or ph.get("reopened_at")
+    caps = _captures(cfg, ph.get("prompt_id"))
+    return any(not since or datetime.fromisoformat(c["at"]) >= datetime.fromisoformat(since) for c in caps)
+
+
+def _given_up(cfg: Config, pid: str) -> bool:
+    """The phase's delivery used its last attempt (``tick.SEND_ATTEMPTS``, alerted then): the engine does not try it
+    again on its own."""
+    from .tick import SEND_ATTEMPTS
+    return (ledger.find(ledger.snapshot(cfg.ledger_path), pid) or {}).get("send_attempts", 0) >= SEND_ATTEMPTS
+
+
+def _send_phase(cfg: Config, prog: Program, run: dict, s: int, p: int, now: datetime, log: list[str],
+                intro: str = "", auto: bool = False) -> bool:
+    """Make the phase current (``_open``) if it is not yet, then deliver it when a delivery is owed. Returns True
+    when it is current and nothing is owed any more (delivered, or no chat).
+
+    The delivery goes through ``tick.send_prompt`` (retries, ``sent.jsonl``, re-send semantics, the mirror). A phase
+    is never deferred for want of a model: a reflect phase without usable model text goes out with the template at
+    once.
+
+    ``auto``: the engine is delivering on its own (a settle, or the tick delivering a phase it owed), not because he
+    asked. Such a delivery never closes a bare ``/x`` window (``_held_off``): it is held, ``send_due`` stays set, and
+    the tick's step tries again once the window has closed. The hold covers the delivery only: the phase is opened
+    first, so a run answered on a face moves on while the chat is off the record. A held delivery is asked about
+    before the model calls a rebuild would make, and again just before the first message goes, since a reflect
+    construction can take minutes and a ``/x`` sent meanwhile is his. An automatic delivery of a phase he has already
+    answered on a face is not made: nothing is owed."""
+    ph = _phase(run, s, p)
+    built = None
+    if not phase_opened(ph):
+        built = _build(cfg, prog, run, s, p, now, log, intro)
+        _open(cfg, run, s, p, built[0], now)
+    if ph.get("send_due") and not cfg.has_channel:  # (the chat was removed while it was owed: nothing is owed now)
+        ph["send_due"] = False
+        _save(cfg, run)
+    if not ph.get("send_due"):
+        return True
+    if auto and _answered_this_visit(cfg, run, s, p):
+        ph["send_due"] = False
+        _save(cfg, run)
+        log.append(f"{run['id']}: session {s} phase {p} was answered on a face; not sent to the chat")
+        return True
+    if auto and _given_up(cfg, ph["prompt_id"]):
+        return False  # (alerted once; his next /start, /next or /skip tries again)
+    return _deliver(cfg, prog, run, s, p, now, log, intro, auto, built)
+
+
+def _deliver(cfg: Config, prog: Program, run: dict, s: int, p: int, now: datetime, log: list[str], intro: str,
+             auto: bool, built: tuple[dict, list[str]] | None) -> bool:
+    """Send the open phase to the chat (``send_due``). ``built``: the record and messages ``_open`` was just given;
+    without them (a delivery that waited) the phase is built again."""
+    from . import tick
+    held = _held_for_chat(auto)
+    if held and _held_off(cfg, run, s, p, now, log):
         return False
+    made = ledger.find(ledger.snapshot(cfg.ledger_path), prompt_id(run["id"], s, p)) or {}
+    record, messages = built or _build(cfg, prog, run, s, p, now, log, intro or made.get("intro", ""), made=made)
+    if held and _held_off(cfg, run, s, p, now, log):
+        return False
+    pid = record["id"]
     ph0 = _phase(run, s, p)
     # the earlier parts a failed attempt already sent count only in the chat they went to (a record of them that names
     # no chat was made before CHANNELS, so on Telegram); after the channel moved they are sent again, in the new chat
@@ -541,19 +716,14 @@ def _send_phase(cfg: Config, prog: Program, run: dict, s: int, p: int, now: date
                                  refold=lambda _old: compose.folded_phase_html(record, "sent again below", cfg.names))
     if not delivered:
         return False
-    with ledger.locked(cfg.ledger_path) as data:  # one open phase per run
-        for q in data["prompts"]:
-            if q.get("run") != run["id"]:
-                continue
-            if q["id"] == pid:
-                q["phase_open"] = True
-                _span(q, True, q.get("sent_at") or _iso(datetime.now(timezone.utc)))
-                for k in ("advanced_at", "send_attempts", "send_error"):  # a later failure counts from zero again
-                    q.pop(k, None)
-                q["needs_edit"] = False
-            elif q.get("phase_open"):
-                q["phase_open"] = False
-                _span(q, False, _iso(datetime.now(timezone.utc)))
+    with ledger.locked(cfg.ledger_path) as data:
+        q = ledger.find(data, pid)
+        if q is not None:
+            q["phase_open"] = True
+            _span(q, True, q.get("sent_at") or _iso(datetime.now(timezone.utc)))
+            for k in ("advanced_at", "send_attempts", "send_error", "face_open"):  # a later failure counts from zero
+                q.pop(k, None)
+            q["needs_edit"] = False
     ph = _phase(run, s, p)
     ph.update(prompt_id=pid, sent_at=_iso(datetime.now(timezone.utc)), send_due=False)
     ph.pop("chunk_ids", None)
@@ -656,7 +826,8 @@ def _close_phases(cfg: Config, run: dict, **extra) -> None:
     """No phase of the run takes the next message any more (the run ended, expired or a session completed)."""
     with ledger.locked(cfg.ledger_path) as data:
         for q in data["prompts"]:
-            if q.get("run") == run["id"] and (q.get("phase_open") or extra):
+            if q.get("run") == run["id"] and (q.get("phase_open") or q.get("face_open") or extra):
+                q.pop("face_open", None)
                 if q.get("phase_open"):
                     q["phase_open"] = False
                     _span(q, False, _iso(datetime.now(timezone.utc)))
@@ -725,7 +896,7 @@ def start(cfg: Config, program_id: str, now: datetime, log: list[str], session: 
         newest = _capture_key(max(caps, key=lambda c: c["at"])) if caps else None
         used = f"{run['id']}:{cur['session']}:{cur['phase']}:{newest}" in (ph.get("advance_keys") or [])
         schedule_phase = prog.session(cur["session"]).phase(cur["phase"]).type == "schedule"  # (needs its confirmation)
-        if was_paused and prog.advance == "settle" and newest and not ph.get("send_due") and not used \
+        if was_paused and prog.advance == "settle" and newest and phase_opened(ph) and not used \
                 and not schedule_phase:
             # answered while on a break: carry on from there (an active run just gets the phase again, and the
             # settle or /next moves it on as usual)
@@ -808,7 +979,10 @@ def advance(cfg: Config, run_id: str, now: datetime, log: list[str], *, reason: 
         _save(cfg, run)
         return _send_current(cfg, prog, run, now, log)
     ph = _phase(run, s, p)
-    if ph.get("send_due"):
+    if not phase_opened(ph) or (ph.get("send_due") and cfg.has_channel and not _FACE.get()
+                                and not _answered_this_visit(cfg, run, s, p)):
+        # not yet current, or current and owed to the chat with no answer yet, and asked for in the chat: that is
+        # what was owed (an answer, or a command on a face, moves it on whether or not the chat has it)
         return _send_current(cfg, prog, run, now, log) if reason != "settle" else False
     key = f"{run['id']}:{s}:{p}:{capture_id or 'cmd' + str(ph.get('visit', 1))}"
     if key in (ph.get("advance_keys") or []):
@@ -829,6 +1003,7 @@ def advance(cfg: Config, run_id: str, now: datetime, log: list[str], *, reason: 
         if q is not None:
             q.update(phase_open=False, advanced_at=_iso(now), needs_edit=True)
             _span(q, False, _iso(now))
+            _left(q)
     log.append(f"{run['id']}: session {s} phase {p} → " + ("next phase" if p < len(prog.session(s).phases)
                                                              else "session complete") + f" ({reason})")
     if p < len(prog.session(s).phases):
@@ -838,7 +1013,7 @@ def advance(cfg: Config, run_id: str, now: datetime, log: list[str], *, reason: 
     else:
         sess["completion_due"] = True  # until complete_session finishes: the tick's step finishes it if this dies
         _save(cfg, run)
-        complete_session(cfg, run, s, now, log)
+        complete_session(cfg, run, s, now, log, auto=reason == "settle")
     return True
 
 
@@ -858,8 +1033,11 @@ def skip(cfg: Config, run_id: str | None, now: datetime, log: list[str], expect:
     if _moved_on(run, expect):
         log.append(f"{run['id']}: already moved on from {':'.join(str(x) for x in expect)} (skip ignored)")
         return False
-    if _session(run, s).get("status") == "in_progress" and not _phase(run, s, p).get("send_due"):
-        _phase(run, s, p)["skipped"] = True
+    ph = _phase(run, s, p)
+    if _session(run, s).get("status") == "in_progress" and phase_opened(ph) \
+            and not (ph.get("send_due") and cfg.has_channel and not _FACE.get()
+                     and not _answered_this_visit(cfg, run, s, p)):
+        ph["skipped"] = True
         _save(cfg, run)
     return advance(cfg, run["id"], now, log, reason="skip", expect=expect)
 
@@ -880,8 +1058,7 @@ def back(cfg: Config, run_id: str | None, now: datetime, log: list[str], expect:
     with ledger.locked(cfg.ledger_path) as data:
         q = ledger.find(data, _phase(run, s, p).get("prompt_id") or "")
         if q is not None:
-            q["phase_open"] = False
-            _span(q, False, _iso(now))
+            _close_one(q, _iso(now))
     _arrive(run, s, p - 1)
     _phase(run, s, p - 1)["reopened_at"] = _iso(now)
     run.update(last_activity_at=_iso(now))
@@ -966,6 +1143,8 @@ def _reconcile_sent(cfg: Config, run: dict) -> None:
         rec = snap.get(pid) or {}
         if rec.get("message_id"):
             item.update(status="sent", prompt_id=pid)
+        elif rec.get("captures"):  # opened and answered on a face before the chat had it
+            item.update(status="answered", prompt_id=pid)
         elif rec.get("send_attempts", 0) >= SEND_ATTEMPTS:
             item.update(status="failed", prompt_id=None)
 
@@ -993,7 +1172,7 @@ def settle(cfg: Config, run_id: str, now: datetime, log: list[str]) -> bool:
         return False
     s, p = run["current"]["session"], run["current"]["phase"]
     ph = _phase(run, s, p)
-    if _session(run, s).get("status") != "in_progress" or ph.get("send_due") or not ph.get("prompt_id"):
+    if _session(run, s).get("status") != "in_progress" or not phase_opened(ph):
         return False
     caps = _captures(cfg, ph["prompt_id"])
     if ph.get("reopened_at"):  # a /back: the answers from before it are not an answer to this visit
@@ -1005,7 +1184,9 @@ def settle(cfg: Config, run_id: str, now: datetime, log: list[str]) -> bool:
         return False
     if audio.transcription_enabled(cfg) and any(c.get("transcript") == "pending" for c in caps):
         return False  # an audio answer not yet transcribed: moving on now would build the next phase as if skipped
-    if _off_the_record(cfg, now):
+    if not capture.by_face(newest) and _off_the_record(cfg, now):
+        # an answer in the chat: moving on now would make his next private message the next phase's answer. An
+        # answer on a face moves the run on, and only the next phase's delivery waits for the window (``_held_off``)
         return False
     return advance(cfg, run_id, now, log, reason="settle", capture_id=_capture_key(newest), expect=(s, p))
 
@@ -1058,13 +1239,21 @@ def _plain_of(markup: str) -> str:
     return html.unescape(re.sub(r"<[^>]+>", "", markup))
 
 
-def _say(cfg: Config, prog: Program, markup: str, log: list[str], now: datetime) -> bool:
-    """A short note from the engine (not a prompt: nothing answers it). Best effort; True when it was delivered."""
+def _say(cfg: Config, prog: Program, markup: str, log: list[str], now: datetime, auto: bool = False) -> bool:
+    """A short note from the engine (not a prompt: nothing answers it). Best effort; True when it was delivered.
+    ``auto``: said on the engine's own move (a settle), which a face's answer can make while a bare ``/x`` holds the
+    chat off the record: the note is then held back, as the phase that follows is."""
+    if _held_for_chat(auto) and cfg.has_channel and _off_the_record(cfg, now):
+        log.append(f"{prog.id}: note held back: off the record (or the privacy pass cannot say)")
+        return False
     return _say_about(cfg, prog.id, markup, log, now)
 
 
 def _say_about(cfg: Config, program_id: str, markup: str, log: list[str], now: datetime) -> bool:
-    """``_say`` for a note that must not depend on the program's definition still loading."""
+    """``_say`` for a note that must not depend on the program's definition still loading. With no chat
+    (``channel.platform: none``) nothing is attempted."""
+    if not cfg.has_channel:
+        return False
     try:
         cfg.channel().send(cfg.chat_id, markup)
     except ChannelError as e:
@@ -1103,7 +1292,7 @@ def _batch(run: dict, s: int) -> int:
     """Which confirmation of session ``s`` this is: the first is 1; a later one (the session run again, or a phase
     reopened after interrupts went out) is the next, so its prompt ids are its own."""
     return 1 + max((i.get("batch", 1) for i in run.get("scheduled") or [] if i.get("session") == s
-                    and i.get("status", "pending") != "pending"), default=0)
+                    and (i.get("status", "pending") != "pending" or i.get("opened_at"))), default=0)
 
 
 def plan_interrupts(cfg: Config, prog: Program, run: dict, s: int, p: int, day: date, hour: int,
@@ -1126,7 +1315,7 @@ def plan_interrupts(cfg: Config, prog: Program, run: dict, s: int, p: int, day: 
 
 
 def confirm_schedule(cfg: Config, prog: Program, run: dict, s: int, p: int, now: datetime,
-                     log: list[str]) -> tuple[str, str]:
+                     log: list[str], auto: bool = False) -> tuple[str, str]:
     """Look for his confirmation in the open schedule phase and, when there is one, schedule the interrupts from it
     (replacing the ones of this session that have not been sent yet). Returns ``("scheduled", "")``, ``("none", "")``
     (no reply of this visit is a day and time), ``("past", why)`` (it is one, but every interrupt would be over) or
@@ -1156,6 +1345,7 @@ def confirm_schedule(cfg: Config, prog: Program, run: dict, s: int, p: int, now:
         return "none", ""
     if ends <= now:
         return "past", f"{day.isoformat()} {hour:02d}:{minute:02d}"
+    _reconcile_sent(cfg, run)  # (one opened and answered on a face, not yet noted, is kept as answered)
     keep = [i for i in run.get("scheduled") or [] if not (i.get("session") == s and i.get("status", "pending") == "pending")]
     run["scheduled"] = keep + items
     ph = _phase(run, s, p)
@@ -1171,7 +1361,7 @@ def confirm_schedule(cfg: Config, prog: Program, run: dict, s: int, p: int, now:
             at = schedule.wall_clock(cfg, i["local"])
             rows.append((i["offset"], at.strftime("%H:%M" if at.date() == first.date() else "%a %H:%M"), i["text"]))
         if _say(cfg, prog, compose.schedule_confirmed_html(rows, _day_name(first, now.astimezone(cfg.tz)), gone),
-                log, now):
+                log, now, auto=auto):
             ph["schedule_told"] = True
             _save(cfg, run)
     return "scheduled", ""
@@ -1181,7 +1371,7 @@ def _confirmed(cfg: Config, prog: Program, run: dict, s: int, p: int, now: datet
                explicit: bool) -> bool:
     """The schedule phase is being left. True: go on (the interrupts are timed, or he said ``/next`` and gets none).
     False: stay on the phase; the settle found no usable confirmation and has asked once."""
-    outcome, why = confirm_schedule(cfg, prog, run, s, p, now, log)
+    outcome, why = confirm_schedule(cfg, prog, run, s, p, now, log, auto=not explicit)
     if outcome == "scheduled":
         return True
     if explicit:  # /next or the web app's button: his own act, with nothing new to schedule
@@ -1205,7 +1395,7 @@ def _confirmed(cfg: Config, prog: Program, run: dict, s: int, p: int, now: datet
                     outcome, "I couldn't find a day and wake time in that. ")
         phase = prog.session(s).phase(p)
         if _say(cfg, prog, f"<i>{html.escape(lead, quote=False)}{html.escape(confirm_request(cfg, phase, now), quote=False)}</i>",
-                log, now):
+                log, now, auto=True):
             ph["confirm_asked"] = _iso(now)
             _save(cfg, run)
             log.append(f"{run['id']}: session {s} phase {p} waits for a day and wake time ({outcome})")
@@ -1270,6 +1460,8 @@ def send_interrupts(cfg: Config, now: datetime, log: list[str], tried: set[str] 
             rec = snap.get(pid) or {}
             if rec.get("message_id"):  # sent, and the engine died before it wrote that down
                 item.update(status="sent", prompt_id=pid)
+            elif rec.get("captures"):  # opened and answered on a face before the chat had it: nothing is owed
+                item.update(status="answered", prompt_id=pid)
             elif rec.get("send_attempts", 0) >= tick.SEND_ATTEMPTS:
                 item.update(status="failed", prompt_id=None)
             else:
@@ -1294,6 +1486,9 @@ def send_interrupts(cfg: Config, now: datetime, log: list[str], tried: set[str] 
     due: dict[str, list] = {}
     for one in schedule.oneoffs_due(cfg, now_local, sent_ids | tried):
         due.setdefault(one.run, []).append(one)
+    _open_interrupts(cfg, due, log)
+    if not cfg.has_channel:
+        return alerts  # no chat: an interrupt is opened at its time and answered on a face; nothing is sent
     if due and _off_the_record(cfg, now):
         # a send ends a bare /x window (privacy: a prompt send does), so his next private message would be filed;
         # they stay pending inside the grace window and are missed after it (``held_back`` is what makes that an
@@ -1321,6 +1516,11 @@ def send_interrupts(cfg: Config, now: datetime, log: list[str], tried: set[str] 
         try:
             prog = _program(cfg, run["program"])
             item = next(i for i in run["scheduled"] if i["id"] == newest.item["id"])
+            if (ledger.find(ledger.snapshot(cfg.ledger_path), newest.prompt_id) or {}).get("captures"):
+                item.update(status="answered", prompt_id=newest.prompt_id)  # on a face while it waited: not sent
+                log.append(f"{run['id']}: interrupt {item['n']} was answered on a face; not sent to the chat")
+                _save(cfg, run)
+                continue
             record = _interrupt_record(cfg, prog, run, item, newest.at)
             delivered = tick.send_prompt(
                 cfg, record, log, label=f"{prog.id} interrupt {item['n']}",
@@ -1337,6 +1537,34 @@ def send_interrupts(cfg: Config, now: datetime, log: list[str], tried: set[str] 
             log.append(f"{run['id']}: interrupt {newest.item['id']} not sent ({type(e).__name__}: {e})")
         _save(cfg, run)
     return alerts
+
+
+def _open_interrupts(cfg: Config, due: dict[str, list], log: list[str]) -> None:
+    """Every interrupt whose time has come is opened (OPEN-PROGRAMS): its ledger record is written with no
+    ``message_id`` and ``sent_at`` the moment it opened, so a face can answer it (``capture.add_web_block``), with or
+    without a chat, and whatever holds its delivery. Nothing is sent and nothing is a chat boundary. With no chat its
+    item reads ``open``; with one it stays ``pending`` until it is delivered (``sent``), answered on a face
+    (``answered``) or missed."""
+    at = _iso(datetime.now(timezone.utc))
+    for run_id, ones in due.items():
+        run = find_run(cfg, run_id)
+        if run is None:
+            continue
+        try:
+            prog = _program(cfg, run["program"])
+            with ledger.locked(cfg.ledger_path) as data:
+                for one in ones:
+                    item = next(i for i in run["scheduled"] if i["id"] == one.item["id"])
+                    if ledger.find(data, one.prompt_id) is None:
+                        rec = _interrupt_record(cfg, prog, run, item, one.at)
+                        data["prompts"].append({**rec, "message_id": None, "sent_at": at})
+                    item.setdefault("opened_at", at)
+                    if not cfg.has_channel:
+                        item.update(status="open", prompt_id=one.prompt_id)
+        except Exception as e:  # noqa: BLE001 - one run's trouble must not hold back the others (sent below, or not)
+            log.append(f"{run_id}: interrupts not opened ({type(e).__name__}: {e})")
+            continue
+        _save(cfg, run)
 
 
 def send_due_interrupts(cfg: Config, now: datetime, log: list[str], tried: set[str]) -> None:
@@ -1485,7 +1713,7 @@ def refresh_summary(cfg: Config, run_id: str, s: int, log: list[str]) -> bool:
     return True
 
 
-def complete_session(cfg: Config, run: dict, s: int, now: datetime, log: list[str]) -> None:
+def complete_session(cfg: Config, run: dict, s: int, now: datetime, log: list[str], auto: bool = False) -> None:
     """The session's last phase is done: fill ``## Summary`` (and the session's document) from his words into the
     entry, send it as the session-complete message with the keyboard removed, say what comes next, file the
     debrief follow-up, and, after the last session, compile the insights document."""
@@ -1514,7 +1742,7 @@ def complete_session(cfg: Config, run: dict, s: int, now: datetime, log: list[st
     run["last_activity_at"] = _iso(now)
     _save(cfg, run)
     log.append(f"{run['id']}: session {s} complete" + ("; run complete" if run["status"] == "completed" else ""))
-    _send_summary(cfg, prog, run, s, now, log, last.completion, summary, document, next_line)
+    _send_summary(cfg, prog, run, s, now, log, last.completion, summary, document, next_line, auto=auto)
     debrief = None
     if prog.debrief:
         with contextlib.suppress(library.UnknownDefinition):
@@ -1551,10 +1779,22 @@ def still_open_line(cfg: Config, prog: Program, now: datetime) -> str:
 
 
 def _send_summary(cfg: Config, prog: Program, run: dict, s: int, now: datetime, log: list[str], completion: str,
-                  summary: str, document: str, next_line: str) -> bool:
+                  summary: str, document: str, next_line: str, auto: bool = False) -> bool:
     session = prog.session(s)
     html = compose.summary_html(prog, s, completion, summary, session.document_title, document, next_line, cfg.names)
     sess = _session(run, s)
+    if not cfg.has_channel:
+        # no chat: the summary is in the entry; nothing is attempted or counted (OPEN-PROMPTS rule 6), and a chat set
+        # later does not get it (its "Next:" line would be out of date by then)
+        if not sess.get("summary_sent_at") and not sess.get("summary_unsent"):
+            sess["summary_unsent"] = "no chat"
+            _save(cfg, run)
+        return False
+    if _held_for_chat(auto) and _off_the_record(cfg, now):
+        # (a session finished by a settle or on a face while a bare /x holds the chat: no attempt is counted, and
+        # the tick's step sends it once the window has closed, ``_retry_summary``)
+        log.append(f"{run['id']}: session {s} summary held back: off the record (or the privacy pass cannot say)")
+        return False
     try:
         mid = cfg.channel().send(cfg.chat_id, html, keyboard=compose.REMOVE_KEYBOARD)
     except ChannelError as e:
@@ -1613,7 +1853,6 @@ def step(cfg: Config, now: datetime, log: list[str], *, tried: set[str] | None =
 
 def _step_run(cfg: Config, run: dict, now: datetime, log: list[str], alerts: list[str]) -> None:
     """One run's share of the tick's ``step``."""
-    from .tick import SEND_ATTEMPTS
     if run.get("status") == "completed":  # (a completed run still owes a summary its send failed)
         try:
             prog = _program(cfg, run["program"])
@@ -1639,7 +1878,7 @@ def _step_run(cfg: Config, run: dict, now: datetime, log: list[str], alerts: lis
         if sess.get("completion_due") and sess.get("status") == "in_progress":
             log.append(f"{run['id']}: session {k} was left completing; finishing it")
             try:
-                complete_session(cfg, run, int(k), now, log)
+                complete_session(cfg, run, int(k), now, log, auto=True)
             except Exception as e:  # noqa: BLE001 - tried again next tick; the log has why
                 log.append(f"{run['id']}: session {k} still cannot complete ({type(e).__name__}: {e})")
             run = find_run(cfg, run["id"]) or run
@@ -1649,27 +1888,29 @@ def _step_run(cfg: Config, run: dict, now: datetime, log: list[str], alerts: lis
     if run["status"] != "active":
         return
     s, p = run["current"]["session"], run["current"]["phase"]
-    if _session(run, s).get("status") == "in_progress" and _phase(run, s, p).get("send_due"):
-        rec = ledger.find(ledger.snapshot(cfg.ledger_path), prompt_id(run["id"], s, p)) or {}
-        if rec.get("send_attempts", 0) >= SEND_ATTEMPTS:
-            return  # given up (alerted once); his next /start, /next or /skip tries again
-        log.append(f"{run['id']}: session {s} phase {p} was owed a send; sending it")
-        _send_current(cfg, prog, run, now, log, auto=True)  # (not his act: it must not close a /x window)
-        return
-    settle(cfg, run["id"], now, log)
+    ph = _phase(run, s, p)
+    if _session(run, s).get("status") == "in_progress" and (not phase_opened(ph) or ph.get("send_due")):
+        # (a delivery given up on, alerted once, waits for his next /start, /next or /skip; the phase is still
+        # opened, and still settles on a face's answer)
+        if not phase_opened(ph) or not _given_up(cfg, prompt_id(run["id"], s, p)):
+            log.append(f"{run['id']}: session {s} phase {p} was owed a send; sending it")
+            _send_current(cfg, prog, run, now, log, auto=True)  # (not his act: it must not close a /x window)
+    settle(cfg, run["id"], now, log)  # (a held or failed delivery leaves the phase current: a face's answer settles)
 
 
 def _retry_summary(cfg: Config, prog: Program, run: dict, k: str, sess: dict, now: datetime, log: list[str],
                    alerts: list[str]) -> None:
     """Send a session's completion message again after a failed send (the same text: summary and document are
     recomputed from his words, the next-session line was kept). The failure that uses the last attempt is alerted."""
-    if sess.get("status") != "completed" or sess.get("summary_sent_at") \
+    if sess.get("status") != "completed" or sess.get("summary_sent_at") or not cfg.has_channel \
+            or sess.get("summary_unsent") \
             or sess.get("summary_attempts", 0) >= SUMMARY_ATTEMPTS:
         return  # (zero attempts is a completion that was saved but died before its message)
     session = prog.session(int(k))
     doc = fill_template(cfg, prog, run, int(k), session.document) if session.document else ""
     if not _send_summary(cfg, prog, run, int(k), now, log, session.phases[-1].completion,
-                         fill_template(cfg, prog, run, int(k), session.summary), doc, sess.get("next_line") or "") \
+                         fill_template(cfg, prog, run, int(k), session.summary), doc, sess.get("next_line") or "",
+                         auto=True) \
             and sess.get("summary_attempts", 0) >= SUMMARY_ATTEMPTS:
         alerts.append(f"{run['id']} session {k}: the completion message was not delivered after "
                       f"{SUMMARY_ATTEMPTS} attempts ({sess.get('summary_error', '')}); the summary is in the entry")
@@ -1718,14 +1959,17 @@ def _sections(cfg: Config, prog: Program, run: dict) -> list[str]:
                        key=lambda i: (i.get("local", ""), i.get("n", 0)))
         if items:
             said = entries.interrupt_answers(body) if body else {}
+            snap = ledger.snapshot(cfg.ledger_path)
             out.append(f"### {cfg.names.user_possessive_title} answers to the interrupts\n")
             for i in items:
                 at = datetime.fromisoformat(i["local"]).strftime("%a %-d %b %H:%M")
                 state = i.get("status", "pending")
-                words = said.get(i["n"]) if state == "sent" else None
+                # (answered in the chat or on a face, whatever became of its message; another confirmation's interrupt
+                # with the same number is not this one: its own record must have the answer)
+                words = said.get(i["n"]) if ledger.answers(ledger.find(snap, f"{run['id']}-{i['id']}")) else None
                 out.append(f"**Interrupt {i['n']}/{i['of']} ({i['offset']}) · {at}** — {i['text']}\n\n"
                            + (entries.demote_headings(words) if words else
-                              "_(no answer)_" if state == "sent" else
+                              "_(no answer)_" if state in ("sent", "open", "answered") else
                               "_(not yet sent)_" if state == "pending" else f"_(not sent: {state})_") + "\n")
     return out
 
@@ -1934,12 +2178,14 @@ def describe(cfg: Config, run: dict, now: datetime) -> str:
     sep = ", " if where else " — "
     state = f"{sep}phase {p}/{len(session.phases)}"
     caps = _captures(cfg, ph.get("prompt_id"))
-    if ph.get("send_due"):
+    if not phase_opened(ph):
         state += " about to be sent"
     elif caps:
         state += f" answered {_since(cfg, max(c['at'] for c in caps), now)}"
     else:
-        state += f" open since {_since(cfg, ph.get('sent_at'), now)}"
+        state += f" open since {_since(cfg, ph.get('opened_at') or ph.get('sent_at'), now)}"
+    if phase_opened(ph) and ph.get("send_due"):
+        state += ", still to be sent to the chat"  # (current on the faces; its send waits: a /x window, a failure)
     if ph.get("confirm_asked") and session.phase(p).type == "schedule":
         state += " · waiting for a day and wake time (YYYY-MM-DD HH:MM)"
     if run.get("status") == "paused":

@@ -8,7 +8,8 @@ change when the definitions became files.
 
 Resolution (``load``): built-ins first, then every ``*.md`` directly under ``cfg.practices_dir``. A user file with
 a built-in's id replaces it whole (no merging of sections: a file is a complete definition, and every key it
-leaves out takes the default below), ``enabled: false`` hides one, and a file that does not parse is reported
+leaves out takes the default below), ``enabled: false`` takes one off the schedule (every face still opens,
+writes and sends it), and a file that does not parse is reported
 as a problem while the built-in of the same id keeps working, so an editing mistake never silences a prompt.
 The library is re-read whenever a file under ``practices_dir`` changes (name, mtime or size), so an edit is
 live on the next tick and the next message without a restart.
@@ -1006,7 +1007,7 @@ def resolve(practice: Practice | str, cfg: Config | None = None) -> Practice:
 def placeholder(pid: str, title: str | None = None, emoji: str = "") -> Practice:
     """A stand-in for a practice the library no longer has (renamed, deleted or broken since a prompt was sent):
     enough to fold that prompt's message and to title an entry for a late reply. No questions, no schedule;
-    never sent (it is disabled)."""
+    never scheduled (it is disabled), and not in the library, so nothing resolves it to send."""
     return Practice(id=pid, kind=PRACTICE, title=title or pid, emoji=emoji, schedule=(), sections=(),
                     collapse_hours=float(DEFAULTS["collapse_hours"]), annotate=True, closes=None,
                     opener={"mode": "plain", "shape": DEFAULTS["opener.shape"], "limit": DEFAULTS["opener.limit"],
@@ -1041,6 +1042,22 @@ def question_snapshot(practice: Practice) -> list[dict]:
     out = [{"id": q.id, "text": q.text, "section": title} for title, qs in practice.sections for q in qs]
     size = sum(len(q["id"]) + len(q["text"]) + len(q["section"] or "") for q in out)
     return out if size <= SNAPSHOT_MAX_CHARS else []
+
+
+def record_fields(p: Practice) -> dict:
+    """What a prompt record carries about its practice beyond ``kind``. Nothing for a built-in, so the rituals'
+    records are what they always were (and ``windows.collapse_hours`` keeps governing them); a practice of his own
+    records its title (a fold or a late reply still has it if the file is renamed or deleted), its window, and
+    ``annotate: false`` when it asks for no annotations. A delivery (``tick.send_due``) and his first words on a face
+    (``actions.answer``) write the same."""
+    out: dict = {}
+    if not p.builtin:
+        out.update(title=p.title, collapse_hours=p.collapse_hours)
+        if p.emoji:
+            out["emoji"] = p.emoji
+    if not p.annotate:
+        out["annotate"] = False
+    return out
 
 
 def snapshot_sections(record: Mapping | None) -> tuple[tuple[str | None, tuple[Question, ...]], ...] | None:

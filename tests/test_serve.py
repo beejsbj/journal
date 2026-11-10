@@ -572,6 +572,7 @@ class ReadRoutesTest(ServeCase):
         week = got.pop("week")
         self.assertEqual(got.pop("voices"), {"his": "Sam", "hers": "Ada"})   # the two voices, named as the document names them
         self.assertIsNone(got.pop("location_source"))   # no place named by OpenStreetMap: no credit to show
+        self.assertIs(got.pop("chat"), True)   # a chat to send to (Send to chat)
         self.assertEqual(got, json.loads(json.dumps(today.collect(self.cfg, NOW, stems=True))))   # the block's dict
         for row in got["practices"]["rows"]:      # plus the stems the web app links by, and nothing else
             row.pop("stem", None)

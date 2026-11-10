@@ -70,6 +70,16 @@ Steps 2–4 work on the **journal day** of `at`: its local date, except that wor
 (a new setting, default `04:00`) belong to the day before. So a 21:00 evening with a two-hour window, missed by
 00:30, takes that answer from step 2, and tonight's evening is left alone.
 
+A deliberate delivery (`/start <id>`, `journal send <id>`, *Send to chat*) made before `day_ends_at` is the
+exception: its slot is of today's calendar date, not the previous journal day (the owner, 2026-11-09). The same steps
+run over today's slots only, so `/start morning` at 03:30 delivers today's morning (its 06:00 slot, early), and the
+tick's 06:00 send is then done. Words he writes at 03:30 still go to the journal day before. The exception has its
+own limit: when the practice's nearest scheduled slot is last night's, the delivery resolves as words do. `/start
+evening` at 00:30 means last night's 23:00 evening, 1.5 hours behind, not tonight's, 22.5 hours ahead: it sends last
+night's again while that is unanswered, and makes an extra entry of last night once it is answered. Tonight's send
+is left alone. A tie, and a practice with no schedule, are today's; with no slot on today's date, last night's counts when it is
+under twelve hours behind.
+
 1. A slot of that practice that is **due or open** now, today's or yesterday's, newest first, whose time is at or
    before `at`. An evening answer at 00:30 takes last night's slot.
 2. Else the journal day's newest slot that is **missed and unanswered**, whose time is at or before `at`. The chat's fold
@@ -125,6 +135,10 @@ snapshot and the stem.
    annotation replies, reflection sends, program summaries (`programs._send_summary`, `_retry_summary`), the
    program notes `programs._say_about` and `cli._notify`, and the `status` rows built on them
    (`pending_annotation_replies`, `undelivered`). With a channel configured, all of it behaves exactly as today.
+   An annotation reply or a reflection that would have been sent is marked skipped, `no chat`, so a chat configured
+   later never sends it, as a program's summary is (`summary_unsent: "no chat"`); instead `standing` tells the
+   companion how many were written while there was no chat since the last delivered prompt, in counts, never their
+   words (the owner, 2026-11-09).
 7. **Privacy.** Saving words on a face writes nothing to `sent.jsonl`, `send-times.json` or the thread stamps
    (`today.note_send`, `last_send`), so it never ends a bare `/x` window or starts a thread. `conversations._send_times`
    and `privacy.send_times` keep their own reading (delivered records and every `sent.jsonl` line) and do not move

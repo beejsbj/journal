@@ -15,6 +15,9 @@
  *    when the page was already shown the kept copy), and any `logout` request, empty the data caches (the page does the
  *    same on its side, `offline.ts`). An answer that was in flight when the caches were emptied is not stored when it
  *    lands: it was read under the session that has just ended.
+ *
+ * And for Web Push (`nudge`, `openTarget`): a push shows the practice's title and "due now", and a tap opens
+ * `/today?write=<id>` on this site; the payload is read as data, never as an address to open.
  */
 
 export const API = "/api/v1/";
@@ -223,4 +226,98 @@ export function respond(request: Request, env: Env): Promise<Response> | undefin
     default:
       return undefined;
   }
+}
+
+// ── Web Push ─────────────────────────────────────────────────────────────
+
+/** Where a notification opens: Today with that practice ready to write, or Today. Only a path of this site: the
+ *  payload names a practice id, never an address. */
+export function writeUrl(practice: unknown): string {
+  return typeof practice === "string" && practice ? `/today?write=${encodeURIComponent(practice)}` : "/today";
+}
+
+/** A notification as the worker shows it. */
+export interface Nudge {
+  title: string;
+  options: { body: string; tag: string; renotify: boolean; icon: string; badge: string; data: { url: string } };
+}
+
+/** What a push says, from the server's payload (`serve/push.py`: the practice's title, "due now" and its id). A payload
+ *  that is not that shape still shows something plain: a push the worker received must show a notification. One per
+ *  practice at a time (`tag`): a newer one replaces an older one still showing. */
+export function nudge(data: unknown): Nudge {
+  const p = data !== null && typeof data === "object" ? (data as Record<string, unknown>) : {};
+  const practice = typeof p.practice === "string" && p.practice ? p.practice : "";
+  const known = typeof p.title === "string" && p.title !== "";
+  return {
+    title: known ? (p.title as string) : "Journal",
+    options: {
+      body: known && typeof p.body === "string" && p.body ? p.body : "A practice is due",
+      tag: practice ? `practice:${practice}` : "practice",
+      renotify: true,   // a newer one replacing one still showing (last night's, or a second slot) alerts again
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      data: { url: known ? writeUrl(practice) : "/today" },
+    },
+  };
+}
+
+/** The worker's `clients`, as far as a tap needs it. */
+export interface ClientsLike {
+  matchAll(options?: { type?: string; includeUncontrolled?: boolean }): Promise<ReadonlyArray<{
+    url: string;
+    focus(): Promise<unknown>;
+    navigate?(url: string): Promise<unknown>;
+  }>>;
+  openWindow(url: string): Promise<unknown>;
+}
+
+/** A tap on a notification: an open page of the app comes forward and goes to `url`, else the app opens there. `url`
+ *  must be a path of this site; anything else opens Today. */
+export async function openTarget(url: unknown, clients: ClientsLike, origin: string): Promise<void> {
+  let target = `${origin}/today`;
+  if (typeof url === "string" && url.startsWith("/") && !url.startsWith("//")) {
+    const parsed = new URL(url, origin);
+    if (parsed.origin === origin) target = parsed.href;
+  }
+  const open = (await clients.matchAll({ type: "window", includeUncontrolled: true }))
+    .filter((c) => c.url.startsWith(`${origin}/`) || c.url === origin);
+  const page = open[0];
+  if (page) {
+    // focus first: a browser lets the worker focus a page only just after the tap, and navigating waits for a load
+    await page.focus().catch(() => undefined);
+    try {
+      if (!page.navigate) throw new TypeError("no navigate");
+      await page.navigate(target);
+      return;
+    } catch {
+      // a page the worker does not control cannot be navigated: open the address beside it
+    }
+  }
+  await clients.openWindow(target);
+}
+
+/** What `renew` needs of the worker: its push manager's `subscribe`, and `fetch`. */
+export interface RenewEnv {
+  subscribe(options: { userVisibleOnly: boolean; applicationServerKey: BufferSource }): Promise<{ toJSON(): unknown }>;
+  fetch(url: string, init: RequestInit): Promise<Response>;
+}
+
+/** `pushsubscriptionchange`: the browser replaced this device's subscription (Firefox rotates them). The server is
+ *  given the new one (the browser's, else one made again with the old one's key) and told to drop the old, so pushes
+ *  do not stop until he next opens Settings. Signed in by the page's cookie, as every request from the worker is. */
+export async function renew(
+  old: { endpoint: string; options?: { applicationServerKey?: BufferSource | null } } | null,
+  fresh: { toJSON(): unknown } | null,
+  env: RenewEnv,
+): Promise<void> {
+  let sub = fresh;
+  const key = old?.options?.applicationServerKey;
+  if (!sub && key) sub = await env.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+  const send = (method: string, body: unknown) => env.fetch(`${API}push/subscriptions`, {
+    method, credentials: "same-origin", headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (sub) await send("POST", sub.toJSON());
+  if (old) await send("DELETE", { endpoint: old.endpoint });
 }

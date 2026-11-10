@@ -43,8 +43,8 @@ def window(cfg: Config, prompt: dict) -> timedelta:
 
 def open_phase(prompt: dict, at: datetime | None = None) -> bool:
     """A program phase that is (``at``: was, at that moment) the open phase of its run: it takes more than one
-    message. ``programs`` sets ``phase_open`` when the phase is sent and clears it when the run moves on or goes on a
-    break, keeping the spans in between (``open_spans``) for the sweep, which asks about a message's own time."""
+    message. ``programs`` sets ``phase_open`` when the phase becomes current (``programs._open``; a record the chat
+    already has, when it is sent again) and clears it when the run moves on or goes on a break, keeping the spans in between (``open_spans``) for the sweep, which asks about a message's own time."""
     if not prompt.get("program"):
         return False
     if at is not None and prompt.get("open_spans") is not None:  # when it was open, send to close (programs._span)
@@ -224,6 +224,14 @@ def capture_to(cfg: Config, pid: str, rule: str, text: str, now: datetime,
 # ── the web app's writes (``journal serve``): the same entries, the same ledger lock ─────────────────────────────
 
 WEB_RULE = "web"   # the capture rule of a reply written from the web app to a practice's open prompt
+def by_face(c: dict | None) -> bool:
+    """A capture of words saved on a face (the web app, the CLI, MCP: its ``via``), not of a chat message. Rules 9 and
+    10 of OPEN-PROMPTS set these apart; a chat capture without a platform message id, or one the sweep or the
+    conversation writer made, is not one."""
+    via = c.get("via") if isinstance(c, dict) else None
+    return isinstance(via, str) and via in entries.FACES  # (a damaged record never raises)
+
+
 WEB_VIA = "web"    # ``captures[].via``: where the web app's captures came from, whatever their source
 MCP_VIA = "mcp"    # the same for ``journal mcp`` (an MCP client): rule, source and via all say ``mcp``
 
@@ -315,7 +323,8 @@ class PhaseClosed(Exception):
 
 def add_web_block(cfg: Config, stem: str, text: str, now: datetime, *, media: str | None = None, ext: str = ".ogg",
                   meta: dict | None = None, client_id: str | None = None, phase_prompt: str | None = None,
-                  key_of: Callable[[Path], str | None] | None = None) -> dict:
+                  interrupt_prompt: str | None = None, key_of: Callable[[Path], str | None] | None = None,
+                  via: str = WEB_VIA) -> dict:
     """Append a block of his words to the engine entry ``stem`` (the caller has checked it is the engine's own
     file). Through the entry's ledger prompt when it still has one, so the tick sees the reply (annotations wait on
     the first one); otherwise straight into the file. Nothing already in the file is touched. A repeated
@@ -328,8 +337,14 @@ def add_web_block(cfg: Config, stem: str, text: str, now: datetime, *, media: st
     session entry, and the answer goes where ``entry_stem`` says); otherwise
     ``PhaseClosed`` and nothing is written. Moving the run on is the caller's: the settle or ``/next``.
 
+    ``interrupt_prompt``: the ledger id of a session's interrupt that has opened (``programs._open_interrupts``, at
+    its time, delivered to the chat or not). The block is his answer to it, keyed ``%% journal interrupt:N %%`` as a
+    reply to it in the chat is; it moves nothing. ``PhaseClosed`` when it has not opened.
+
     ``key_of(path)`` names the block just written (the web document's key for it); it is called under the lock and
-    its answer kept with the capture, so a retry returns the first block's key even after others were added."""
+    its answer kept with the capture, so a retry returns the first block's key even after others were added.
+
+    ``via``: the face writing (``web``; ``cli`` for ``journal write --entry``), the block's rule, source and via."""
     with ledger.locked(cfg.ledger_path) as data:
         done = ledger.capture_of_client(data, client_id)
         if done:
@@ -339,22 +354,28 @@ def add_web_block(cfg: Config, stem: str, text: str, now: datetime, *, media: st
         for cid in [k for k, v in seen.items() if _stale(v)]:
             del seen[cid]
         if client_id and client_id in seen:
-            return {"path": str(entries.entry_path(cfg.root, seen[client_id]["stem"])), "rule": WEB_RULE,
+            return {"path": str(entries.entry_path(cfg.root, seen[client_id]["stem"])), "rule": via,
                     "untracked": True, "duplicate": True, "block": seen[client_id].get("block")}
         if phase_prompt is not None:
             prompt = ledger.find(data, phase_prompt)
-            if prompt is None or not open_phase(prompt):
+            # (open: in the chat, or current on the faces while its message waits to be sent again, ``face_open``)
+            if prompt is None or not (open_phase(prompt) or prompt.get("face_open")):
                 raise PhaseClosed(phase_prompt)
-            return _web_record(cfg, data, prompt, WEB_RULE, text, now, client_id, media, ext, meta, key_of)
+            return _web_record(cfg, data, prompt, via, text, now, client_id, media, ext, meta, key_of, via=via)
+        if interrupt_prompt is not None:
+            prompt = ledger.find(data, interrupt_prompt)
+            if prompt is None or not prompt.get("interrupt"):
+                raise PhaseClosed(interrupt_prompt)
+            return _web_record(cfg, data, prompt, via, text, now, client_id, media, ext, meta, key_of, via=via)
         prompt = prompt_of_entry(data, stem)
         if prompt is not None:
-            return _web_record(cfg, data, prompt, WEB_RULE, text, now, client_id, media, ext, meta, key_of)
+            return _web_record(cfg, data, prompt, via, text, now, client_id, media, ext, meta, key_of, via=via)
         path = entries.entry_path(cfg.root, stem)
         kept = jaudio.keep(cfg, media, str(path), ext) if media else None
         # no ledger prompt, so no capture for the tick to find: an audio file here is kept but not transcribed
         words = text.strip() or (jaudio.NOT_TRANSCRIBED if kept else "")
         try:
-            entries.record_reply(cfg.root, {"stem": stem}, words, now.astimezone(cfg.tz), "audio" if kept else "web",
+            entries.record_reply(cfg.root, {"stem": stem}, words, now.astimezone(cfg.tz), "audio" if kept else via,
                                  kept, cfg.names, meta)
         except BaseException:
             if kept:
@@ -363,7 +384,7 @@ def add_web_block(cfg: Config, stem: str, text: str, now: datetime, *, media: st
         key = block_key(key_of, path)
         if client_id:
             seen[client_id] = {"stem": stem, "at": datetime.now(timezone.utc).isoformat(), **({"block": key} if key else {})}
-        return {"path": str(path), "rule": WEB_RULE, "untracked": True, **({"block": key} if key else {})}
+        return {"path": str(path), "rule": via, "untracked": True, **({"block": key} if key else {})}
 
 
 def client_seen(data: dict, client_id: str, blocks: bool = True) -> bool:
@@ -471,13 +492,21 @@ OFF_RECORD_END = "it stays out of the journal.]"
 OFF_RECORD = re.compile(r"\[Off the record — .*?" + re.escape(OFF_RECORD_END) + r"\s*", re.S)
 
 
-def stored_opener(cfg: Config, record: dict | None) -> str | None:
+def sent_opener(record: dict | None) -> str | None:
+    """The opener the chat message says: ``sent_opener`` when a delivery attached to a record his words on a face
+    made (the record keeps its own ``opener``, OPEN-PROMPTS rule 3), else the record's ``opener``."""
+    rec = record or {}
+    return rec.get("sent_opener") if "sent_opener" in rec else rec.get("opener")
+
+
+def stored_opener(cfg: Config, record: dict | None, sent: bool = False) -> str | None:
     """The opener a send record holds, for a reader that shows it again (the web app, a Telegram fold), or None.
     It is her text, written by the tick's model call. The check is narrow, and is not a privacy pass: it catches a
     literal echo, an opener with a line that starts with the opt-out command or that holds the engine's
     off-the-record notice, and then withholds the whole opener. It cannot tell whether the model drew on something
-    said off the record and put it in other words; what keeps that out is what the tick gives the model."""
-    text = (record or {}).get("opener")
+    said off the record and put it in other words; what keeps that out is what the tick gives the model.
+    ``sent``: the opener of the chat message (``sent_opener``), for a reader of the message (the fold)."""
+    text = sent_opener(record) if sent else (record or {}).get("opener")
     if not isinstance(text, str) or not text.strip():
         return None
     if opt_out(cfg, text) is not None or opt_out_inside(cfg, text) or OFF_RECORD.search(text):

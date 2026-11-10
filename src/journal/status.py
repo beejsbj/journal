@@ -63,7 +63,8 @@ def status(cfg: Config, now: datetime | None = None, *, web: bool = False) -> di
     now_local = now.astimezone(cfg.tz)
     data = ledger.snapshot(cfg.ledger_path)
     prompts = data["prompts"]
-    sent_ids = {p["id"] for p in prompts if p.get("message_id")}
+    # done: delivered, or answered on any face (OPEN-PROMPTS rule 1), so a slot done in the web app is not due
+    sent_ids = {p["id"] for p in prompts if p.get("message_id") or p.get("captures")}
     visible, pending_ann, pending_reply, failed = [], [], [], []
     for p in prompts:
         if p.get("message_id") and not p.get("collapsed_at") and p.get("sent_at") \
@@ -74,9 +75,12 @@ def status(cfg: Config, now: datetime | None = None, *, web: bool = False) -> di
                 and _annotations_pending(p.get("entry_path")):
             pending_ann.append(p["id"])
         r = p.get("annotation_reply") or {}
-        if p.get("annotated_at") and not r.get("message_id") and cfg.telegram.get("annotation_replies", True):
+        if p.get("annotated_at") and not r.get("message_id") and not r.get("skipped") \
+                and cfg.telegram.get("annotation_replies", True) \
+                and cfg.has_channel:  # (no chat: no reply is ever attempted, so none is pending; skipped: never)
             pending_reply.append({"id": p["id"], "attempts": r.get("attempts", 0), "error": r.get("error")})
-        if p.get("send_attempts") and not p.get("message_id"):
+        if p.get("send_attempts") and not p.get("message_id") and not p.get("captures") and cfg.has_channel:
+            # (a failed send he has since answered on a face is owed nothing: OPEN-PROMPTS)
             failed.append({"id": p["id"], "attempts": p["send_attempts"], "error": p.get("send_error")})
     waiting = []  # work parked by an unreachable model or speech-to-text backend (see outage.py)
     for p in prompts:
@@ -104,6 +108,7 @@ def status(cfg: Config, now: datetime | None = None, *, web: bool = False) -> di
         "due_now": [k for k, _ in schedule.due(cfg, now_local, sent_ids)],
         "next": next_occurrences(cfg, now_local),
         "open_prompts": visible,
+        "slots": _slots_today(cfg, now),
         "pending_annotations": pending_ann,
         "pending_annotation_replies": pending_reply,
         "deferred": waiting,
@@ -127,6 +132,18 @@ def status(cfg: Config, now: datetime | None = None, *, web: bool = False) -> di
         for key in ("conversations", "mirror_queued", "notebook_open", "hook_state"):
             out.pop(key)
     return out
+
+
+def _slots_today(cfg: Config, now: datetime) -> list[dict]:
+    """Today's slots and their states (``slots.day``): ``[{id, practice, state, via?}]``; [] when they cannot be
+    read."""
+    from . import slots
+    try:
+        return [{"id": s.id, "practice": s.practice, "state": s.state,
+                 **({"via": s.record["opened_via"]} if (s.record or {}).get("opened_via") else {})}
+                for s in slots.day(cfg, now.astimezone(cfg.tz).date().isoformat(), now)]
+    except Exception:  # noqa: BLE001 - status reads state; one bad record must not take it down
+        return []
 
 
 def _program_runs(cfg: Config, now: datetime) -> list[dict]:
@@ -166,7 +183,7 @@ def _reflections(cfg: Config, data: dict) -> dict:
         tg = r.get("telegram") or {}
         rows.append({"id": r.get("id"), "written": bool(r.get("written_at")), "trigger": r.get("trigger"),
                      "attempts": r.get("attempts", 0), "error": r.get("error"),
-                     "sent": bool(tg.get("message_id")), "send_error": tg.get("error")})
+                     "sent": bool(tg.get("message_id")), "send_error": tg.get("skipped") or tg.get("error")})
     on = {k: (cfg.reflections.get(k) or {}).get("enabled", True) is not False for k in ("day", "week")}
     return {"day_enabled": on["day"], "week_enabled": on["week"], "recent": rows}
 
@@ -238,6 +255,10 @@ def format_status(s: dict) -> str:
         lines.append("Last run: none recorded")
     lines.append("Due now: " + (", ".join(s["due_now"]) or "nothing"))
     lines.append("Next: " + (", ".join(f"{k} {v}" for k, v in s["next"].items()) or "nothing scheduled"))
+    if s.get("slots"):
+        lines.append("Today: " + " · ".join(
+            f"{x['id']} {x['state']}" + (f" ({entries.FACES.get(x['via'], x['via'])})" if x.get("via") else "")
+            for x in s["slots"]))
     lines.append("Open prompts: " + (", ".join(f"{p['id']}{' (answered)' if p['answered'] else ''}"
                                                for p in s["open_prompts"]) or "none"))
     if s["pending_annotations"]:
@@ -306,6 +327,9 @@ def _channel_row(cfg: Config) -> tuple[str, str, str]:
     where = f"{cfg.platform}:{cfg.chat_id}" if cfg.chat_id else f"{cfg.platform} (no chat set)"
     if cfg.owner_ids:
         where += f", from {', '.join(cfg.owner_ids)}"
+    if not cfg.has_channel:
+        return ("channel", "ok", "none: no chat on purpose (channel.platform: none); practices are done in the web "
+                                 "app, the CLI or MCP, and nothing is sent")
     if cfg.platform == "telegram":
         return ("channel", "ok" if cfg.chat_id else "fail", f"{where}; sent through the Telegram Bot API")
     if cfg.adapter == "none":
@@ -453,8 +477,15 @@ def transcript_sample(cfg: Config) -> tuple[str, str, str]:
 
 def serve_rows(cfg: Config, token: bool = True) -> list[tuple[str, str, str]]:
     """``journal serve``'s rows: its token (``token``: resolved, never shown), whether its bind address exists on
-    this host, the web app build, and whether this code is the code the tick last ran (two installs, one pin)."""
-    from .serve import auth, static
+    this host, the web app build, and whether this code is the code the tick last ran (two installs, one pin). An
+    install without ``journal serve`` (the engine alone) has one row saying so."""
+    try:
+        from .serve import auth, static
+    except ImportError as e:
+        if isinstance(e, ModuleNotFoundError) and e.name == f"{__package__}.serve":
+            return [("serve", "ok", "journal serve is not part of this install"), version_row(cfg)]
+        # (serve is here but does not import: a broken install, never "not part of it")
+        return [("serve", "fail", f"journal serve does not import: {type(e).__name__}: {e}"), version_row(cfg)]
     rows = []
     if token:
         tok, where = auth.resolve_token(cfg)
@@ -468,6 +499,7 @@ def serve_rows(cfg: Config, token: bool = True) -> list[tuple[str, str, str]]:
         del tok
     rows.append(_bind_row(cfg))
     rows += _socket_rows(cfg)
+    rows.append(_push_row(cfg))
     if static.built(cfg):
         info = static.build_info(cfg)
         detail = f"web app in {static.assets_dir(cfg)}" + (f" (built from web/ {info['source'][:12]})" if info else "")
@@ -485,6 +517,23 @@ def serve_rows(cfg: Config, token: bool = True) -> list[tuple[str, str, str]]:
                                            "(pairing only) is served"))
     rows.append(version_row(cfg))
     return rows
+
+
+def _push_row(cfg: Config) -> tuple[str, str, str]:
+    """``serve push``: whether the extra is installed, the VAPID keys, how many devices are subscribed, and whether
+    this journal pushes (``push.when``). Reads ``serve-push.json`` only; makes nothing."""
+    from .serve import push, webpush
+    if not webpush.available():
+        return ("serve push", "ok", "off: Web Push needs the optional extra journal[push] (uv tool install --force "
+                                    "'journal[push]'); without it Settings says push is unavailable")
+    if push.keys(cfg, create=False) is None:
+        return ("serve push", "ok", "journal[push] installed; no keys yet: journal serve makes them at its first start")
+    n = len(push.subscriptions(cfg))
+    detail = f"{n} device{'' if n == 1 else 's'} subscribed; push.when {push.when(cfg)}"
+    if not push.active(cfg):
+        return ("serve push", "warn" if n else "ok", detail + ": this journal has a chat, so nothing is pushed (set "
+                                                             "push.when to always to push its slots too)")
+    return ("serve push", "ok", detail)
 
 
 def _bind_row(cfg: Config) -> tuple[str, str, str]:

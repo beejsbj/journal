@@ -12,24 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ..agent import CommandCompanion
-
-# Hermes' user-facing failure copy (locales/en.yaml ``gateway.*``: generic_failed, unreachable,
-# connection_interrupted, provider_kept_failing, no_credentials, no_response …) opens with a warning
-# sign and points at /retry, `hermes doctor` or `hermes logs`; provider rejections add "Provider said:".
-_FAILURE_MARKS = ("⚠", "⏱")
-_FAILURE_PHRASES = ("(`hermes logs`)", "`hermes doctor` on the host", "use /retry", "provider said:",
-                    "couldn't finish this reply")
-
-
-def is_failure_text(text: str | None) -> bool:
-    """Whether ``text`` is Hermes reporting a failure rather than a model answer."""
-    t = (text or "").strip()
-    if not t:
-        return False
-    if t.startswith(_FAILURE_MARKS):
-        return True
-    low = t.lower()
-    return len(t) < 800 and any(p in low for p in _FAILURE_PHRASES)
+from ..agent import is_failure_text  # noqa: F401 - Hermes' failure copy, kept in the engine (it runs without Hermes)
 
 
 class HermesCompanion(CommandCompanion):

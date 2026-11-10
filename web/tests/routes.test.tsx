@@ -86,7 +86,7 @@ describe("Today", () => {
     expect(reply.querySelector(".words")?.textContent).toContain("The ferry was late");
     expect(answered.querySelector(".prompt")?.contains(reply)).toBe(false);   // never inside her message
     expect(upcoming.querySelector(".prompt")).toBeNull();   // not sent yet: nothing to show
-    expect([...missed.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Reply", "Send now"]);
+    expect([...missed.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Write now", "Send to chat"]);
   });
 
   it("credits OpenStreetMap under the place while it named it, quietly, and not otherwise", async () => {
@@ -115,7 +115,7 @@ describe("Today", () => {
     const missed = must(host.querySelector<HTMLElement>("li.practice.missed"));
     expect(missed.querySelector(".pill")?.textContent).toBe("came at 06:00");
     expect(missed.querySelector(".prompt")).toBeNull();
-    expect([...missed.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Reply", "Send now"]);
+    expect([...missed.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Write now", "Send to chat"]);
   });
 
   it("falls back to the pairing screen on a 401", async () => {
