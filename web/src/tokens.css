@@ -133,12 +133,16 @@
   --z-toast: 90;
 
   /* ---- motion ---- */
+  --d-0: 60ms;    /* a beat: a delay behind something else, a stagger step */
   --d-1: 120ms;   /* press, hover */
   --d-2: 200ms;   /* colour, small fades */
   --d-3: 340ms;   /* chevrons, knobs */
   --d-4: 480ms;   /* push, recede */
   --d-bloom: 640ms; /* the write room opening */
   --d-ink: 700ms; /* her ink flowing to a new colour */
+  --d-5: 1.2s;    /* a long settle: a strip filling, a ring passing */
+  --d-loop: 1.6s; /* a quiet loop: the skeleton's shimmer, the caret's blink */
+  --d-breath: 2.8s; /* the room's orb breathing while it waits */
   --stagger: 28ms;
   --e-out: cubic-bezier(0.16, 1, 0.3, 1);        /* arrivals */
   --e-inout: cubic-bezier(0.65, 0, 0.35, 1);     /* both ends matter */
@@ -252,9 +256,9 @@
 /* ---- her four inks (Folio's set; settings and ink.ts offer them). Set on <html data-ink>, and on any element that
    shows an ink of its own (a swatch carries data-ink, and data-theme too when it shows the other scheme) ---- */
 [data-ink="blue-black"] { --her: #28367f; }
-[data-ink="brown"] { --her: #7a4519; }
+[data-ink="brown"] { --her: #6e3c14; }
 [data-ink="violet"] { --her: #4b2a8a; }
-[data-ink="green"] { --her: #1b5642; }
+[data-ink="green"] { --her: #1a523f; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"])[data-ink="blue-black"], :root:not([data-theme="light"]) [data-ink="blue-black"] { --her: #b6c0ff; }
   :root:not([data-theme="light"])[data-ink="brown"], :root:not([data-theme="light"]) [data-ink="brown"] { --her: #dcab78; }
@@ -265,6 +269,16 @@
 [data-theme="dark"][data-ink="brown"], [data-theme="dark"] [data-ink="brown"] { --her: #dcab78; }
 [data-theme="dark"][data-ink="violet"], [data-theme="dark"] [data-ink="violet"] { --her: #d2b4ff; }
 [data-theme="dark"][data-ink="green"], [data-theme="dark"] [data-ink="green"] { --her: #8fd3b4; }
+/* a swatch that names its own scheme wins over the page's (a light swatch on a dark page, /design and Settings' proof):
+   the element's own [data-ink][data-theme] pair outranks any rule that reached it through an ancestor */
+[data-ink="blue-black"][data-theme="light"][data-theme] { --her: #28367f; }
+[data-ink="brown"][data-theme="light"][data-theme] { --her: #6e3c14; }
+[data-ink="violet"][data-theme="light"][data-theme] { --her: #4b2a8a; }
+[data-ink="green"][data-theme="light"][data-theme] { --her: #1a523f; }
+[data-ink="blue-black"][data-theme="dark"][data-theme] { --her: #b6c0ff; }
+[data-ink="brown"][data-theme="dark"][data-theme] { --her: #dcab78; }
+[data-ink="violet"][data-theme="dark"][data-theme] { --her: #d2b4ff; }
+[data-ink="green"][data-theme="dark"][data-theme] { --her: #8fd3b4; }
 
 /* ---- made from her ink, wherever an ink or a theme is set, so a swatch carries its own grades ---- */
 :root, [data-ink], [data-theme] {
@@ -280,7 +294,7 @@ html { transition: --her var(--d-ink) var(--e-inout); }
 
 /* ---- reduced motion: every duration becomes instant (base.css stops the rest) ---- */
 @media (prefers-reduced-motion: reduce) {
-  :root { --d-1: 1ms; --d-2: 1ms; --d-3: 1ms; --d-4: 1ms; --d-bloom: 1ms; --d-ink: 1ms; --spring-dur: 1ms; --spring-soft-dur: 1ms; --stagger: 0ms; }
+  :root { --d-0: 0ms; --d-1: 1ms; --d-2: 1ms; --d-3: 1ms; --d-4: 1ms; --d-bloom: 1ms; --d-ink: 1ms; --d-5: 1ms; --d-loop: 1ms; --d-breath: 1ms; --spring-dur: 1ms; --spring-soft-dur: 1ms; --stagger: 0ms; }
 }
 
 /* ---- phone ---- */

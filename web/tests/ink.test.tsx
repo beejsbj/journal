@@ -128,11 +128,23 @@ describe("her inks", () => {
         const letter = mixSrgb(ink, ground("letter"), wash);
         for (const g of GROUNDS) expect(contrast(ink, ground(g)), `${id} on ${mode} ${g}`).toBeGreaterThanOrEqual(4.5);
         expect(contrast(ink, letter), `${id} on its wash, ${mode}`).toBeGreaterThanOrEqual(4.5);
+        // the softer grade (her labels and times) is made against the pane and may stand on any ground, as the ink can
         const softer = mixOklab(ink, ground("pane"), soft);
-        expect(contrast(softer, ground("pane")), `${id} soft on ${mode} pane`).toBeGreaterThanOrEqual(4.5);
+        for (const g of GROUNDS) expect(contrast(softer, ground(g)), `${id} soft on ${mode} ${g}`).toBeGreaterThanOrEqual(4.5);
         expect(contrast(softer, letter), `${id} soft on its wash, ${mode}`).toBeGreaterThanOrEqual(4.5);
       }
     }
+  });
+});
+
+describe("a swatch that names its scheme", () => {
+  it("carries that scheme's value of its ink, whatever the page's scheme (its own pair outranks the page's rules)", () => {
+    for (const [id, v] of inks) {
+      expect(tokens, `${id} light swatch`).toContain(`[data-ink="${id}"][data-theme="light"][data-theme] { --her: ${v.light[0]}; }`);
+      expect(tokens, `${id} dark swatch`).toContain(`[data-ink="${id}"][data-theme="dark"][data-theme] { --her: ${v.dark[0]}; }`);
+    }
+    // and they come after every rule that reaches a swatch through an ancestor, so they win a tie too
+    expect(tokens.indexOf('[data-ink="blue-black"][data-theme="light"][data-theme]')).toBeGreaterThan(tokens.lastIndexOf('[data-theme="dark"] [data-ink='));
   });
 });
 

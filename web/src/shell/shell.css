@@ -168,25 +168,25 @@
 
 /* ---------- page transitions (shell/transition.ts) ---------- */
 ::view-transition-group(*) { animation-duration: var(--spring-soft-dur); animation-timing-function: var(--spring-soft); }
-::view-transition-old(root), ::view-transition-new(root) { animation-duration: 240ms; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: var(--d-2); }
 ::view-transition-image-pair(page), ::view-transition-image-pair(entrypane) { overflow: hidden; border-radius: var(--r-l); }
 ::view-transition-old(page), ::view-transition-new(page), ::view-transition-old(entrypane), ::view-transition-new(entrypane) {
   height: 100%; width: auto; object-fit: none; object-position: left top;
 }
-::view-transition-old(page) { animation: 200ms ease both vt-out; }
-::view-transition-new(page) { animation: 360ms 60ms ease both vt-in; }
+::view-transition-old(page) { animation: var(--d-2) ease both vt-out; }
+::view-transition-new(page) { animation: var(--d-3) var(--d-0) ease both vt-in; }
 ::view-transition-new(entrypane):only-child { animation: pane-in var(--spring-soft-dur) var(--spring-soft) both; }
-::view-transition-old(entrypane):only-child { animation: pane-out 320ms var(--e-out) both; }
+::view-transition-old(entrypane):only-child { animation: pane-out var(--d-3) var(--e-out) both; }
 ::view-transition-group(rail) { z-index: 30; }
 @keyframes vt-out { to { opacity: 0; } }
 @keyframes vt-in { from { opacity: 0; } }
 @keyframes pane-in { from { opacity: 0; transform: translateX(56px) scale(0.985); } }
 @keyframes pane-out { to { opacity: 0; transform: translateX(56px) scale(0.985); } }
 @media (max-width: 760px) {
-  html[data-vt="push"]::view-transition-old(page) { animation: push-out 420ms var(--e-out) both; }
+  html[data-vt="push"]::view-transition-old(page) { animation: push-out var(--d-4) var(--e-out) both; }
   html[data-vt="push"]::view-transition-new(page) { animation: push-in var(--spring-soft-dur) var(--spring-soft) both; }
-  html[data-vt="pop"]::view-transition-old(page) { animation: pop-out 360ms var(--e-out) both; z-index: 2; }
-  html[data-vt="pop"]::view-transition-new(page) { animation: pop-in-page 420ms var(--e-out) both; }
+  html[data-vt="pop"]::view-transition-old(page) { animation: pop-out var(--d-3) var(--e-out) both; z-index: 2; }
+  html[data-vt="pop"]::view-transition-new(page) { animation: pop-in-page var(--d-4) var(--e-out) both; }
   @keyframes push-out { to { transform: translateX(-28%); filter: brightness(0.7); } }
   @keyframes push-in { from { transform: translateX(100%); } }
   @keyframes pop-out { to { transform: translateX(100%); } }

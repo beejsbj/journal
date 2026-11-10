@@ -94,7 +94,7 @@ legend { padding: 0; }
   }
 }
 /* a rise-in for rows and blocks: set --i on each for the stagger */
-.rise { animation: rise 520ms var(--e-out) both; animation-delay: calc(var(--i, 0) * var(--stagger)); }
+.rise { animation: rise var(--d-4) var(--e-out) both; animation-delay: calc(var(--i, 0) * var(--stagger)); }
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
 @keyframes fade-in { from { opacity: 0; } }
 @keyframes pop-in { from { opacity: 0; transform: scale(0.95) translateY(-4px); } }

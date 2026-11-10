@@ -31,11 +31,11 @@
 .disclosure-inner { min-height: 0; overflow: hidden; }
 .disclosure-content {
   opacity: 0; transform: translateY(-8px); filter: blur(2px);
-  transition: opacity 160ms, transform 280ms var(--e-out), filter 200ms;
+  transition: opacity var(--d-1), transform var(--d-3) var(--e-out), filter var(--d-2);
 }
 .disclosure[data-open="true"] > .disclosure-body .disclosure-content {
   opacity: 1; transform: none; filter: none;
-  transition: opacity 360ms 90ms, transform var(--spring-soft-dur) var(--spring-soft) 60ms, filter 300ms 90ms;
+  transition: opacity var(--d-3) var(--d-0), transform var(--spring-soft-dur) var(--spring-soft) var(--d-0), filter var(--d-3) var(--d-0);
 }
 @media (prefers-reduced-motion: reduce) {
   .disclosure-content { transform: none !important; filter: none !important; }

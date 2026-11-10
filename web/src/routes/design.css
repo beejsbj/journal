@@ -47,7 +47,7 @@
 }
 .ds-inkopt:hover { background: var(--raised); }
 .ds-inkopt[aria-checked="true"] { background: var(--pane); box-shadow: inset 0 0 0 1.5px var(--text), var(--elev-tab); }
-.ds-blot { color: var(--her); filter: drop-shadow(0 0 10px var(--her-glow)); transition: transform 500ms var(--e-paper); }
+.ds-blot { color: var(--her); filter: drop-shadow(0 0 10px var(--her-glow)); transition: transform var(--d-4) var(--e-paper); }
 .ds-inkopt[aria-checked="true"] .ds-blot { transform: scale(1.1) rotate(-4deg); }
 .ds-inkopt b { font: 500 14px / 1.2 var(--f-ui); }
 .ds-inkopt small { font: italic 400 14px / 1.3 var(--f-his); color: var(--text-3); }
@@ -114,7 +114,7 @@
 .ds-dot { position: relative; display: block; height: 14px; border-radius: 7px; background: var(--sunk); }
 .ds-dot::after {
   content: ""; position: absolute; top: 0; left: 0; width: 14px; height: 14px; border-radius: 50%; background: var(--lamp);
-  transition: left 900ms; transition-timing-function: inherit;
+  transition: left var(--d-5); transition-timing-function: inherit;
 }
 .ds-dot.moved::after { left: calc(100% - 14px); }
 

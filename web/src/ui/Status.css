@@ -3,8 +3,8 @@
 .skeleton {
   height: 4.5rem; border-radius: var(--r-m);
   background: linear-gradient(90deg, var(--raised), var(--raised-2), var(--raised)); background-size: 200% 100%;
-  animation: shimmer 1.6s linear infinite, fade-in 400ms var(--e-out) both;
-  animation-delay: 0s, calc(var(--i, 0) * 60ms);
+  animation: shimmer var(--d-loop) linear infinite, fade-in var(--d-4) var(--e-out) both;
+  animation-delay: 0s, calc(var(--i, 0) * var(--d-0));
 }
 .skeletons.line .skeleton { height: 1.1rem; border-radius: var(--r-xs); }
 .skeletons.line .skeleton:last-child { width: 62%; }

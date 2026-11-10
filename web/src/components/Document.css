@@ -28,7 +28,7 @@
   display: block; padding-top: 22px; font: italic 400 15px / 1 var(--f-his); color: var(--her-soft);
 }
 .doc-letter { margin-bottom: var(--s3); }
-.doc-letter > .letter { grid-column: 2; animation: letter-in 520ms var(--e-paper) both; }
+.doc-letter > .letter { grid-column: 2; animation: letter-in var(--d-4) var(--e-paper) both; }
 @keyframes letter-in { from { opacity: 0; transform: translateY(-10px); } }
 
 /* ---- a passage of his ---- */

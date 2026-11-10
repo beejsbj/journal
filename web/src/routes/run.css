@@ -19,12 +19,12 @@
 .run-page .phase-strip { list-style: none; display: flex; gap: 4px; margin: 0; padding: 0; max-width: 30rem; }
 .run-page .phase-strip li {
   flex: 1; height: 4px; border-radius: 2px; background: var(--hair-2); position: relative; overflow: hidden;
-  animation: seg-in 500ms var(--e-out) both; animation-delay: calc(var(--k, 0) * 40ms);
+  animation: seg-in var(--d-4) var(--e-out) both; animation-delay: calc(var(--k, 0) * var(--d-0));
 }
 .run-page .phase-strip li.done { background: var(--text); }
 .run-page .phase-strip li.now::after {
   content: ""; position: absolute; inset: 0; background: var(--text); transform-origin: left; transform: scaleX(0.45);
-  animation: seg-fill 1.4s var(--e-out) 0.3s both;
+  animation: seg-fill var(--d-5) var(--e-out) var(--d-3) both;
 }
 .run-page .phase-title { display: block; margin: 0 0 var(--s4); font: 400 var(--t-h2) / 1.15 var(--f-his); font-optical-sizing: auto; color: var(--text); text-wrap: balance; }
 .run-page .phase-sent > .hint { margin: 0 0 var(--s2); }
