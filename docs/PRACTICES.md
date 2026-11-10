@@ -7,7 +7,9 @@ every model step has a named plain fallback, and nothing waits on a model.
 
 1. **Three kinds, one engine path.** *Practice* (recurring, unordered), *program* (ordered sessions of phases,
    stateful), *situational* (a one-session program started by an event). A phase send is a ledger prompt, so
-   capture, folding, sweep, threading and annotation are the existing code paths.
+   capture, folding, sweep, threading and annotation are the existing code paths. *Revisited 2026-11-10 (the
+   owner; DECISIONS.md, PROGRAM-KINDS): two kinds, practice and program. Proposed, not built: this page is the format
+   as it runs.*
 2. **Format: Markdown with flat `key: value` front matter** parsed by `entries.front_matter` (stdlib). Dotted
    keys nest; lists are comma-separated; several schedule slots are `schedule.1.time`, `schedule.2.time`. The
    body uses `## ` sections and `- ` questions (practices) or `## Phase N` + `### Introduction|Questions|Task|
@@ -261,6 +263,13 @@ on `/start prep` (aliases resolve), from the PWA, or when he accepts the compani
 after `expires_hours`. `post-session-debrief.md` is the same shape (`after: fix-life` lets the engine offer it,
 through a notebook `FOLLOW-UP` the code files when a fix-life session completes: "offer the post-session debrief
 when it fits").
+
+**Proposed, not built (the owner, 2026-11-10; DECISIONS.md, PROGRAM-KINDS).** "Situational" stops being a kind: a
+definition like the one above becomes `kind: program` in one file, and what sets it apart today (it never holds the
+one-program slot, it expires, it compiles no insights) becomes settings any program's file can carry
+(`one_at_a_time`, `expires_hours`, `insights`). `kind: situational` keeps working as another spelling. Until that is
+built, this section is the format. One correction to it as built: nothing reads `after:`; the debrief is offered
+because the program's own file says `debrief:` (§1.3).
 
 ## 2. Loading, overriding, validating (`library.py`)
 
