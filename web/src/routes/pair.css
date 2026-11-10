@@ -1,0 +1,41 @@
+/* Pairing and sign-in (routes/pair.tsx), outside the shell: a sheet of the paper laid on the desk, the lamp at its
+   head, the mark above the title. Also the shell's "Not here" page (app.tsx, NotFound). */
+
+.pair-screen {
+  display: grid; place-items: center; height: 100dvh; overflow-y: auto; background: var(--room);
+  padding: calc(var(--s6) + env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) calc(var(--s6) + env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+}
+.pair-card {
+  position: relative; isolation: isolate; width: min(30rem, 100%); padding: 44px 40px 36px; border-radius: var(--r-l);
+  background: var(--pane); box-shadow: var(--elev-1); outline: 1px solid var(--hair); outline-offset: -1px; animation: rise 520ms var(--e-out) both;
+}
+.pair-card > .lamp-light { height: 260px; }
+.pair-mark { display: block; margin-bottom: var(--s4); color: var(--text); }
+.pair-card .display { font-size: 2.4rem; margin-bottom: var(--s3); }
+.pair-intro { margin: 0 0 var(--s5); font: 400 17px / 1.5 var(--f-his); color: var(--text-2); text-wrap: pretty; }
+.pair-intro code { font-size: 0.8em; }
+.pair-busy { margin: 0 0 var(--s3); color: var(--text-2); }
+.pair-form { display: grid; gap: var(--s3); margin-top: var(--s2); }
+.pair-form .input { font-family: var(--f-code); font-size: 14px; }
+.pair-card > .button + .error-line, .pair-card > .error-line { margin: var(--s4) 0 0; }
+.pair-fallback { margin-top: var(--s5); border-top: 1px solid var(--hair); }
+.pair-fallback > .disclosure-head { font-size: var(--t-small); color: var(--text-2); }
+.pair-fallback .pair-form { padding-bottom: var(--s2); }
+
+@media (max-width: 760px) {
+  .pair-screen { place-items: start stretch; background: var(--pane); }
+  .pair-card { padding: 24px 0 0; background: none; box-shadow: none; outline: 0; }
+  .pair-card > .lamp-light { display: none; }
+  .pair-card .display { font-size: 2rem; }
+}
+@media (max-width: 760px), (pointer: coarse) {
+  .pair-form .input { font-size: max(1rem, 16px); }
+}
+
+/* "Not here": a page with nothing at its address */
+.not-found { max-width: 40rem; margin: 0 auto; padding: 72px var(--gutter) var(--s8); }
+.not-found .kicker { margin: 0 0 8px; }
+.not-found .lede { margin: 14px 0 var(--s5); }
+@media (max-width: 760px) {
+  .not-found { padding: 24px 20px var(--s6); }
+}

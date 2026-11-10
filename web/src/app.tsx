@@ -23,6 +23,7 @@ import "./shell/shell.css";
 import { useTitle } from "./title";
 import { OfflineRibbon } from "./ui/OfflineRibbon";
 import { ThemeToggle } from "./ui/ThemeChoice";
+import { ButtonLink } from "./ui/Button";
 
 // the style guide is its own chunk: nothing on the everyday pages pays for it
 const DesignRoute = lazy(() => import("./routes/design").then((m) => m.DesignRoute));
@@ -61,13 +62,11 @@ function NavLink({ n, path, badge, folded }: { n: (typeof NAV)[number]; path: st
 function NotFound() {
   useTitle("Not found");
   return (
-    <div class="page">
-      <header class="page-head">
-        <h1>Not here</h1>
-      </header>
-      <p>
-        There is no page at this address. <a href="/">Back to Today</a>
-      </p>
+    <div class="not-found">
+      <p class="kicker">Nothing at this address</p>
+      <h1 class="display">Not here</h1>
+      <p class="lede">There is no page at this address. It may have moved, or the link was cut short.</p>
+      <ButtonLink href="/" data-vt="pop">Back to Today</ButtonLink>
     </div>
   );
 }

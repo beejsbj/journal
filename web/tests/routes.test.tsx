@@ -141,7 +141,7 @@ describe("Today", () => {
     await until(() => must(host.querySelector(".tailscale-lost")));
     expect(host.querySelector("h1")?.textContent).toBe("Couldn't confirm your Tailscale sign-in");
     await until(() => expect(host.querySelector('[role="alert"]')?.textContent).toContain("may be restarting"));
-    expect(host.querySelector(".pair-fallback")?.hasAttribute("open")).toBe(false);   // pairing is folded away, not the screen
+    expect(host.querySelector(".pair-fallback")?.getAttribute("data-open")).toBe("false");   // pairing is folded away, not the screen
     up = true;
     must([...host.querySelectorAll<HTMLButtonElement>("button")].find((b) => b.textContent === "Retry")).click();
     await until(() => expect(host.querySelector("h1")?.textContent).toBe("Thursday 15 October 2026"));
@@ -154,7 +154,7 @@ describe("Today", () => {
     stubFetch({ ...base, "/api/v1/today": () => json({ error: "token", detail: "no token" }, 401), "/api/v1/session": () => json({ error: "token", detail: "" }, 401) });
     const host = mount(<App />);
     await until(() => expect(host.querySelector("h1")?.textContent).toBe("This device isn't recognised by Tailscale any more"));
-    expect(host.querySelector(".pair-fallback")?.hasAttribute("open")).toBe(true);
+    expect(host.querySelector(".pair-fallback")?.getAttribute("data-open")).toBe("true");
     expect(host.querySelector("input#pair-code")).not.toBeNull();
     expect(host.textContent).not.toContain("may be restarting");
   });
@@ -412,7 +412,10 @@ describe("Library", () => {
     await until(() => must(host.querySelector(".library-card")));
     const mine = must(host.querySelector('a[href="/library/gratitude"]'));
     expect(mine.querySelector(".meta")?.textContent).toBe("Daily 21:30");
-    expect(mine.querySelector(".badge.source")?.textContent).toBe("yours");
+    // WEB-UX: his own practice is marked by a solid ribbon and the quiet word "Yours", not a boxed "yours" badge
+    expect(mine.querySelector(".source")?.textContent).toBe("Yours");
+    expect(mine.querySelector(".ribbon-mark.own")).not.toBeNull();
+    expect(mine.querySelector(".badge")).toBeNull();
     visit("/library/gratitude");
     const detail = mount(<App />);
     await until(() => must(detail.querySelector(".question-set")));
@@ -427,12 +430,19 @@ describe("Insights", () => {
     stubFetch(base);
     const host = mount(<App />);
     await until(() => must(host.querySelector(".week-card")));
-    expect(host.querySelector(".stepper strong")?.textContent).toBe("12 – 18 Oct");
-    expect(host.querySelector(".counts")?.textContent).toContain("Words32");
-    await until(() => expect(host.querySelector(".reflection summary")?.textContent).toBe("Ada's reflection — Wed 14 Oct 2026"));
-    must(host.querySelector<HTMLElement>(".stepper button")).click();
-    await until(() => expect(host.querySelector(".stepper strong")?.textContent).toBe("5 – 11 Oct"));
+    // WEB-UX: the week is the page's title, set large; its counts are a sentence (round 02, Insights)
+    expect(host.querySelector("h1.ins-title")?.textContent).toContain("12 – 18 October");
+    expect(host.querySelector(".week-ago")?.textContent).toContain("This week");
+    expect(host.querySelector(".prose-figs")?.textContent).toBe("You wrote 32 words in 3 entries. You answered the one prompt from Ada. Ada wrote 1 day reflection.");
+    // a day's reflection is folded to its date and her first line, under "Day by day, from Ada"
+    await until(() => expect(host.querySelector(".reflection .slip-line")?.textContent).toBe("What stood out — the harbour."));
+    expect(host.querySelector("#days-h")?.textContent).toBe("Day by day, from Ada");
+    expect(host.querySelector(".reflection")?.getAttribute("data-open")).toBe("false");
+    must(host.querySelector<HTMLElement>(".week-stepper button")).click();   // Earlier
+    await until(() => expect(host.querySelector("h1.ins-title")?.textContent).toContain("5 – 11 October"));
+    expect(host.querySelector(".week-ago")?.textContent).toContain("Last week");
     await until(() => expect(host.querySelector(".week-card")?.textContent).toContain("No day reflections this week."));
+    expect(host.querySelector(".prose-figs")?.textContent).toBe("Nothing was written this week.");
   });
 
   it("finds the week a reflection link names", () => {
@@ -462,8 +472,11 @@ describe("Settings", () => {
     expect(windows?.querySelector(".origin")?.textContent).toBe("config file");
     await until(() => must(host.querySelector(".warning")));
     expect(host.querySelector(".warning")?.textContent).toContain("different code");
-    await until(() => must(host.querySelector("table.doctor")));
-    expect(host.querySelectorAll("table.doctor tbody tr")).toHaveLength(2);
+    // WEB-UX: the health check is a list of checks, each with a mark and its state in words, problems first
+    await until(() => must(host.querySelector(".doctor li.check")));
+    expect([...host.querySelectorAll(".doctor li.check")].map((li) => li.className)).toEqual(["check warn", "check ok"]);
+    expect(host.querySelector(".doctor li.check.warn .check-status")?.textContent).toBe("to look at");
+    expect(host.querySelector(".health-words b")?.textContent).toBe("1 to look at.");
     expect(host.textContent).toContain("Paired as localhost:3000");
   });
 

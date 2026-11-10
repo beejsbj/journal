@@ -166,7 +166,9 @@ describe("Settings, Ink", () => {
     expect(radios.filter((r) => r.checked).map((r) => r.value)).toEqual(["brown"]);
     // every option carries its own ink, so its sample is drawn in it whatever the page's ink is
     expect([...host.querySelectorAll("label.ink")].map((l) => l.getAttribute("data-ink"))).toEqual(["blue-black", "brown", "violet", "green"]);
-    expect(host.querySelector(".ink-from")?.textContent).toBe("From the companion");
+    // WEB-UX: a letter of hers under the blots retypes in the ink chosen (her name when the page knows it)
+    expect(host.querySelector(".ink-proof .letter-from")?.textContent).toBe("From the companion");
+    expect(host.querySelector(".ink-proof")?.textContent).toContain("How did today go?");
     await click(must(radios[3]));
     expect(document.documentElement.dataset.ink).toBe("green");
     expect(localStorage.getItem("journal:ink")).toBe("green");
