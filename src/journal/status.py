@@ -499,6 +499,7 @@ def serve_rows(cfg: Config, token: bool = True) -> list[tuple[str, str, str]]:
         del tok
     rows.append(_bind_row(cfg))
     rows += _socket_rows(cfg)
+    rows.append(_push_row(cfg))
     if static.built(cfg):
         info = static.build_info(cfg)
         detail = f"web app in {static.assets_dir(cfg)}" + (f" (built from web/ {info['source'][:12]})" if info else "")
@@ -516,6 +517,23 @@ def serve_rows(cfg: Config, token: bool = True) -> list[tuple[str, str, str]]:
                                            "(pairing only) is served"))
     rows.append(version_row(cfg))
     return rows
+
+
+def _push_row(cfg: Config) -> tuple[str, str, str]:
+    """``serve push``: whether the extra is installed, the VAPID keys, how many devices are subscribed, and whether
+    this journal pushes (``push.when``). Reads ``serve-push.json`` only; makes nothing."""
+    from .serve import push, webpush
+    if not webpush.available():
+        return ("serve push", "ok", "off: Web Push needs the optional extra journal[push] (uv tool install --force "
+                                    "'journal[push]'); without it Settings says push is unavailable")
+    if push.keys(cfg, create=False) is None:
+        return ("serve push", "ok", "journal[push] installed; no keys yet: journal serve makes them at its first start")
+    n = len(push.subscriptions(cfg))
+    detail = f"{n} device{'' if n == 1 else 's'} subscribed; push.when {push.when(cfg)}"
+    if not push.active(cfg):
+        return ("serve push", "warn" if n else "ok", detail + ": this journal has a chat, so nothing is pushed (set "
+                                                             "push.when to always to push its slots too)")
+    return ("serve push", "ok", detail)
 
 
 def _bind_row(cfg: Config) -> tuple[str, str, str]:

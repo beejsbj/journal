@@ -154,6 +154,10 @@ DEFAULTS: dict[str, Any] = {
         "socket": None,            # absolute path of a Unix socket to listen on as well (for `tailscale serve`)
         "tailscale_users": [],     # Tailscale logins signed in by their identity header, on the socket only
     },
+    "push": {                      # Web Push from `journal serve` to the installed PWA (serve/push.py; journal[push])
+        "when": "no-chat",         # no-chat: only with channel.platform none; always: delivered slots are pushed too
+        "subject": None,           # the VAPID contact (mailto: or https:) push services see; None = the project's URL
+    },
     "programs": {                  # ordered sessions of phases (programs.py)
         "settle_minutes": 2,       # a phase answer advances the run after this much quiet (/next: at once)
         "reflect": True,           # ask the model for a reflect phase's construction (template when it can't)
@@ -382,6 +386,7 @@ class Config:
     today: dict = field(default_factory=lambda: copy.deepcopy(DEFAULTS["today"]))
     pack: dict = field(default_factory=lambda: copy.deepcopy(DEFAULTS["pack"]))
     serve: dict = field(default_factory=lambda: copy.deepcopy(DEFAULTS["serve"]))
+    push: dict = field(default_factory=lambda: copy.deepcopy(DEFAULTS["push"]))
     programs: dict = field(default_factory=lambda: copy.deepcopy(DEFAULTS["programs"]))
     practices_dir: Path | None = None  # None only until from_dict resolves it; see ``practices_path``
     hermes_home: Path | None = None
@@ -582,6 +587,7 @@ def from_dict(data: Mapping, *, hermes_home: Path | None = None, config_file: Pa
         warnings.append(f"serve must be an object like {{\"port\": 8790}} (got {serve_cfg!r}); defaults are used")
         serve_cfg = DEFAULTS["serve"]
     serve_cfg = copy.deepcopy(dict(serve_cfg))
+    push_cfg = _push(merged.get("push"), warnings)
     bind_env = _env("JOURNAL_SERVE_BIND", environ)
     if bind_env:  # an environment override for one run; never written back (like JOURNAL_STATE_DIR)
         serve_cfg["bind"] = bind_env
@@ -621,6 +627,7 @@ def from_dict(data: Mapping, *, hermes_home: Path | None = None, config_file: Pa
             today=dict(today_cfg),
             pack=pack_cfg,
             serve=serve_cfg,
+            push=push_cfg,
             programs=dict(merged.get("programs") or {}) if isinstance(merged.get("programs"), Mapping) else {},
             hermes_home=Path(hermes_home) if hermes_home is not None else None,
             adapter=adapter,
@@ -636,6 +643,29 @@ def from_dict(data: Mapping, *, hermes_home: Path | None = None, config_file: Pa
     except Exception:
         raise ConfigError(f"unknown timezone {cfg.timezone!r}") from None
     return cfg
+
+
+PUSH_WHEN = ("no-chat", "always")
+
+
+def _push(value, warnings: list) -> dict:
+    """The ``push`` setting with its defaults; a value that cannot be read is said in ``warnings`` and means the
+    default (``no-chat``: nothing is pushed while a chat is configured)."""
+    out = copy.deepcopy(DEFAULTS["push"])
+    if value is None:
+        return out
+    if not isinstance(value, Mapping):
+        warnings.append(f"push must be an object like {{\"when\": \"always\"}} (got {value!r}); defaults are used")
+        return out
+    out.update(copy.deepcopy(dict(value)))
+    if out.get("when") not in PUSH_WHEN:
+        warnings.append(f"push.when must be one of {', '.join(PUSH_WHEN)} (got {out.get('when')!r}); no-chat is used")
+        out["when"] = "no-chat"
+    subject = out.get("subject")
+    if subject is not None and not (isinstance(subject, str) and subject.startswith(("mailto:", "https:"))):
+        warnings.append(f"push.subject must be a mailto: or https: URI (got {subject!r}); the project's URL is used")
+        out["subject"] = None
+    return out
 
 
 def _channel(value, telegram_chat: str, warnings: list) -> tuple[str, str, tuple]:

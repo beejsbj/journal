@@ -7,14 +7,28 @@
  */
 import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from "workbox-precaching";
 import { NavigationRoute, registerRoute } from "workbox-routing";
-import { clearData, respond } from "./swCore";
+import { clearData, nudge, openTarget, renew, respond } from "./swCore";
 
 interface Scope {
   __WB_MANIFEST: Array<string | { url: string; revision: string | null }>;
   addEventListener(type: string, listener: (event: any) => void): void;
   skipWaiting(): Promise<void>;
-  clients: { claim(): Promise<void>; matchAll(): Promise<Array<{ postMessage(message: unknown): void }>> };
+  clients: {
+    claim(): Promise<void>;
+    matchAll(options?: { type?: string; includeUncontrolled?: boolean }): Promise<Array<{
+      url: string;
+      postMessage(message: unknown): void;
+      focus(): Promise<unknown>;
+      navigate?(url: string): Promise<unknown>;
+    }>>;
+    openWindow(url: string): Promise<unknown>;
+  };
   caches: CacheStorage;
+  registration: {
+    showNotification(title: string, options: object): Promise<void>;
+    pushManager: { subscribe(options: object): Promise<{ toJSON(): unknown }> };
+  };
+  location: { origin: string };
 }
 declare const self: Scope;
 
@@ -47,3 +61,41 @@ self.addEventListener("message", (event: { data?: { type?: string }; waitUntil(p
 self.addEventListener("activate", (event: { waitUntil(p: Promise<unknown>): void }) => {
   event.waitUntil(self.clients.claim());
 });
+
+// Web Push (`serve/push.py`): a practice is due. The payload is read as data, never as an address (`swCore.nudge`).
+self.addEventListener("push", (event: { data?: { json(): unknown } | null; waitUntil(p: Promise<unknown>): void }) => {
+  let data: unknown = null;
+  try {
+    data = event.data ? event.data.json() : null;
+  } catch {
+    data = null;
+  }
+  const n = nudge(data);
+  event.waitUntil(self.registration.showNotification(n.title, n.options));
+});
+
+// A tap opens Today with that practice ready to write (`/today?write=<id>`), in a page already open when there is one.
+self.addEventListener(
+  "notificationclick",
+  (event: { notification: { close(): void; data?: { url?: unknown } }; waitUntil(p: Promise<unknown>): void }) => {
+    event.notification.close();
+    event.waitUntil(openTarget(event.notification.data?.url, self.clients, self.location.origin));
+  },
+);
+
+// The browser replaced the subscription (Firefox rotates them): give the server the new one (swCore.renew).
+self.addEventListener(
+  "pushsubscriptionchange",
+  (event: {
+    oldSubscription?: { endpoint: string; options?: { applicationServerKey?: BufferSource | null } } | null;
+    newSubscription?: { toJSON(): unknown } | null;
+    waitUntil(p: Promise<unknown>): void;
+  }) => {
+    event.waitUntil(
+      renew(event.oldSubscription ?? null, event.newSubscription ?? null, {
+        subscribe: (options) => self.registration.pushManager.subscribe(options),
+        fetch: (url, init) => fetch(url, init),
+      }).catch(() => undefined),
+    );
+  },
+);

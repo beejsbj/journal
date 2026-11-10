@@ -166,6 +166,13 @@ programs with no active run).
   when they differ), location/timezone (via `PATCH /settings` → `set_location`), windows, reflections, quiet
   minutes, settle minutes, today-block toggles; each field shows its origin (file / hermes / env) and is locked
   when not writable from here (with the CLI hint). Doctor and Status pages (read-only tables).
+- **Notifications** (OPEN-PUSH): this device's Web Push subscription. *Turn on notifications* asks the permission
+  from that tap only (never on load), subscribes with `GET /push`'s key and posts the subscription; *Turn off* ends it
+  in the browser and on the server. It says why it cannot be offered (the server lacks `journal[push]`, an older
+  server, no push in this browser, an iPhone or iPad not running the Home Screen app) and that a journal with a chat
+  pushes nothing under `push.when: no-chat`. The service worker shows a push as the practice's title and "due now"
+  (one per practice, `swCore.nudge`), and a tap opens `/today?write=<id>` in an open page or a new one
+  (`swCore.openTarget`, this site only).
 
 ## 2. Visual direction (in words)
 
