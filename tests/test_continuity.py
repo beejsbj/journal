@@ -17,6 +17,7 @@ from test_reflect import GOOD, IST, Base
 
 from journal import (agent, capture, conversations, entries, hookstate, ledger, notebook, prompts, reflect, status,
                      sweep, tools, validate)
+from journal.config import Names
 
 tc_m = test_conversations.m
 
@@ -110,6 +111,18 @@ class ContinuityTest(Earlier):
         self.evening()
         query, _ = self.query()
         self.assertIn("- (none in the chat;", query)
+
+    def test_with_no_chat_there_is_no_reply_to_speak_of(self):
+        self.analysis("reflection", "2026-10-13", "**What I notice** — the move.\n\n**To carry forward** — Settled?")
+        self.evening()
+        self.cfg.platform = "none"  # (``channel.platform: none``: the reflection stays in its file)
+        query, log = self.query()
+        self.assertIn("2026-10-14-reflection: not sent: no chat (in its file)", log)
+        self.assertIn("### reflection:2026-10-13-reflection (your day reflection, Tue 13 Oct)\nYou began: ", query)
+        self.assertIn("You asked him: Settled?", query)
+        self.assertIn("He will read it in\nthe journal: it is", query)
+        for absent in ("in the chat", "wrote back", "None"):
+            self.assertNotIn(absent, query)
 
     def test_only_notebook_threads_the_engine_filed_from_the_journal(self):
         self.analysis("reflection", "2026-10-13", "**What I notice** — the move.")
@@ -610,6 +623,50 @@ class VoiceTest(unittest.TestCase):
         self.assertIn('Put his words in straight\ndouble quotes "like this", on one line, and use no other quotation '
                       "marks anywhere", text)
         self.assertIn("## Before the day (your own words, except his replies, which are marked as his)\nBEFORE", text)
+
+    def test_the_reflection_request_agrees_with_any_pronouns_and_with_no_chat(self):
+        # (review, 2026-11-10: "They knows what they wrote; what they doesn't have yet", and on a no-chat install
+        # "read it in the journal and in None" with "what he wrote back to it in the chat")
+        they = make_cfg(Path(self.tmp.name) / "they", names=Names(user="Sam", companion="Ada"))
+        self.assertIn("They know what they wrote; what they cannot get from their own entries is what you make of it.",
+                      prompts.reflection_request(they, "reflection", "Wednesday", "IN", ""))
+        self.assertIn("He knows what he wrote; what he cannot get from his own entries is what you make of it.",
+                      prompts.reflection_request(self.cfg, "reflection", "Wednesday", "IN", ""))
+        quiet = make_cfg(Path(self.tmp.name) / "quiet", platform="none")
+        text = prompts.reflection_request(quiet, "reflection", "Wednesday", "IN", "")
+        self.assertIn("He will read it in\nthe journal: it is your considered word", text)
+        self.assertIn("copied exactly from his entries. Put his words", text)
+        self.assertIn("## Before the day (your own words)\n(nothing yet: this is your first)", text)
+        for absent in ("None", "in the chat", "his replies", "or replies", "wrote back"):
+            self.assertNotIn(absent, text)
+
+    def test_the_other_requests_state_the_rule_their_check_applies(self):
+        # (review, 2026-11-10: their checks took the reflection's rule while their requests still said only "copy
+        # the words exactly"; a catch-up that put her own earlier line in double quotes was not used, unwarned)
+        from journal import programs
+        prog = programs._program(self.cfg, "fix-life")
+        session = prog.session(1)
+        rec = {"messages": [{"at_local": "10:00", "text": "hi, back home now"}],
+               "context": [["Iris", "09:00", "how was the drive?"], ["Theo", "09:01", "long"]]}
+        asks = {"message": prompts.catchup_request(self.cfg, rec, "09:05 to 11:00"),
+                "construction": prompts.reflect_phase_request(self.cfg, prog, session, session.phase(1), "an answer"),
+                "paragraph": prompts.bridge_request(self.cfg, prog, session, "an answer"),
+                "synthesis": prompts.insights_request(self.cfg, prog, "the document")}
+        for what, text in asks.items():
+            with self.subTest(what):
+                self.assertIn("Double quotation marks are only for his exact words from ", text)
+                self.assertIn("Put nothing else in double quotes: not words of your own (an earlier line of yours "
+                              "included), not a title or a name, not a term", text)
+                self.assertIn(f"one that is not around his exact words means the {what} is not used.", text)
+                self.assertNotIn("thrown away", text)
+        self.assertIn("from what Theo wrote below (his lines of the conversation and his messages after it)",
+                      asks["message"])
+        self.assertIn("from his answers in the document (not its titles, questions or summaries)", asks["synthesis"])
+        # and the check does what the request says: her own line in double quotes is not his
+        self.assertFalse(validate.check_catchup('Back now. "how was the drive?" was my last question.',
+                                                "hi, back home now\nlong")[0])
+        self.assertTrue(validate.check_catchup('Back now. A long drive, then; "back home now" is good to read.',
+                                               "hi, back home now\nlong")[0])
 
     def test_the_annotation_is_about_him_in_the_third_person_and_her_reading_in_the_first(self):
         self.assertIn("about him in the third person; your reading stays yours, in the first person",

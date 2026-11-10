@@ -372,7 +372,7 @@ def continuity(cfg: Config, kind: str, end: date, data: dict) -> tuple[str, list
         what = "week review" if k == "week" else "day reflection"
         body = body_of(p.read_text(encoding="utf-8", errors="replace"))
         rec = next((r for r in data.get("reflections") or [] if Path(r.get("path") or "").name == p.name), None)
-        replies = _replies_to(cfg, rec, p, end, data)
+        replies = _replies_to(cfg, rec, p, end, data) if cfg.has_channel else []  # (no chat: nowhere to reply in)
         replies_all += [r.split("] ", 1)[1] for r in replies]
         asked = _carried(body)
         said = ("\n".join(f"- {r}" for r in replies) if replies
@@ -380,7 +380,8 @@ def continuity(cfg: Config, kind: str, end: date, data: dict) -> tuple[str, list
         when = date.fromisoformat(p.name[:10]).strftime("%a %-d %b")
         parts.append(f"### {k}:{p.stem} (your {what}, {when})\nYou began: {_opening(body)}"
                      + (f"\nYou asked {cfg.names.object}: {_cut(asked)}" if asked else "")
-                     + f"\n\nWhat {who} wrote back to it in the chat ({his} words):\n{said}")
+                     + (f"\n\nWhat {who} wrote back to it in the chat ({his} words):\n{said}"
+                        if cfg.has_channel else ""))
     items = notebook.on_record(cfg)
     if items:
         lines = [f"- {it['text']} [from {it['source']}] — noted {str(it.get('created_at') or '')[:10]}"
