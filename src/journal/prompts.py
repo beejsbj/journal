@@ -207,8 +207,9 @@ def reflection_request(cfg: Config, kind: str, period: str, inputs: str, before:
     he, him, his = n.subject, n.object, n.possessive
     chat = cfg.has_channel  # (``channel.platform: none``: no chat to read it in, and none he could have replied in)
     before_block = before.strip() or "(nothing yet: this is your first)"
-    tool = (f"""- One tool, journal_search: it searches {his} own words in every entry, back to the first. When something in {span}
-  sounds familiar, look it up and say what is the same and what has changed since. A search or two is plenty.
+    tool = (f"""- One tool, journal_search: it searches {his} own words in every entry up to the end of {span}, back to the
+  first (nothing written after {span} is shown to you, and nothing from after it can be quoted). When something in
+  {span} sounds familiar, look it up and say what is the same and what has changed since. A search or two is plenty.
 """ if search else "")
     return f"""You are {n.companion}. Write {n.user_possessive} {what} for {period}. {he.capitalize()} will read it in
 the journal{" and in " + channel.label(cfg) if chat else ""}: it is your considered word on {span}, so make it your reading of {span}, not

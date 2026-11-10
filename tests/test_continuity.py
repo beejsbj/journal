@@ -12,11 +12,11 @@ from pathlib import Path
 from unittest import mock
 
 import test_conversations
-from helpers import CHAT, add_prompt, make_cfg
+from helpers import CHAT, add_prompt, make_cfg, real_ask
 from test_reflect import GOOD, IST, Base
 
-from journal import (agent, capture, conversations, entries, hookstate, ledger, notebook, prompts, reflect, status,
-                     sweep, tools, validate)
+from journal import (agent, capture, conversations, entries, hookstate, ledger, notebook, prompts, reflect, search,
+                     status, sweep, tools, validate)
 from journal.config import Names
 
 tc_m = test_conversations.m
@@ -325,6 +325,43 @@ class QuotesTest(Earlier):
         self.assertFalse((self.cfg.root / "2026-10-14-reflection.md").exists())
 
 
+class LateReflectionTest(Earlier):
+    """A reflection written after its period (the morning fallback, an outage's retry) reads the journal as it stood
+    at the period's end: no later entry in its quotes, its search or its notebook threads (review, 2026-11-10)."""
+
+    def setUp(self):
+        super().setUp()
+        self.evening()
+        add_prompt(self.cfg, kind="morning", local_date="2026-10-15",
+                   sent=datetime(2026, 10, 15, 0, 31, tzinfo=timezone.utc), message_id="21")
+        capture.capture(self.cfg, CHAT, "21", "the lake house, finally. I slept there",
+                        datetime(2026, 10, 15, 1, 0, tzinfo=timezone.utc), "text", "1021")
+        notebook.add(self.cfg, "ask about the soup recipe", source="2026-10-14-evening", origin="annotation")
+        notebook.add(self.cfg, "ask how the lake house was", source="2026-10-15-morning", origin="annotation")
+
+    def late(self, minute):
+        return self.reflect(datetime(2026, 10, 15, 8, minute, tzinfo=IST))  # the morning after
+
+    def test_it_cannot_quote_what_he_wrote_after_its_period(self):
+        self.answer = GOOD.replace("rain all day, walked anyway", "the lake house, finally")
+        _, log = self.late(0)
+        self.assertEqual(log, ["2026-10-14-reflection: reflection attempt 1/3 failed (a quote not in his words at "
+                               "character 96 (line 3), 25 characters long)"])
+        self.assertFalse((self.cfg.root / "2026-10-14-reflection.md").exists())
+        self.assertTrue(any("the lake house, finally" in t for t in search.his_texts(self.cfg)))  # (his, but later)
+        self.answer = GOOD
+        _, log = self.late(5)
+        self.assertIn("wrote 2026-10-14-reflection.md (annotated) (+1 notebook)", log)
+
+    def test_its_search_and_its_notebook_threads_stop_there_too(self):
+        self.late(0)
+        query = self.asked[-1][0]
+        self.assertEqual(self.env, {search.UPTO_ENV: "2026-10-14"})
+        self.assertIn("in every entry up to the end of the day", query)
+        self.assertIn("- ask about the soup recipe [from 2026-10-14-evening]", query)
+        self.assertNotIn("lake house", query)  # neither the later entry nor the thread filed from it
+
+
 class DoubleQuoteMarksTest(Earlier):
     """Every double quote mark, of any kind, outside a well-formed pair is irregular (a class: review rounds 4 and
     5); Obsidian's blockquote shapes are checked. Each input wrote an invented line into a saved reflection on attempt 1
@@ -413,10 +450,12 @@ class DoubleQuoteMarksTest(Earlier):
 class LongRunTest(Earlier):
     def setUp(self):
         super().setUp()
+        self.envs = []
         self.evening()
 
-    def ask(self, cfg, query, budget, toolsets=None):
+    def ask(self, cfg, query, budget, toolsets=None, env=None):
         self.asked.append((query, toolsets, budget))
+        self.envs.append(env)
         raise agent.AgentUnavailable(f"timed out after {budget + 60}s")
 
     def test_a_timeout_after_the_model_answered_this_tick_uses_an_attempt(self):
@@ -447,6 +486,7 @@ class LongRunTest(Earlier):
         self.assertNotIn("journal_search", q2)
         self.assertNotIn("look it up", q2)
         self.assertEqual(self.rec("2026-10-14-reflection")["defer_error"], "timed out after 360s")
+        self.assertEqual(self.envs, [{"JOURNAL_SEARCH_UPTO": "2026-10-14"}, None])  # (no search, nothing to bound)
 
 
 class QuoteCheckTest(unittest.TestCase):
@@ -695,7 +735,12 @@ class ModelStepTest(unittest.TestCase):
             return mock.Mock(returncode=0, stdout="an answer", stderr="")
         with mock.patch("journal.agent.subprocess.run", run):
             self.assertEqual(agent.CommandCompanion(self.cfg).ask("q", 10, "none"), "an answer")
-        self.assertEqual(seen[agent.MODEL_STEP_ENV], "1")
+            self.assertEqual(seen[agent.MODEL_STEP_ENV], "1")
+            self.assertNotIn(search.UPTO_ENV, seen)
+            # a step's own variables go with it (the reflection's search bound); the mark is the engine's to set
+            more = {search.UPTO_ENV: "2026-10-14", agent.MODEL_STEP_ENV: "0"}
+            self.assertEqual(real_ask(self.cfg, "q", 10, "none", env=more), "an answer")
+        self.assertEqual((seen[agent.MODEL_STEP_ENV], seen[search.UPTO_ENV]), ("1", "2026-10-14"))
 
     def test_the_journals_hook_adds_nothing_to_a_model_step(self):
         from journal.hermes import hooks, runtime

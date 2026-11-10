@@ -50,8 +50,9 @@ class Base(unittest.TestCase):
             p.stop()
         self.tmp.cleanup()
 
-    def ask(self, cfg, query, budget, toolsets=None):
+    def ask(self, cfg, query, budget, toolsets=None, env=None):
         self.asked.append((query, toolsets))
+        self.env = env  # (what the run's environment gains: the search's bound, the period's last day)
         return self.answer
 
     def prompt(self, kind, day, hour, mid, opener):

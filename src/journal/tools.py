@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable
@@ -260,10 +261,11 @@ def _program(cfg: Config, params: dict, **_) -> str:
 
 def _search(cfg: Config, params: dict, **_) -> str:
     """A read of his words in the journal's files (``search``): allowed in an off-record turn, as the notebook's list
-    is."""
+    is. In a reflection's one-shot the engine has set ``search.UPTO_ENV`` to the period's last day, and nothing dated
+    after it is found, whatever the call asks for."""
     try:
         found = search.search(cfg, params.get("query") or "", params.get("date_from"), params.get("date_to"),
-                              params.get("limit"))
+                              params.get("limit"), upto=os.environ.get(search.UPTO_ENV) or None)
     except search.SearchError as e:
         return json.dumps({"success": False, "error": str(e)})
     return json.dumps({"success": True, **found}, ensure_ascii=False)

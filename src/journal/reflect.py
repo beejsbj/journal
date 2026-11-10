@@ -360,9 +360,9 @@ def _carried(body: str) -> str:
 def continuity(cfg: Config, kind: str, end: date, data: dict) -> tuple[str, list[str]]:
     """What a reflection reads of what came before ``end``, and his words in it: for each earlier analysis
     (``_earlier``), its opening paragraph and the question it left him (``EARLIER_CAP`` each), then what he wrote back
-    to it (``_replies_to``); then her open notebook threads that came from the journal (``notebook.on_record``). Her
-    words are labelled hers and his replies his. Returns (the text, "" when there is nothing; his replies, for the
-    quote check)."""
+    to it (``_replies_to``; nothing of this with no chat); then her open notebook threads that came from the journal
+    (``notebook.on_record``), those filed from a file dated ``end`` or before. Her words are labelled hers and his
+    replies his. Returns (the text, "" when there is nothing; his replies, for the quote check)."""
     who = cfg.names.user or "the user"
     his = cfg.names.possessive
     parts: list[str] = []
@@ -382,7 +382,8 @@ def continuity(cfg: Config, kind: str, end: date, data: dict) -> tuple[str, list
                      + (f"\nYou asked {cfg.names.object}: {_cut(asked)}" if asked else "")
                      + (f"\n\nWhat {who} wrote back to it in the chat ({his} words):\n{said}"
                         if cfg.has_channel else ""))
-    items = notebook.on_record(cfg)
+    # (a thread filed from a file dated after the period is not this reflection's to read, as a later reply is not)
+    items = [it for it in notebook.on_record(cfg) if str(it.get("source") or "")[:10] <= end.isoformat()]
     if items:
         lines = [f"- {it['text']} [from {it['source']}] — noted {str(it.get('created_at') or '')[:10]}"
                  + (f" (bring up after {it['bring_up_after']})" if it.get("bring_up_after") else "") for it in items]
@@ -473,9 +474,11 @@ def write_one(cfg: Config, kind: str, end: date, trigger: str, now: datetime,
     plain = str(rec.get("defer_error") or "").startswith("timed out")  # the last try hung: this one goes without search
     title, period = _label(cfg, kind, end)
     timed_out = ""
+    upto = end.isoformat()  # (written late, it still reads the journal as it stood at the end of its own period)
     try:
         raw = agent.ask(cfg, prompts.reflection_request(cfg, kind, period, inputs, before, search=not plain),
-                        RETRY_BUDGET if plain else BUDGET, toolsets="none" if plain else READ_TOOLSET)
+                        RETRY_BUDGET if plain else BUDGET, toolsets="none" if plain else READ_TOOLSET,
+                        env=None if plain else {search.UPTO_ENV: upto})
     except agent.AgentUnavailable as e:
         if not (str(e).startswith("timed out") and agent.answered_this_run()):
             return _outage(cfg, rid, kind, end, now, str(e), log), True
@@ -485,7 +488,7 @@ def write_one(cfg: Config, kind: str, end: date, trigger: str, now: datetime,
     if raw:
         ok, reason = validate.check_reflection(kind, text, "", misquotes=False)
         bad = validate.unfound(text, [entries.his_text(p) for p in mine] + his_replies,
-                               lambda: search.his_texts(cfg)) if ok else []
+                               lambda: search.his_texts(cfg, upto)) if ok else []
         if bad:  # a bad answer, retried; one that never passes is never written
             # (the reason is in numbers only: it goes to the tick's output, ``error`` and the alert, which leave the
             # state dir. The start of a quote that was not his stays in the ledger alone, as main kept it there.)

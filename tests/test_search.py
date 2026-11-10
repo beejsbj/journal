@@ -1,6 +1,7 @@
 """``journal_search`` (DECISIONS.md, CONTINUITY): his words in the journal's files and nothing else, read-only and
 allowed in any turn, registered apart in the ``journal_read`` toolset so the reflection can be given it alone."""
 import json
+import os
 import re
 import sqlite3
 import tempfile
@@ -74,6 +75,26 @@ class SearchTest(unittest.TestCase):
                     {"query": "harbour", "limit": "many"}):
             with self.subTest(bad), self.assertRaises(search.SearchError):
                 search.search(self.cfg, bad.pop("query"), **bad)
+
+    def test_a_reflections_search_stops_at_the_end_of_its_period(self):
+        # (review, 2026-11-10: a reflection written late, the morning after or days after an outage, could search
+        # and quote what he wrote after its period)
+        def call(**params):
+            return json.loads(tools.call(self.cfg, "journal_search", {"query": "harbour", **params}))
+        self.assertNotIn("through", call())
+        self.assertEqual(len(call()["results"]), 3)
+        with mock.patch.dict(os.environ, {search.UPTO_ENV: "2026-10-02"}):
+            for params in ({}, {"date_to": "2026-12-31"}, {"date_from": "2026-01-01", "limit": 20}):
+                with self.subTest(params):
+                    out = call(**params)
+                    self.assertEqual([r["entry"] for r in out["results"]], ["2026-10-02-morning", "2026-09-20-evening"])
+                    self.assertEqual(out["through"], "2026-10-02")
+            self.assertEqual([r["entry"] for r in call(date_to="2026-09-30")["results"]], ["2026-09-20-evening"])
+        with mock.patch.dict(os.environ, {search.UPTO_ENV: "soon"}):  # a bound that is no date: closed, not unbounded
+            self.assertEqual(call(), {"success": False, "error": "the search's bound must be a date, YYYY-MM-DD"})
+        texts = search.his_texts(self.cfg, "2026-10-02")
+        self.assertTrue(any("The harbour at dusk" in t for t in texts))
+        self.assertFalse(any("my own file" in t or "Mother called" in t for t in texts))  # (5 and 14 October)
 
     def test_the_tool_is_a_read_allowed_off_the_record(self):
         self.assertIsNone(tools.refusal(self.cfg, "journal_search", {"query": "harbour"}))

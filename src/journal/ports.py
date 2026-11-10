@@ -172,7 +172,8 @@ class NoChannel:
 
 @runtime_checkable
 class Companion(Protocol):
-    def ask(self, query: str, budget: int, toolsets: str | None = None, image: str | None = None) -> str | None: ...
+    def ask(self, query: str, budget: int, toolsets: str | None = None, image: str | None = None,
+            env: dict[str, str] | None = None) -> str | None: ...
 
 
 class NullTranscript:

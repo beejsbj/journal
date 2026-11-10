@@ -328,7 +328,7 @@ class ReflectOutageTest(ReflectBase):
         super().setUp()
         self.down = True
 
-    def ask(self, cfg, query, budget, toolsets=None):
+    def ask(self, cfg, query, budget, toolsets=None, env=None):
         self.asked.append((query, toolsets))
         if self.down:
             raise agent.AgentUnavailable("exit 1: " + UNREACHABLE)

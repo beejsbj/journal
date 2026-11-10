@@ -9,6 +9,10 @@ transcript, a context pack, the notebook or the companion's memory, and it write
 A query is words (an entry matches any of them, as a word or the start of one: ``walk`` finds "walked"), and
 "phrases in double quotes" that must appear as written. With three or more of them, an entry must match at least
 half. Entries with more matches come first, then the newest.
+
+A reflection's one-shot carries its period's last day in ``UPTO_ENV`` (``reflect.write_one``): the tool then finds
+nothing dated after it, whatever the call asks for, so a reflection written late (the morning fallback, an outage's
+retry days later) reads the journal as it stood at the end of its own period. Her chat has no such bound.
 """
 from __future__ import annotations
 
@@ -25,6 +29,7 @@ QUERY_LIMIT = 200    # characters of a query (as ``/entries?q`` and MCP's ``jour
 MAX_NEEDLES = 8      # words and phrases of a query that count
 EXCERPTS = 2         # excerpts per entry
 WINDOW = 110         # characters kept either side of a match in an excerpt
+UPTO_ENV = "JOURNAL_SEARCH_UPTO"  # YYYY-MM-DD in a reflection's one-shot: no file dated after it is searched
 _DATED = "[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*.md"
 _STOP = frozenset("""a an and are as at be but by did do for from had has have he her his i if in is it its me my
 no not of on or our she so that the their them then there they this to was we were what when where which who why
@@ -37,18 +42,20 @@ class SearchError(ValueError):
     """A query the search cannot run (empty, too long, a date that is not YYYY-MM-DD)."""
 
 
-def files(cfg: Config) -> list[Path]:
+def files(cfg: Config, upto: str | None = None) -> list[Path]:
     """The journal's dated Markdown files, oldest name first (entries, analyses and his own dated files alike:
-    ``entries.his_text`` decides what of each is his)."""
+    ``entries.his_text`` decides what of each is his); with ``upto`` (YYYY-MM-DD), none dated after that day."""
     root = Path(cfg.root)
-    return sorted(root.glob(_DATED)) if root.is_dir() else []
+    found = sorted(root.glob(_DATED)) if root.is_dir() else []
+    return [p for p in found if p.name[:10] <= upto] if upto else found
 
 
-def his_texts(cfg: Config) -> list[str]:
+def his_texts(cfg: Config, upto: str | None = None) -> list[str]:
     """His words in each file of the journal, one item per file: what a quote reached through search is checked
-    against, file by file (``validate.unfound``: a quote stitched from several files is not his)."""
+    against, file by file (``validate.unfound``: a quote stitched from several files is not his). ``upto``: only
+    files dated that day or before (a reflection's own period end: it cannot quote what he wrote after it)."""
     out = []
-    for p in files(cfg):
+    for p in files(cfg, upto):
         try:
             text = entries.his_text(p)
         except OSError:
@@ -103,9 +110,11 @@ def _clean(text: str) -> str:
     return " ".join(_EMBED.sub(" ", text).replace("**", "").split())
 
 
-def search(cfg: Config, query: str, date_from=None, date_to=None, limit=None) -> dict:
+def search(cfg: Config, query: str, date_from=None, date_to=None, limit=None, upto=None) -> dict:
     """``{"query", "results": [{"entry", "date", "kind", "matched", "excerpts"}], "more"}``: entries whose words
-    match, best first. Raises ``SearchError`` for a query it cannot run."""
+    match, best first. Raises ``SearchError`` for a query it cannot run. ``upto`` (YYYY-MM-DD) is the engine's own
+    bound (``UPTO_ENV``), not the caller's: no entry dated after it is found whatever ``date_to`` says, the result
+    names it as ``through``, and one that is no date refuses the search (closed, not unbounded)."""
     q = " ".join(str(query or "").split())
     if not q:
         raise SearchError("query is empty: give words or a phrase in double quotes")
@@ -115,6 +124,9 @@ def search(cfg: Config, query: str, date_from=None, date_to=None, limit=None) ->
     if not needles:
         raise SearchError("query has no words to look for (only very common ones)")
     start, end = _date(date_from, "date_from"), _date(date_to, "date_to")
+    cap = _date(upto, "the search's bound")
+    if cap and (end is None or end > cap):
+        end = cap
     try:
         want = LIMIT if limit in (None, "") else max(1, min(MAX_LIMIT, int(limit)))
     except (TypeError, ValueError):
@@ -145,4 +157,5 @@ def search(cfg: Config, query: str, date_from=None, date_to=None, limit=None) ->
         found.append((len(hits), path.stem, {"entry": path.stem, "date": day, "kind": entries.kind_of(path) or "his own",
                                              "matched": [label for label, _ in hits], "excerpts": excerpts}))
     found.sort(key=lambda f: (f[0], f[1]), reverse=True)
-    return {"query": q, "results": [f[2] for f in found[:want]], "more": max(0, len(found) - want)}
+    return {"query": q, "results": [f[2] for f in found[:want]], "more": max(0, len(found) - want),
+            **({"through": cap} if cap else {})}
