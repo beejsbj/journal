@@ -23,7 +23,8 @@ row, so a swept voice note is recorded as its transcript without the embedded re
 row names the cached file). A picture Hermes attached natively is named in its row: it is kept beside the entry
 while Hermes' picture cache still holds it (a path anywhere else is not copied; a picture that is not kept is said
 in the log, and his caption is still saved). Such a row sent with no caption is stored at the time its turn ran,
-which for a queued message is later than he sent it; the cached file's time is when it arrived (``arrival``).
+which for a queued message is later than he sent it; the cached file's time is when it arrived (``arrival``: for a
+row with no words only; one with words is stored at the time he sent it).
 
 A row the transcript withheld from his words (``Row.meta["withheld"]``: it still carried something added to his
 message) is never captured; the sweep logs it under ``WITHHELD``, which the tick files under its errors (not a row
@@ -95,8 +96,11 @@ def arrival(row: Row, pictures, since: datetime) -> datetime:
     """When a message with pictures came in. Hermes stores a picture sent with no caption at the time its turn ran,
     for a message queued behind a stuck turn long after he sent it; the gateway wrote each picture to its cache as
     it arrived (a new file every time), so the earliest file time after ``since`` and before the row's own time
-    is when he sent it. ``pictures``: files in Hermes' cache only (``in_cache``)."""
+    is when he sent it. A row with words (a caption) is stored at the time he sent it and keeps it: a file's time
+    never moves it. ``pictures``: files in Hermes' cache only (``in_cache``)."""
     at = row.at
+    if (row.text or "").strip():
+        return at
     for path in pictures or ():
         try:
             t = datetime.fromtimestamp(os.stat(path).st_mtime, timezone.utc)

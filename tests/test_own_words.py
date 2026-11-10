@@ -533,6 +533,16 @@ class SweepTest(SweepBase):
                     SENT + timedelta(minutes=8), "3565")
         self.assertEqual(self.sweep(), (0, []))
 
+    def test_a_captioned_picture_is_filed_at_its_own_time_whatever_its_files_time(self):
+        # Hermes stores a message with words at the time he sent it; a cache file with an older time (a restored
+        # cache, a touched file) must not move it out of the prompt's window
+        pic = picture(self.cache / "img_old.jpg", SENT - timedelta(hours=5))
+        self.db.add(native("the sky this morning", [pic], contextfence.wrap(self.notes)), self.arrived, "3566")
+        n, log = self.sweep()
+        self.assertEqual(n, 1, log)
+        c = self.captures()[0]
+        self.assertEqual((c["at"], c["source"], c["images"]),
+                         (self.arrived.isoformat(), "photo", ["2026-10-15-morning.jpg"]))
 
 
 class ArrivalTest(Fixture):
@@ -557,6 +567,11 @@ class ArrivalTest(Fixture):
                                  self.since - timedelta(hours=2)), SENT + timedelta(minutes=5))  # several: earliest
         self.assertEqual(sweep.arrival(self.row, [str(self.cache / "img_none.jpg")], self.since), self.row.at)
 
+    def test_a_row_with_words_keeps_its_own_time(self):
+        row = transcript.to_row({"id": 2, "ts": self.row.at.timestamp(), "role": "user", "pmid": "2",
+                                 "content": native("a caption", ["/c/a.jpg"])})
+        earlier = picture(self.cache / "img_w.jpg", SENT + timedelta(minutes=5))
+        self.assertEqual(sweep.arrival(row, [earlier], self.since), row.at)
 
 
 class ReadersTest(SweepBase):
