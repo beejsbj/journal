@@ -3322,9 +3322,8 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
      06:00 slot, early: step 3), and the tick's 06:00 send is then done. Built as `slots._by_calendar`: with
      `delivery=True` and `at` before `day_ends_at`, `resolve`'s steps run over today's calendar date only (a due or
      open slot; the newest missed; the next later one with no record or a failed send's; an extra entry dated today).
-     **Read to the letter:** at 00:30 with last night's evening still open in the chat, `/start evening` delivers
-     tonight's evening early rather than re-sending last night's (words at 00:30 still answer last night's); this is
-     also what `main` did. Faces never pass `delivery=True`, so a face write cannot move by this, and a delivery
+     **Read to the letter** this sent tonight's evening early for `/start evening` at 00:30; amended 2026-11-10 to
+     the nearest slot (*Decision 1's evening case*, under 3 below). Faces never pass `delivery=True`, so a face write cannot move by this, and a delivery
      stays the only thing that makes a chat boundary. Tests: `tests/test_open_slots.py`
      (`a_delivery_before_day_ends_at…`, `…after_day_ends_at…`), `tests/test_open_core.py`
      (`start_before_day_ends_at…`).
@@ -3355,7 +3354,10 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
      calendar date unless the practice's scheduled slot nearest to now belongs to the journal day before
      (`slots._last_night_is_nearer`); then it resolves as words do (last night's slot while it is due, open or
      missed; an extra entry of last night once it is answered). A tie, a slot that is both, and a practice with no
-     schedule are today's. Tests: the four `test_a_delivery_before_day_ends_at_…` cases after the 03:30 one in
+     schedule are today's; with no slot on today's date, last night's counts when under twelve hours behind. The
+     rule is not evening-only: a 13:00 practice started at 00:30 is yesterday's, as its words then would be. A
+     delivery of last night's slot after midnight is headed with today's date (declined for re-sends above; the
+     same here). Tests: the four `test_a_delivery_before_day_ends_at_…` cases after the 03:30 one in
      `tests/test_open_slots.py`.
   4. **`enabled: false` means "not scheduled" only.** Every face can still open, write and deliver a disabled
      practice (the web app, `journal open`/`journal write`, MCP, `/start` and `journal send`); the schedule never
