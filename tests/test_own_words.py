@@ -239,12 +239,17 @@ class ReadTest(Fixture):
         for row in rows:
             self.assertTrue(privacy.row_marked(self.cfg, row, set()))
 
-    def test_a_withheld_delivery_or_frame_is_no_message_of_his(self):
+    def test_a_delivery_or_frame_is_no_message_of_his_and_a_withheld_row_is_read_whole(self):
         row = self.row("[IMPORTANT: a scheduled note]\n" + self.notes)
         self.assertEqual((row.kind, row.meta["delivery"]), ("system", True))
-        self.assertIn("withheld", row.meta)
+        self.assertNotIn("withheld", row.meta)  # (the platform's own row: test_the_platforms_own_rows_are_never…)
         self.assertIsNone(privacy._said(row))
         self.assertEqual(privacy._said(self.row("plain words\n\n" + self.notes)), "plain words\n\n" + self.notes)
+        # his picture under a frame, cut or not (what follows the placeholders is not known): read whole
+        for injected in (self.notes, "ANOTHER PLUGIN: context of its own"):
+            row = self.row(native("[IMPORTANT: a note]\n\nthe view\n/x and this", ["/c/a.jpg"], injected))
+            self.assertEqual((row.kind, row.meta["withheld"]), ("system", "a platform note in front of his picture"))
+            self.assertTrue(privacy.row_marked(self.cfg, row, set()))
 
     def test_a_row_the_hook_saved_stays_saved_without_the_context(self):
         stored = native("[Journal reply — saved verbatim to the evening entry.]\n\nthe lake", ["/c/a.jpg"],
@@ -336,6 +341,24 @@ class ReadTest(Fixture):
         v = privacy.compute(self.cfg, rows, [], [], set())
         self.assertEqual(sorted(v.private), [r.id for r in rows])  # each of his rows, and her reply to it
 
+    def test_the_platforms_own_rows_are_never_withheld_whatever_they_hold(self):
+        # Hermes' notice of a finished background process cuts its output short under a header of its own
+        # (gateway/run_notifications.py _build_process_completion_event)
+        notice = ("[IMPORTANT: Background process proc_1 completed (exit code 0).\nCommand: make\nOutput:\n"
+                  "[… output truncated — showing last 1987 chars]\nline a\nline b]")
+        for stored, kind in ((notice, "system"), ("[CONTEXT COMPACTION] a summary\n" + self.notes, "system"),
+                             ("[Your active task list was preserved]\n[screenshot]", "system"),
+                             ("[Cron delivery: digest]\n## Journal: today — Thu 15 Oct 2026\n- rain", "boundary"),
+                             (f"[Cron delivery: digest]\nsee {OPEN}", "boundary")):
+            row = self.row(stored, mid=None)
+            self.assertEqual((row.kind, row.meta.get("withheld")), (kind, None), stored[:30])
+            self.assertIsNone(privacy._said(row))
+            self.assertIsNone(sweep.message(row))
+            self.assertEqual(recovery.his_words(row), "")
+        # a row that can hold words of his still fails closed: an attachment's caption, a note in front of a message
+        for stored in ("[The user sent a document: 'a.txt'. It is saved at: /c/a.txt]\n\nmy caption\n\n" + self.notes,
+                       "[System note: something this reader does not know]\n\nmy words\n\n" + self.notes):
+            self.assertWithheld(self.row(stored), "an engine block")
 
 
 class FenceTest(Fixture):
@@ -500,6 +523,16 @@ class SweepTest(SweepBase):
         self.assertFalse(self.entry.exists())
         self.assertTrue(tick.files_as_error(log[0]))
 
+    def test_hermes_own_rows_and_a_row_the_hook_saved_are_not_logged_as_withheld(self):
+        notice = ("[IMPORTANT: Background process proc_1 completed (exit code 0).\nCommand: make\nOutput:\n"
+                  "[… output truncated — showing last 1987 chars]\nline a\nline b]")
+        self.db.add(notice, SENT + timedelta(minutes=5), display_kind="internal_notification")
+        self.db.add(notice, SENT + timedelta(minutes=6))  # an older Hermes: no display kind
+        self.db.add("[Cron delivery: digest]\n## Journal: today — Thu 15 Oct 2026\n- rain", SENT + timedelta(minutes=7))
+        self.db.add("[Journal reply — saved verbatim to the morning entry.]\n\nthe lake\n\n" + self.notes,
+                    SENT + timedelta(minutes=8), "3565")
+        self.assertEqual(self.sweep(), (0, []))
+
 
 
 class ArrivalTest(Fixture):
@@ -600,6 +633,15 @@ class WriterTest(ConversationBase):
         for words in ("look at this row", "my real thought", "I see it."):
             self.assertNotIn(words, body)
 
+    def test_a_cron_delivery_that_holds_a_mark_still_ends_the_thread(self):
+        self.his("a thought about work", m(0), "840")
+        self.hers("tell me more", m(1))
+        self.his("[Cron delivery: digest]\n## Journal: today — Thu 15 Oct 2026\n- rain", m(3), None)
+        self.his("interesting digest, the second item", m(4), "841")
+        self.hers("Which one caught you?", m(5))
+        self.tick(m(20))
+        self.assertNotIn("interesting digest", self.note().read_text())
+        self.assertIn("interesting digest", self.note(2).read_text())
 
 
 if __name__ == "__main__":

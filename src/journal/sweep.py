@@ -26,7 +26,8 @@ in the log, and his caption is still saved). Such a row sent with no caption is 
 which for a queued message is later than he sent it; the cached file's time is when it arrived (``arrival``).
 
 A row the transcript withheld from his words (``Row.meta["withheld"]``: it still carried something added to his
-message) is never captured; the sweep logs it under ``WITHHELD``, which the tick files under its errors.
+message) is never captured; the sweep logs it under ``WITHHELD``, which the tick files under its errors (not a row
+the hook already saved: his words are in the entry as he sent them).
 """
 from __future__ import annotations
 
@@ -407,7 +408,9 @@ def run(cfg: Config, now: datetime, log: list[str], db: Path | None = None) -> i
     caches = picture_caches(cfg, chat.source)
     try:
         for row in found:
-            if row.meta.get("withheld"):  # (the reason is the adapter's fixed label, never his words)
+            # (the reason is the adapter's fixed label, never his words; a row the hook saved is in its entry as he
+            # sent it, so there is nothing for anyone to look at)
+            if row.meta.get("withheld") and row.kind != "handled":
                 log.append(f"{WITHHELD} row {row.id} (message {row.platform_message_id or '-'}): what is left of it "
                            f"still carries {row.meta['withheld']}, so it is not read as his words")
             msg = message(row)

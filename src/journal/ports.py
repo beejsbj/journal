@@ -44,7 +44,8 @@ platform's envelopes. ``copy`` is the id of the row this one repeats (a compacti
   transcript cut off, when anything: what the turn added, never read as his words; the privacy pass alone reads
   it, for an opt-out), ``withheld`` (why the row is not read as his words although it may hold some: it still
   carries something added to his message, such as context injected into the turn; the row is ``system`` with no
-  caption, or stays ``handled``, and its ``loose`` is empty; nothing is cut off such a row);
+  caption, or stays ``handled``, and its ``loose`` is empty; nothing is cut off such a row, and one of the
+  platform's own rows is not withheld for a mark);
 * her rows: ``ends_turn`` (this row ends her turn for the privacy pass), ``outage`` (a failed turn that names a
   provider error), ``reply`` (a plain chat reply of hers, for aligning annotations).
 

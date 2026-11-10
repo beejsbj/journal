@@ -18,8 +18,10 @@ once what Hermes stored:
   to add (``added``); the cut-off part goes to the privacy pass (``Row.meta["cut"]``), which still reads it for an
   opt-out. Nothing else is ever cut off a row: one whose words still carry a mark of something added
   (``leftover``: also a block ending a row with no picture, or anything else after a picture's placeholders) is
-  not read as his words (``withheld``): it fails closed, whole, as a ``system`` row. A list of parts Hermes stored
-  as JSON is read as its text first (``decode``).
+  not read as his words (``withheld``): it fails closed, whole, as a ``system`` row. The platform's own rows (a
+  compaction frame, a delivery, a notice: ``_FRAMES``) are never his message and are not withheld, whatever they
+  hold; a cron delivery is always a ``boundary``. A list of parts Hermes stored as JSON is read as its text first
+  (``decode``).
 * **Her rows.** A tool step (``tool_calls``), a failed turn (``display_kind = 'failed_turn'``, its notice, or
   the failure copy older Hermes stored), a turn closed without a reply (``[SILENT]``, an interruption), a typed or
   compaction row, or her reply.
@@ -100,6 +102,7 @@ _ENVELOPES = ("[The user sent", "[Replying to", "[voice message could not", "[No
               "[System note:", "Gateway message origin")
 # The outage catch-up never took these user rows for his messages (opening, after leading space).
 _FRAMES = ("[PRIOR CONTEXT", "[CONTEXT COMPACTION", "[Cron delivery:", "[IMPORTANT:", "[Your active task list")
+_CRON = "[Cron delivery:"  # a delivery mirrored into the chat: the end of a thread (``boundary``)
 # The context pack's own filter, as its query had it: SQL LIKE (ASCII case-insensitive), no leading space allowed.
 _DELIVERIES = ("[Cron delivery:", "[IMPORTANT:", mirror.PREFIX)
 # Annotation alignment never took these for her reply (the same LIKE).
@@ -279,7 +282,8 @@ def read(content: str | None, platform_message_id: str | None) -> dict:
     placeholders and cut off, when anything (what the turn added: for the privacy pass only). ``withheld``: what
     still marked something added in the words left (``leftover``), a platform note in front of a native picture,
     or a stored list that could not be read; the row is then "system" (or still "handled"), whole: nothing is cut
-    off a row that is withheld."""
+    off a row that is withheld. One of the platform's own rows (``_FRAMES``) is no message of his and is not
+    withheld for a mark; a cron delivery never is."""
     text, readable = decode(content)
     out = {"message_id": str(platform_message_id) if platform_message_id else None, "quote": None,
            "text": "", "source": "text", "audio_path": None, "kind": "empty"}
@@ -307,7 +311,9 @@ def read(content: str | None, platform_message_id: str | None) -> dict:
     m = _REPLY.match(text)
     if m:
         out["quote"], text = m.group(1), text[m.end():]
-    text, pictures, cut, tail = native(text)
+    # (a cron delivery is mirrored into the chat, never a turn of his: no picture's turn, whatever it holds)
+    cron = text.startswith(_CRON)
+    text, pictures, cut, tail = (text, [], False, "") if cron else native(text)
     if pictures:
         out["images"] = pictures
     if cut:
@@ -322,15 +328,21 @@ def read(content: str | None, platform_message_id: str | None) -> dict:
         if why:
             out["withheld"] = why
         return out
+    if text.startswith(_SKIP_PREFIXES):
+        # a picture of his under a platform note this reader does not know (a picture's turn by its shape, cut or
+        # not): withheld, so the privacy pass still reads all of it (a /x after the note counts). Otherwise one of
+        # the platform's own rows (``_FRAMES``: a compaction frame, a delivery, a notice) is no message of his
+        # whatever it holds, and is not withheld for a mark (a notice of a finished process cuts its output short
+        # under a header shaped like the hook spill's); a placeholder or a note that his caption or message can
+        # follow still fails closed
+        out["kind"], out["text"] = "system", text.strip()
+        if cut or (not cron and pictured(text)):
+            out["withheld"], out["native"] = "a platform note in front of his picture", True
+        elif why and not text.startswith(_FRAMES):
+            out["withheld"] = why
+        return out
     if why:  # fails closed: what is left could be his words or what was added to them, so it is not read as his
         out["kind"], out["text"], out["withheld"] = "system", text.strip(), why
-        return out
-    if text.startswith(_SKIP_PREFIXES):
-        # a picture of his under a platform note this reader does not know: withheld, so the privacy pass still reads
-        # all of it (a /x after the note counts); any other such row is the platform's
-        out["kind"], out["text"] = "system", text.strip()
-        if cut:
-            out["withheld"] = "a platform note in front of his picture"
         return out
     source, audio_path = "text", None
     a = _AUDIO_PATH.match(text)
@@ -458,7 +470,7 @@ def to_row(raw: Mapping) -> Row | None:
     msg = read(content, pmid)
     kind = msg["kind"]
     withheld = msg.get("withheld")
-    if kind == "system" and msg["text"].startswith("[Cron delivery:") and not withheld:
+    if kind == "system" and msg["text"].startswith(_CRON):  # (never withheld: ``read``)
         kind = "boundary"
     meta.update(notice=bool(dk) and dk != "steer", steer=dk == "steer", internal=dk == "internal_notification",
                 loose="" if withheld else clean_user_text(stored), frame=stored.lstrip().startswith(_FRAMES),
