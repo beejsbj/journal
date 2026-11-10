@@ -3606,6 +3606,6 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   Not in *At a glance*: it would need the subscription read on every load of the page. A tap on a notification opens
   `/today?write=<id>`, which opens the write room (WEB-UX-OPEN-FACES). `web/tests/push.test.tsx` runs unchanged
   against the new markup (every assertion holds); `web/tests/pages.test.tsx` pins where the card stands; the shots draw
-  it blocked (headless Chromium's default) and off with the permission granted (`settings-push-blocked`, `-off`).
+  it blocked (headless Chromium's default) and off with the permission not asked yet (`settings-push-blocked`, `-off`).
   Main's docs carried conflict markers from its own merge (AGENTS.md, DEPLOY.md, README.md); they are resolved here
   as open PR #32 resolves them, with its `tests/test_no_conflict_markers.py`.

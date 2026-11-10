@@ -75,14 +75,14 @@ for (const scheme of SCHEMES) {
 
 // Notifications on this device (OPEN-PUSH), at the head of "07 This device", with the worker allowed so the device is
 // read, over a server that can push: as headless Chromium starts (notifications denied: "blocked for this site"), and
-// with the permission granted (Off for this device, Turn on notifications). Light and dark, phone and desktop. The
+// with the permission not asked yet (Off for this device, Turn on notifications). Light and dark, phone and desktop. The
 // other states (the server cannot push, an older server, an iPhone not on the Home Screen, no key yet, On) are pinned
 // by web/tests/push.test.tsx.
 const PUSH = { available: true, detail: "", public_key: "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4", when: "no-chat", active: true, subscriptions: 0 };
 for (const scheme of SCHEMES) {
   test.describe(`notifications ${scheme}`, () => {
     test.use({ colorScheme: scheme, serviceWorkers: "allow" });
-    test(`settings notifications ${scheme}`, async ({ page, context }, info) => {
+    test(`settings notifications ${scheme}`, async ({ page }, info) => {
       await page.route("**/api/v1/push", (r) => r.fulfill({ json: PUSH }));
       const shoot = async (name: string, button: string) => {
         await page.goto("/settings");
@@ -94,7 +94,8 @@ for (const scheme of SCHEMES) {
       };
       await shoot("settings-push-blocked", "Turn on notifications");
       await expect(page.locator(".set-push .field-error")).toContainText("blocked");
-      await context.grantPermissions(["notifications"]);
+      // headless Chromium keeps notifications denied whatever is granted: say "not asked yet", as a fresh browser does
+      await page.addInitScript(() => Object.defineProperty(Notification, "permission", { get: () => "default" }));
       await shoot("settings-push-off", "Turn on notifications");
       await expect(page.locator(".set-push .field-error")).toHaveCount(0);
     });
