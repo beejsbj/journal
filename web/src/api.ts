@@ -166,6 +166,8 @@ export const api = {
   entries: (params: Record<string, string | number | boolean | undefined>, signal?: AbortSignal) =>
     get(`/entries${query(params)}`, EntryPage, signal),
   entry: (stem: string, signal?: AbortSignal) => get(`/entries/${encodeURIComponent(stem)}`, EntryDoc, signal),
+  /** The entry, read for the write room: quiet, so the page behind keeps its own offline marks. */
+  entryQuiet: (stem: string, signal?: AbortSignal) => get(`/entries/${encodeURIComponent(stem)}`, EntryDoc, signal, true),
   reflections: (params: Record<string, string | number | undefined>, signal?: AbortSignal) =>
     get(`/reflections${query(params)}`, arr(Reflection), signal),
   weeks: (params: Record<string, string | number | undefined>, signal?: AbortSignal) =>
@@ -179,8 +181,9 @@ export const api = {
   health: (signal?: AbortSignal) => get("/healthz", Health, signal),
   push: (signal?: AbortSignal) => get("/push", PushInfo, signal),
   /** A practice as Write now shows it, and the slot words saved now would fill. Opening it writes nothing. */
-  openPractice: (id: string, signal?: AbortSignal) => get(`/library/${enc(id)}/open`, PracticeView, signal),
+  openPractice: (id: string, signal?: AbortSignal) => get(`/library/${enc(id)}/open`, PracticeView, signal, true),   // (quiet: the room's)
   runs: (signal?: AbortSignal) => get("/runs", arr(Run), signal),
+  runsQuiet: (signal?: AbortSignal) => get("/runs", arr(Run), signal, true),
   run: (id: string, signal?: AbortSignal) => get(`/runs/${enc(id)}`, RunOne, signal),
   runInsights: (id: string, signal?: AbortSignal) => get(`/runs/${enc(id)}/insights`, obj({ stem: str, body: str }), signal),
 

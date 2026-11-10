@@ -21,7 +21,10 @@ export interface WriteRequest {
 let request: WriteRequest | null = null;
 const listeners = new Set<(r: WriteRequest | null) => void>();
 
+/** Open the room. One at a time: while it stands (open, saving, or folding away) another request is ignored, so a
+ *  stray N or a late link never swaps what the open room is for or how it began. */
 export function openWrite(req: WriteRequest = {}): void {
+  if (request) return;
   request = { for: { kind: "note" }, ...req };
   listeners.forEach((l) => l(request));
 }
@@ -43,4 +46,20 @@ export function useWriteRequest(): WriteRequest | null {
     };
   }, []);
   return r;
+}
+
+// what the room wrote: a page showing that entry reads it again (the entry's own box is told by the draft, drafts.ts)
+const written = new Set<(stem: string) => void>();
+
+/** Hear what the write room saved (the stem of the entry it wrote or added to). Returns the way to stop. */
+export function onWritten(fn: (stem: string) => void): () => void {
+  written.add(fn);
+  return () => {
+    written.delete(fn);
+  };
+}
+
+/** The room says it saved into an entry. */
+export function wrote(stem: string): void {
+  for (const fn of [...written]) fn(stem);
 }

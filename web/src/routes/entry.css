@@ -118,6 +118,7 @@
 .entry-doc .add-head .link { gap: 6px; font-size: var(--t-small); }
 .entry-doc .add-head .link > svg { width: 15px; height: 15px; }
 .entry-doc > .composer-closed { margin-top: 44px; }
+.entry-doc .add-in-room { margin: 0; padding: var(--s2) 0; border: 0; }
 
 /* her readings: Analysis and her reflection unfold at the end (no tabs) */
 .entry-doc .readings { margin-top: 56px; }

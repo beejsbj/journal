@@ -63,13 +63,24 @@ function listen(stream: MediaStream, el: HTMLElement | null): () => void {
  * Two looks: a quiet "Voice" button beside the inline composer's send, and (`orb`) the write room's breathing orb,
  * which swells with his voice while it records and says how long. `start` begins at once (the room's "Speak it").
  */
-export function Recorder({ onRecorded, disabled, orb, start: startNow, onRecording }: {
+export interface RecorderControl {
+  /** Whether it is recording now. */
+  recording: () => boolean;
+  /** Stop, and hand the recording over as a tap on stop does. */
+  stop: () => void;
+}
+
+export function Recorder({ onRecorded, disabled, orb, start: startNow, onBegan, onRecording, control }: {
   onRecorded: (blob: Blob, seconds: number) => void;
   disabled?: boolean;
   orb?: boolean;
+  /** Begin at once ("Speak it"); `onBegan` is told when it has, so the owner can make it a one-shot. */
   start?: boolean;
+  onBegan?: () => void;
   /** Told when recording starts and stops, with the seconds so far (the room shows them in its dock). */
   onRecording?: (recording: boolean, seconds: number) => void;
+  /** Filled with what the owner may ask of it (the room stops a recording before it closes). */
+  control?: { current: RecorderControl | null };
 }) {
   const [recording, setRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
@@ -81,6 +92,8 @@ export function Recorder({ onRecorded, disabled, orb, start: startNow, onRecordi
   handoff.current = onRecorded;
   const told = useRef(onRecording);
   told.current = onRecording;
+  // gone (unmounted): a microphone granted after that is closed at once, never left open by a component no one sees
+  const alive = useRef(true);
 
   const release = () => {
     if (timer.current) clearInterval(timer.current);
@@ -90,6 +103,8 @@ export function Recorder({ onRecorded, disabled, orb, start: startNow, onRecordi
   };
   useEffect(
     () => () => {
+      alive.current = false;
+      if (control) control.current = null;
       const m = media.current;
       media.current = null;
       if (m && m.recorder.state !== "inactive") {
@@ -113,8 +128,14 @@ export function Recorder({ onRecorded, disabled, orb, start: startNow, onRecordi
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (e) {
+      if (!alive.current) return;
       const denied = e instanceof DOMException && (e.name === "NotAllowedError" || e.name === "SecurityError");
       setProblem(denied ? "The microphone is blocked for this page. Allow it in the browser's site settings." : "No microphone could be opened.");
+      return;
+    }
+    if (!alive.current) {
+      // the room closed (or the box went) while the browser asked for the microphone: let it go at once
+      stream.getTracks().forEach((t) => t.stop());
       return;
     }
     const type = recordingType();
@@ -148,12 +169,15 @@ export function Recorder({ onRecorded, disabled, orb, start: startNow, onRecordi
     const m = media.current;
     if (m && m.recorder.state !== "inactive") m.recorder.stop();
   };
+  if (control) control.current = { recording: () => !!media.current && media.current.recorder.state !== "inactive", stop };
 
-  // "Speak it": begin as the room opens (once)
+  // "Speak it": begin as the room opens, once for this mount; the owner hears `onBegan` and does not ask again (a
+  // Recorder mounted anew after a discard, or for another note, must not turn the microphone on by itself)
   const began = useRef(false);
   useEffect(() => {
     if (!startNow || began.current || !canRecord()) return;
     began.current = true;
+    onBegan?.();
     void start();
   }, [startNow]);
 

@@ -21,11 +21,12 @@ import { longDay } from "../format";
 import { useAction, useResource, type Resource } from "../hooks";
 import { Close, Focus, Pen, Send, Wave } from "../icons";
 import { isProgramBacked } from "../labels";
-import { closeWrite, useNavigate, type WriteRequest } from "../shell";
+import { closeWrite, useNavigate, wrote, type WriteRequest } from "../shell";
 import type { Created, LibraryItem, PracticeRow, Prompt, Today } from "../types";
 import { AudioPlayer, Button, Disclosure, Empty, ErrorLine, IconButton, Letter, Skeleton, TextButton, reducedMotion } from "../ui";
 import { KeptWords, OfflineNote, useCompose } from "./Composer";
-import { Recorder } from "./Recorder";
+import { loadDraft, saveDraft } from "../drafts";
+import { Recorder, type RecorderControl } from "./Recorder";
 import "./WriteRoom.css";
 
 // ── the page's paragraphs: what focus greys ────────────────────────────────────────────────────────────────────────
@@ -124,14 +125,24 @@ export function rowFor(rows: PracticeRow[], practice: string, slot?: number): { 
 
 /** Her letter, from a prompt as he was sent it. */
 function HerLetter({ prompt, hers }: { prompt: Prompt; hers: string }) {
+  // on a phone her opener rests at three lines, so his page shows under it; it opens in full on a tap (never cut off
+  // with no way to read it)
+  const [whole, setWhole] = useState(false);
+  const long = (prompt.opener ?? "").length > 160;
   const asked = prompt.asked.map((q) => q.question);
   // sent with the plain opener and nothing asked: the questions were the message, so they stand open (as on Today)
   const bare = !prompt.opener && asked.length === 0;
   // one question and nothing marked asked: the letter folds nothing away (Letter folds two or more), so it is shown
   const lone = !bare && asked.length === 0 && prompt.questions.length === 1 ? prompt.questions[0] : undefined;
   return (
-    <Letter class="room-letter" from={hers} at={prompt.sent_at_local ?? undefined} opener={prompt.opener ?? undefined}
-      asked={asked} questions={bare ? [] : prompt.questions} askedIds={prompt.asked.map((q) => q.id)}>
+    <Letter class={["room-letter", (whole || !long) && "whole"].filter(Boolean).join(" ")} from={hers}
+      at={prompt.sent_at_local ?? undefined} opener={prompt.opener ?? undefined}
+      asked={asked} questions={bare ? [] : prompt.questions} askedIds={prompt.asked.map((q) => q.id)}
+      foot={long ? (
+        <TextButton class="room-letter-more" aria-expanded={whole} onClick={() => setWhole(!whole)}>
+          {whole ? "Show less of her letter" : "Read all of her letter"}
+        </TextButton>
+      ) : undefined}>
       {bare && prompt.questions.length > 0 && (
         <ol class="room-questions">
           {prompt.questions.map((q) => (
@@ -181,13 +192,18 @@ export function WriteRoom({ req }: { req: WriteRequest }) {
   const [target, setTarget] = useState<Target>(req.for ?? { kind: "note" });
   const [made, setMade] = useState<Created | null>(null);
   const go = useNavigate();
+  // "Speak it" starts the microphone once, for the first page only: not again after a discard or "Write another"
+  const [voice, setVoice] = useState(!!req.voice);
+  // what the page in the room says about leaving now (a save under way, a recording going or unsent): set by Desk
+  const guard = useRef<(() => boolean) | null>(null);
 
   // the day: the open prompts and her letter for an answer, the offers on a new note, the hour in the margin
   const [day, reloadDay] = useResource<Day>(async (signal) => {
     if (target.kind === "entry") return { today: null, library: [] };
     const [today, library] = await Promise.all([
-      api.today(signal),
-      api.library(signal).catch((e: unknown) => {
+      // (quiet reads: the room never touches the offline marks of the page behind it)
+      api.todayQuiet(signal),
+      api.libraryQuiet(signal).catch((e: unknown) => {
         if (e instanceof DOMException) throw e;
         return [] as LibraryItem[];
       }),
@@ -202,13 +218,15 @@ export function WriteRoom({ req }: { req: WriteRequest }) {
     [target.kind === "answer" ? target.practice : ""],
   );
   const [doc, reloadDoc] = useResource(
-    (signal) => (target.kind === "entry" ? api.entry(target.stem, signal) : Promise.resolve(null)),
+    (signal) => (target.kind === "entry" ? api.entryQuiet(target.stem, signal) : Promise.resolve(null)),
     [target.kind === "entry" ? target.stem : ""],
   );
 
-  const leave = useRef(() => {});
-  leave.current = () => {
+  const leave = useRef((_force?: boolean) => {});
+  leave.current = (force = false) => {
     if (leaving) return;
+    // the page may hold him back: a save settling, a recording to stop and keep, an unsent recording to ask about
+    if (!force && guard.current && !guard.current()) return;
     document.documentElement.classList.remove("room-open");
     const d = dialog.current;
     if (reducedMotion() || !d) return closeWrite();
@@ -254,7 +272,7 @@ export function WriteRoom({ req }: { req: WriteRequest }) {
   // Escape closes (the draft is already kept); from the first moment the room is on screen
   useLayoutEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !e.defaultPrevented) {
+      if (e.key === "Escape" && !e.defaultPrevented && !e.isComposing) {   // (Escape ending an IME composition is the IME's)
         e.preventDefault();
         leave.current();
       }
@@ -328,7 +346,18 @@ export function WriteRoom({ req }: { req: WriteRequest }) {
       submit: (words) => api.createEntry(words),
       head: (
         <Start day={day} titleOf={titleOf}
-          onAnswer={(practice, slot) => setTarget({ kind: "answer", practice, slot })}
+          onAnswer={(practice, slot) => {
+            // the words of the note go with him into the answer (its draft, after what it held), and the note's draft
+            // is left empty: they come back once, not again in the next note
+            const note = loadDraft("quick-note");
+            if (note.trim()) {
+              const key = `reply:${practice}:${slot}`;
+              const had = loadDraft(key);
+              saveDraft(key, had.trim() ? `${had.replace(/\s+$/, "")}\n\n${note}` : note);
+              saveDraft("quick-note", "");
+            }
+            setTarget({ kind: "answer", practice, slot });
+          }}
           onStarted={(id) => {
             leave.current();
             void go(`/library/${id}`);
@@ -351,7 +380,11 @@ export function WriteRoom({ req }: { req: WriteRequest }) {
           setTarget({ kind: "note" });
         }} />
       ) : (
-        <Desk page={page} hour={hour} voice={!!req.voice} onClose={() => leave.current()} onMade={setMade} />
+        <Desk page={page} hour={hour} voice={voice} onVoiceUsed={() => setVoice(false)} guard={guard}
+          onClose={(force) => leave.current(force)} onMade={(m) => {
+          wrote(m.stem);   // a page showing that entry reads it again
+          setMade(m);
+        }} />
       )}
     </dialog>
   );
@@ -370,11 +403,13 @@ interface Page {
 }
 
 /** The room's working state: the top bar, her letter or the start, his page, the dock. */
-function Desk({ page, hour, voice, onClose, onMade }: {
+function Desk({ page, hour, voice, onVoiceUsed, guard, onClose, onMade }: {
   page: Page;
   hour: string | undefined;
   voice: boolean;
-  onClose: () => void;
+  onVoiceUsed: () => void;
+  guard: { current: (() => boolean) | null };
+  onClose: (force?: boolean) => void;
   onMade: (made: Created) => void;
 }) {
   const made = useRef<Created | null>(null);
@@ -389,6 +424,25 @@ function Desk({ page, hour, voice, onClose, onMade }: {
   const [focus, setFocus] = useState(savedFocus);
   const [sel, setSel] = useState<[number, number]>(() => [c.text.length, c.text.length]);
   const [rec, setRec] = useState<{ on: boolean; s: number }>({ on: false, s: 0 });
+  const recorder = useRef<RecorderControl | null>(null);
+  // Escape or Close with his voice in the room: a recording going is stopped and kept (he stays); a recording not
+  // sent is asked about in place; a save under way is let settle. Typed words are always kept as the draft.
+  const [asking, setAsking] = useState(false);
+  guard.current = () => {
+    if (c.busy) return false;
+    if (recorder.current?.recording()) {
+      recorder.current.stop();
+      return false;
+    }
+    if (c.clip) {
+      setAsking(true);
+      return false;
+    }
+    return true;
+  };
+  useEffect(() => () => {
+    guard.current = null;
+  }, []);
   const id = `room-${page.key}`;
 
   const toggleFocus = () => {
@@ -435,7 +489,7 @@ function Desk({ page, hour, voice, onClose, onMade }: {
   return (
     <>
       <header class="room-top">
-        <IconButton label="Close" onClick={onClose}>
+        <IconButton label="Close" onClick={() => onClose()}>
           <Close />
         </IconButton>
         <p class="room-ctx">
@@ -512,6 +566,19 @@ function Desk({ page, hour, voice, onClose, onMade }: {
               <TextButton onClick={c.drop} disabled={c.busy}>Discard</TextButton>
             </div>
           )}
+          {asking && c.clip && (
+            <div class="room-asking" role="alertdialog" aria-label="Your recording is not sent">
+              <p>Your recording isn't sent yet. Closing the room drops it.</p>
+              <div class="room-asking-actions">
+                <Button size="small" variant="primary" onClick={() => setAsking(false)}>Keep writing</Button>
+                <Button size="small" variant="quiet" onClick={() => {
+                  c.drop();
+                  setAsking(false);
+                  onClose(true);
+                }}>Discard the recording</Button>
+              </div>
+            </div>
+          )}
           {!c.online && <OfflineNote clip={!!c.clip} />}
           {c.error && <ErrorLine error={c.error} {...(c.error.status === 422 ? {} : { onRetry: () => void c.send() })} />}
         </div>
@@ -521,8 +588,8 @@ function Desk({ page, hour, voice, onClose, onMade }: {
         <div class="room-dock">
           <span class={["room-count", rec.on && "recording"].filter(Boolean).join(" ")} aria-live="off">{count}</span>
           <div class="room-orb">
-            {!c.clip && <Recorder orb start={voice} onRecorded={c.record} disabled={c.busy}
-              onRecording={(on, s) => setRec({ on, s })} />}
+            {!c.clip && <Recorder orb start={voice} onBegan={onVoiceUsed} onRecorded={c.record} disabled={c.busy}
+              control={recorder} onRecording={(on, s) => setRec({ on, s })} />}
           </div>
           <div class="room-send">
             <Button variant="primary" icon={<Send />} disabled={!c.has || c.busy} onClick={() => void c.send()}>
@@ -572,7 +639,8 @@ function Start({ day, titleOf, onAnswer, onStarted }: {
 /** The programs he could begin: enabled, and with no run going. The server starts one a moment after it is asked. */
 function StartList({ onStarted }: { onStarted: (id: string) => void }) {
   const [res, reload] = useResource(async (signal) => {
-    const [items, runs] = await Promise.all([api.library(signal), api.runs(signal).catch(() => [])]);
+    // (quiet reads; a failed read of the runs is an error here, not "none running": it would offer one already going)
+    const [items, runs] = await Promise.all([api.libraryQuiet(signal), api.runsQuiet(signal)]);
     const live = new Set(runs.filter((r) => r.status === "active" || r.status === "paused").map((r) => r.program));
     return items.filter((i) => isProgramBacked(i) && i.enabled && !live.has(i.id));
   }, []);
@@ -606,7 +674,7 @@ function Done({ made, onClose, onAgain }: { made: Created; onClose: () => void; 
   return (
     <>
       <header class="room-top">
-        <IconButton label="Close" onClick={onClose}>
+        <IconButton label="Close" onClick={() => onClose()}>
           <Close />
         </IconButton>
       </header>

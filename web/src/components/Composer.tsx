@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { uploadAudio, type ApiError, type Words } from "../api";
-import { loadDraft, newClientId, saveDraft } from "../drafts";
+import { loadDraft, newClientId, onDraft, saveDraft } from "../drafts";
 import { asApiError } from "../hooks";
 import { OFFLINE_WRITE, useOnline } from "../offline";
 import { duration } from "../format";
@@ -62,6 +62,18 @@ export function useCompose({ draftKey, onSubmit, onDone }: {
   const uploaded = useRef<{ id: string; at: number } | null>(null);
   // what was in the box when the box moved to another place, until he puts it back or lets it go
   const [kept, setKept] = useState<Compose["kept"]>(null);
+  // this box's token: another box on the same draft (the entry's box and the room on that entry) tells us what it
+  // wrote or sent, and we take it up, so neither overwrites the other's words nor sends them twice. Only while this
+  // box is not sending: what it sends is the text it had.
+  const me = useRef({});
+  const sending = useRef(false);
+  useEffect(() => onDraft(draftKey, (value, from) => {
+    if (from === me.current || sending.current) return;
+    setText(value);
+    setError(null);
+    setKeptAt(null);
+    clientId.current = null;   // other words: a new write, not the retry of the last
+  }), [draftKey]);
 
   // another box (another entry, another phase): its own draft, and no leftovers of the last one's write. Words he had
   // typed and not sent are not dropped with the old box (a settle can move the run on while he is still typing):
@@ -70,8 +82,12 @@ export function useCompose({ draftKey, onSubmit, onDone }: {
   useEffect(() => {
     if (key.current === draftKey) return;
     key.current = draftKey;
-    setKept(text.trim() !== "" || clip ? { text, clip: clip ? { blob: clip.blob, seconds: clip.seconds } : null } : null);
-    setText(loadDraft(draftKey));
+    const next = loadDraft(draftKey);
+    // words already carried into the new box's draft (the room's note becoming an answer) are not offered again
+    const carried = text.trim() !== "" && next.includes(text.trim());
+    const words = carried ? "" : text;
+    setKept(words.trim() !== "" || clip ? { text: words, clip: clip ? { blob: clip.blob, seconds: clip.seconds } : null } : null);
+    setText(next);
     setClip(null);
     setError(null);
     setKeptAt(null);
@@ -85,7 +101,7 @@ export function useCompose({ draftKey, onSubmit, onDone }: {
 
   const edit = (value: string) => {
     setText(value);
-    setKeptAt({ at: Date.now(), stored: saveDraft(draftKey, value) });
+    setKeptAt({ at: Date.now(), stored: saveDraft(draftKey, value, me.current) });
     clientId.current = null;   // changed words are a new write, not the retry of the last
   };
 
@@ -114,6 +130,7 @@ export function useCompose({ draftKey, onSubmit, onDone }: {
   const send = async () => {
     if (!has || busy) return;
     setBusy(true);
+    sending.current = true;
     setError(null);
     try {
       const upload = async () => {
@@ -137,7 +154,7 @@ export function useCompose({ draftKey, onSubmit, onDone }: {
         await upload();
         await post();
       }
-      saveDraft(draftKey, "");
+      saveDraft(draftKey, "", me.current);   // (the other boxes on this draft empty too: it is sent)
       setText("");
       setClip(null);
       setKeptAt(null);
@@ -147,6 +164,7 @@ export function useCompose({ draftKey, onSubmit, onDone }: {
     } catch (e) {
       setError(asApiError(e));   // the text, the recording and the id stay: Retry is the same write
     } finally {
+      sending.current = false;
       setBusy(false);
     }
   };

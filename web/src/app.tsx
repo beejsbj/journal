@@ -71,11 +71,15 @@ function NotFound() {
   );
 }
 
-/** N opens the write surface, from anywhere but a field (or a dialog, or with a modifier). */
-function useWriteKey(): void {
+/** N opens the write surface, from anywhere but a field (or a dialog, a composition, or with a modifier), and only
+ *  in the app itself: not on the pairing screens, where a room would wait to open after pairing. */
+function useWriteKey(enabled: boolean): void {
+  const on = useRef(enabled);
+  on.current = enabled;
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (e.key !== "n" && e.key !== "N") return;
+      if (!on.current || e.isComposing) return;
       if (e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return;
       const t = e.target as HTMLElement | null;
       if (t?.closest?.("input, textarea, select, [contenteditable], [role=dialog], dialog")) return;
@@ -97,7 +101,7 @@ function Shell() {
   const next = useNext(wide && !lost);
   const main = useRef<HTMLElement>(null);
   useLinkTransitions();
-  useWriteKey();
+  useWriteKey(path !== "/pair" && !lost);
   // the ribbon describes the view on screen: a new view starts without it (layout effects run before any read starts);
   // and a new page starts at its top (a filter or a #hash on the same page keeps its place)
   useLayoutEffect(() => {

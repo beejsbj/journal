@@ -78,6 +78,79 @@ describe("The composer on an entry", () => {
     expect(loadDraft("entry:2026-10-14-evening")).toBe("");
   });
 
+  // review of #33, finding 1 (blocker): the entry's box and the write room on that entry hold one draft
+  const wideScreen = () => vi.stubGlobal("matchMedia", (q: string) => ({ matches: q === "(min-width: 761px)", media: q, addEventListener() {}, removeEventListener() {} }));
+  const escapeKey = () => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+
+  it("loses nothing between the room and the entry's box: each takes up what the other wrote", async () => {
+    wideScreen();
+    visit("/entries/2026-10-14-evening");
+    stubApi(reads);
+    const host = mount(<App />);
+    const inline = await until(() => must(host.querySelector<HTMLTextAreaElement>(".add .composer textarea")));
+    await click(byText(host, "button", "In the writing room"));
+    const r = await until(() => must(host.querySelector<HTMLElement>('[role="dialog"]')));
+    expect(must(inline.closest("[hidden]"))).toBeDefined();              // the entry's box waits while the room is on it
+    expect(host.querySelector(".add-in-room")?.textContent).toContain("writing room");
+    const box = await until(() => must(r.querySelector<HTMLTextAreaElement>('textarea[id="room-entry:2026-10-14-evening"]')));
+    await type(box, "A passage written in the room.");
+    escapeKey();
+    await until(() => expect(host.querySelector('[role="dialog"]')).toBeNull());
+    expect(inline.closest("[hidden]")).toBeNull();
+    expect(inline.value).toBe("A passage written in the room.");         // took it up
+    await type(inline, "A passage written in the room. And one more line.");
+    await click(byText(host, "button", "In the writing room"));
+    const again = await until(() => must(host.querySelector<HTMLElement>('[role="dialog"] textarea')) as HTMLTextAreaElement);
+    expect(again.value).toBe("A passage written in the room. And one more line.");
+    closeWrite();
+  });
+
+  it("sends the shared draft once: what the room saved leaves the entry's box empty, and the entry reads again", async () => {
+    wideScreen();
+    visit("/entries/2026-10-14-evening");
+    const { writes, sent } = stubApi({ ...reads, "POST /api/v1/entries/2026-10-14-evening/blocks": { key: "words:2", stem: "2026-10-14-evening" } });
+    const host = mount(<App />);
+    const inline = await until(() => must(host.querySelector<HTMLTextAreaElement>(".add .composer textarea")));
+    await type(inline, "abc");
+    await click(byText(host, "button", "In the writing room"));
+    const r = await until(() => must(host.querySelector<HTMLElement>('[role="dialog"]')));
+    const box = await until(() => must(r.querySelector<HTMLTextAreaElement>('textarea[id="room-entry:2026-10-14-evening"]')));
+    expect(box.value).toBe("abc");
+    const reads0 = sent.filter((x) => x.method === "GET" && x.path === "/api/v1/entries/2026-10-14-evening").length;
+    await type(box, "abc def");
+    await click(byText(r, "button", "Add to the entry"));
+    await until(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0]?.body).toMatchObject({ text: "abc def" });
+    await until(() => expect(inline.value).toBe(""));                     // nothing left to send twice
+    await until(() => expect(sent.filter((x) => x.method === "GET" && x.path === "/api/v1/entries/2026-10-14-evening").length).toBeGreaterThan(reads0));
+    closeWrite();
+    await until(() => expect(inline.closest("[hidden]")).toBeNull());
+    expect((byText(host, ".add button", "Add to the entry") as HTMLButtonElement).disabled).toBe(true);
+    expect(writes()).toHaveLength(1);
+  });
+
+  it("the room's own reads leave the page's offline ribbon as it was (finding 5)", async () => {
+    wideScreen();
+    visit("/entries/2026-10-14-evening");
+    let n = 0;
+    stubApi({
+      ...reads,
+      "GET /api/v1/entries/2026-10-14-evening": () => {
+        n += 1;   // the page's read is the kept copy; the room's, later, is fresh
+        return n === 1
+          ? new Response(JSON.stringify(fixtures.entryEvening), { status: 200, headers: { "Content-Type": "application/json", "x-journal-cache": "stale", "x-journal-cached-at": String(Date.now() - 60_000) } })
+          : fixtures.entryEvening;
+      },
+    });
+    const host = mount(<App />);
+    await until(() => must(host.querySelector(".ribbon")));
+    await click(await until(() => must(byText(host, "button", "In the writing room"))));
+    await until(() => expect(n).toBeGreaterThan(1));
+    await tick();
+    expect(host.querySelector(".ribbon")).not.toBeNull();   // the page still says it is the kept copy
+    closeWrite();
+  });
+
   it("keeps the text and the error when the write fails, and a retry is the same write", async () => {
     visit("/entries/2026-10-14-evening");
     let tries = 0;
@@ -777,7 +850,7 @@ describe("The Library", () => {
     const host = mount(<App />);
     await until(() => must(byText(host, "button", "Turn on")));
     expect(byText(host, "a.button", "Write now")?.getAttribute("href")).toBe("/today?write=gratitude");
-    expect(byText(host, "button", "Send to chat")).toBeDefined();
+    await until(() => must(byText(host, "button", "Send to chat")));   // (once the day's read says there is a chat)
   });
 
   it("turns a practice off by saving the file with enabled false, against the mtime it read", async () => {
@@ -1157,6 +1230,131 @@ describe("The write room", () => {
     const r = await room(host);
     await until(() => must(r.querySelector('[aria-label="Stop recording"]')));
     await until(() => expect(r.querySelector(".room-count")?.textContent).toContain("tap to stop"));
+  });
+
+  // review of #33, findings 2-4: his voice is never dropped without a word, and the microphone never turns on by itself
+  const escape = () => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+
+  it("Escape while recording stops and keeps the recording, then asks before an unsent one is dropped", async () => {
+    visit("/");
+    fakeMicrophone();
+    stubApi({ ...reads, "GET /api/v1/today": fixtures.todayPrompts, "GET /api/v1/library/weekly/open": view("weekly", "Answers the prompt in the chat, sent at 20:05.") });
+    const host = mount(<App />);
+    const card = await until(() => must(host.querySelector("li.practice.open")));
+    await click(byText(card, "button", "Speak it"));
+    const r = await room(host);
+    await until(() => must(r.querySelector('[aria-label="Stop recording"]')));
+    escape();
+    await until(() => must(r.querySelector(".room-clip")));            // stopped, and kept
+    expect(host.querySelector('[role="dialog"]')).toBe(r);              // still open
+    escape();
+    const ask = await until(() => must(r.querySelector(".room-asking")));
+    expect(ask.textContent).toContain("isn't sent yet");
+    await click(byText(ask, "button", "Keep writing"));
+    expect(r.querySelector(".room-asking")).toBeNull();
+    expect(r.querySelector(".room-clip")).not.toBeNull();
+    escape();
+    await click(byText(await until(() => must(r.querySelector(".room-asking"))), "button", "Discard the recording"));
+    await until(() => expect(host.querySelector('[role="dialog"]')).toBeNull());
+  });
+
+  it("does not close while a save is settling", async () => {
+    visit("/");
+    stubApi({ ...reads, "POST /api/v1/entries": () => new Response(new ReadableStream({ start() {} }), { status: 201, headers: { "Content-Type": "application/json" } }) });
+    const host = mount(<App />);
+    await until(() => must(host.querySelector("li.practice")));
+    await click(byText(host, "button.plus", "Write"));
+    const r = await room(host);
+    await type(r.querySelector("textarea"), "Words in flight.");
+    await click(byText(r, "button", "Put it in the journal"));
+    await until(() => must(byText(r, "button", "Saving…")));
+    escape();
+    await tick();
+    expect(host.querySelector('[role="dialog"]')).toBe(r);
+    await click(r.querySelector('[aria-label="Close"]'));
+    expect(host.querySelector('[role="dialog"]')).toBe(r);
+  });
+
+  it("starts the microphone once: not again after the recording is discarded", async () => {
+    visit("/");
+    fakeMicrophone();
+    stubApi({ ...reads, "GET /api/v1/today": fixtures.todayPrompts, "GET /api/v1/library/weekly/open": view("weekly", "x") });
+    const host = mount(<App />);
+    const card = await until(() => must(host.querySelector("li.practice.open")));
+    await click(byText(card, "button", "Speak it"));
+    const r = await room(host);
+    await click(await until(() => must(r.querySelector('[aria-label="Stop recording"]'))));
+    await click(byText(await until(() => must(r.querySelector(".room-clip"))), "button", "Discard"));
+    await until(() => must(r.querySelector('[aria-label="Record a voice note"]')));
+    await tick();
+    expect(r.querySelector('[aria-label="Stop recording"]')).toBeNull();   // waiting for his tap
+  });
+
+  it("lets the microphone go when the room closed while the browser was asking for it", async () => {
+    visit("/");
+    let grant: (s: unknown) => void = () => {};
+    const stopped = vi.fn();
+    let made = 0;
+    class FakeRecorder {
+      static isTypeSupported = () => true;
+      state = "inactive";
+      constructor() {
+        made += 1;
+      }
+      start() {}
+      stop() {}
+    }
+    vi.stubGlobal("MediaRecorder", FakeRecorder);
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: { getUserMedia: () => new Promise((ok) => { grant = ok; }) },
+    });
+    stubApi({ ...reads, "GET /api/v1/today": fixtures.todayPrompts, "GET /api/v1/library/weekly/open": view("weekly", "x") });
+    const host = mount(<App />);
+    const card = await until(() => must(host.querySelector("li.practice.open")));
+    await click(byText(card, "button", "Speak it"));
+    await room(host);
+    escape();   // the permission prompt still up: nothing recorded, so the room closes
+    await until(() => expect(host.querySelector('[role="dialog"]')).toBeNull());
+    grant({ getTracks: () => [{ stop: stopped }] });
+    await tick();
+    await tick();
+    expect(stopped).toHaveBeenCalled();   // the microphone is let go at once
+    expect(made).toBe(0);                 // and nothing records
+  });
+
+  it("carries a note's words into the answer he turns to, once: the note's draft is left empty", async () => {
+    visit("/");
+    const today = { ...fixtures.today, practices: { rows: [{ id: "gratitude", state: "open", sent: "21:30" }], open: ["gratitude"] } };
+    stubApi({ ...reads, "GET /api/v1/today": today });
+    const host = mount(<App />);
+    await until(() => must(host.querySelector("li.practice")));
+    await click(byText(host, "button.plus", "Write"));
+    const r = await room(host);
+    await type(r.querySelector("textarea"), "A thought for the gratitude.");
+    await click(await until(() => must(byText(r, "button", /Answer Daily gratitude/))));
+    const box = await until(() => must(r.querySelector<HTMLTextAreaElement>('textarea[id="room-reply:gratitude:0"]')));
+    await until(() => expect(box.value).toBe("A thought for the gratitude."));   // (the box takes its new draft after it draws)
+    expect(r.querySelector(".composer-kept")).toBeNull();    // carried, not offered a second time
+    expect(loadDraft("quick-note")).toBe("");                // and not waiting in the next note
+  });
+
+  it("lets him read all of her letter on a phone: a long opener rests at three lines with a way to open it (finding 9)", async () => {
+    visit("/");
+    const opener = "Evening, Sam. ".repeat(20).trim();
+    const today = { ...fixtures.today, practices: { rows: [{ id: "gratitude", state: "open", sent: "21:30",
+      prompt: { sent_at_local: "21:30 IST", opener, opener_source: "ada", asked: [], questions: [] } }], open: ["gratitude"] } };
+    stubApi({ ...reads, "GET /api/v1/today": today });
+    const host = mount(<App />);
+    const card = await until(() => must(host.querySelector("li.practice.open")));
+    await click(byText(card, "button", "Write now"));
+    const r = await room(host);
+    const more = await until(() => must(r.querySelector<HTMLButtonElement>(".room-letter-more")));
+    expect(more.getAttribute("aria-expanded")).toBe("false");
+    expect(r.querySelector(".room-letter")?.classList.contains("whole")).toBe(false);
+    await click(more);
+    expect(more.getAttribute("aria-expanded")).toBe("true");
+    expect(r.querySelector(".room-letter")?.classList.contains("whole")).toBe(true);
   });
 
   it("greys every paragraph but the one with the caret, and Focus turns it off", async () => {

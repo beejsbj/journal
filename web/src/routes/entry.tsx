@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { api } from "../api";
+import { api, type ApiError } from "../api";
 import { Composer } from "../components/Composer";
 import { Document, hourOf, isPending } from "../components/Document";
 import { SideRow, dayParts } from "../components/EntryRow";
@@ -7,12 +7,12 @@ import { Markdown } from "../components/Markdown";
 import { MetaSheet } from "../components/MetaSheet";
 import { useLive } from "../events";
 import { clip, dayLabel, duration, plainTitle, weekHeader } from "../format";
-import { useResource } from "../hooks";
+import { asApiError, useResource } from "../hooks";
 import { ChevronDown, ChevronLeft, ChevronUp, Envelope, Expand, Pen, SideDots, SideList, SideNone, Star } from "../icons";
-import { Pane, openWrite, useNavigate, useShellMode, withTransition } from "../shell";
+import { Pane, onWritten, openWrite, useNavigate, useShellMode, useWriteRequest, withTransition } from "../shell";
 import { useTitle } from "../title";
 import type { EntryDoc, EntryPage, EntrySummary } from "../types";
-import { Await, BackLink, Button, Calendar, Disclosure, Empty, IconButton, Segmented, Sheet, Skeleton, TextButton, Toast } from "../ui";
+import { Await, BackLink, Button, Calendar, Disclosure, Empty, ErrorLine, IconButton, Segmented, Sheet, Skeleton, TextButton, Toast } from "../ui";
 import { filterQuery, filtersOf, groupByWeek, localDay, params, rememberQuery, rememberedQuery, useWide, useWrittenDays, type Filters } from "./entries";
 import "./entry.css";
 
@@ -58,9 +58,18 @@ function dateOf(day: string): { weekday: string; d: number; month: string; year:
 
 // The sidebar's list: the list he came from (its filters), the first pages of it. Kept between entries so stepping
 // from one to the next does not empty it while it is read again.
-let sideCache: { key: string; items: EntrySummary[]; next: string | null } | null = null;
+let sideCache: { key: string; page: EntryPage } | null = null;
 
-function useSideList(f: Filters, wanted: boolean): { items: EntrySummary[] | null; error: boolean; next: string | null; more: () => void; busy: boolean; reload: () => void } {
+/**
+ * The sidebar's list: the first page for the filters (kept across entries, so moving between them does not blank it),
+ * and the pages "Load more" brings. As on Entries (entries.tsx), a page of "Load more" belongs to the first page it
+ * was asked after (the server's cursor is an offset into that very list): it is kept with that first page's identity
+ * and shown only while that first page is on screen; a newer first page (an entry arrived, the filters changed) aborts
+ * a page in flight and drops one that lands anyway; a failed page says so, with Retry.
+ */
+function useSideList(f: Filters, wanted: boolean): {
+  items: EntrySummary[] | null; error: boolean; next: string | null; more: () => void; busy: boolean; moreError: ApiError | null; reload: () => void;
+} {
   const key = filterQuery(f);
   // a phone has no sidebar (and no newer/older): nothing to read there
   const [res, reload] = useResource(
@@ -68,24 +77,49 @@ function useSideList(f: Filters, wanted: boolean): { items: EntrySummary[] | nul
     [key, wanted],
   );
   useLive(["entries-changed"], reload);
-  const [extra, setExtra] = useState<{ key: string; items: EntrySummary[]; next: string | null; busy: boolean }>({ key, items: [], next: null, busy: false });
-  const more = extra.key === key ? extra : { key, items: [], next: null, busy: false };
-  if (res.state === "ready" && wanted) sideCache = { key, items: res.data.items, next: res.data.next };
-  const first = res.state === "ready" ? res.data : sideCache?.key === key ? sideCache : null;
-  const next = more.items.length ? more.next : first?.next ?? null;
+  if (res.state === "ready" && wanted && sideCache?.page !== res.data) sideCache = { key, page: res.data };
+  const first: EntryPage | null = res.state === "ready" ? res.data : sideCache?.key === key ? sideCache.page : null;
+
+  type More = { origin: unknown; items: EntrySummary[]; next?: string | null; busy: boolean; error?: ApiError };
+  const [moreState, setMore] = useState<More>({ origin: null, items: [], busy: false });
+  const more: More = moreState.origin === first ? moreState : { origin: first, items: [], busy: false };
+  const current = useRef(first);
+  current.current = first;
+  const inflight = useRef<{ ctl: AbortController; origin: unknown } | null>(null);
+  useEffect(() => {
+    if (inflight.current && inflight.current.origin !== first) {
+      inflight.current.ctl.abort();
+      inflight.current = null;
+    }
+  }, [first]);
+  useEffect(() => () => inflight.current?.ctl.abort(), []);
+
+  const next = more.items.length ? (more.next ?? null) : first?.next ?? null;
   const load = () => {
     if (!next || more.busy) return;
-    setExtra({ ...more, busy: true });
-    api.entries({ ...params(f), limit: 60, cursor: next })
-      .then((page) => setExtra((m) => (m.key === key ? { key, items: [...m.items, ...page.items], next: page.next, busy: false } : m)))
-      .catch(() => setExtra((m) => ({ ...m, busy: false })));
+    const origin = first;
+    inflight.current?.ctl.abort();
+    const ctl = new AbortController();
+    inflight.current = { ctl, origin };
+    const live = () => !ctl.signal.aborted && current.current === origin;
+    setMore({ ...more, origin, busy: true, error: undefined });
+    api.entries({ ...params(f), limit: 60, cursor: next }, ctl.signal)
+      .then((page) => {
+        if (live()) setMore((m) => ({ origin, items: [...(m.origin === origin ? m.items : []), ...page.items], next: page.next, busy: false }));
+      })
+      .catch((e: unknown) => {
+        if (live()) setMore((m) => ({ ...(m.origin === origin ? m : { origin, items: [] }), busy: false, error: asApiError(e) }));
+      });
   };
-  return { items: first ? [...first.items, ...more.items] : null, error: res.state === "error" && !first, next, more: load, busy: more.busy, reload };
+  return {
+    items: first ? [...first.items, ...more.items] : null, error: res.state === "error" && !first, next, more: load, busy: more.busy,
+    moreError: more.error ?? null, reload,
+  };
 }
 
-function SideTitled({ items, stem, f, setF, date, error, reload, next, more, busy }: {
+function SideTitled({ items, stem, f, setF, date, error, reload, next, more, busy, moreError }: {
   items: EntrySummary[] | null; stem: string; f: Filters; setF: (f: Filters) => void; date: string | undefined; error: boolean;
-  reload: () => void; next: string | null; more: () => void; busy: boolean;
+  reload: () => void; next: string | null; more: () => void; busy: boolean; moreError: ApiError | null;
 }) {
   const [month, setMonth] = useState<string | null>(null);
   const shown = month ?? f.day?.slice(0, 7) ?? date?.slice(0, 7) ?? localDay().slice(0, 7);
@@ -119,7 +153,8 @@ function SideTitled({ items, stem, f, setF, date, error, reload, next, more, bus
                 {w.days.flatMap((d) => d.items).map((e) => <SideRow key={e.stem} entry={e} current={e.stem === stem} vt="page" />)}
               </section>
             ))}
-            {next && <Button size="small" variant="quiet" wide class="side-more" disabled={busy} onClick={more}>{busy ? "Loading…" : "Load more"}</Button>}
+            {moreError && <ErrorLine error={moreError} onRetry={more} />}
+            {next && !moreError && <Button size="small" variant="quiet" wide class="side-more" disabled={busy} onClick={more}>{busy ? "Loading…" : "Load more"}</Button>}
           </>
         )}
       </div>
@@ -312,6 +347,13 @@ function Readings({ doc }: { doc: EntryDoc }) {
 /** Add to the entry: a new block of his, at the end. A program session's answers go through the run, where the open
  *  phase is known (the server refuses a block on a program entry that does not name it). */
 function Add({ doc, reload, wide }: { doc: EntryDoc; reload: () => void; wide: boolean }) {
+  // while the write room is open on this entry its box is the one in use: this one waits, hidden (kept mounted, so a
+  // recording in it stays), and both share the draft (drafts.ts); what the room saves here, the page reads again
+  const req = useWriteRequest();
+  const inRoom = req?.for?.kind === "entry" && req.for.stem === doc.stem;
+  useEffect(() => onWritten((stem) => {
+    if (stem === doc.stem) reload();
+  }), [doc.stem]);
   if (doc.program) {
     return (
       <p class="composer-closed">
@@ -328,7 +370,8 @@ function Add({ doc, reload, wide }: { doc: EntryDoc; reload: () => void; wide: b
   }
   return (
     <section class="add" aria-label="Add to this entry">
-      {wide && (
+      {inRoom && <p class="composer-closed add-in-room" role="status">You're writing more for this entry in the writing room.</p>}
+      {wide && !inRoom && (
         <p class="add-head">
           <span>Keep writing</span>
           <TextButton onClick={(e) => openWrite({ for: { kind: "entry", stem: doc.stem }, from: e.currentTarget as HTMLElement })}>
@@ -336,6 +379,7 @@ function Add({ doc, reload, wide }: { doc: EntryDoc; reload: () => void; wide: b
           </TextButton>
         </p>
       )}
+      <div hidden={inRoom}>
       <Composer
         draftKey={`entry:${doc.stem}`}
         label={`Add to this entry, as ${doc.voices.his}`}
@@ -345,6 +389,7 @@ function Add({ doc, reload, wide }: { doc: EntryDoc; reload: () => void; wide: b
         onSubmit={(words) => api.addBlock(doc.stem, words)}
         onDone={reload}
       />
+      </div>
     </section>
   );
 }
@@ -384,11 +429,13 @@ export function EntryRoute({ stem = "" }: { stem?: string }) {
   const older = at >= 0 ? list[at + 1] : undefined;
   const step = (e: EntrySummary | undefined) => e && void go(`/entries/${e.stem}`, { kind: "page" });
 
-  // "[" cycles the sidebar, as the entry bar's switch does
+  // "[" cycles the sidebar: a convenience beside the entry bar's switch (its three buttons are the way that works on
+  // every keyboard; a layout that needs AltGr or Option for "[" sends a modifier, and is left alone). Never while
+  // typing, composing, or with a modifier held.
   useEffect(() => {
     if (!wide) return;
     const key = (e: KeyboardEvent) => {
-      if (e.key !== "[" || e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return;
+      if (e.key !== "[" || e.metaKey || e.ctrlKey || e.altKey || e.isComposing || e.defaultPrevented) return;
       if ((e.target as HTMLElement | null)?.closest?.("input, textarea, select, [contenteditable], dialog")) return;
       e.preventDefault();
       setMode(MODES[(MODES.indexOf(mode) + 1) % MODES.length] as SidebarMode);
@@ -491,7 +538,7 @@ export function EntryRoute({ stem = "" }: { stem?: string }) {
         <Pane class={`side-pane ${mode}`} glow={false} vt="page" label="Entries">
           {mode === "list" ? (
             <SideTitled items={side.items} stem={stem} f={f} setF={setF} date={doc?.date} error={side.error} reload={side.reload}
-              next={side.next} more={side.more} busy={side.busy} />
+              next={side.next} more={side.more} busy={side.busy} moreError={side.moreError} />
           ) : (
             <SideDotsRail items={side.items} stem={stem} f={f} />
           )}
