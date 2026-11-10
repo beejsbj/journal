@@ -16,7 +16,6 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
-<<<<<<< HEAD
 ## OPEN-PUSH — Web Push from `journal serve` to the installed PWA (2026-11-09; serve side only; **no gateway restart**; a new optional extra `journal[push]`; a new setting `push.*`; no state migration)
 
 **What changes.** `journal serve` can nudge the installed web app when a practice is due (README *Web app*,
@@ -87,7 +86,7 @@ restart). The old server ignores `serve-push.json` and `push-sent.json` (leave t
 means every device turns notifications on again later). The new PWA keeps its subscription, finds no `/push` route
 ("This server does not offer notifications yet") and gets no pushes; turn notifications off on each device first to
 end the subscriptions cleanly. The plugin pin needs no rollback of its own.
-=======
+
 ## OPEN-PROGRAMS — programs and interrupts with no chat (2026-11-09; tick, hook and serve side; **gateway restart required, in a window**; no config change; no state migration)
 
 **What changes.** A program phase becomes current before it is sent: its ledger record is written with no
@@ -122,7 +121,6 @@ is opened and sent by the next tick's step.
    the open phase with `journal program start <program>` (it sends the open phase again) once a chat is set. An interrupt item `open` (no
    chat) or `answered` is not pending to old code and is never sent; its record and any answer stay in the ledger and
    the entry.
->>>>>>> origin/main
 
 ## OPEN-FACES — do and answer a practice from the web app, the CLI and MCP (2026-11-09; serve side, the CLI and MCP; **no gateway restart of its own**: it rides OPEN-CORE's window; no config change; no state migration)
 
