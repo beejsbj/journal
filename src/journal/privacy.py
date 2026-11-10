@@ -101,19 +101,34 @@ def send_times(cfg: Config) -> list[datetime]:
 
 def _said(row: Row) -> str | None:
     """What of the row is his typed words: the text of his message, or the caption after an image or document
-    placeholder (Hermes stores those as a ``system`` row, the placeholder being its own); None for any other row."""
-    if row.kind == "his":
+    placeholder (Hermes stores those as a ``system`` row, the placeholder being its own); None for any other row.
+    A row withheld from his words (``Row.meta["withheld"]``) is read whole here, so an opt-out in it still counts;
+    not a delivery or a platform frame withheld so, which is no message of his, unless it carries a picture he sent
+    (``Row.meta["native"]``)."""
+    if row.kind == "his" or (row.kind == "system" and row.meta.get("withheld")
+                             and (row.meta.get("native") or not (row.meta.get("delivery") or row.meta.get("frame")))):
         return row.text
     return (row.meta.get("caption") or None) if row.kind == "system" else None
 
 
+def _in_cut(cfg: Config, row: Row) -> bool:
+    """Whether a line of what the transcript cut off the row after a picture's placeholders (``Row.meta["cut"]``)
+    opens with the opt-out command. That part is read as what the turn added, never as his words; but a row is taken
+    for a picture's turn by its shape alone, and a message of his shaped like one would hold his words there. So an
+    opt-out in it counts for the whole row, as it did when the row was read whole: when in doubt, private."""
+    return any(capture.opt_out(cfg, line) is not None for line in str(row.meta.get("cut") or "").splitlines())
+
+
 def row_marked(cfg: Config, row: Row, off_ids: set[str]) -> bool:
     """One of his rows off the record by itself: the hook's marker in the stored text, the opt-out command (any
-    text after it), or an id the hook recorded."""
+    text after it; on a later line of his words, or of what was cut off after a picture's placeholders: ``_in_cut``),
+    or an id the hook recorded."""
     if capture.OFF_RECORD.search(row.stored):
         return True
     text = _said(row)
     if text is not None and (capture.opt_out(cfg, text) is not None or capture.opt_out_inside(cfg, text)):
+        return True
+    if _in_cut(cfg, row):
         return True
     mid = row.platform_message_id
     return bool(mid) and str(mid) in off_ids
@@ -255,14 +270,15 @@ def compute(cfg: Config, rows: list[Row], hook_starts: list[datetime], sends: li
             continue  # notifications, process completions: not his words, no activity of his
         said = _said(row)
         if row.kind in ("mirror", "empty", "system", "boundary") and said is None:
-            if row.kind in ("empty", "system") and inside(t):
+            if row.kind in ("empty", "system") and (inside(t) or _in_cut(cfg, row)):
                 # a captionless photo (Hermes' image placeholder, or an empty row in native image mode) inside a
                 # window: no words to mark, but the picture, its stash and the vision note are his private
                 # message, and it keeps the window going as any message of his does: else her reply to it, or his next
                 # message, more than ``quiet_minutes`` after the activity before it, would read as outside the window
                 # and be saved. (A gateway row of these kinds extends it too: that errs toward more privacy.) Her
                 # turn took it in, as any private message of his: her reply describing it is private, also when the
-                # photo was queued and stored after the window ended.
+                # photo was queued and stored after the window ended. (The same for a row with no words in front of
+                # a picture's placeholders and an opt-out in what was cut off after them: ``_in_cut``.)
                 private(rid, t)
                 v.taint, v.answered = True, False
                 if v.window:

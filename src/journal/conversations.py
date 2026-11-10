@@ -353,8 +353,8 @@ def classify(cfg: Config, row: Row, data: dict, pv, saved: _Saved, off: dict | N
     if row_is_off(cfg, pv, row, off):  # the pass's answer, and the row's own marks besides
         return Event(at, rid, "excluded", key=mid or "", mid=mid, off=True, why="off")
     pictured = bool(mid and ((off or {}).get("images") or {}).get(mid))  # the hook stashed his picture
-    if kind == "empty" and pictured:
-        kind = "his"  # native image input stores no placeholder: a captionless photo is a row with no text at all
+    if kind == "empty" and (pictured or row.meta.get("images")):
+        kind = "his"  # a captionless photo attached natively: no words, only Hermes' notes (taken off by the adapter)
     if kind in ("mirror", "empty"):
         return Event(at, rid, "system", why="journal" if kind == "mirror" else "system")
     if kind == "boundary":

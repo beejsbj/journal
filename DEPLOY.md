@@ -16,6 +16,46 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## OWN-WORDS — what the engine adds to a turn is never filed as his words (2026-11-09; hook side and tick side; **gateway restart required**; no config or state change)
+
+**What changes.** The context the engine injects into the companion's turn (`pre_llm_call`: notebook, pack, program
+block, today block) is fenced (`<journal-context>` … `</journal-context>`). The chat reader (`hermes/transcript.py`)
+takes off what was added to his message in storage before reading a row: the gateway's notes in front, a natively
+attached picture's notes and what is stored after its placeholders when that is what a turn adds (the fenced context,
+recalled memory, Hermes' own turn note); a list of parts Hermes stored as JSON is read as its text. A row whose words
+still carry such a mark anywhere else (a fenced block or recalled memory ending a message with no picture, and
+anything else after a picture's placeholders, included) is **withheld** whole (never cut, captured, written, packed or
+quoted) and the sweep logs it, so it shows in `errors.jsonl` and `journal status`. The sweep now keeps a native
+picture of a queued message beside its entry (only from Hermes' picture cache) and stamps the capture of one sent with
+no caption with when the picture arrived. Entries already written are not touched. DECISIONS.md, OWN-WORDS.
+
+**Side and restart.** `turncontext.py` and the new `contextfence.py` (the fence) run in the gateway: the companion
+gets fenced context only after `hermes gateway restart`. `privacy.py`, `conversations.py` and `sweep.py` load with
+the plugin, and `hermes/transcript.py` when the hook first reads the chat (the privacy pass); the sweep itself and
+`tick.py` run in the tick, a fresh process, from the next tick after the pin moves. The order is safe either
+way: before the restart the gateway injects unfenced context, and the new reader still cuts a native picture's row at
+its placeholders and withholds an unfenced block by its first line. Rides the next restart window.
+
+1. Install the CLI at `<sha>`, move the plugin pin (`hermes -p <profile> plugins install beejsbj/journal --force
+   --ref <sha>`), restart `journal-serve` so doctor's version rows agree, then `hermes -p <profile> gateway restart`
+   in a window. Nothing is sent.
+2. First checks, without sending: `journal doctor --deep` is as before (its transcript sample counts withheld rows
+   among "read as empty or system"). After the next tick, `errors.jsonl` has no new `sweep: withheld row …` line;
+   one that appears names a row (ids only) Hermes stored with something added: read that row read-only
+   (`?mode=ro`) before deciding anything. It can be a picture's row with something after its placeholders the
+   reader does not know (another plugin's turn context, a new Hermes note): its caption stays out of the journal
+   until the reader is taught that shape (`hermes/transcript.py` `added`). A row the hook already saved and a cron
+   delivery never make such a line; another of Hermes' own rows (a compaction frame, an `[IMPORTANT: …` notice)
+   only when it carries a picture's turn. A `sweep: a picture of message … was not kept (…)` line in the tick's log
+   says why a swept picture stayed out (outside Hermes' picture cache, gone from it, too large, a failed copy). The sweep's watermark is unchanged, so rows it already passed are not read
+   again and nothing is captured twice.
+3. Live check, only with the owner (it sends into his chat): with a vault checksum before and after
+   (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`), he sends a picture with no caption while the companion is still
+   answering an open prompt. The next tick files it into the prompt's entry as a `· photo` block with the picture
+   embedded, at the time he sent it, with nothing else in his block.
+4. Rollback: the CLI and the plugin pin at the previous sha, and a gateway restart. Rows Hermes stored while this
+   release ran carry the fenced context; the previous reader does not strip it (the old behaviour), so keep the
+   sweep's watermark as it is.
 ## CONTINUITY — reflections read what came before, `journal_search`, only his words in quotes, one voice (2026-11-09; tick and hook side; **gateway restart needed**; **plugin pin before the CLI**; no config change; three new optional state fields)
 
 **What changes.** The day reflection and week review read the opening and the question of her last few analyses,

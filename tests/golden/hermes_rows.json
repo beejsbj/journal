@@ -401,8 +401,8 @@
      "kind": "his"
     },
     "caption": null,
-    "loose": "[Note: model was just switched from a to b. Adjust your self-identification accordingly.]\n\nafter the note",
-    "his_text": "[Note: model was just switched from a to b. Adjust your self-identification accordingly.]\n\nafter the note",
+    "loose": "after the note",
+    "his_text": "after the note",
     "pack": true,
     "parse": {
      "message_id": "15",
