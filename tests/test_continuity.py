@@ -573,6 +573,14 @@ class QuoteCheckTest(unittest.TestCase):
         ok, why = validate.check_catchup("You wrote ˮI adore napsˮ and slept. Glad you rested.", "I adore naps")
         self.assertFalse(ok)
         self.assertEqual(why, "irregular quote mark U+02EE at character 11 (line 1)")  # the mark and where, no words
+        # a quote that begins with the word is a quote all the same: its words stay out of what is reported
+        text = 'You wrote "irregular hours again, and no sleep" today.'
+        bad = validate.unfound(text, ["I slept well"])
+        self.assertEqual([validate.problem(text, b) for b in bad],
+                         ["a quote not in his words at character 11 (line 1), 37 characters long"])
+        self.assertFalse(validate.is_mark(bad[0][2]))
+        self.assertEqual(validate.check_catchup(text, "I slept well"),
+                         (False, "quote not in his messages: 'irregular hours again, and no sleep'"))  # (main's reason)
 
 
 class ReplyThroughConversationsTest(test_conversations.Base):

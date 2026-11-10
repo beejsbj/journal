@@ -303,7 +303,7 @@ def _misquote(text: str, corpus: str, source: str) -> str | None:
     if not bad:
         return None
     what = bad[0][2]
-    return what if what.startswith("irregular") else f"quote not in {source}: {what[:60]!r}"
+    return what if is_mark(what) else f"quote not in {source}: {what[:60]!r}"
 
 
 def _patterns(q: str) -> list[re.Pattern]:
@@ -386,12 +386,21 @@ def place(text: str, start: int, end: int | None = None) -> str:
     return at if end is None else f"{at}, {end - start} characters long"
 
 
+_MARK = re.compile(r"irregular quote mark U\+[0-9A-F]{4,6} at character \d+ \(line \d+\)")
+
+
+def is_mark(what: str) -> bool:
+    """Whether a finding of ``unfound`` is an irregular mark (said in numbers alone, so it may go anywhere), not a
+    quoted passage (words: a passage that merely begins with the word "irregular" is still one)."""
+    return _MARK.fullmatch(what or "") is not None
+
+
 def problem(text: str, bad: tuple[int, int, str]) -> str:
     """One finding of ``unfound`` in numbers only, for a log line, a ledger record's ``error`` or an alert: an
     irregular mark is said that way already; a quotation that is not his is named by where it stands and how long
     it is."""
     start, end, what = bad
-    return what if what.startswith("irregular") else f"a quote not in his words at {place(text, start, end)}"
+    return what if is_mark(what) else f"a quote not in his words at {place(text, start, end)}"
 
 
 def check_reflection(kind: str, text: str | None, corpus: str, misquotes: bool = True) -> tuple[bool, str]:

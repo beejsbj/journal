@@ -500,7 +500,7 @@ def write_one(cfg: Config, kind: str, end: date, trigger: str, now: datetime,
             # (the reason is in numbers only: it goes to the tick's output, ``error`` and the alert, which leave the
             # state dir. The start of a quote that was not his stays in the ledger alone, as main kept it there.)
             ok, reason = False, validate.problem(text, bad[0])
-            rejected = None if bad[0][2].startswith("irregular") else bad[0][2][:60]
+            rejected = None if validate.is_mark(bad[0][2]) else bad[0][2][:60]
     path = None
     if ok:
         path = _target(cfg, kind, end)
