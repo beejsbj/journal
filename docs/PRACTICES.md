@@ -17,7 +17,8 @@ every model step has a named plain fallback, and nothing waits on a model.
    question.
 4. **Whole-file override, inherited defaults.** A user file with a built-in's id replaces it entirely; a user file
    with three fields (`kind`, `id`, `title`) plus one question is a complete practice because every other key
-   has a default. `enabled: false` hides a built-in. No `extends`/`+Section` mini-language.
+   has a default. `enabled: false` takes a practice (a built-in too) off the schedule, nothing more: every face
+   still opens, writes and delivers it (the owner, 2026-11-09). No `extends`/`+Section` mini-language.
 5. **Built-ins were generated from `questions.py` once (the module is gone since WP13)** and frozen by a golden test: rendered bank lines,
    `bank_items`, `bank_with_ids` and the Telegram HTML for a fixed date are byte-equal to today's.
 6. **Advance:** `advance: settle` (default, `programs.settle_minutes` = 2) or `advance: next`. `/next` always
@@ -474,7 +475,9 @@ clock), the grace window, and that nothing is scheduled from free text.
 As built (WP5; the reasons are in DECISIONS.md, "Taken by packages"): the run stores each interrupt's wall-clock
 time as `local` (read in whatever timezone applies on the day) beside `at`; only a Telegram reply to the interrupt's
 message is its answer (it is written under a `%% journal interrupt:N %%` key); of several due at once the tick sends
-the newest; `/skip` and `/next` go on without interrupts.
+the newest; `/skip` and `/next` go on without interrupts. OPEN-PROGRAMS: each interrupt opens at its time (its
+ledger record is written, sent or not), and a face's block with `interrupt: N` answers it as a reply does; a phase
+becomes current with no delivery, so a run is done on the web app with no chat too.
 
 ### 4.9 Fix-life mapped onto the format
 
@@ -571,7 +574,8 @@ no transcript text in the output, `sources.*` never called from `turncontext`.
 
 ## 7. User override rules, in one place
 
-- A user file with a built-in's id replaces it whole; `enabled: false` hides it; deleting the user file restores
+- A user file with a built-in's id replaces it whole; `enabled: false` takes it off the schedule (the web app,
+  `journal open`/`write`, MCP, `/start` and `journal send` still open, write and deliver it); deleting the user file restores
   the built-in (the PWA's Reset to default, `journal practices reset <id>`). The packaged files are read-only; a
   `PUT` of a built-in writes his version in its place (BUILTIN-EDIT). A later release that changes a default keeps
   his version, and says the default has changed when the default his edit began from is known (kept in

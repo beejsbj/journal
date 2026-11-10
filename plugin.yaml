@@ -191,6 +191,13 @@ config_schema:
       generated state_dir/serve-token), trusted_proxies (CIDRs whose X-Forwarded-* are believed), allow_write,
       assets_dir, socket (an absolute Unix socket path served as well, 0600, for `tailscale serve`),
       tailscale_users (Tailscale logins signed in by their identity header, on the socket only, from tailscaled). No default here on purpose: a settings form that saved one would override the config file's.
+  push:
+    type: dict
+    description: >-
+      Web Push from `journal serve` to the installed web app (needs the extra journal[push]; read by serve only):
+      when (no-chat = only on a journal with channel.platform none; always = scheduled slots the chat delivered
+      too), subject (the VAPID contact the push services see, mailto: or https:; absent = the project's URL). No
+      default here on purpose: a settings form that saved one would override the config file's.
   programs:
     type: dict
     default: {settle_minutes: 2, reflect: true, bridges: false, keyboard: true, synthesis: false}

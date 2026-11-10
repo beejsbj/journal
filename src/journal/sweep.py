@@ -184,10 +184,10 @@ def prompt_texts(cfg: Config, p: dict) -> list[str]:
         out += [words(compose.header(practice, local, s, cfg.names)) for s in STATUSES]  # (folds before the opener stayed)
         # a fold keeps the opener: header, opener, status line; also of an earlier send of the prompt (a re-send)
         earlier = p.get("earlier_openers")
-        sent = [p.get("opener"), *(earlier if isinstance(earlier, list) else [])]
+        sent = [p.get("opener"), p.get("sent_opener"), *(earlier if isinstance(earlier, list) else [])]
         for opener in dict.fromkeys(o for o in sent if isinstance(o, str) and o):  # (a damaged record never raises)
             out += [words(compose.folded_html(practice, local, opener, s, cfg.names)) for s in STATUSES[1:]]
-    for key in ("plain_text", "html"):
+    for key in ("plain_text", "html", "sent_plain_text", "sent_html"):  # (sent_*: a delivery onto a face's record)
         if p.get(key):
             out.append(words(p[key]))
     if p.get("program"):  # a phase folds to its own header line (tick.fold, programs): quoting that is a reply to it

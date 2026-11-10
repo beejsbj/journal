@@ -71,6 +71,17 @@ class CommandsTest(CleanEnv):
         self.assertIn("Evening journal", out)
         self.assertFalse(self.cfg.ledger_path.exists() and json.loads(self.cfg.ledger_path.read_text())["prompts"])
 
+    def test_send_takes_a_practice_turned_off(self):
+        """The owner, 2026-11-09 (decision 4): ``enabled: false`` is "not scheduled" only; ``journal send`` sends it."""
+        d = self.cfg.practices_dir
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "quiet.md").write_text("---\nkind: practice\nid: quiet\ntitle: Quiet\nenabled: false\n---\n- One?\n",
+                                    encoding="utf-8")
+        with mock.patch.object(tick, "_opener", lambda *a: ("Quiet 🌻 hi", "iris", [], [])):
+            code, out, err = run_cli("--config", str(self.conf), "send", "quiet", "--dry-run")
+        self.assertEqual(code, 0, err)
+        self.assertIn("[dry-run] ", out)
+
     def test_tick_records_its_run_and_status_reports_it(self):
         add_prompt(self.cfg, sent=datetime.now(timezone.utc) - timedelta(hours=1), message_id="5")
         with mock.patch.object(tick, "fold", lambda cfg, now, log: log.append("p: fold failed (timeout)")), \

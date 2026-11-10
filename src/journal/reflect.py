@@ -380,12 +380,36 @@ def write_one(cfg: Config, kind: str, end: date, trigger: str, now: datetime,
     return None, False
 
 
+def _owed(rec: dict) -> bool:
+    """A written analysis still to send: not sent, not skipped, attempts left."""
+    tg = rec.get("telegram") or {}
+    return bool(rec.get("written_at")) and not tg.get("message_id") and not tg.get("skipped") \
+        and tg.get("attempts", 0) < SEND_ATTEMPTS
+
+
+def _skip(cfg: Config, now: datetime, log: list[str]) -> None:
+    """No chat: each written analysis that would have been sent is marked skipped, ``no chat``, and never sent, also
+    once a chat is configured later (the owner, 2026-11-09). It stays in its file; ``standing`` tells the companion
+    how many there were, never their words."""
+    skipped = []
+    with ledger.locked(cfg.ledger_path) as data:
+        for rec in data.get("reflections") or []:
+            if isinstance(rec, dict) and _owed(rec):
+                rec.setdefault("telegram", {}).update(skipped="no chat", skipped_at=now.isoformat())
+                skipped.append(str(rec.get("id")))
+    for rid in skipped:
+        log.append(f"{rid}: not sent: no chat (in its file)")
+
+
 def send(cfg: Config, now: datetime, log: list[str]) -> list[str]:
     """Send each written analysis to the chat once (silently when the overnight fallback wrote it)."""
     alerts, where = [], channel.label(cfg)
+    if not cfg.has_channel:
+        _skip(cfg, now, log)
+        return alerts  # no chat: the analysis is in its file, and nothing is attempted (OPEN-PROMPTS rule 6)
     for rec in ledger.snapshot(cfg.ledger_path).get("reflections") or []:
         tg = rec.get("telegram") or {}  # (the record's name for its send, whatever the platform)
-        if not rec.get("written_at") or tg.get("message_id") or tg.get("attempts", 0) >= SEND_ATTEMPTS:
+        if not _owed(rec):
             continue
         path = Path(rec.get("path") or "")
         error, mid, title, body = None, None, "", ""
