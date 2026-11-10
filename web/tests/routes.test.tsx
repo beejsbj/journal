@@ -71,16 +71,19 @@ describe("Today", () => {
       ["waiting since 20:05", "came at 06:00", "answered 21:38", "at 23:00"]);   // a missed prompt says when it came, no more
     expect(host.querySelector("#waiting-h")?.textContent).toBe("Waiting for yousince 20:05");
     const [open, missed, answered, upcoming] = cards as [HTMLElement, HTMLElement, HTMLElement, HTMLElement];
-    // her letter: from her, sent at its hour, the opener, the question she asked, every question kept at the foot
+    // her letter: from her, sent at its hour, the opener, the question she asked, every question under it, open
     expect(missed.querySelector(".letter-from")?.textContent).toBe("From Adasent 06:00 IST");
     expect(missed.querySelector(".letter-body")?.textContent).toContain("Morning, Sam.");
     expect(missed.querySelector(".letter-asked")?.textContent).toBe("How did you sleep?");
     expect(missed.querySelectorAll(".letter-qlist li")).toHaveLength(11);
     expect(missed.querySelector(".letter-qlist li.asked")?.textContent).toContain("How did you sleep?");
-    // sent with the plain opener: nothing recorded, so the questions are the letter and stand open
+    // sent with the plain opener: nothing recorded, so the questions are the letter
     expect(open.querySelector(".letter-asked")).toBeNull();
-    expect(open.querySelectorAll(".today-questions li").length).toBeGreaterThan(0);
-    expect(open.querySelector(".letter-qlist")).toBeNull();
+    expect(open.querySelectorAll(".letter-qlist-open li").length).toBeGreaterThan(0);
+    // Today never folds a prompt (FRONTEND §1.1; main's `.prompt details` assertion): every question stands open, on
+    // every card, and there is no fold to open
+    expect(host.querySelector("li.practice .letter-questions, li.practice details, li.practice [aria-expanded]")).toBeNull();
+    expect(missed.querySelector(".letter-qlist")?.classList.contains("letter-qlist-open")).toBe(true);
     expect(answered.querySelector(".letter-body p")?.textContent).toBe("Three small things tonight, Sam. The walk to the harbour counts.");
     expect(answered.querySelectorAll(".letter-qlist li")).toHaveLength(2);
     // his reply under her letter, in his own type, linked to the entry

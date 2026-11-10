@@ -93,12 +93,14 @@ describe("Document: two voices, one page", () => {
   });
 
   // WEB-UX: the recording plays in ui/AudioPlayer (a play button and a speed button over a real <audio>), and the
-  // letter folds its questions behind a button: neither edits anything. Every other control is still absent.
+  // letter folds its questions behind its head: neither edits anything. Exactly those three buttons are allowed; every
+  // other control is still absent, and her letter holds no field of any kind.
   it("has no control that edits or removes a block of his", () => {
     const host = mount(<Document doc={evening} />);
     const controls = [...host.querySelectorAll("button, textarea, input, [contenteditable]")]
-      .filter((el) => !el.closest(".player") && !el.closest(".letter-questions"));
+      .filter((el) => !el.matches("button.player-play, button.player-rate, .letter-questions > button.disclosure-head"));
     expect(controls).toHaveLength(0);
+    expect(host.querySelectorAll(".letter textarea, .letter input, .letter [contenteditable]")).toHaveLength(0);
     expect(host.querySelectorAll(".block-actions, .block-editor")).toHaveLength(0);
   });
 

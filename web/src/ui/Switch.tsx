@@ -5,7 +5,9 @@
  */
 import "./Switch.css";
 
-export function Switch({ checked, onChange, label, labelledBy, disabled, id }: {
+export function Switch({ checked, onChange, label, labelledBy, describedBy, disabled, id }: {
+  /** The element that says more about it (a setting's hint, or the line saying where a locked one is changed). */
+  describedBy?: string;
   checked: boolean;
   onChange: (next: boolean) => void;
   label?: string;
@@ -15,6 +17,6 @@ export function Switch({ checked, onChange, label, labelledBy, disabled, id }: {
 }) {
   return (
     <button type="button" role="switch" id={id} class="switch" aria-checked={checked} aria-label={labelledBy ? undefined : label}
-      aria-labelledby={labelledBy} disabled={disabled} onClick={() => onChange(!checked)} />
+      aria-labelledby={labelledBy} aria-describedby={describedBy} disabled={disabled} onClick={() => onChange(!checked)} />
   );
 }

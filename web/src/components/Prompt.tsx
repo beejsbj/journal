@@ -1,3 +1,4 @@
+import type { ComponentChildren } from "preact";
 import type { Prompt } from "../types";
 import { Letter } from "../ui";
 
@@ -17,10 +18,13 @@ export function sectionsOf(questions: Question[]): { title: string | null; items
 /**
  * Her message as the design system's letter (ui/Letter): "From Ada · sent 23:00", the opener, the question she asked
  * in italic, and the practice's questions by part. With `fold` (the entry; `FOLD_ENTRY_QUESTIONS`) the questions wait
- * behind "All 24 questions, in 10 parts"; without it (Today) they are shown in full, in the same sections. No fastening
+ * behind "All 24 questions, in 10 parts"; without it (Today: the web never folds a prompt there, FRONTEND §1.1) they
+ * are shown in full, in the same sections, with Today's actions on the letter's crease. No fastening
  * of any kind (the owner's call on round 02).
  */
-export function PromptLetter({ prompt, hers, fold = false, class: cls }: { prompt: Prompt; hers: string; fold?: boolean; class?: string }) {
+export function PromptLetter({ prompt, hers, fold = false, class: cls, actions }: {
+  prompt: Prompt; hers: string; fold?: boolean; class?: string; actions?: ComponentChildren;
+}) {
   if (!prompt.opener && !prompt.sent_at_local && prompt.questions.length === 0) return null;
   const askedIds = prompt.asked.map((q) => q.id);
   const asked = prompt.asked.map((q) => q.question);
@@ -29,7 +33,7 @@ export function PromptLetter({ prompt, hers, fold = false, class: cls }: { promp
   const lone = questions.length === 1 && asked.length === 0 ? questions[0] : undefined;
   return (
     <Letter from={hers} at={prompt.sent_at_local ?? undefined} opener={prompt.opener ?? undefined} asked={asked}
-      askedIds={askedIds} questions={fold ? questions : []} class={cls} label={`${hers}'s prompt`}>
+      askedIds={askedIds} questions={fold ? questions : []} class={cls} label={`${hers}'s prompt`} actions={actions}>
       {lone && <p class="letter-asked">{lone.text}</p>}
       {!fold && questions.length > 1 && (
         <div class="letter-qlist letter-qlist-open">

@@ -22,8 +22,8 @@
 .sheet-head h2 { margin: 0; font: italic 400 var(--t-h3) / 1.2 var(--f-his); color: var(--text); }
 .sheet-head .icon-button { margin-right: -8px; }
 
-.sheet-layer.leaving .sheet-backdrop { animation: fade-out 200ms ease both; }
-.sheet-layer.leaving .sheet { animation: sheet-down 220ms var(--e-inout) both; }
+.sheet-layer.leaving .sheet-backdrop { animation: fade-out var(--d-2) ease both; }
+.sheet-layer.leaving .sheet { animation: sheet-down var(--d-2) var(--e-inout) both; }
 @keyframes sheet-up { from { transform: translateY(105%); } }
 @keyframes sheet-down { to { transform: translateY(105%); } }
 @keyframes fade-out { to { opacity: 0; } }

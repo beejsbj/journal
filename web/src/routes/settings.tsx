@@ -481,31 +481,34 @@ function Row({ f, settings, origins, profile, edit, folded, onInput }: {
   const changed = edit !== undefined && edit !== stored && !(edit === "" && stored === "");
   const emptied = edit === "" && stored !== "";
   const hintId = `${id}-hint`;
+  // a value typed or stepped back to what is stored, or to the default while the field is unset, is no change: the row
+  // is left as it is, and a save writes nothing for it (a default is never written into the file by accident)
+  const put = (v: string) => onInput(v === stored || (stored === "" && v !== "" && isDefault(f, v)) ? undefined : v);
   // "Use default": back to unset when it was unset (a save then leaves it), else the default's own value, written
   const useDefault = () => onInput(stored === "" ? undefined : f.kind === "flag" ? (f.def ? "on" : "off") : String(f.def));
   let control: ComponentChildren;
   if (f.kind === "flag") {
     const on = current === "on" || (current === "" && f.def === true);
     control = (
-      <Switch id={id} labelledBy={`${id}-label`} checked={on} disabled={locked !== null}
+      <Switch id={id} labelledBy={`${id}-label`} describedBy={hintId} checked={on} disabled={locked !== null}
         onChange={(next) => onInput(stored === "" && next === f.def ? undefined : next ? "on" : "off")} />
     );
   } else if (f.kind === "clock") {
     control = (
       <input id={id} class="input set-time" type="time" value={value} disabled={locked !== null} aria-describedby={hintId}
-        aria-invalid={bad ? true : undefined} onInput={(e) => onInput((e.currentTarget as HTMLInputElement).value)} />
+        aria-invalid={bad ? true : undefined} onInput={(e) => put((e.currentTarget as HTMLInputElement).value)} />
     );
   } else if (f.kind === "number" || f.kind === "whole") {
     const step = f.step ?? 1;
     control = (
-      <TypedStepper id={id} label={f.label} value={value} onInput={onInput} step={step} unit={f.unit} whole={f.kind === "whole"}
-        base={typeof f.def === "number" ? f.def : 0} min={f.min ?? (f.above !== undefined ? f.above + step : -Infinity)} max={f.max ?? Infinity}
+      <TypedStepper id={id} label={f.label} value={value} onInput={put} step={step} unit={f.unit} whole={f.kind === "whole"}
+        base={typeof f.def === "number" ? f.def : 0} min={f.min ?? -Infinity} above={f.above} max={f.max ?? Infinity}
         disabled={locked !== null} invalid={!!bad} describedBy={hintId} />
     );
   } else {
     control = (
       <input id={id} class="input set-text" type="text" value={value} disabled={locked !== null} aria-describedby={hintId}
-        aria-invalid={bad ? true : undefined} autocomplete="off" onInput={(e) => onInput((e.currentTarget as HTMLInputElement).value)} />
+        aria-invalid={bad ? true : undefined} autocomplete="off" onInput={(e) => put((e.currentTarget as HTMLInputElement).value)} />
     );
   }
   const row = (
@@ -858,10 +861,21 @@ export function SettingsRoute() {
 
   const ready = res.state === "ready" ? res.data : null;
   const settings = ready?.settings ?? {};
-  const value = (f: SettingField) => edited[keyOf(f)] ?? shown(f, valueAt(settings, f.path));
-  const patch = ready ? buildPatch(settings, edited) : {};
+  // an edit in a row that has folded away (its switch turned off) is not sent: the row it was made in is gone
+  const flagOn = (key: string) => {
+    const g = FIELDS.find((x) => keyOf(x) === key);
+    if (!g) return true;
+    const v = edited[key] ?? shown(g, valueAt(settings, g.path));
+    return v === "on" || (v === "" && g.def !== false);
+  };
+  const live = Object.fromEntries(Object.entries(edited).filter(([k]) => {
+    const f = FIELDS.find((x) => keyOf(x) === k);
+    return !f?.under || flagOn(f.under);
+  }));
+  const value = (f: SettingField) => live[keyOf(f)] ?? shown(f, valueAt(settings, f.path));
+  const patch = ready ? buildPatch(settings, live) : {};
   // what the bar counts is fields changed (the patch nests them under their top-level keys)
-  const changes = ready ? FIELDS.filter((f) => Object.keys(buildPatch(settings, { [keyOf(f)]: edited[keyOf(f)] ?? "" })).length > 0).length : 0;
+  const changes = ready ? FIELDS.filter((f) => Object.keys(buildPatch(settings, { [keyOf(f)]: live[keyOf(f)] ?? "" })).length > 0).length : 0;
   const invalid = FIELDS.some((f) => problem(f, value(f)) !== null);
   const setField = (key: string, v: string | undefined) => {
     setEdited((now) => {

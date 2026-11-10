@@ -77,6 +77,44 @@ describe("Settings, the section index", () => {
   });
 });
 
+describe("Settings, the edits a save sends (review of #33, settings nits)", () => {
+  it("counts a value stepped back to what it was, or to the default while unset, as no change", async () => {
+    visit("/settings");
+    stubApi(read);
+    const host = mount(<App />);
+    const cache = await until(() => must(host.querySelector<HTMLInputElement>("#s-today\\.max_chars")));   // unset: shows 1200, the default
+    const dock = must(host.querySelector(".save-dock"));
+    await click(host.querySelector('button[aria-label="More: Today block, characters"]'));
+    expect(cache.value).toBe("1300");
+    expect(dock.getAttribute("data-shown")).toBe("true");
+    await click(host.querySelector('button[aria-label="Less: Today block, characters"]'));
+    expect(cache.value).toBe("1200");
+    expect(dock.getAttribute("data-shown")).toBe("false");   // back at the default: nothing to save, nothing written
+    expect(cache.closest(".setting")?.classList.contains("changed")).toBe(false);
+  });
+
+  it("does not send an edit made in a row that then folded away under its switch", async () => {
+    visit("/settings");
+    const { writes } = stubApi({ ...read, "PATCH /api/v1/settings": { written: { "today.enabled": "file" } } });
+    const host = mount(<App />);
+    const cache = await until(() => must(host.querySelector<HTMLInputElement>("#s-today\\.max_chars")));
+    await type(cache, "1500");
+    await click(must(host.querySelector("#s-today\\.enabled")));   // off: the row folds away
+    await click(byText(host, "button", "Save"));
+    await until(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0]?.body).toEqual({ today: { enabled: false } });
+  });
+
+  it("describes a locked switch by the line that says where it is changed", async () => {
+    visit("/settings");
+    stubApi(read);
+    const host = mount(<App />);
+    const sw = await until(() => must(host.querySelector<HTMLElement>('.setting.locked [role="switch"], .setting [role="switch"]')));
+    const hint = must(document.getElementById(must(sw.getAttribute("aria-describedby"))));
+    expect(hint.classList.contains("set-hint")).toBe(true);
+  });
+});
+
 describe("Settings, notifications", () => {
   it("are a card of their own at the head of 07 This device", async () => {
     visit("/settings");

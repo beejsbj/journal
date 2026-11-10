@@ -1,3 +1,4 @@
 /* ConfirmButton (components/ConfirmButton.tsx): the question in place of the button, in the book's italic */
 .confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--s2); animation: fade-in var(--d-2) both; }
 .confirm-q { font: italic 400 1.0625rem / 1.3 var(--f-his); color: var(--text); margin-right: var(--s1); }
+.confirm-wrap { display: contents; }

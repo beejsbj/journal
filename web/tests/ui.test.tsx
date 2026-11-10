@@ -100,6 +100,19 @@ describe("the design system's primitives", () => {
     expect(plain.querySelector("text")).toBeNull();
   });
 
+  it("TypedStepper with an open lower bound steps to any value above it, and never to it", async () => {
+    function S() {
+      const [v, set] = useState("0.75");
+      return <TypedStepper label="Minutes" value={v} onInput={set} step={0.5} above={0} />;
+    }
+    const host = mount(<S />);
+    const box = must(host.querySelector<HTMLInputElement>("input"));
+    const [less] = [...host.querySelectorAll("button")] as [HTMLButtonElement];
+    await click(less);
+    expect(box.value).toBe("0.25");          // above 0: allowed (a min of 0 + one step stopped it at 0.5)
+    expect(less.disabled).toBe(true);        // the next step would reach 0
+  });
+
   it("Disclosure says whether it is open, and its closed body is inert", async () => {
     const host = mount(<Disclosure head="Her reflection" peek="To carry forward">Her words.</Disclosure>);
     const head = must(host.querySelector<HTMLButtonElement>(".disclosure-head"));

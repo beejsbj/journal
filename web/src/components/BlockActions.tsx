@@ -116,9 +116,21 @@ export function BlockEditor({ target, onClose }: { target: BlockTarget; onClose:
     onChanged();
   };
   const conflict = act.error?.status === 409 && act.error.slug === "changed";
+  // the editor takes focus as it opens (from Edit beside the passage, or from the sheet on a phone, whose closing would
+  // otherwise hand focus back to the button that opened it): once now, and once after a sheet's exit, if it is elsewhere
+  const form = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    const box = () => form.current?.querySelector<HTMLTextAreaElement>("textarea");
+    box()?.focus({ preventScroll: true });
+    const t = setTimeout(() => {
+      if (form.current && !form.current.contains(document.activeElement)) box()?.focus({ preventScroll: true });
+    }, 450);
+    return () => clearTimeout(t);
+  }, []);
 
   return (
     <form
+      ref={form}
       class="block-editor"
       onSubmit={(e) => {
         e.preventDefault();

@@ -41,9 +41,11 @@ export function Sheet({ title, onClose, children, class: cls }: {
   const [leaving, setLeaving] = useState(false);
   const close = useRef(onClose);
   close.current = onClose;
+  const gone = useRef(false);   // (Escape and the cancel event can both ask in one tick: it leaves once)
   const leave = useRef(() => {});
   leave.current = () => {
-    if (leaving) return;
+    if (gone.current) return;
+    gone.current = true;
     if (reducedMotion()) return close.current();
     setLeaving(true);
     setTimeout(() => close.current(), EXIT_MS);
@@ -100,9 +102,13 @@ export function Sheet({ title, onClose, children, class: cls }: {
   }, []);
 
   return (
-    // the browser's own Escape (the cancel event) is ours: the sheet leaves with its exit, then the parent unmounts it
+    // the browser's own cancel (Escape, Android's back) is ours: the sheet leaves with its exit, then the parent unmounts it
     <dialog ref={dialog} class={["sheet-layer", leaving && "leaving"].filter(Boolean).join(" ")} role="dialog" aria-modal="true"
-      aria-label={title} onCancel={(e) => e.preventDefault()}>
+      aria-label={title} onCancel={(e) => {
+        // the browser's back gesture (Android) and Escape both arrive here: the sheet leaves, as its Close does
+        e.preventDefault();
+        leave.current();
+      }}>
       <div class="sheet-backdrop" aria-hidden="true" onClick={() => leave.current()} />
       <div ref={panel} class={["sheet", cls].filter(Boolean).join(" ")} tabIndex={-1}>
         <header class="sheet-head">

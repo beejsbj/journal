@@ -40,6 +40,8 @@ export function AudioPlayer({ src, duration, label = "the recording", preload = 
   const [pos, setPos] = useState(0);
   const [dur, setDur] = useState(duration ?? 0);
   const [rate, setRate] = useState(1);
+  // a recording that will not load or play says so, in words (there are no native controls to show it)
+  const [failed, setFailed] = useState(false);
   const heights = useMemo(() => bars(54, src), [src]);
   useEffect(() => {
     if (audio.current) audio.current.playbackRate = rate;
@@ -48,7 +50,13 @@ export function AudioPlayer({ src, duration, label = "the recording", preload = 
   const toggle = () => {
     const a = audio.current;
     if (!a) return;
-    if (a.paused) void a.play().catch(() => setPlaying(false));
+    if (a.paused) {
+      void a.play().then(() => setFailed(false)).catch((e: unknown) => {
+        setPlaying(false);
+        // (an AbortError is a pause or a new source arriving mid-start, not a failure)
+        if (!(e instanceof DOMException && e.name === "AbortError")) setFailed(true);
+      });
+    }
     else a.pause();
   };
   const seek = (t: number) => {
@@ -98,10 +106,12 @@ export function AudioPlayer({ src, duration, label = "the recording", preload = 
       <button type="button" class="player-rate" aria-label={`Speed: ${rate} times`} onClick={() => setRate(RATES[(RATES.indexOf(rate) + 1) % RATES.length] ?? 1)}>
         {rate}×
       </button>
-      <audio ref={audio} src={src} preload={preload}
+      {failed && <p class="player-failed" role="alert">This recording can't be played here.</p>}
+      <audio ref={audio} src={src} preload={preload} onError={() => setFailed(true)}
         onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)}
         onTimeUpdate={(e) => setPos((e.currentTarget as HTMLAudioElement).currentTime)}
         onLoadedMetadata={(e) => {
+          setFailed(false);
           const d = (e.currentTarget as HTMLAudioElement).duration;
           if (Number.isFinite(d) && d > 0) setDur(d);
         }}>

@@ -105,7 +105,7 @@
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .settings-page .ink.on { background: var(--raised); } }
 .settings-page .ink input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .settings-page .ink:has(input:focus-visible) { outline: 2px solid var(--text-2); outline-offset: 2px; }
-.settings-page .ink-blot { width: 54px; height: 48px; color: var(--her); filter: drop-shadow(0 0 10px var(--her-glow)); transition: transform 500ms var(--e-paper); }
+.settings-page .ink-blot { width: 54px; height: 48px; color: var(--her); filter: drop-shadow(0 0 10px var(--her-glow)); transition: transform var(--d-4) var(--e-paper); }
 .settings-page .ink.on .ink-blot { transform: scale(1.1) rotate(-4deg); }
 .settings-page .ink-name { font: 500 14px / 1.2 var(--f-ui); color: var(--text); }
 .settings-page .ink-note { font: italic 400 14px / 1.3 var(--f-his); color: var(--text-3); }
@@ -113,7 +113,7 @@
 .settings-page .ink-proof-line { min-height: 3.4em; margin: 0; font-size: 15px; }
 .settings-page .ink-caret {
   display: inline-block; width: 0.55em; height: 1.1em; margin-left: 1px; vertical-align: -2px; background: var(--her); opacity: 0.7;
-  animation: ink-blink 1s steps(1) infinite;
+  animation: ink-blink var(--d-5) steps(1) infinite;
 }
 @keyframes ink-blink { 50% { opacity: 0; } }
 .settings-page .set-theme .set-control { flex: 0 1 auto; }
@@ -179,7 +179,7 @@
 .settings-page .save-dock[data-shown="true"] .save-bar { transform: none; opacity: 1; visibility: visible; transition: transform var(--spring-soft-dur) var(--spring-soft), opacity var(--d-2), visibility 0s; }
 .settings-page .save-count { margin-right: auto; color: var(--text); }
 .settings-page .save-bar .saved { flex: 1; margin: 0; color: var(--text); font-size: var(--t-ui); }
-.settings-page .save-error { margin: 0 var(--gutter) var(--s2); max-width: 40rem; box-shadow: var(--elev-pop); animation: rise 300ms var(--e-out) both; }
+.settings-page .save-error { margin: 0 var(--gutter) var(--s2); max-width: 40rem; box-shadow: var(--elev-pop); animation: rise var(--d-3) var(--e-out) both; }
 .settings-page .save-error ul { margin: 6px 0 0; padding-left: 1.2rem; font-size: var(--t-small); }
 
 /* ---- narrower desks ---- */

@@ -39,7 +39,7 @@ async function small(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     const MIN = 43.5;
     const out: string[] = [];
-    const sel = 'a[href], button, input:not([type="hidden"]), select, textarea, summary, [role="tab"], [role="button"]';
+    const sel = 'a[href], button, input:not([type="hidden"]), select, textarea, summary, [role="tab"], [role="button"], [role="slider"]';
     // behind a modal (the write room, a sheet) nothing can be touched, and the page there recedes (scaled down): measure
     // what is in the modal
     const modal = Array.from(document.querySelectorAll("dialog[open]")).find((d) => d.matches(":modal"));

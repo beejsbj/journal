@@ -20,18 +20,33 @@ export function ConfirmButton(props: {
 }) {
   const [asking, setAsking] = useState(false);
   const keep = useRef<HTMLButtonElement>(null);
+  // Keep (or Escape) gives focus back to the button the question stood in for, never to the page's <body>
+  const back = useRef(false);
+  const wrap = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     if (asking) keep.current?.focus({ preventScroll: true });
+    else if (back.current) {
+      back.current = false;
+      wrap.current?.querySelector<HTMLElement>("button")?.focus({ preventScroll: true });
+    }
   }, [asking]);
+  const keepIt = () => {
+    back.current = true;
+    setAsking(false);
+  };
   if (!asking) {
-    return props.plain ? (
-      <TextButton disabled={props.disabled} onClick={() => setAsking(true)}>
-        {props.children}
-      </TextButton>
-    ) : (
-      <Button size={props.size} disabled={props.disabled} onClick={() => setAsking(true)}>
-        {props.children}
-      </Button>
+    return (
+      <span class="confirm-wrap" ref={wrap}>
+        {props.plain ? (
+          <TextButton disabled={props.disabled} onClick={() => setAsking(true)}>
+            {props.children}
+          </TextButton>
+        ) : (
+          <Button size={props.size} disabled={props.disabled} onClick={() => setAsking(true)}>
+            {props.children}
+          </Button>
+        )}
+      </span>
     );
   }
   return (
@@ -40,7 +55,7 @@ export function ConfirmButton(props: {
         if (e.key === "Escape") {
           e.preventDefault();
           e.stopPropagation();
-          setAsking(false);
+          keepIt();
         }
       }}>
       <span class="confirm-q">{props.question}</span>
@@ -50,7 +65,7 @@ export function ConfirmButton(props: {
       }}>
         {props.yes}
       </Button>
-      <button ref={keep} type="button" class={`button quiet${props.size === "small" ? " small" : ""}`} onClick={() => setAsking(false)}>
+      <button ref={keep} type="button" class={`button quiet${props.size === "small" ? " small" : ""}`} onClick={keepIt}>
         Keep
       </button>
     </span>

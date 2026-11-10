@@ -16,7 +16,7 @@
 .block-tools:focus-within { opacity: 1; transform: none; pointer-events: auto; }
 @media (hover: hover) and (pointer: fine) {
   .block.his:hover > .block-actions > .block-tools, .block.his:focus-within > .block-actions > .block-tools {
-    opacity: 1; transform: none; pointer-events: auto; transition-delay: 60ms;
+    opacity: 1; transform: none; pointer-events: auto; transition-delay: var(--d-0);
   }
 }
 

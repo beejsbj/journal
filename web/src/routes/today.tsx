@@ -2,6 +2,7 @@ import type { ComponentChildren } from "preact";
 import { useLocation } from "preact-iso";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { api } from "../api";
+import { PromptLetter } from "../components/Prompt";
 import { HeldRunCard, RunCard, holdsQuestions } from "../components/RunCard";
 import { OSM, OsmCredit } from "../components/OsmCredit";
 import { WeekStrip } from "../components/WeekStrip";
@@ -13,8 +14,8 @@ import { kindLabel, kindOfStem } from "../labels";
 import { writeTarget } from "../components/WriteRoom";
 import { openWrite } from "../shell";
 import { useTitle } from "../title";
-import type { LibraryItem, PracticeRow, Prompt, Run, Today } from "../types";
-import { Await, Button, ButtonLink, Empty, ErrorLine, Letter, TextButton } from "../ui";
+import type { LibraryItem, PracticeRow, Run, Today } from "../types";
+import { Await, Button, ButtonLink, Empty, ErrorLine, TextButton } from "../ui";
 import "./today.css";
 
 /**
@@ -56,31 +57,6 @@ function StateWords({ row }: { row: PracticeRow }) {
         </>
       )}
     </p>
-  );
-}
-
-/**
- * Her letter on Today, as he was sent it: the opener, the question she asked in her italic, the practice's questions
- * folded at the foot. When nothing was recorded but the questions (the plain opener), the questions are the letter,
- * so they stand open.
- */
-function TodayLetter({ prompt, hers, actions }: { prompt: Prompt; hers: string; actions?: ComponentChildren }) {
-  const asked = prompt.asked.map((q) => q.question);
-  const bare = !prompt.opener && asked.length === 0;
-  // one question and nothing marked asked: the letter folds nothing away (Letter folds two or more), so it is shown
-  const lone = !bare && asked.length === 0 && prompt.questions.length === 1 ? prompt.questions[0] : undefined;
-  return (
-    <Letter from={hers} at={prompt.sent_at_local ?? undefined} opener={prompt.opener ?? undefined} asked={asked}
-      questions={bare ? [] : prompt.questions} askedIds={prompt.asked.map((q) => q.id)} actions={actions}>
-      {bare && prompt.questions.length > 0 && (
-        <ol class="today-questions">
-          {prompt.questions.map((q) => (
-            <li key={q.id}>{q.text}</li>
-          ))}
-        </ol>
-      )}
-      {lone && <p class="letter-asked">{lone.text}</p>}
-    </Letter>
   );
 }
 
@@ -162,7 +138,8 @@ function SentCard({ row, today, library, slot }: CardProps) {
         <StateWords row={row} />
       </header>
       {row.prompt ? (
-        <TodayLetter prompt={row.prompt} hers={hers} actions={actions} />
+        // her whole prompt, every question open: Today never folds a prompt (FRONTEND §1.1; only Telegram folds)
+        <PromptLetter prompt={row.prompt} hers={hers} actions={actions} />
       ) : (
         <div class="today-actions">{actions}</div>
       )}

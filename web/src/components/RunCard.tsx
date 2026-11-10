@@ -55,7 +55,8 @@ export function RunCard({ run }: { run: Run }) {
     <li class="run-card run">
       <div class="run-card-head">
         <h3>{run.title}</h3>
-        {run.sessions.length > 1 && <p class="run-card-at num">{at} of {run.sessions.length}</p>}
+        {/* the session he is in, said as that (the strip under it counts the sessions done) */}
+        {run.sessions.length > 1 && <p class="run-card-at num">{run.current ? `session ${at} of ${run.sessions.length}` : `${at} of ${run.sessions.length} done`}</p>}
       </div>
       {run.sessions.length > 1 && <RunStrip run={run} />}
       <p class="run-card-text">{run.text}</p>

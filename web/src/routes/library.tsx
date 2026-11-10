@@ -211,7 +211,7 @@ function PracticeActions({ one, reload }: { one: LibraryOne; reload: () => void 
         <ButtonLink variant="primary" href={`/library/${d.id}/edit`} data-vt="push">Edit</ButtonLink>
         {/* (turned off is not scheduled, nothing more: it is still written and sent from here; the owner, 2026-11-09) */}
         <ButtonLink href={`/today?write=${encodeURIComponent(d.id)}`}>Write now</ButtonLink>
-        {chat !== false && (
+        {day.state !== "loading" && chat !== false && (   /* (asked first: it never shows, then goes, on a journal with no chat) */
           <Button disabled={act.busy || onItsWay} onClick={async () => {
             const done = await act.run(() => api.sendNow(d.id));
             if (done) setOnItsWay(true);

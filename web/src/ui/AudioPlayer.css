@@ -22,6 +22,10 @@
 }
 .player-rate:hover { background: var(--raised-2); }
 
+.player { flex-wrap: wrap; }
+.player-failed { flex-basis: 100%; margin: 0; padding-left: 4px; font-size: var(--t-small); color: var(--text-2); }
+/* on touch the seek bar is a 44 px target too (web/e2e/mobile.spec.ts measures [role=slider]) */
+@media (pointer: coarse), (max-width: 760px) { .player-wave { height: var(--tap); padding: 5px 0; } }   /* (the bars keep their 34) */
 @media (pointer: coarse) { .player-rate { height: var(--tap); min-width: var(--tap); } }
 @media (max-width: 760px) {
   .player { gap: 10px; padding-right: 12px; }

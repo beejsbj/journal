@@ -78,13 +78,15 @@ export const clockTime = (minutes: number): string =>
 
 /** − [typed value] unit +: the value is a text box he can type in, and the steps move it from what is there (or from
  *  `base` while it is empty). `value` is his text as typed; `onInput` gets the new text. */
-export function TypedStepper({ label, value, onInput, base = 0, min = -Infinity, max = Infinity, step = 1, unit, whole, disabled, invalid, describedBy, id }: {
+export function TypedStepper({ label, value, onInput, base = 0, min = -Infinity, above, max = Infinity, step = 1, unit, whole, disabled, invalid, describedBy, id }: {
   label: string;
   value: string;
   onInput: (next: string) => void;
   /** Where the steps start while the box is empty (the default). */
   base?: number;
   min?: number;
+  /** An open lower bound: the value must be more than this (a step down that would reach it is not taken). */
+  above?: number;
   max?: number;
   step?: number;
   unit?: string;
@@ -97,9 +99,13 @@ export function TypedStepper({ label, value, onInput, base = 0, min = -Infinity,
 }) {
   const n = Number(value.trim());
   const from = value.trim() !== "" && Number.isFinite(n) ? n : base;
+  // an open lower bound ("more than 0") lets a step land anywhere above it, and refuses one that would reach it
+  const ok = (v: number) => v >= min && v <= max && (above === undefined || v > above);
   const move = (by: number) => {
-    const next = Math.min(max, Math.max(min, Math.round((from + by) * 1000) / 1000));
-    if (next !== n) onInput(String(next));
+    let next = Math.round((from + by) * 1000) / 1000;
+    if (!ok(next)) next = Math.min(max, Math.max(min, next));
+    if (!ok(next) || next === n) return;
+    onInput(String(next));
   };
   const onKey = (e: KeyboardEvent) => {
     const by = e.key === "ArrowUp" ? step : e.key === "ArrowDown" ? -step : e.key === "PageUp" ? step * 10 : e.key === "PageDown" ? -step * 10 : 0;
@@ -107,9 +113,10 @@ export function TypedStepper({ label, value, onInput, base = 0, min = -Infinity,
     e.preventDefault();
     move(by);
   };
+  const atFloor = from <= min || (above !== undefined && from - step <= above);
   return (
     <div class="num-stepper num-stepper-typed" aria-disabled={disabled ? true : undefined}>
-      <button type="button" aria-label={`Less: ${label}`} disabled={disabled || from <= min} onClick={() => move(-step)}><Minus /></button>
+      <button type="button" aria-label={`Less: ${label}`} disabled={disabled || atFloor} onClick={() => move(-step)}><Minus /></button>
       <span class="num-stepper-field">
         <input id={id} class="num-stepper-input" type="text" inputMode={whole ? "numeric" : "decimal"} autocomplete="off"
           role="spinbutton" aria-valuenow={value.trim() !== "" && Number.isFinite(n) ? n : undefined}
