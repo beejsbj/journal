@@ -25,4 +25,26 @@ describe("the safe renderer", () => {
   it("joins a wrapped bullet", () => {
     expect(parseMarkdown("- first part\n  continued")).toEqual([{ type: "ul", items: [[{ text: "first part continued" }]] }]);
   });
+
+  it("makes a quote of lines that begin with \"> \", its own paragraphs inside", () => {
+    expect(parseMarkdown("> What did you notice?\n> Name it.\n>\n> **Then** rest.\n\nAfter.")).toEqual([
+      { type: "quote", blocks: [
+        { type: "p", inline: [{ text: "What did you notice?\nName it." }] },
+        { type: "p", inline: [{ text: "Then", bold: true }, { text: " rest." }] },
+      ] },
+      { type: "p", inline: [{ text: "After." }] },
+    ]);
+  });
+
+  it("stops nesting quotes after a few levels: the rest is text", () => {
+    const deep = parseMarkdown(">>>>> deep");
+    let level = deep[0] as { type: string; blocks?: unknown[] };
+    let n = 0;
+    while (level.type === "quote") {
+      n += 1;
+      level = (level.blocks as typeof level[])[0] as typeof level;
+    }
+    expect(n).toBe(3);
+    expect(level).toEqual({ type: "p", inline: [{ text: ">> deep" }] });
+  });
 });

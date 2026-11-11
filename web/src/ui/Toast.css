@@ -1,0 +1,25 @@
+/* Toast (ui/Toast.tsx); the update prompt's markup (.toast > span + .button + .button.primary) is the contract */
+.toast {
+  position: fixed; z-index: var(--z-toast); left: 50%; bottom: max(28px, calc(env(safe-area-inset-bottom) + 16px));
+  display: flex; align-items: center; gap: var(--s2); width: max-content; max-width: calc(100vw - 24px); min-height: 48px; padding: 6px 6px 6px 18px;
+  border-radius: var(--r-pill); background: var(--lamp); color: var(--on-lamp); box-shadow: var(--elev-pop);
+  font: 500 14px / 1.3 var(--f-ui); transform: translateX(-50%);
+  animation: toast-in var(--spring-dur) var(--spring) both;
+}
+.toast > span { padding-right: var(--s2); }
+.toast[data-open="false"] {
+  visibility: hidden; opacity: 0; transform: translate(-50%, 20px);
+  animation: none; transition: transform var(--d-3) var(--e-out), opacity var(--d-2), visibility 0s var(--d-3);
+}
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 20px); } }
+/* on the lamp: words in its light, the primary inverted */
+.toast .button { min-height: 36px; padding: 0 12px; box-shadow: none; background: transparent; color: var(--on-lamp); font-size: 14px; }
+.toast .button:hover:not(:disabled) { background: color-mix(in oklab, var(--on-lamp) 14%, transparent); }
+.toast .button.primary { background: var(--on-lamp); color: var(--lamp); }
+.toast .button.primary:hover:not(:disabled) { background: color-mix(in oklab, var(--on-lamp) 86%, var(--lamp)); }
+
+@media (max-width: 760px) {
+  .toast { bottom: auto; top: max(10px, calc(env(safe-area-inset-top) + 8px)); animation-name: toast-down; }
+  .toast .button { min-height: var(--tap); }
+  @keyframes toast-down { from { opacity: 0; transform: translate(-50%, -20px); } }
+}

@@ -1,0 +1,43 @@
+/* Field, TextField, TextArea (ui/Field.tsx) */
+.text-field { display: grid; gap: 6px; min-width: 0; }
+.field-label { font: 500 var(--t-ui) / 1.35 var(--f-ui); color: var(--text); }
+.field-hint { margin: 0; font-size: var(--t-small); line-height: 1.45; color: var(--text-3); }
+/* the error under a field (TextField's, a setting's, a schedule slot's): a filled mark says "this is wrong" without a
+   hue (status has none) */
+.field-error {
+  display: flex; align-items: baseline; gap: var(--s2); margin: 0;
+  font: 500 var(--t-small) / 1.45 var(--f-ui); color: var(--text);
+}
+.field-error::before {
+  content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--text);
+  box-shadow: 0 0 0 2px var(--pane), 0 0 0 3px var(--text); transform: translateY(-1px);
+}
+
+.input {
+  width: 100%; min-height: var(--tap); padding: 10px 14px; border: 0; border-radius: var(--r-m);
+  background: var(--pane); color: var(--text); box-shadow: inset 0 0 0 1px var(--hair-2);
+  font: 400 var(--t-ui) / 1.4 var(--f-ui);
+  transition: box-shadow var(--d-2), background var(--d-2);
+}
+[data-theme="dark"] .input { background: var(--sunk); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .input { background: var(--sunk); } }
+.input::placeholder { color: var(--text-3); }
+.input:hover:not(:disabled) { box-shadow: inset 0 0 0 1px var(--text-3); }
+.input:focus { outline: none; box-shadow: inset 0 0 0 1.5px var(--text); }
+.input:disabled { opacity: 0.6; }
+.input[aria-invalid="true"] { box-shadow: inset 0 0 0 1.5px var(--text); }
+.input.area { min-height: 6rem; resize: vertical; }
+
+/* his words: the book's roman on a ruled line, as his page is */
+.input.his {
+  padding: 10px 0; border-radius: 0; background: transparent; box-shadow: inset 0 -1px 0 var(--hair-2);
+  font: 400 var(--t-read) / var(--lh-read) var(--f-his); font-optical-sizing: auto;
+}
+.input.his::placeholder { font-style: italic; }
+.input.his:hover:not(:disabled) { box-shadow: inset 0 -1px 0 var(--text-3); }
+.input.his:focus { box-shadow: inset 0 -1.5px 0 var(--text); }
+
+@media (max-width: 760px), (pointer: coarse) {
+  .input { font-size: max(1rem, 16px); }
+  .input.his { font-size: 1.1875rem; }
+}

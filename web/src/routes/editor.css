@@ -1,0 +1,68 @@
+/* The editor (routes/editor.tsx): a practice as a form or as its Markdown, a program as its files. The page itself is
+   the Library's (.library-page, its crumb: library.css). */
+
+.editor-page .editor-head { margin: 0 0 var(--s5); padding: 0; border: 0; }
+.editor-page .editor-head .kicker { margin: 0 0 6px; }
+.editor-page .editor-head .display { margin: 0; }
+.editor-page .editor-head .sub { max-width: 36rem; margin: 12px 0 0; font: 400 17px / 1.5 var(--f-his); color: var(--text-2); }
+.editor-page .editor-note { max-width: 36rem; font: 400 18px / 1.5 var(--f-his); color: var(--text-2); }
+
+/* Form · Raw Markdown: two tabs drawn as a segmented track */
+.editor-page .editor-tabs {
+  display: inline-flex; gap: 2px; margin: 0 0 var(--s5); padding: 3px; border-radius: 12px; background: var(--sunk);
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+.editor-page .editor-tabs [role="tab"] {
+  min-height: 38px; padding: 0 16px; border: 0; border-radius: 9px; background: none; color: var(--text-3);
+  font: 500 13.5px / 1 var(--f-ui); white-space: nowrap; transition: color var(--d-2), background var(--d-2), box-shadow var(--d-2);
+}
+.editor-page .editor-tabs [role="tab"]:hover { color: var(--text); }
+.editor-page .editor-tabs [role="tab"][aria-selected="true"] { background: var(--pane); color: var(--text); box-shadow: var(--elev-tab), 0 0 0 1px var(--hair); }
+[data-theme="dark"] .editor-page .editor-tabs [role="tab"][aria-selected="true"] { background: var(--raised-2); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .editor-page .editor-tabs [role="tab"][aria-selected="true"] { background: var(--raised-2); } }
+
+.editor-page .editor-form { display: grid; gap: var(--s5); }
+.editor-page .editor-form .text-field.short { max-width: 8rem; }
+.editor-page .editor-pair { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--s5) var(--s7); }
+.editor-page .editor-switch { display: grid; gap: 6px; }
+.editor-page .editor-switch-row { display: flex; align-items: center; gap: var(--s3); min-height: var(--tap); }
+.editor-page .editor-switch-row .field-hint { margin: 0; }
+
+.editor-page .schedule { display: grid; gap: var(--s2); }
+.editor-page .schedule > legend { margin-bottom: var(--s2); }
+.editor-page .schedule > .hint { margin: 0; }
+.editor-page .slot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); }
+.editor-page .slot .input { width: auto; font-variant-numeric: tabular-nums; }
+.editor-page .slot .field-error { flex-basis: 100%; }
+.editor-page .editor-add { justify-self: start; margin-top: 2px; }
+.editor-page .form-h { margin: var(--s2) 0 0; font-size: 18px; }
+
+.editor-page .more { border-top: 1px solid var(--hair); }
+.editor-page .more > .disclosure-head .disclosure-title { font-weight: 500; }
+.editor-page .editor-more { display: grid; gap: var(--s4); padding: var(--s2) 0 var(--s3); }
+.editor-page .editor-more .text-field.short { max-width: 10rem; }
+
+.editor-page .editor-raw { display: grid; gap: var(--s2); }
+.editor-page .editor-raw .raw-text { min-height: 24rem; font: 400 0.86rem / 1.55 var(--f-code); resize: vertical; }
+.editor-page .editor-raw .hint { margin: 0; }
+.editor-page .files-hint { max-width: 40rem; margin: 0 0 var(--s4); }
+.editor-page > .text-field { margin-bottom: var(--s4); max-width: 28rem; }
+.editor-page > .error-line, .editor-page > .problems { margin: var(--s4) 0; }
+.editor-page .hint.ok { display: flex; align-items: center; gap: 6px; margin: var(--s4) 0 0; color: var(--text-2); }
+.editor-page .hint.ok svg { width: 16px; height: 16px; }
+
+/* Save and Cancel: on a phone they ride above the tab bar, within the thumb's reach */
+.editor-page .editor-actions { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s5); }
+@media (max-width: 760px) {
+  .editor-page .editor-actions {
+    position: sticky; z-index: var(--z-sticky); bottom: calc(var(--bar-h) + env(safe-area-inset-bottom)); margin: var(--s4) -20px 0;
+    padding: var(--s2) 20px; background: var(--frost); -webkit-backdrop-filter: blur(16px) saturate(1.3); backdrop-filter: blur(16px) saturate(1.3);
+    box-shadow: 0 -1px 0 var(--hair);
+  }
+  .editor-page .editor-actions .button { flex: 1; }
+  .editor-page .editor-tabs { display: flex; }
+  .editor-page .editor-tabs [role="tab"] { flex: 1; min-height: var(--tap); }
+}
+@media (max-width: 760px), (pointer: coarse) {
+  .editor-page .editor-raw .raw-text { font-size: max(1rem, 16px); }   /* 16 px or more where a finger types, or iOS zooms */
+}

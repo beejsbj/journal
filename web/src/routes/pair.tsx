@@ -3,10 +3,10 @@ import { useLocation } from "preact-iso";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { askSession, byTailscale, pair, session, type ApiError } from "../api";
 import { setAuthLost } from "../auth";
-import { ErrorLine } from "../components/Status";
-import { Mark } from "../icons";
 import { asApiError } from "../hooks";
 import { useTitle } from "../title";
+import { Button, Disclosure, ErrorLine, Mark, TextField } from "../ui";
+import "./pair.css";
 
 /** The code in `/pair#<code>`, or "" (also accepts a whole pairing URL pasted into the field). */
 export function codeFrom(text: string): string {
@@ -65,12 +65,15 @@ export function PairPanel({ title = "Pair this browser", intro, readHash = false
 
   return (
     <main class="pair-screen">
-      <Mark class="pair-mark" size={44} />
-      <h1>{title}</h1>
-      <p class="pair-intro">{intro ?? <>Open the link that <code>journal serve pair</code> printed on the server. It works once, for ten minutes.</>}</p>
-      {busy && <p role="status">Pairing…</p>}
-      {error && <ErrorLine error={error} onRetry={error.unpaired || !tried.current ? undefined : () => redeem(tried.current)} />}
-      <PairForm text={text} setText={setText} busy={busy} onPair={() => redeem(text)} />
+      <div class="pair-card">
+        <div class="lamp-light" aria-hidden="true" />
+        <Mark class="pair-mark" size={52} />
+        <h1 class="display">{title}</h1>
+        <p class="pair-intro">{intro ?? <>Open the link that <code>journal serve pair</code> printed on the server. It works once, for ten minutes.</>}</p>
+        {busy && <p class="pair-busy" role="status">Pairing…</p>}
+        {error && <ErrorLine error={error} onRetry={error.unpaired || !tried.current ? undefined : () => redeem(tried.current)} />}
+        <PairForm text={text} setText={setText} busy={busy} onPair={() => redeem(text)} />
+      </div>
     </main>
   );
 }
@@ -84,12 +87,11 @@ function PairForm({ text, setText, busy, onPair }: { text: string; setText: (t: 
         onPair();
       }}
     >
-      <label for="pair-code">Pairing link or code</label>
-      <input id="pair-code" type="text" autocomplete="off" autocapitalize="off" spellcheck={false} value={text}
-        onInput={(e) => setText((e.target as HTMLInputElement).value)} />
-      <button type="submit" class="button primary" disabled={busy}>
-        Pair
-      </button>
+      <TextField id="pair-code" label="Pairing link or code" hint="The whole link, or only the code after its #." autocomplete="off"
+        autocapitalize="off" spellcheck={false} value={text} onInput={(e) => setText((e.target as HTMLInputElement).value)} />
+      <Button type="submit" variant="primary" wide disabled={busy}>
+        {busy ? "Pairing…" : "Pair"}
+      </Button>
     </form>
   );
 }
@@ -119,29 +121,32 @@ export function TailscaleLost() {
   const refused = state === "refused";
   return (
     <main class="pair-screen tailscale-lost">
-      <Mark class="pair-mark" size={44} />
-      <h1>{refused ? "This device isn't recognised by Tailscale any more" : "Couldn't confirm your Tailscale sign-in"}</h1>
-      {refused ? (
-        <p class="pair-intro">
-          The journal server answered, and no longer signs this device in by its Tailscale identity: it may be signed in to
-          another Tailscale account, or no longer allowed. Retrying won't change that. Pair it with a link below, or sign in
-          to the right tailnet and retry.
-        </p>
-      ) : (
-        <p class="pair-intro">
-          This browser signs in to the journal with its Tailscale identity, and the server didn't recognise it just now.
-          Check that Tailscale is connected on this device, then retry.
-        </p>
-      )}
-      <button type="button" class={`button wide${refused ? "" : " primary"}`} disabled={state === "asking"} onClick={() => ask(true)}>
-        {state === "asking" ? "Checking…" : "Retry"}
-      </button>
-      {state === "unreachable" && (
-        <p class="error-line" role="alert">
-          The journal server didn't answer. It may be restarting, or this device is offline: try again in a moment.
-        </p>
-      )}
-      <PairFallback open={refused} />
+      <div class="pair-card">
+        <div class="lamp-light" aria-hidden="true" />
+        <Mark class="pair-mark" size={52} />
+        <h1 class="display">{refused ? "This device isn't recognised by Tailscale any more" : "Couldn't confirm your Tailscale sign-in"}</h1>
+        {refused ? (
+          <p class="pair-intro">
+            The journal server answered, and no longer signs this device in by its Tailscale identity: it may be signed in to
+            another Tailscale account, or no longer allowed. Retrying won't change that. Pair it with a link below, or sign in
+            to the right tailnet and retry.
+          </p>
+        ) : (
+          <p class="pair-intro">
+            This browser signs in to the journal with its Tailscale identity, and the server didn't recognise it just now.
+            Check that Tailscale is connected on this device, then retry.
+          </p>
+        )}
+        <Button variant={refused ? "secondary" : "primary"} wide disabled={state === "asking"} onClick={() => ask(true)}>
+          {state === "asking" ? "Checking…" : "Retry"}
+        </Button>
+        {state === "unreachable" && (
+          <div class="error-line" role="alert">
+            <p>The journal server didn't answer. It may be restarting, or this device is offline: try again in a moment.</p>
+          </div>
+        )}
+        <PairFallback open={refused} />
+      </div>
     </main>
   );
 }
@@ -151,9 +156,10 @@ function PairFallback({ open }: { open: boolean }) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
+  // folded until the server refuses this device, when the way that can help unfolds; his own fold or unfold wins
+  const [shown, setShown] = useState<boolean | null>(null);
   return (
-    <details class="pair-fallback" open={open}>
-      <summary>Reaching the journal another way? Pair with a link</summary>
+    <Disclosure class="pair-fallback" head="Reaching the journal another way? Pair with a link" open={shown ?? open} onToggle={setShown}>
       {error && <ErrorLine error={error} />}
       <PairForm text={text} setText={setText} busy={busy} onPair={() => {
         const code = codeFrom(text);
@@ -167,7 +173,7 @@ function PairFallback({ open }: { open: boolean }) {
             setBusy(false);
           });
       }} />
-    </details>
+    </Disclosure>
   );
 }
 

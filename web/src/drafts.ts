@@ -21,13 +21,42 @@ export function loadDraft(key: string): string {
   }
 }
 
-export function saveDraft(key: string, text: string): void {
+/** Who changed a draft (a box's own token), so a box does not answer its own change. */
+export type DraftOwner = object;
+type Listener = (text: string, from: DraftOwner | undefined) => void;
+const listeners = new Map<string, Set<Listener>>();
+
+/**
+ * Hear every change to one key's draft made in this tab: two boxes can hold the same draft (the entry's box and the
+ * write room on that entry), and each must see what the other wrote or sent, or one overwrites the other's words
+ * (or sends them twice). Returns the way to stop listening.
+ */
+export function onDraft(key: string, fn: Listener): () => void {
+  let set = listeners.get(key);
+  if (!set) listeners.set(key, (set = new Set()));
+  set.add(fn);
+  return () => {
+    set?.delete(fn);
+    if (set?.size === 0) listeners.delete(key);
+  };
+}
+
+/** Keep (or, for nothing, forget) the draft, and tell the other boxes on this key. Says whether the store took it:
+ *  the write room only says "Draft kept" when it was. */
+export function saveDraft(key: string, text: string, from?: DraftOwner): boolean {
+  let stored = false;
   try {
-    if (text) store()?.setItem(PREFIX + key, text);
-    else store()?.removeItem(PREFIX + key);
+    const s = store();
+    if (s) {
+      if (text) s.setItem(PREFIX + key, text);
+      else s.removeItem(PREFIX + key);
+      stored = true;
+    }
   } catch {
-    /* a full or blocked store: the text stays on the page */
+    stored = false;   // a full or blocked store: the text stays on the page
   }
+  for (const fn of [...(listeners.get(key) ?? [])]) fn(text, from);
+  return stored;
 }
 
 /** An id for one write, so that sending it twice (a retry after a lost answer) is one write. */

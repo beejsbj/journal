@@ -3062,6 +3062,11 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   situational session interrupts a program's open phase, the program does not resend that phase by itself;
   `/start <word>` brings it back. Manual by design. Closes the open point in ONE-PROGRAM-RUN, review fixes (6) ("whether
   the engine should re-send it on its own").
+- **FAVICON (2026-11-04) — the tab has its own mark.** The page mark (`mark.svg`) shrunk to 16 px loses its rule, lines
+  and ring, so the favicon is drawn for that size (`public/icons/favicon.svg`, with `favicon-32.png` for a browser without
+  SVG favicons): a `j` in his ink whose dot is the postmark ring in her default ink, on the paper. Its colours are fixed,
+  on an opaque tile, so it reads on light and dark tabs with no style in the SVG. The installed app's icons and `Mark` in
+  `icons.tsx` stay the page; **open:** whether they follow it belongs to the WEB-UX identity pass.
 - **X-SCOPE (the owner, 2026-11-09) — `/x` keeps a message out of the journal, not out of the agent.** An audit of
   the live chat found an off-the-record turn in which the companion wrote to her own memory and to a task inbox:
   the tool guard refuses only the journal's writes (`journal_add_note`, notebook writes, `journal_set_location`).
@@ -3793,6 +3798,174 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     reflection-only hang above; paraphrase, single quotes and HTML as quotation, and keeping a reflection with a bad
     quote (#26); the summaries in a synthesis's source; from the review fixes: a retry that tells the model what was
     rejected, and main's quote excerpt in the catch-up's and the programs' log lines (#26 for the first).
+- **WEB-UX-IDENTITY (2026-11-09) — the web app's design system: round 02, "Folio × Night Room".** The owner accepted
+  the round-02 prototype (`design/rounds/02-combined/`) with four changes; his verdict is in `design/state.md`, *Round 02
+  result*, paraphrased (he liked the sectioned letter from her but not its stamp and wavy lines; he chose the "margin j"
+  for the mark; Today, Entries, the entry in all three sidebar modes, dark, Insights and Settings each approved by name).
+  `design/DESIGN.md` is now the written language, `web/src/tokens.css` its tokens, `web/src/ui/` its components and
+  `/design` draws them. What changes from IDENTITY (2026-10-27), and why:
+  - **Her voice moves from Courier Prime to IBM Plex Mono** (400, 400 italic, 500): typed still, but a quieter, more
+    even face that sits with Newsreader on warm paper and reads at 13–14.5 px in her margin notes. A round-01 call he
+    left standing in round 02. Her ink keeps its four values; `--her-soft` is now mixed in oklab and every ink is held
+    at AA on every ground and on her letter's wash (`web/tests/ink.test.tsx`).
+  - **The Fraunces figures are dropped**, and **times are no longer typed**: figures are Newsreader (lining, tabular
+    where they align) or the interface's sans; her face never sets interface text. Courier Prime and Fraunces leave
+    `web/public/fonts`; `tools/web_fonts.py` now cuts only the Newsreader italic. The faces served stay about the
+    same: 273 KB before, 272 KB now (Plex Mono is three latin files of 15–16 KB).
+  - **No fastening on her letter** (no postmark, wavy lines, clip or tape) and **no dated stamps**, as before.
+  - **The theme can be chosen on the device**: System (the default, `prefers-color-scheme`), Paper or Night, kept like
+    the ink (`web/src/theme.ts`, `localStorage["journal:theme"]`, `<html data-theme>`), never sent to the server, for
+    the same reasons as the ink (DECISIONS IDENTITY, *Her ink is the reader's choice*). The dark roles are written twice
+    in `tokens.css` (the media query and `[data-theme="dark"]`); the test holds the copies equal. The browser's
+    theme colour follows the choice, and the manifest's is the page (`--pane`, `#fbf8f1`), not the old paper.
+  - **The mark is the "margin j"** (round 02, option 01): the in-app `Mark`, `mark.svg` and the installed icons. The tab
+    keeps the small `j` (FAVICON), which closes FAVICON's open point.
+  - **Layout:** a rail and floating panes on the desk on a wide screen (the rail folds to icons while an entry is open
+    and under 1100 px); the page, a top bar and a floating tab bar on a phone. The e2e check that the desktop navigation
+    sits in a header (`web/e2e/smoke.spec.ts`) now checks the rail.
+  - **Still open, for the route builders of this pass:** the entry's Analysis and Reflection unfolding at the end
+    (replacing FRONTEND §1.3's tabs), the write room replacing the + sheet, the sidebar beside an entry. Each is
+    recorded with its route when it lands.
+- **WEB-UX-ENTRY-TABS (2026-11-09) — the entry has no Entry/Analysis tabs; her readings unfold at its end.** FRONTEND
+  §1.3 put an entry's analysis on a second tab. Round 02 drew it as her readings at the foot of the entry instead, and
+  the owner accepted round 02 with this call left uncontested (`design/state.md`, *Round 02 result*: among the calls he
+  did not contest, which stand and are reversible, Analysis and Reflection unfold at the end of the entry, with no tabs). So the entry page
+  (`web/src/routes/entry.tsx`) ends with "Her readings": *What she noticed* (her annotations and her notes) and *her
+  reflection on the day*, each a disclosure (`ui/Disclosure`) that unfolds in place; the reflection is read when its
+  fold first opens. The data and the empty text are as they were ("Nothing here yet: Ada adds notes after the entry
+  settles."); the program summary stays at the end of the document, where it was already shown. Nothing hides the
+  composer any more (it was hidden while the Analysis tab was open). The tests that clicked the tab now open the
+  folds (`web/tests/routes.test.tsx`, `web/e2e/smoke.spec.ts`, `web/e2e/mobile.spec.ts`).
+  The same pass, recorded here as they land with the entry: her chat replies in an entry, folded `<details>` callouts
+  until now, stand **in the right margin beside the passage they follow** (`ui/MarginNote`; under the passage when the
+  page is under 840 px wide), shown in full, still read-only; the list slides into a **sidebar beside an open entry**
+  on a wide screen, in one of three modes the reader picks in the entry bar (titles, dates and dots, none; default
+  titles) and that this device keeps (`localStorage["journal:sidebar"]`, never sent); the Entries filters are a
+  sentence with menus and a month calendar (`/days`), on the same address as before. **Not done:** Delete keeps its
+  question in place and has no Undo, since the server has no undo for a block and a delayed delete would change
+  when the file is written.
+- **WEB-UX-WRITE-ROOM (2026-11-09) — Write opens a room, not the "+" sheet.** FRONTEND §1 put a sheet behind the tab
+  bar's +: Quick note, Voice, Answer today's prompt, Start. The owner asked for immersive, inviting writing (it is
+  a writing app) and found the write modal ugly (`design/state.md`, WEB-UX); round 02 drew a room, and
+  he accepted it with focus greying on by default left uncontested. So everything that says Write (the rail's lamp, the
+  tab bar's disc, the `N` key, Today's *Write now* and *Speak it*, `/today?write=<id>`, an entry's *In the writing room*) calls
+  `openWrite` (`web/src/shell/write.ts`), and the shell draws `components/WriteRoom.tsx`: a native modal dialog that
+  blooms out of the control pressed, his words large in a real textarea over a mirror that greys every paragraph but
+  his own, her letter at its head when he answers, and a quiet start on a new note that offers what the sheet did (the
+  prompts still open, the programs to start). The sheet's other jobs keep their writes: a note is `POST /entries`, an
+  answer `POST /entries` with `practice`, more for an entry `POST /entries/{stem}/blocks`, through the composer's own
+  rules (`useCompose`: the draft per box, the same `client_id` on a retry, the upload reused, the offline line, a `422`
+  without Retry). Turning Focus off is a display preference of the device, kept like the ink and the sidebar
+  (`localStorage["journal:room-focus"]`, "off" while off; never sent). `QuickAdd.tsx` is gone; the tests that drove the
+  sheet drive the room (`web/tests/writes.test.tsx`, `web/e2e/mobile.spec.ts`, `web/e2e/writes.spec.ts`).
+- **WEB-UX-INTEGRATION (2026-11-10) — the three route builds as one app.** Merging the entries, write and pages builds
+  showed what each had hidden alone, and the pass settled it:
+  - **The old sheet is gone.** `web/src/styles/legacy.css` (the pre-WEB-UX rules and the alias block of old token
+    names) is deleted: its live rules moved to the components that need them (the done line `.saved` and the offline
+    line in `ui/Status.css`, the error under a field in `ui/Field.css`, the place credit in `components/OsmCredit.css`,
+    the touch floor for a link on its own line in `styles/base.css`), the rest had no reader. With it went the global
+    `section > h2` head (every head is `.book-head`, `.kicker` or a route's own) and its `!important` 16 px floor on
+    fields, which had flattened the write room's 21 px box on a phone under its 21 px mirror. A merge had left that
+    sheet with an unclosed rule that swallowed every sheet after it; the browser runs caught it.
+  - **Route sheets are scoped** under their root class (`.today-page …`): every route's sheet loads on every page, and
+    unscoped names collided (`.day-n` in Entries and Insights, `.phase-title` in the Library and the run, `.more`,
+    `.actions`, `.confirm`). `design/DESIGN.md`, *Agent guide*, now says so.
+  - **One way back** (`ui/BackLink`, `PageBack`): the Library's, the editor's, the run's and the entry's back links
+    were three looks; `/design` gets one to Settings. **One page rhythm**: `--page-top` / `--page-foot` in
+    `tokens.css` set every page's first and last line; page titles are `.display` at `--t-h1` everywhere but the two
+    the system names for `--t-display` (Settings, Insights' week) and Today's numeral.
+  - **Settings' save bar is docked**: a bar with its own backing across the foot of the page, the page's last child
+    (outside the form; Save names it with `form=`), instead of a pill floating over the steppers' column mid-scroll.
+  - **The composer's resting line is Composer's own**: `rest` puts `data-rest` on the form while nothing is in it or
+    happening, and `Composer.css` draws the one line on a phone; the entry and the run ask for it. (The entry had keyed
+    it on Composer's class names from outside.)
+  - **Smaller fixes:** her letter's question fold is 44 px on touch in `ui/Letter.css` alone; Settings' typed stepper is
+    `ui/TypedStepper`; a weekday on a Library clock sits in the half of the face the hand is not in; her Markdown
+    renders `> ` as a quote (`markdown.ts`, a quote nested at most three deep); a browser that refuses the service
+    worker no longer leaves an uncaught error (`pwa.ts`); the rail's *Next from* read is no longer thrown away when he
+    moves on before it lands; the 360/390 px sideways check measures against the width the test set, not
+    `innerWidth`, which grows with the overflow.
+  - **Tests changed on purpose:** presentation only, each in its commit: the transcript-pending word's class
+    (`.transcript-pending`, was `.badge.pending`); the save dock is the page's last child; the "Saved: …" line is read
+    from the dock; the e2e mobile pass covers `/design` and "Not here" and fails on an uncaught page error; the shots are
+    one suite (`web/shots/`: `screens`, `entries`, `pages`, `write`, `shell`, with `lib.ts`) under stable names.
+- **WEB-UX-OPEN-FACES (2026-11-10) — main's OPEN-FACES web behaviour, inside the redesign.** Main (OPEN-CORE,
+  OPEN-FACES, OPEN-PROGRAMS) moved while WEB-UX was built; its merge keeps main's behaviour and WEB-UX's presentation:
+  - **Write now on every Today card**, whatever its state, opens the **write room** on the practice (WEB-UX replaced the
+    inline composer it opened on main): the room reads the view (`GET /library/{id}/open`) only then, shows her letter
+    (the card's prompt when it was sent, else the view's opener and questions, a lone question shown), the line saying
+    which slot the words fill (`.room-fills`), and posts `POST /entries` with `practice` on **Save** (the room's answer
+    button was "Send your answer"; beside *Send to chat* a "send" would read as the chat). A view refused (unknown, a
+    note) shows the server's reason and no box. *Speak it* stays beside *Write now* on a prompt that waits or is due.
+  - **`/today?write=<id>`** (and `/today` as Today's second path, its nav item marked) opens the room once, on the row
+    `writeTarget` names (the engine's slot order; now in `components/WriteRoom.tsx`, re-exported by `routes/today.tsx`,
+    and the room's own row choice uses it too), or on the practice alone; it leaves the address at once, and the reload
+    after a save does not open it again.
+  - **Due** rows ("due since 09:00") wait with the open ones under "Waiting for you", and the room's quiet start offers
+    them; **Send to chat** (was *Send now*) is on a card to come, due or missed, never when `/today` says `chat: false`;
+    a practice turned off keeps both (decision 4). The Library's practice page has *Write now* (`/today?write=<id>`)
+    and *Send to chat*, which it leaves out too when the day's quiet read says `chat: false` (main's page has no chat
+    flag to read; an addition, the same rule as Today's).
+  - **Tests:** main's new web tests are ported to the room's DOM with every behavioural assertion kept (the view asked
+    only on open, nothing written on open, its opener, question and fills line, the words and their practice, the
+    entry linked, `?write` used once and not reopened after a save (and the view not asked again), the slot order, no
+    box for a refused view, no Send to chat without a chat, Write now and Send to chat on a practice turned off — with
+    WEB-UX's *Speak it* beside them). Main's app.css lines live in `routes/today.css` (`.pill.due`) and
+    `components/WriteRoom.css` (`.room-fills`).
+- **WEB-UX-OPEN-PUSH (2026-11-10) — main's notifications, inside the redesigned Settings.** Main's OPEN-PUSH put a
+  *Notifications* section in the old Settings page. Merged into WEB-UX, its behaviour is unchanged (`Notifications` in
+  `web/src/routes/settings.tsx`, still exported with its `device` and `env` seams; `push.ts`, `sw.ts`, `swCore.ts` as
+  main has them, `pwa.ts`'s refused-registration fix untouched by them) and its presentation is the system's: a card
+  of its own at the head of *07 This device* (it is about this device, as pairing is), one row with the state in words
+  (*On for this device*, *Off for this device*, *Checking this device…*, *Asking the server…*, or why it cannot be
+  offered) and *Turn on notifications* / *Turn off* (`ui/Button`, small: a permission prompt and a subscription are
+  not a switch that acts at once), the blocked permission and a failed change under it (the filled-mark error line),
+  and a second row saying what a notification carries and when nothing is pushed (`push.when: no-chat` with a chat).
+  Not in *At a glance*: it would need the subscription read on every load of the page. A tap on a notification opens
+  `/today?write=<id>`, which opens the write room (WEB-UX-OPEN-FACES). `web/tests/push.test.tsx` runs unchanged
+  against the new markup (every assertion holds); `web/tests/pages.test.tsx` pins where the card stands; the shots draw
+  it blocked (headless Chromium's default) and off with the permission not asked yet (`settings-push-blocked`, `-off`).
+  Main's docs carried conflict markers from its own merge (AGENTS.md, DEPLOY.md, README.md); they are resolved here
+  as open PR #32 resolves them, with its `tests/test_no_conflict_markers.py`.
+- **WEB-UX-REVIEW (2026-11-10) — the independent review of the WEB-UX pull request, and what changed.** One blocker,
+  eight code points, four of docs and housekeeping, and nits; all taken, with these calls:
+  - **One draft, two boxes.** The entry's box and the write room on that entry share `entry:<stem>`; `drafts.ts` now
+    tells every box on a key what another box wrote or sent (`onDraft`, same tab), and a box takes it up unless it is
+    sending, so neither overwrites the other's words nor sends them twice. While the room is open on an entry its box
+    is hidden (kept mounted: a recording in it stays) with a line saying so, and what the room saves there makes the
+    page read the entry again (`shell/write.ts`, `onWritten`).
+  - **His voice is not dropped by a key.** Escape or Close while recording stops the recording and keeps it (the room
+    stays); with a recording not sent the room asks in place (*Keep writing* / *Discard the recording*); while a save
+    settles, closing waits. Typed words are kept as the draft, as before. *Speak it* starts the microphone once (the
+    room owns it, so a discard or *Write another* does not start it again), and a microphone granted after the room
+    closed is let go at once. Only one room at a time: a stray `N`, or a link, while it stands is ignored; `N` does
+    nothing on the pairing screens or while composing.
+  - **The room's reads are quiet** (`todayQuiet`, `libraryQuiet`, `entryQuiet`, `runsQuiet`, the practice view): they
+    never change the offline ribbon or the kept-copy rules of the page behind it.
+  - **Today never folds a prompt** (FRONTEND §1.1): her questions stand open on every card, by part, as main had them;
+    the test that forbade a fold is back. The entry keeps its fold (`FOLD_ENTRY_QUESTIONS`).
+  - **The entry sidebar's "Load more"** keeps a page with the first page it followed, aborts on a newer one, and says
+    a failed page with Retry, as Entries does.
+  - **Her letter in the room on a phone** rests at three lines with *Read all of her letter* to open it.
+  - **Colour.** `--her-soft` is held at AA on every ground, as the ink is; light brown and light green were a touch
+    too pale for that on the darkest grounds and are deepened (`#6e3c14`, `#1a523f`). A swatch that names its own
+    scheme (a light one on a dark page) now carries that scheme's ink. Every duration in a component's sheet is a
+    token (`--d-0`, `--d-5`, `--d-loop` and `--d-breath` are new).
+  - **Settings.** A value stepped back to what it was, or to the default while unset, is no change (a default is never
+    written into the file by accident); an edit in a row that folded away under its switch is not sent; a locked
+    switch is described by its line; a stepper with an open lower bound ("more than 0") can step to any value above
+    it. (The test that ties the page's defaults to `config.DEFAULTS` was already there.)
+  - **Smaller:** Keep in a question in place gives focus back to its button; Edit from a passage's sheet puts the caret
+    in the editor; a sheet leaves on Android's back; the run card says "session 3 of 10" beside a strip that counts
+    sessions done; the player says when a recording cannot be played, and its seek bar is 44 px on touch (the mobile
+    pass now measures sliders); the room's program list says a failed read instead of offering a program already
+    running; a note's words carried into an answer leave no copy in the next note; the Library waits for the chat
+    flag before it offers *Send to chat*.
+  - **Housekeeping.** The build brief for this pass named one operator's tooling and is gone from the repository; the
+    owner's verdicts in `design/` are paraphrased (his exact words are in the deployment's private notes).
+  - **Tests changed on purpose:** the read-only document test allows exactly the player's two buttons and the fold's
+    head, and asserts no field in her letter; Today's card test asserts no fold; the Library's turned-off test waits
+    for *Send to chat*. New tests cover each point above.
 - **X-MEMORY (raised 2026-11-09; the owner, 2026-11-11) — the journal's own model calls load the companion's
   memory, and her memory tool is not refused in an off-the-record turn. Accepted.** Every model step (openers,
   annotations, day reflections, week reviews, program reflections and insights, outage replies) runs

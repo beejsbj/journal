@@ -1,0 +1,4 @@
+/* Ribbon (ui/Ribbon.tsx) */
+.ribbon-mark { display: block; flex: none; color: var(--text); }
+.ribbon-mark path { fill: currentColor; }
+.ribbon-mark.edited path { fill: none; stroke: currentColor; stroke-width: 1.5; }

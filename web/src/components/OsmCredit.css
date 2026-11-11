@@ -1,0 +1,5 @@
+/* OsmCredit (components/OsmCredit.tsx): the credit a place named by OpenStreetMap carries wherever it is shown, a
+   caption, the quietest type on the page */
+.credit { margin: 2px 0 0; font-size: var(--t-micro); color: var(--text-3); }
+.credit a { color: inherit; }
+.credit a:hover { color: var(--text-2); }

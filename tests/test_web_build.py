@@ -79,9 +79,12 @@ class CommittedBuildTest(unittest.TestCase):
     def test_it_is_a_pwa_that_installs_from_any_origin(self):
         names = {p.relative_to(STATIC).as_posix() for p in STATIC.rglob("*") if p.is_file()}
         self.assertTrue({"sw.js", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png",
-                         "icons/icon-maskable-512.png", "icons/apple-touch-icon.png", "icons/mark.svg"} <= names)
+                         "icons/icon-maskable-512.png", "icons/apple-touch-icon.png", "icons/mark.svg",
+                         "icons/favicon.svg", "icons/favicon-32.png"} <= names)
         html = (STATIC / "index.html").read_text(encoding="utf-8")
         self.assertIn('<link rel="manifest" href="/manifest.webmanifest">', html)
+        self.assertIn('<link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">', html)
+        self.assertIn('<link rel="icon" href="/icons/favicon-32.png" type="image/png" sizes="32x32">', html)
         manifest = json.loads((STATIC / "manifest.webmanifest").read_text(encoding="utf-8"))
         # nothing names a host or a port: the same build installs from a tailnet address with a port, a published
         # host or loopback
@@ -93,11 +96,11 @@ class CommittedBuildTest(unittest.TestCase):
         for icon in manifest["icons"]:
             self.assertFalse(icon["src"].startswith(("/", "http")), icon["src"])    # relative to the manifest
             self.assertTrue((STATIC / icon["src"]).is_file(), icon["src"])
-        # the installed app's colours are the page's (tokens.css, the light sheet)
+        # the installed app's colours are the page's (tokens.css, the light sheet's --pane)
         tokens = (WEB / "src" / "tokens.css").read_text(encoding="utf-8")
-        bg = re.search(r"--bg:\s*(#[0-9a-fA-F]{6});", tokens).group(1).lower()
-        self.assertEqual((manifest["theme_color"], manifest["background_color"]), (bg, bg))
-        self.assertIn(f'content="{bg}" media="(prefers-color-scheme: light)"', html)
+        pane = re.search(r"--pane:\s*(#[0-9a-fA-F]{6});", tokens).group(1).lower()
+        self.assertEqual((manifest["theme_color"], manifest["background_color"]), (pane, pane))
+        self.assertIn(f'content="{pane}" media="(prefers-color-scheme: light)"', html)
 
     def test_the_service_worker_is_a_classic_script_that_precaches_the_shell_and_holds_the_rules(self):
         sw = (STATIC / "sw.js").read_text(encoding="utf-8")

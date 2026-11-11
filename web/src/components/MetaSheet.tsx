@@ -1,9 +1,10 @@
 import { useState } from "preact/hooks";
 import { api } from "../api";
 import { useAction } from "../hooks";
-import { Star } from "../icons";
+import { Close, Star } from "../icons";
 import type { EntryDoc } from "../types";
-import { ErrorLine } from "./Status";
+import { Button, ErrorLine } from "../ui";
+import "./MetaSheet.css";
 
 /** What the server allows in one mood or person: up to 60 characters, no commas, brackets or line breaks. */
 export function cleanTag(raw: string): string {
@@ -22,21 +23,26 @@ function Tags({ label, tags, onChange }: { label: string; tags: string[]; onChan
     setDraft("");
   };
   return (
-    <div class="field">
-      <label for={`tag-${label}`}>{label}</label>
-      <p class="chips">
-        {tags.map((t) => (
-          <button type="button" class="chip" key={t} aria-label={`Remove ${t}`} onClick={() => onChange(tags.filter((x) => x !== t))}>
-            {t} ×
-          </button>
-        ))}
-      </p>
+    <div class="meta-field">
+      <label class="field-label" for={`tag-${label}`}>{label}</label>
+      {tags.length > 0 && (
+        <p class="meta-tags">
+          {tags.map((t) => (
+            <button type="button" class="meta-tag" key={t} aria-label={`Remove ${t}`} onClick={() => onChange(tags.filter((x) => x !== t))}>
+              <span>{t}</span>
+              <Close aria-hidden="true" />
+            </button>
+          ))}
+        </p>
+      )}
       <input
         id={`tag-${label}`}
+        class="input"
         type="text"
         value={draft}
         placeholder="Add, then press Enter"
         maxLength={60}
+        autoComplete="off"
         onInput={(e) => setDraft((e.currentTarget as HTMLInputElement).value)}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === ",") {
@@ -84,9 +90,10 @@ export function MetaSheet({ doc, onSaved, onReload }: { doc: EntryDoc; onSaved: 
         void save();
       }}
     >
-      <label class="check">
+      <label class="meta-star">
         <input type="checkbox" checked={starred} onChange={(e) => setStarred((e.currentTarget as HTMLInputElement).checked)} />
-        <Star width={16} height={16} /> Starred
+        <Star aria-hidden="true" />
+        <span>Starred</span>
       </label>
       <Tags label="Mood" tags={mood} onChange={setMood} />
       <Tags label="People" tags={people} onChange={setPeople} />
@@ -94,16 +101,18 @@ export function MetaSheet({ doc, onSaved, onReload }: { doc: EntryDoc; onSaved: 
         (act.error.status === 409 && act.error.slug === "mtime" ? (
           <div class="error-line" role="alert">
             <p>{act.error.detail}</p>
-            <button type="button" class="button" onClick={onReload}>
+            <Button size="small" onClick={onReload}>
               Reload the entry
-            </button>
+            </Button>
           </div>
         ) : (
           <ErrorLine error={act.error} />
         ))}
-      <button type="submit" class="button primary" disabled={act.busy || !changed}>
-        {act.busy ? "Saving…" : "Save"}
-      </button>
+      <div class="meta-actions">
+        <Button variant="primary" type="submit" disabled={act.busy || !changed}>
+          {act.busy ? "Saving…" : "Save"}
+        </Button>
+      </div>
     </form>
   );
 }

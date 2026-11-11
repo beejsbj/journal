@@ -55,11 +55,16 @@ export function registerWorker(): void {
       wb.messageSkipWaiting();
     });
   });
-  void wb.register().then((reg) => {
-    if (!reg) return;
-    setInterval(() => void reg.update().catch(() => undefined), UPDATE_CHECK_MS);
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") void reg.update().catch(() => undefined);
-    });
-  });
+  // A browser may refuse the worker or hand back no registration (a policy, private mode; Playwright's
+  // `serviceWorkers: "block"` resolves `register()` with nothing, and Workbox then reads `.waiting` off undefined): the
+  // app runs without it, reading from the network, so a refused registration is not an error worth a console line.
+  wb.register()
+    .then((reg) => {
+      if (!reg) return;
+      setInterval(() => void reg.update().catch(() => undefined), UPDATE_CHECK_MS);
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") void reg.update().catch(() => undefined);
+      });
+    })
+    .catch(() => undefined);
 }

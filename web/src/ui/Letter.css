@@ -1,0 +1,42 @@
+/* Letter (ui/Letter.tsx): her ink on a wash of it, a dashed crease, sections; no fastening of any kind */
+.letter {
+  position: relative; isolation: isolate; padding: 22px 26px 20px; border-radius: var(--r-letter);
+  background: var(--her-wash); box-shadow: 0 0 0 1px var(--her-hair), var(--elev-letter);
+}
+/* the crease of a letter opened flat */
+.letter::before { content: ""; position: absolute; left: 16px; right: 16px; top: 0; border-top: 1px dashed var(--her-edge); }
+.letter-from {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--s2); margin: 0 0 10px;
+  font: 500 var(--t-small) / 1.3 var(--f-ui); color: var(--her-soft);
+}
+.letter-at::before { content: "·"; margin-right: var(--s2); opacity: 0.7; }
+.letter-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--her); box-shadow: 0 0 10px var(--her-glow); }
+.letter-body p { margin: 0 0 0.7em; }
+.letter-body > :last-child { margin-bottom: 0; }
+.letter-asked { font-style: italic; font-size: var(--t-her-lg); line-height: 1.6; }
+
+.letter-foot, .letter-actions {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--s2); margin-top: 14px; padding-top: 10px;
+  border-top: 1px dashed var(--her-edge);
+}
+.letter-actions { gap: var(--s2); padding-top: 14px; }
+.letter-questions { flex: 1 1 100%; }
+.letter-questions > .disclosure-head { min-height: 40px; padding: 0; color: var(--her); font: 500 var(--t-small) / 1.2 var(--f-ui); }
+.letter-questions > .disclosure-head .disclosure-chevron { width: 28px; height: 28px; color: var(--her-soft); }
+.letter-questions > .disclosure-head:hover .disclosure-title { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.letter-qlist { columns: 2; column-gap: 32px; padding: 6px 0 4px; font-size: 13.5px; line-height: 1.55; }
+.letter-qsec { break-inside: avoid; padding: 8px 0; }
+.letter-qsec h4 { margin: 0 0 6px; font: italic 400 16px / 1.3 var(--f-his); color: var(--her-soft); }
+.letter-qsec ol { list-style: none; margin: 0; padding: 0; }
+.letter-qsec li { display: grid; grid-template-columns: 34px 1fr; gap: 4px; padding: 3px 0; align-items: baseline; }
+.letter-qid { font: 500 11.5px / 1 var(--f-ui); color: var(--her-soft); font-variant-numeric: tabular-nums; }
+.letter-qsec li.asked .letter-qt { font-weight: 500; }
+.letter-asked-tag { font-weight: 400; color: var(--her-soft); }
+
+@media (max-width: 760px), (pointer: coarse) {
+  .letter-questions > .disclosure-head { min-height: var(--tap); }   /* 44 px on touch (web/e2e/mobile.spec.ts) */
+}
+@media (max-width: 760px) {
+  .letter { padding: 22px 18px 16px; }
+  .letter-qlist { columns: 1; }
+}

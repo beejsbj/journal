@@ -1,0 +1,69 @@
+/* Entries (routes/entries.tsx): Folio's list, the filter sentence, Almanac's month. On a wide screen the list is the
+   page that becomes the sidebar when an entry opens (entry.css names the side pane "page", the same name). */
+
+.entries-page { max-width: 1060px; margin: 0 auto; padding: var(--page-top) var(--gutter) var(--page-foot); }
+
+.entries-page .entries-head.page-head {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s6); align-items: end;
+  margin: 0 0 var(--s1); padding: 0; border: 0;
+}
+@media (min-width: 1000px) {
+  .entries-page .entries-head.page-head { grid-template-columns: minmax(0, 1fr) 252px; gap: var(--s8); }
+}
+.entries-page .entries-lead { min-width: 0; }
+.entries-page .entries-head h1 { margin: 0; }
+
+.entries-page .filter-sentence { margin: 14px 0; font: 400 1.1875rem / 1.6 var(--f-his); color: var(--text-2); text-wrap: pretty; }
+
+/* the search: an italic line to write on, not a box */
+.entries-page .search {
+  display: flex; align-items: center; gap: 10px; min-height: var(--tap); padding: 4px 2px;
+  border-bottom: 1px solid var(--hair-2); color: var(--text-3); transition: border-color var(--d-2);
+}
+.entries-page .search:focus-within { border-bottom-color: var(--text); }
+.entries-page .search > svg { flex: none; width: 18px; height: 18px; }
+.entries-page .search input {
+  flex: 1; min-width: 0; height: 40px; padding: 0; border: 0; background: none; outline: none; -webkit-appearance: none; appearance: none;
+  font: italic 400 18px / 1.3 var(--f-his); color: var(--text);
+}
+.entries-page .search input::placeholder { color: var(--text-3); }
+.entries-page .search input::-webkit-search-cancel-button { filter: grayscale(1); opacity: 0.5; }
+
+.entries-page .active-filter {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-height: 28px; margin: 10px 0 0;
+  font: 400 var(--t-small) / 1.4 var(--f-ui); color: var(--text-2);
+}
+.entries-page .active-filter .link { gap: 4px; font-size: var(--t-small); }
+.entries-page .active-filter .link > svg { width: 13px; height: 13px; }
+
+.entries-page .entries-calendar { max-width: 360px; }
+
+/* the list: weeks, then days with their numerals, then his first lines */
+.entries-page .entries-list { padding-top: var(--s2); }
+.entries-page .entries-list .week { margin-top: 30px; }
+.entries-page .entries-list .week > .week-head { margin: 0 0 6px; }
+.entries-page .entries-list .day { display: grid; grid-template-columns: 68px minmax(0, 1fr); border-top: 1px solid var(--hair); }
+.entries-page .entries-list .week > .week-head + .day { border-top: 0; }
+.entries-page .day-tab { display: grid; align-content: start; gap: 3px; margin: 0; padding: 16px 0 0 2px; font-weight: 400; }
+.entries-page .day-n { font: 300 34px / 0.95 var(--f-his); font-variant-numeric: lining-nums; letter-spacing: -0.02em; color: var(--text); }
+.entries-page .day-w { font: 500 12px / 1 var(--f-ui); color: var(--text-3); }
+.entries-page .entries-list .rows { display: grid; padding: 8px 0; }
+.entries-page .entries-list .load-more { margin-top: var(--s6); }
+.entries-page > .empty, .entries-page > .skeletons, .entries-page > .error-line { margin-top: var(--s6); }
+
+/* touch: the search reaches 44 px (the sentence's choices do in ui/Menu.css) */
+@media (max-width: 760px), (pointer: coarse) {
+  .entries-page .search input { height: var(--tap); }
+}
+
+/* a mid-width window: the month narrower under the sentence */
+@media (max-width: 999px) and (min-width: 761px) {
+  .entries-page .entries-calendar { max-width: 320px; }
+}
+@media (max-width: 760px) {
+  .entries-page .entries-head.page-head { gap: var(--s5); }
+  .entries-page .filter-sentence { font-size: 1.0625rem; }
+  .entries-page .entries-calendar { max-width: none; }
+  .entries-page .entries-list .day { grid-template-columns: 52px minmax(0, 1fr); }
+  .entries-page .day-n { font-size: 28px; }
+}

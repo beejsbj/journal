@@ -1,4 +1,5 @@
 import type { Json } from "../schema";
+import "./OsmCredit.css";
 
 /** `coordinates.source` of a place the reverse lookup named (location.py `OSM`). */
 export const OSM = "openstreetmap";

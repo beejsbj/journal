@@ -1,0 +1,159 @@
+/* The write room (components/WriteRoom.tsx): Night Room's room with Folio's letter on top. It blooms out of the button
+   pressed as a clip-path circle (--bx, --by: that button's centre) while the page behind recedes, and folds back into it.
+   design/DESIGN.md, "Motion" (--d-bloom) and the round-02 prototype's #write. */
+
+.room[open] {
+  position: fixed; inset: 0; z-index: var(--z-sheet); display: flex; flex-direction: column;
+  width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; overflow: hidden;
+  background: var(--write-room); color: var(--text);
+  clip-path: circle(22px at var(--bx, 50%) var(--by, 90%));
+  transition: clip-path var(--d-4) cubic-bezier(0.4, 0, 0.2, 1);
+}
+.room.open { clip-path: circle(150vmax at var(--bx, 50%) var(--by, 90%)); transition: clip-path var(--d-bloom) var(--e-out); }
+.room::backdrop { background: transparent; }
+/* the lamp behind the writing column: the room's one light */
+.room::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 46% 62% at 50% 30%, var(--glow-room), transparent 72%);
+}
+
+/* the page behind steps back while the room is open (the room is in the top layer: none of this touches it) */
+.stage, .phone-top { transition: transform var(--d-4) var(--e-out), filter var(--d-4) var(--e-out); transform-origin: 50% 40%; }
+html.room-open :is(.stage, .phone-top) { transform: scale(0.972); filter: brightness(var(--recede)) blur(2px); }
+
+/* ── the top bar: close, where this is going, the draft's state, Focus ── */
+.room-top {
+  position: relative; z-index: 2; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: var(--s2);
+  height: 64px; padding: 0 16px; padding-top: env(safe-area-inset-top);
+  box-sizing: content-box;
+}
+.room-ctx { margin: 0; font-size: 13.5px; color: var(--text-3); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.room-ctx b { font: italic 400 16px / 1 var(--f-his); color: var(--text-2); }
+.room-tools { justify-self: end; display: flex; align-items: center; gap: 4px; }
+.room-saved { display: inline-flex; align-items: center; gap: 8px; padding: 0 10px; font-size: 13px; color: var(--text-3); white-space: nowrap; }
+.room-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-3); animation: room-keep var(--d-5) var(--e-out) both; }
+@keyframes room-keep { 0% { background: var(--text-2); transform: scale(0.5); } 40% { transform: scale(1.4); } }
+.room-focus {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 12px; border: 0; border-radius: var(--r-m);
+  background: none; color: var(--text-3); font: 500 13.5px / 1 var(--f-ui); cursor: pointer;
+  transition: background var(--d-1), color var(--d-1);
+}
+.room-focus:hover { background: var(--raised); color: var(--text); }
+.room-focus[aria-pressed="true"] { color: var(--text); background: color-mix(in oklab, var(--raised) 70%, transparent); }
+.room-focus > svg { width: 18px; height: 18px; }
+
+/* ── the column: her letter (or the quiet start), then his page ── */
+.room-body { position: relative; z-index: 1; flex: 1; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.room-col { position: relative; max-width: 720px; margin: 0 auto; padding: 5vh 28px 220px; }
+.room-head { margin-bottom: 48px; opacity: 0; transform: translateY(-12px); transition: transform var(--d-bloom) var(--e-paper), opacity var(--d-3) ease; }
+.room.open .room-head { opacity: 1; transform: none; transition: transform var(--d-bloom) var(--e-paper) var(--d-2), opacity var(--d-4) ease var(--d-2); }
+.room-letter .letter-qlist { columns: 1; }
+/* her letter in full or at three lines: the toggle exists for a phone, where it is cut (WriteRoom.tsx, HerLetter) */
+.room-letter-more { font-size: var(--t-small); }
+@media (min-width: 761px) { .room-letter-more, .room-letter .letter-foot:has(> .room-letter-more:only-child) { display: none; } }
+/* which slot his words fill, in words ("Fills the 23:00 slot early; it will not be sent."): under her letter */
+.room-fills { margin: var(--s3) 0 0; font-size: var(--t-small); line-height: 1.45; color: var(--text-2); }
+.room-questions { margin: 0; padding-left: 1.6em; display: grid; gap: 4px; }
+.room-questions li::marker { color: var(--her-soft); }
+
+.room-start { display: grid; gap: var(--s3); justify-items: start; }
+.room-none { margin: 0; font: italic 400 17px / 1.5 var(--f-his); color: var(--text-3); }
+.room-offers { list-style: none; display: flex; flex-wrap: wrap; gap: var(--s1) var(--s2); margin-left: -14px; }
+.room-offer-when { font-weight: 400; color: var(--text-3); }
+.room-programs { width: 100%; }
+.room-program-list { list-style: none; display: flex; flex-wrap: wrap; gap: var(--s2); padding: var(--s2) 0 var(--s1); }
+
+/* his page: a textarea over a mirror of its own words. The mirror draws the letters (and greys them); the textarea's
+   are transparent, so the caret, selection, IME, spellcheck and undo are the browser's own. Both share every metric. */
+.room-page { position: relative; min-height: 40vh; opacity: 0; transition: opacity var(--d-4) ease var(--d-1); }
+.room.open .room-page { opacity: 1; }
+.room-mirror, .room-text {
+  margin: 0; padding: 0; border: 0; font: 400 var(--t-write) / var(--lh-write) var(--f-his); font-optical-sizing: auto;
+  letter-spacing: -0.004em; white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; tab-size: 4;
+  text-rendering: optimizeLegibility;
+}
+.room-mirror { min-height: inherit; color: var(--text); pointer-events: none; }
+.room-text {
+  position: absolute; inset: 0; width: 100%; height: 100%; resize: none; overflow: hidden; background: transparent;
+  color: transparent; -webkit-text-fill-color: transparent; caret-color: var(--text); outline: none;
+}
+.room-text::placeholder { color: var(--text-3); -webkit-text-fill-color: var(--text-3); font-style: italic; opacity: 1; }
+.room-text::selection { background: color-mix(in oklab, var(--text) 18%, transparent); color: transparent; -webkit-text-fill-color: transparent; }
+.room-text:disabled { cursor: progress; }
+.room-page.busy .room-mirror { opacity: 0.6; }
+/* focus: every paragraph but the one with the caret greys (30 % by day, 22 % at night) */
+.room-p { transition: opacity var(--d-4) var(--e-out); }
+.room-page.focus .room-p:not(.lit) { opacity: var(--focus-dim); }
+/* the hour he began, hung in the left margin beside his first line */
+.room-hour {
+  position: absolute; top: 0.62em; right: calc(100% + 28px); width: var(--margin-l); text-align: right;
+  font: italic 400 15px / 1 var(--f-his); color: var(--text-3); animation: rise var(--d-4) var(--e-out) var(--d-3) both;
+}
+
+/* a recording waiting to go with the words */
+.room-clip {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); margin-top: var(--s5); padding: 10px 14px 10px 12px;
+  border-radius: var(--r-m); background: var(--raised); box-shadow: inset 0 0 0 1px var(--hair-2); animation: rise var(--d-4) var(--e-out) both;
+}
+.room-clip-line { display: inline-flex; align-items: center; gap: 10px; margin: 0; flex: 1 1 100%; font: 500 13.5px / 1.3 var(--f-ui); color: var(--text-2); }
+.room-clip-line > svg { width: 16px; height: 16px; flex: none; }
+.room-clip .audio-player { flex: 1 1 16rem; }
+.room-col > .offline-note, .room-col > .error-line { margin-top: var(--s4); }
+/* leaving with his voice unsent: asked in place, never dropped without a word */
+.room-asking {
+  display: grid; gap: var(--s3); margin-top: var(--s4); padding: var(--s3) var(--s4); border-radius: var(--r-m);
+  background: var(--raised); box-shadow: inset 0 0 0 1px var(--hair-2); animation: rise var(--d-3) var(--e-out) both;
+}
+.room-asking p { margin: 0; font-size: var(--t-small); color: var(--text); }
+.room-asking-actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
+
+/* ── the dock: the words so far, the voice orb, the lamp ── */
+.room-dock {
+  position: absolute; z-index: 3; left: 50%; bottom: max(22px, env(safe-area-inset-bottom)); transform: translateX(-50%);
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 18px;
+  width: min(720px, calc(100% - 24px)); padding: 10px 10px 10px 22px; border-radius: 30px;
+  background: var(--frost); box-shadow: var(--elev-pop);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4); backdrop-filter: blur(24px) saturate(1.4);
+  opacity: 0; translate: 0 16px; transition: opacity var(--d-3) ease, translate var(--d-4) var(--e-out);
+}
+.room.open .room-dock { opacity: 1; translate: 0 0; transition-delay: var(--d-1); }
+.room-count { font-size: 13px; color: var(--text-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.room-count.recording { color: var(--text); }
+.room-orb { display: grid; place-items: center; min-width: 60px; }
+.room-send { justify-self: end; }
+
+/* ── after a send ── */
+.room-done { display: grid; gap: var(--s5); justify-items: start; padding-top: 18vh; animation: rise var(--d-4) var(--e-out) both; }
+.room-done .saved { margin: 0; font: italic 400 1.75rem / 1.3 var(--f-his); color: var(--text); }
+.room-done .saved a { font: 500 var(--t-ui) / 1 var(--f-ui); color: var(--text-2); margin-left: var(--s2); }
+.room-done-actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
+
+/* ── phones ── */
+@media (max-width: 760px) {
+  .room-top { grid-template-columns: auto 1fr; height: 56px; padding: env(safe-area-inset-top) 6px 0; }
+  .room-ctx, .room-saved-words, .room-focus-label { display: none; }
+  .room-focus { min-width: var(--tap); min-height: var(--tap); justify-content: center; padding: 0; }
+  .room-col { padding: 2vh 20px 200px; }
+  .room-mirror, .room-text { font-size: 21px; line-height: 1.62; }
+  .room-hour { display: none; }
+  .room-head { margin-bottom: 32px; }
+  .room-letter:not(.whole) .letter-body p:not(.letter-asked) {
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .room-dock { grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; padding: 8px 8px 8px 10px; }
+  .room-orb { order: -1; min-width: 0; }
+  .room-count { white-space: normal; font-size: 12px; line-height: 1.3; }
+  .room-send .button > svg { display: none; }
+  .room-send .button { padding: 0 16px; }
+  .room-done .saved { font-size: 1.5rem; }
+}
+@media (pointer: coarse) {
+  .room-focus { min-width: var(--tap); min-height: var(--tap); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .room[open], .room.open { clip-path: none; transition: none; }
+  html.room-open :is(.stage, .phone-top) { transform: none; filter: none; }
+  .room-head, .room-page { opacity: 1; transform: none; translate: none; }
+  .room-dock { opacity: 1; translate: none; }   /* (its transform centres it: kept) */
+}

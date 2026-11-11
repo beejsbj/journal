@@ -19,17 +19,19 @@ describe("the manifest", () => {
     for (const icon of m.icons) expect(icon.src.startsWith("/")).toBe(false);   // relative to the manifest, so any origin
   });
 
+  // the page colour (--pane), since WEB-UX: on a phone the status bar sits over the page, not the desk behind it
   it("takes its colours from tokens.css", () => {
     const p = palette(tokens);
-    expect(p.light.bg).toBe("#f4efe4");
-    expect(m.theme_color).toBe(p.light.bg);
-    expect(m.background_color).toBe(p.light.bg);
+    expect(p.light.pane).toBe("#fbf8f1");
+    expect(p.dark.pane).toBe("#141921");
+    expect(m.theme_color).toBe(p.light.pane);
+    expect(m.background_color).toBe(p.light.pane);
   });
 
   it("is the page's theme-color too, light and dark", () => {
     const p = palette(tokens);
-    expect(html).toContain(`content="${p.light.bg}" media="(prefers-color-scheme: light)"`);
-    expect(html).toContain(`content="${p.dark.bg}" media="(prefers-color-scheme: dark)"`);
+    expect(html).toContain(`content="${p.light.pane}" media="(prefers-color-scheme: light)"`);
+    expect(html).toContain(`content="${p.dark.pane}" media="(prefers-color-scheme: dark)"`);
   });
 
   it("names icons that exist: 192, 512 and a maskable 512, made from the SVG mark", () => {

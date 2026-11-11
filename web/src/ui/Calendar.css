@@ -1,0 +1,30 @@
+/* Calendar (ui/Calendar.tsx): Almanac's month */
+.calendar { border-top: 2px solid var(--text); padding-top: 10px; }
+.calendar-head { display: flex; align-items: center; gap: 2px; margin-bottom: 6px; }
+.calendar-month { margin: 0; font: 400 28px / 1 var(--f-his); letter-spacing: -0.01em; }
+.calendar-year { flex: 1; margin-left: 10px; font: 500 var(--t-micro) / 1.2 var(--f-ui); color: var(--text-3); }
+.calendar-grid { width: 100%; border-collapse: collapse; table-layout: fixed; text-align: center; }
+.calendar-grid th { padding: 0; font: 500 11.5px / 2.2 var(--f-ui); color: var(--text-3); }
+.calendar-grid td { padding: 0.5px 0; }
+.calendar-grid td > span, .calendar-grid td > button {
+  position: relative; display: grid; place-items: center; width: 100%; max-width: 40px; height: 34px; margin: 0 auto; padding: 0;
+  border: 0; border-radius: 50%; background: none; font: 400 14px / 1 var(--f-ui); font-variant-numeric: tabular-nums; color: var(--text-3);
+}
+.calendar-grid td > span.future { color: color-mix(in oklab, var(--text-3) 55%, var(--pane)); }
+.calendar-grid td > button { color: var(--text); font-weight: 600; cursor: pointer; transition: background var(--d-1), color var(--d-1); }
+.calendar-grid td > button::after {
+  content: ""; position: absolute; left: 50%; bottom: 4px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%;
+  background: var(--text); opacity: 0.75;
+}
+.calendar-grid td > button:hover { background: var(--raised); }
+.calendar-grid .today::before { content: ""; position: absolute; inset: 1px 4px; border: 1px solid var(--text-2); border-radius: 50%; }
+.calendar-grid td > button[aria-pressed="true"] { background: var(--lamp); color: var(--on-lamp); }
+.calendar-grid td > button[aria-pressed="true"]::after { background: var(--on-lamp); }
+.calendar-legend { display: flex; gap: 14px; margin: 8px 0 0; font: 500 var(--t-micro) / 1.3 var(--f-ui); color: var(--text-3); }
+.calendar-legend i { display: inline-block; margin-right: 6px; vertical-align: middle; border-radius: 50%; }
+.calendar-legend i.written { width: 4px; height: 4px; background: var(--text); }
+.calendar-legend i.ring { width: 10px; height: 10px; border: 1px solid var(--text-2); }
+
+@media (max-width: 760px), (pointer: coarse) {
+  .calendar-grid td > span, .calendar-grid td > button { height: var(--tap); max-width: var(--tap); }
+}

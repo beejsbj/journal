@@ -16,6 +16,31 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## WEB-UX — the web app on its design system (2026-11-10; serve side only; no gateway restart; no config or state change)
+
+**What changes.** The web app's whole look and its write surface: the round-02 design system (`design/DESIGN.md`,
+`web/src/tokens.css`, `web/src/ui/`, `/design`), every screen rebuilt on it, the write room in place of the "+" sheet,
+Entry/Analysis tabs gone (her readings unfold at the entry's end), and the entries list as a sidebar beside an open
+entry (DECISIONS.md, WEB-UX-IDENTITY, WEB-UX-ENTRY-TABS, WEB-UX-WRITE-ROOM, WEB-UX-INTEGRATION). It reaches the browser
+through the committed web build (`src/journal/serve/static/`); the API, the server and the engine are unchanged.
+**Side and restart.** Serve side: `uv tool install --force` at the merge sha, then `systemctl --user restart
+journal-serve`. No gateway restart: the release changes `web/`, the committed build under `src/journal/serve/static/`,
+`tests/` (the build test reads the new token name and the favicon links), `tools/web_fonts.py` (a dev tool that cuts the
+fonts, never imported at run time) and docs; it changes no module under `src/journal` outside `serve/static/`
+(checked against the main it merged into: `git diff --stat <main sha> <merge sha> -- src/
+':!src/journal/serve/static'` lists nothing), and the gateway never reads `serve/static/`. It uses main's
+OPEN-FACES API as it is (`GET /library/{id}/open`, `chat`, `due`) and OPEN-PUSH's (`GET /push`,
+`/push/subscriptions`; Settings' notifications card): an install still before OPEN-CORE/OPEN-FACES deploys their
+sections first (they need the gateway restart, in a window), and OPEN-PUSH's section says what it needs (serve side,
+the optional extra `journal[push]` and `push.*`; without the extra the card says notifications are not set up on the
+server); WEB-UX adds nothing to those. No setting, state file or practice moves. **First checks.** After the restart,
+`curl -s localhost:<port>/healthz` answers, and a fresh load of the app shows the rail (or, on a phone, the tab bar)
+and the paper or the night room; the installed PWA shows "Update available" once and takes the new build on Reload
+(drafts are in `sessionStorage`, so nothing typed is lost). Write opens the room; an entry opens beside its list.
+The device keeps its ink and its theme; the new keys (`journal:theme`, `journal:sidebar`, `journal:room-focus`) start
+at their defaults. **Rollback.** The CLI at the previous sha and the same restart; the browser takes the old build at
+the next "Update available".
+
 ## OWN-WORDS — what the engine adds to a turn is never filed as his words (2026-11-09; hook side and tick side; **gateway restart required**; no config or state change)
 
 **What changes.** The context the engine injects into the companion's turn (`pre_llm_call`: notebook, pack, program
@@ -370,6 +395,14 @@ reflection `skipped: "no chat"` (with `skipped_at`); existing records read the s
    a real channel or stop its tick first. Old code does not know the `skipped: "no chat"` mark either: with a real
    channel set, it sends the annotation replies and reflections skipped meanwhile (it checks only for a message id and
    attempts left), so stopping the tick is the safe choice.
+
+## FAVICON — the tab's own mark (2026-11-04; serve side only; no gateway restart; no config or state change)
+
+**What changes.** The web app's favicon is `icons/favicon.svg` (and `icons/favicon-32.png`), through the committed web
+build. **Side and restart.** Serve side: `uv tool install --force` at the merge sha, then
+`systemctl --user restart journal-serve`. **First checks.** `/icons/favicon.svg` answers 200 and a fresh tab shows the
+`j`; browsers cache favicons hard, so an old tab can keep the page mark for a while. **Rollback.** The CLI at the
+previous sha and the same restart.
 
 ## SCRUB-PERSONAL — the repo holds nothing specific to a deployment (2026-10-28; docs, tests and comments, one doctor row; no gateway restart needed; no config or state change)
 

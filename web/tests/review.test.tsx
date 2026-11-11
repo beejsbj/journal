@@ -17,6 +17,14 @@ function visit(path: string) {
   window.history.replaceState(null, "", path);
 }
 
+/** WEB-UX: the entries' filters are a sentence ("Showing every entry from any practice"); each phrase opens a menu. */
+async function chooseFilter(host: HTMLElement, phrase: string, choice: string): Promise<void> {
+  const trigger = await until(() => must([...host.querySelectorAll<HTMLElement>('.filter-sentence [aria-haspopup="menu"]')].find((b) => b.textContent === phrase)));
+  trigger.click();
+  const item = await until(() => must([...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')].find((b) => b.textContent === choice)));
+  item.click();
+}
+
 const base = {
   "/api/v1/today": fixtures.today,
   "/api/v1/library": fixtures.library,
@@ -51,8 +59,7 @@ describe("Entries: a page of Load more never outlives its filters", () => {
     const more = await until(() => must(host.querySelector<HTMLElement>("button.wide")));
     more.click();
     await until(() => expect(calls.some((c) => c.includes("cursor=40"))).toBe(true));
-    const audio = must([...host.querySelectorAll<HTMLElement>(".filter-chips .chip")].find((c) => c.textContent === "Has audio"));
-    audio.click();
+    await chooseFilter(host, "every entry", "entries with your voice");
     await until(() => expect(window.location.search).toContain("audio=1"));
     await until(() => expect(host.querySelectorAll(".rows a").length).toBe(1));
     release(json({ items: [note], next: "80" }));
@@ -79,7 +86,7 @@ describe("Insights", () => {
         url.searchParams.get("from") === "2026-10-12" && url.searchParams.get("to") === "2026-10-18" ? fixtures.reflections : [],
     });
     const host = mount(<App />);
-    await until(() => expect(host.querySelector(".reflection summary")?.textContent).toContain("reflection"));
+    await until(() => expect(host.querySelector(".reflection")?.id).toBe("2026-10-14-reflection"));
     expect(f.calls.some((c) => c.includes("from=2026-10-12") && c.includes("to=2026-10-18"))).toBe(true);
     expect(f.calls.every((c) => !c.includes("limit=200"))).toBe(true);
   });
@@ -275,10 +282,9 @@ describe("Today links", () => {
     stubFetch({ ...base, "/api/v1/today": data });
     const host = mount(<App />);
     await until(() => expect(host.querySelectorAll("a.open-entry")).toHaveLength(2));
-    expect([...host.querySelectorAll("a.open-entry")].map((a) => a.getAttribute("href"))).toEqual([
-      "/entries/2026-10-15-evening",
-      "/entries/2026-10-15-evening-2",
-    ]);
+    // (WEB-UX: the open slot waits at the top of the page, the answered one under "Earlier today")
+    expect(host.querySelector("li.practice.answered a.open-entry")?.getAttribute("href")).toBe("/entries/2026-10-15-evening");
+    expect(host.querySelector("li.practice.open a.open-entry")?.getAttribute("href")).toBe("/entries/2026-10-15-evening-2");
     expect(host.querySelector(".carry a")?.getAttribute("href")).toBe("/insights#2026-10-14-reflection-2");
   });
 });
@@ -291,8 +297,7 @@ describe("Entries search", () => {
     const box = await until(() => must(host.querySelector<HTMLInputElement>("input[type=search]")));
     box.value = "harbour";
     box.dispatchEvent(new Event("input", { bubbles: true }));
-    const audio = await until(() => must([...host.querySelectorAll<HTMLElement>(".filter-chips .chip")].find((c) => c.textContent === "Has audio")));
-    audio.click();
+    await chooseFilter(host, "every entry", "entries with your voice");
     await new Promise((r) => setTimeout(r, 600));
     expect(window.location.search).toContain("audio=1");
     expect(window.location.search).toContain("q=harbour");
@@ -340,8 +345,10 @@ describe("Entry of a program session", () => {
     visit("/entries/2026-10-15-fix-life-s01");
     stubFetch({ ...base, "/api/v1/entries/2026-10-15-fix-life-s01": fixtures.entrySession });
     const host = mount(<App />);
-    await until(() => must(host.querySelector(".questions summary")));
-    expect(host.querySelector(".questions")?.textContent).toContain("Phase 1");
+    // WEB-UX: the questions fold under her letter (ui/Letter), "All 14 questions, in 6 parts"
+    const head = await until(() => must(host.querySelector(".letter-questions .disclosure-head")));
+    expect(head.textContent).toContain("All 14 questions, in 6 parts");
+    expect(host.querySelector(".letter-questions")?.textContent).toContain("Phase 1");
     expect(host.querySelector(".phase-divider")?.textContent).toMatch(/^Phase 1 · \S/);   // the divider names the phase
   });
 });

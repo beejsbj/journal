@@ -1,0 +1,42 @@
+/* Disclosure (ui/Disclosure.tsx): height on the soft spring, the content settling a beat later */
+.disclosure-head {
+  display: flex; align-items: center; gap: var(--s3); width: 100%; min-height: var(--tap); padding: var(--s2) 0;
+  border: 0; border-radius: var(--r-m); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.disclosure-title { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.disclosure-peek {
+  font-size: var(--t-small); line-height: 1.5; color: var(--text-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: opacity var(--d-3);
+}
+.disclosure[data-open="true"] > .disclosure-head .disclosure-peek { opacity: 0; }
+.disclosure-chevron {
+  flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; color: var(--text-3);
+  transition: transform var(--spring-dur) var(--spring), background var(--d-1), color var(--d-1);
+}
+.disclosure-chevron > svg { width: 18px; height: 18px; }
+.disclosure-head:hover .disclosure-chevron { background: var(--raised); color: var(--text); }
+.disclosure[data-open="true"] > .disclosure-head .disclosure-chevron { transform: rotate(180deg); }
+/* an envelope in the head opens its flap as the reading unfolds */
+.disclosure-head .flap { transform-origin: 50% 30%; transition: transform var(--d-3) var(--e-paper); }
+.disclosure[data-open="true"] > .disclosure-head .flap { transform: scaleY(-1); }
+
+.disclosure-body {
+  display: grid; grid-template-rows: 0fr; visibility: hidden;
+  transition: grid-template-rows var(--spring-soft-dur) var(--spring-soft), visibility 0s linear var(--spring-soft-dur);
+}
+.disclosure[data-open="true"] > .disclosure-body {
+  grid-template-rows: 1fr; visibility: visible;
+  transition: grid-template-rows var(--spring-soft-dur) var(--spring-soft), visibility 0s;
+}
+.disclosure-inner { min-height: 0; overflow: hidden; }
+.disclosure-content {
+  opacity: 0; transform: translateY(-8px); filter: blur(2px);
+  transition: opacity var(--d-1), transform var(--d-3) var(--e-out), filter var(--d-2);
+}
+.disclosure[data-open="true"] > .disclosure-body .disclosure-content {
+  opacity: 1; transform: none; filter: none;
+  transition: opacity var(--d-3) var(--d-0), transform var(--spring-soft-dur) var(--spring-soft) var(--d-0), filter var(--d-3) var(--d-0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .disclosure-content { transform: none !important; filter: none !important; }
+}

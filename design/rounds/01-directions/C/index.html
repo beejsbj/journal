@@ -1,0 +1,1725 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-ink="blue-black" data-tod="day">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>journal — direction C, Almanac</title>
+<script>
+/* set paper, light and ink before the first paint, so the page never shows another first */
+(function(){var h=document.documentElement,q=(location.hash.split("?")[1]||""),p=new URLSearchParams(q);
+var dark=matchMedia("(prefers-color-scheme: dark)").matches;h.dataset.theme=p.get("theme")||(dark?"dark":"light");
+try{var k=localStorage.getItem("journal:ink");if(k)h.dataset.ink=k}catch(e){}if(p.get("ink"))h.dataset.ink=p.get("ink");
+var hr=new Date().getHours();h.dataset.tod=p.get("tod")||(hr<5?"night":hr<10?"dawn":hr<17?"day":hr<21?"dusk":"night");
+if(p.get("motion")==="off")h.classList.add("rm");})();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Schibsted+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ==========================================================================
+   ALMANAC — direction C
+   Three families: Instrument Serif (the almanac's display, and Ada's voice in
+   italic), Newsreader (his words, the body copy), Schibsted Grotesk (interface).
+   One hue: her ink. Grounds shift quietly with the time of day.
+   ========================================================================== */
+:root{
+  --display:"Instrument Serif","Iowan Old Style",Georgia,serif;
+  --text:"Newsreader","Iowan Old Style",Charter,Georgia,serif;
+  --ui:"Schibsted Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;
+
+  /* type scale (px at 1280; phone overrides below) */
+  --t-xs:12px; --t-sm:13.5px; --t-ui:15px; --t-his:20px; --t-her:20px;
+  --t-lede:27px; --t-h3:34px; --t-h2:48px; --t-h1:96px; --t-num:120px; --t-mega:200px;
+
+  /* space, 4px base */
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px; --s8:64px; --s9:96px;
+  --margin:clamp(20px,3.4vw,48px); --gutter:clamp(14px,1.9vw,28px); --cols:12;
+  --maxw:1320px; --mast:64px; --tab:0px;
+  --r1:2px; --r2:4px; --r3:999px;
+
+  /* motion */
+  --e-out:cubic-bezier(.16,.84,.24,1);
+  --e-io:cubic-bezier(.66,0,.34,1);
+  --e-in:cubic-bezier(.5,0,.75,0);
+  --d-xs:120ms; --d-s:200ms; --d-m:320ms; --d-l:520ms; --d-xl:720ms; --stagger:45ms;
+}
+/* ---------- grounds (light), by time of day ---------- */
+[data-theme=light]{
+  --ground:#f7f5f0; --raised:#fbfaf6; --sunk:#efebe2;
+  --ink:#171512; --ink-2:#47423a; --ink-3:#6b6458;
+  --rule:#d6cfc2; --rule-2:#e7e2d8; --shade:rgb(40 32 18 / .10);
+  --grid:rgb(23 21 18 / .045);
+}
+[data-theme=light][data-tod=dawn]{--ground:#f8f2ee; --raised:#fcf8f5; --sunk:#f0e7e1; --rule-2:#ebe1da}
+[data-theme=light][data-tod=dusk]{--ground:#f4eee4; --raised:#f9f5ee; --sunk:#ebe3d6; --rule-2:#e5dccd}
+[data-theme=light][data-tod=night]{--ground:#f1f0ec; --raised:#f8f7f4; --sunk:#e7e5df; --rule-2:#e1dfd8}
+/* ---------- grounds (dark) ---------- */
+[data-theme=dark]{
+  --ground:#121110; --raised:#1a1917; --sunk:#0d0c0b;
+  --ink:#ede7dc; --ink-2:#bdb5a8; --ink-3:#928a7d;
+  --rule:#36322c; --rule-2:#25221f; --shade:rgb(0 0 0 / .5);
+  --grid:rgb(237 231 220 / .04);
+}
+[data-theme=dark][data-tod=dawn]{--ground:#141317; --raised:#1c1b20}
+[data-theme=dark][data-tod=day]{--ground:#151413; --raised:#1d1c1a}
+[data-theme=dark][data-tod=dusk]{--ground:#16130f; --raised:#1f1b16}
+/* ---------- her inks: the only hue. AA on every ground. ---------- */
+[data-theme=light] [data-ink=blue-black],[data-theme=light][data-ink=blue-black]{--her:#28367f}
+[data-theme=light] [data-ink=brown],[data-theme=light][data-ink=brown]{--her:#7a4519}
+[data-theme=light] [data-ink=violet],[data-theme=light][data-ink=violet]{--her:#4b2a8a}
+[data-theme=light] [data-ink=green],[data-theme=light][data-ink=green]{--her:#1b5642}
+[data-theme=dark] [data-ink=blue-black],[data-theme=dark][data-ink=blue-black]{--her:#b6c0ff}
+[data-theme=dark] [data-ink=brown],[data-theme=dark][data-ink=brown]{--her:#dcab78}
+[data-theme=dark] [data-ink=violet],[data-theme=dark][data-ink=violet]{--her:#d2b4ff}
+[data-theme=dark] [data-ink=green],[data-theme=dark][data-ink=green]{--her:#8fd3b4}
+:root,[data-ink]{--her-soft:color-mix(in srgb,var(--her) 87%,var(--ground)); --her-rule:color-mix(in srgb,var(--her) 38%,var(--ground)); --her-wash:color-mix(in srgb,var(--her) 6%,var(--ground))}
+
+@media (max-width:760px){
+  :root{--cols:4; --t-his:19px; --t-her:19px; --t-lede:23px; --t-h3:28px; --t-h2:36px; --t-h1:58px; --t-num:76px; --t-mega:120px; --mast:56px; --tab:68px}
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html,body{overflow-x:clip}
+html{background:var(--ground); color:var(--ink); -webkit-text-size-adjust:100%; transition:background-color 700ms var(--e-io)}
+body{margin:0; color:var(--ink); font:400 var(--t-ui)/1.5 var(--ui); -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; padding-bottom:calc(var(--tab) + env(safe-area-inset-bottom)); min-height:100vh}
+button{font:inherit; color:inherit; background:none; border:0; padding:0; cursor:pointer; -webkit-tap-highlight-color:transparent}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--ink); outline-offset:3px; border-radius:var(--r1)}
+::selection{background:color-mix(in srgb,var(--ink) 16%,transparent)}
+svg.i{width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; flex:none}
+.sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0)}
+
+/* ---------- voices ---------- */
+.his{font-family:var(--text); color:var(--ink); font-size:var(--t-his); line-height:1.62; font-optical-sizing:auto}
+.hers{font-family:var(--display); font-style:italic; color:var(--her); font-size:var(--t-her); line-height:1.38; transition:color 600ms var(--e-io)}
+.hers b,.hers .runin{font-style:normal; font-weight:400}
+.who{font:500 var(--t-xs)/1.3 var(--ui); color:var(--her); letter-spacing:.01em; transition:color 600ms}
+.who span{color:var(--ink-3); font-weight:400}
+.kicker{font:500 var(--t-sm)/1.35 var(--ui); color:var(--ink-3)}
+.kicker b{color:var(--ink); font-weight:500}
+.num{font-family:var(--display); font-variant-numeric:lining-nums; line-height:.82; letter-spacing:-.015em; font-weight:400}
+.tab{font-variant-numeric:tabular-nums}
+.hint{font:400 var(--t-sm)/1.45 var(--ui); color:var(--ink-3)}
+
+/* ---------- the grid ---------- */
+.wrap{max-width:var(--maxw); margin-inline:auto; padding-inline:var(--margin)}
+.g{display:grid; grid-template-columns:repeat(var(--cols),minmax(0,1fr)); column-gap:var(--gutter)}
+.g>*{grid-column:var(--cp,1/-1); min-width:0}
+@media (min-width:761px){.g>*{grid-column:var(--c,1/-1)}}
+.gridlines{position:fixed; inset:0; pointer-events:none; z-index:60; opacity:0}
+.gridlines .wrap{height:100%}
+.gridlines .g{height:100%}
+.gridlines span{background:color-mix(in srgb,var(--grid) 60%,transparent); border-inline:1px solid var(--grid); transform-origin:top; grid-column:auto}
+.gridlines.flash{animation:gridflash 900ms var(--e-io)}
+.gridlines.flash span{animation:colwipe 620ms var(--e-out) both; animation-delay:calc(var(--k)*28ms)}
+.gridlines.show{opacity:1}
+@keyframes gridflash{0%{opacity:0}25%{opacity:.8}100%{opacity:0}}
+@keyframes colwipe{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+
+/* ---------- masthead ---------- */
+.mast{position:sticky; top:0; z-index:40; background:color-mix(in srgb,var(--ground) 92%,transparent); backdrop-filter:saturate(1.2) blur(10px); -webkit-backdrop-filter:blur(10px); transition:background-color 700ms}
+.mast .wrap{display:flex; align-items:center; height:var(--mast); gap:var(--s6); position:relative}
+.mast .wrap::after{content:""; position:absolute; left:var(--margin); right:var(--margin); bottom:0; height:1px; background:var(--ink); transform-origin:left; transition:transform 0ms}
+.mast.draw .wrap::after{animation:rule 760ms var(--e-io)}
+@keyframes rule{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.mark{display:flex; align-items:baseline; gap:var(--s3); text-decoration:none; white-space:nowrap; color:var(--ink)}
+.mark .w{font:italic 400 30px/1 var(--display); letter-spacing:-.01em}
+.mark .no{font:500 var(--t-xs)/1 var(--ui); color:var(--ink-3)}
+.nav{display:flex; gap:var(--s5); margin-left:var(--s4)}
+.nav a{font:500 var(--t-ui)/1 var(--ui); color:var(--ink-2); text-decoration:none; padding:23px 0 21px; position:relative}
+.nav a:hover{color:var(--ink)}
+.nav a[aria-current=page]{color:var(--ink)}
+.nav a[aria-current=page]::after{content:""; position:absolute; left:0; right:0; bottom:0; height:3px; background:var(--ink)}
+.mast .right{margin-left:auto; display:flex; align-items:center; gap:var(--s2)}
+.iconbtn{width:44px; height:44px; display:grid; place-items:center; border-radius:var(--r3); color:var(--ink-2)}
+.iconbtn:hover{color:var(--ink); background:var(--sunk)}
+.btn{display:inline-flex; align-items:center; gap:var(--s2); height:44px; padding:0 var(--s4); border-radius:var(--r2); font:500 var(--t-ui)/1 var(--ui); white-space:nowrap; transition:background-color var(--d-s), transform var(--d-xs)}
+.btn:active{transform:scale(.98)}
+.btn.solid{background:var(--ink); color:var(--ground)}
+.btn.solid:hover{background:var(--ink-2)}
+.btn.line{box-shadow:inset 0 0 0 1px var(--rule); color:var(--ink)}
+.btn.line:hover{box-shadow:inset 0 0 0 1px var(--ink)}
+.btn.quiet{padding:0 var(--s2); color:var(--ink-2)}
+.btn.quiet:hover{color:var(--ink)}
+.textlink{font:500 var(--t-sm)/1 var(--ui); color:var(--ink-2); text-decoration:underline; text-decoration-color:var(--rule); text-underline-offset:4px; min-height:44px; display:inline-flex; align-items:center; gap:6px}
+.textlink:hover{color:var(--ink); text-decoration-color:var(--ink)}
+
+/* phone tab bar */
+.tabbar{display:none}
+@media (max-width:760px){
+  .nav,.mast .right .btn,.mast .right .hide-phone{display:none}
+  .mark .w{font-size:26px}
+  .tabbar{display:grid; grid-template-columns:repeat(5,1fr); position:fixed; z-index:45; left:0; right:0; bottom:0; height:calc(var(--tab) + env(safe-area-inset-bottom)); padding-bottom:env(safe-area-inset-bottom); background:color-mix(in srgb,var(--ground) 94%,transparent); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border-top:1px solid var(--rule)}
+  .tabbar a{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; font:500 11.5px/1 var(--ui); color:var(--ink-3); text-decoration:none}
+  .tabbar a[aria-current=page]{color:var(--ink)}
+  .tabbar a[aria-current=page] .lbl{text-decoration:underline; text-underline-offset:4px; text-decoration-thickness:2px}
+  .tabbar .pen{width:48px; height:48px; border-radius:var(--r2); background:var(--ink); color:var(--ground); display:grid; place-items:center; margin:auto}
+}
+
+/* ---------- stage + page transitions ---------- */
+#stage{min-height:calc(100vh - var(--mast) - var(--tab))}
+#stage.out>*{opacity:0; transform:translateY(-8px); transition:opacity 180ms var(--e-in), transform 180ms var(--e-in)}
+.rv{opacity:0; transform:translateY(12px)}
+.in .rv{opacity:1; transform:none; transition:opacity 480ms var(--e-out), transform 620ms var(--e-out); transition-delay:calc(var(--i,0)*var(--stagger))}
+.line-wipe{overflow:hidden; display:block}
+.line-wipe>span{display:block; transform:translateY(102%)}
+.in .line-wipe>span{transform:none; transition:transform 760ms var(--e-out); transition-delay:calc(var(--i,0)*var(--stagger))}
+
+/* ---------- page heads ---------- */
+.pagehead{padding-top:var(--s8); padding-bottom:var(--s6)}
+.pagehead h1{font:400 var(--t-h1)/.9 var(--display); letter-spacing:-.025em; margin:0}
+.pagehead h1 em{font-style:italic}
+.folio{display:flex; justify-content:space-between; align-items:baseline; gap:var(--s4); border-top:1px solid var(--ink); padding-top:var(--s2); margin-top:var(--s5); font:500 var(--t-xs)/1.4 var(--ui); color:var(--ink-3)}
+@media (max-width:760px){.pagehead{padding-top:var(--s6); padding-bottom:var(--s5)}}
+
+/* ==========================================================================
+   CONTENTS (entries) + ENTRY
+   ========================================================================== */
+.cl{display:flex; align-items:flex-start; position:relative}
+.cl .list{flex:0 0 auto; width:100%; min-width:0; transition:width 560ms var(--e-io)}
+.cl .pane{flex:1 1 auto; min-width:0; width:0; overflow:hidden}
+.cl .list-in{transition:opacity 200ms var(--e-out)}
+.cl.hush .list-in{opacity:0; transition-duration:140ms}
+@media (min-width:761px){
+  .cl.reading .list{width:17.5rem; position:sticky; top:var(--mast); max-height:calc(100vh - var(--mast)); overflow:auto; scrollbar-width:thin; border-right:1px solid var(--rule); padding-right:var(--s4)}
+  .cl.reading .pane{overflow:visible; width:auto; padding-left:clamp(24px,3.5vw,56px)}
+}
+
+/* filter sentence */
+.lede-filter{font:400 var(--t-lede)/1.3 var(--display); color:var(--ink-2); margin:var(--s5) 0 0; max-width:30ch}
+.fword{font:inherit; color:var(--ink); border-bottom:1px dashed var(--ink-3); padding:0 1px; line-height:1.1; position:relative}
+.fword:hover{border-bottom-style:solid; border-color:var(--ink)}
+.fword[aria-expanded=true]{border-bottom:2px solid var(--ink)}
+.search{display:flex; align-items:center; gap:var(--s2); border-bottom:1px solid var(--rule); height:44px; color:var(--ink-3); max-width:20rem; margin-top:var(--s5)}
+.search:focus-within{border-color:var(--ink); color:var(--ink)}
+.search input{border:0; background:none; font:400 var(--t-ui)/1 var(--ui); color:var(--ink); width:100%; outline:none; height:100%}
+.search input::placeholder{color:var(--ink-3)}
+.pop{position:absolute; z-index:70; background:var(--raised); border:1px solid var(--rule); border-radius:var(--r2); box-shadow:0 1px 2px var(--shade),0 12px 40px var(--shade); padding:var(--s2) 0; min-width:15rem; transform-origin:top left; animation:pop 200ms var(--e-out)}
+@keyframes pop{from{opacity:0; transform:translateY(-4px) scale(.98)}}
+.pop button{display:flex; justify-content:space-between; align-items:center; gap:var(--s4); width:100%; text-align:left; padding:0 var(--s4); min-height:44px; font:400 var(--t-ui)/1.2 var(--ui)}
+.pop button:hover{background:var(--sunk)}
+.pop button .c{color:var(--ink-3); font-size:var(--t-sm)}
+.pop button[aria-checked=true]{font-weight:500}
+
+/* the month, almanac-style */
+.month{align-self:end; border-top:2px solid var(--ink); padding-top:var(--s3)}
+.month .mh{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:var(--s3)}
+.month .mn{font:400 30px/1 var(--display)}
+.mg7{display:grid; grid-template-columns:repeat(7,1fr); row-gap:2px; text-align:center}
+.mg7 b{font:500 var(--t-xs)/2 var(--ui); color:var(--ink-3)}
+.mg7 span,.mg7 button{font:400 var(--t-sm)/1 var(--ui); height:34px; display:grid; place-items:center; color:var(--ink-2); font-variant-numeric:tabular-nums}
+.mg7 .fut{color:color-mix(in srgb,var(--ink-3) 55%,var(--ground))}
+.mg7 button.on,.mg7 button.td{color:var(--ink); font-weight:600; text-decoration:underline; text-decoration-thickness:2px; text-underline-offset:5px}
+.mg7 button:hover{background:var(--sunk); border-radius:var(--r1)}
+.mg7 .td{position:relative}
+.mg7 .td::after{content:""; position:absolute; inset:2px 6px; border:1px solid var(--ink); border-radius:50%}
+.cl.compact .month{display:none}
+@media (max-width:760px){.month{display:none}}
+
+/* weeks + days (full contents) */
+.week{margin-top:var(--s7)}
+.weekhead{display:flex; align-items:baseline; justify-content:space-between; gap:var(--s4); border-top:2px solid var(--ink); padding-top:var(--s3); padding-bottom:var(--s2)}
+.weekhead h2{font:400 var(--t-h3)/1 var(--display); margin:0; letter-spacing:-.01em}
+.weekhead .kicker{text-align:right}
+.day{border-top:1px solid var(--rule); padding:var(--s5) 0; row-gap:var(--s4)}
+.day:first-of-type{border-top:0}
+.dnum{--c:1/3; --cp:1/2; display:flex; flex-direction:column; gap:var(--s2)}
+.dnum .num{font-size:var(--t-num)}
+.dnum .kicker{padding-left:4px}
+.dentries{--c:3/13; --cp:2/5; display:flex; flex-direction:column}
+.erow{display:grid; grid-template-columns:5rem minmax(0,1fr) 12rem; column-gap:var(--gutter); text-align:left; width:100%; padding:var(--s3) 0 var(--s4); border-top:1px solid var(--rule-2); position:relative; transition:opacity 200ms}
+.erow:first-child{border-top:0; padding-top:var(--s1)}
+.erow .t{font:500 var(--t-sm)/2.3 var(--ui); color:var(--ink-3)}
+.erow .prac{font:500 var(--t-sm)/1.3 var(--ui); color:var(--ink-2); margin-bottom:6px; display:block}
+.erow .hl{font:400 32px/1.14 var(--text); font-optical-sizing:auto; letter-spacing:-.012em; color:var(--ink); display:block; text-wrap:balance; transition:color 200ms}
+.erow:hover .hl{text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:6px; text-decoration-color:var(--rule)}
+.erow .meta{font:400 var(--t-sm)/1.5 var(--ui); color:var(--ink-3); text-align:right; padding-top:4px}
+.erow .meta .her{color:var(--her)}
+.erow .meta>span{display:block}
+.dnum .sh{display:none}
+.dayref{margin-top:var(--s3); padding-top:var(--s3); border-top:1px dashed var(--her-rule); display:grid; grid-template-columns:5rem minmax(0,1fr); column-gap:var(--gutter); text-align:left; width:100%}
+.dayref .hers{font-size:21px}
+.dayref .who{line-height:2.2}
+
+@media (max-width:760px){
+  .dnum .num{font-size:56px}
+  .dnum{gap:4px}
+  .dnum .kicker{padding-left:2px; font-size:var(--t-xs)}
+  .day{column-gap:var(--s4); grid-template-columns:52px minmax(0,1fr)}
+  .day .dnum{grid-column:1} .day .dentries{grid-column:2}
+  .erow{grid-template-columns:1fr; padding:var(--s2) 0 var(--s4)}
+  .erow .t{display:none}
+  .erow .hl{font-size:23px; line-height:1.2}
+  .erow .meta{text-align:left; padding-top:6px}
+  .erow .meta>span{display:inline}
+  .erow .meta>span+span::before{content:" · "; color:var(--ink-3)}
+  .dnum .lg{display:none} .dnum .sh{display:inline}
+  .dayref{grid-template-columns:1fr}
+  .dayref .who{line-height:1.6}
+  .weekhead h2{font-size:30px}
+}
+
+/* compact contents (the index column) */
+.cl.compact .pagehead{padding-top:var(--s6); padding-bottom:var(--s3); display:block}
+.day{scroll-margin-top:calc(var(--mast) + 16px)}
+.cl.compact .pagehead h1{font-size:40px}
+.cl.compact .lede-filter,.cl.compact .search,.cl.compact .folio .r{display:none}
+.cl.compact .week{margin-top:var(--s5)}
+.cl.compact .weekhead h2{font-size:22px}
+.cl.compact .weekhead .kicker{display:none}
+.cl.compact .day{grid-template-columns:2.6rem minmax(0,1fr); column-gap:var(--s3); padding:var(--s3) 0}
+.cl.compact .dnum{grid-column:1}
+.cl.compact .dentries{grid-column:2}
+.cl.compact .dnum .num{font-size:34px}
+.cl.compact .dnum .kicker{display:none}
+.cl.compact .erow{grid-template-columns:1fr; padding:var(--s2) var(--s2) var(--s2) 0; border-top:0}
+.cl.compact .erow .t,.cl.compact .erow .meta,.cl.compact .dayref{display:none}
+.cl.compact .erow .prac{font-size:var(--t-xs); margin-bottom:2px; color:var(--ink-3)}
+.cl.compact .erow .hl{font-size:16px; line-height:1.3; letter-spacing:0; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+.cl.compact .erow[aria-current=true]::before{content:""; position:absolute; left:-12px; top:10px; bottom:10px; width:3px; background:var(--ink)}
+.cl.compact .erow[aria-current=true] .hl{font-weight:500}
+.cl.compact .erow:not([aria-current=true]) .hl{color:var(--ink-2)}
+
+/* phone push */
+@media (max-width:760px){
+  .cl{display:grid; grid-template-columns:minmax(0,1fr)}
+  .cl .list,.cl .pane{grid-area:1/1; width:100%; min-width:0}
+  .cl .pane{overflow:visible; transform:translateX(100%); visibility:hidden}
+  .cl.reading .pane{transform:none; visibility:visible}
+  .cl.reading .list{transform:translateX(-28%); opacity:0}
+  .cl.anim .pane{transition:transform 460ms var(--e-io), visibility 0s}
+  .cl.anim .list{transition:transform 460ms var(--e-io), opacity 460ms var(--e-io)}
+  .cl.gone .list{display:none}
+  .cl.compact .pagehead h1{font-size:var(--t-h1)}
+}
+
+/* ---------- the entry document ---------- */
+.doc{--mg:5.75rem; --hc:minmax(0,35rem); --nc:minmax(12rem,16rem); display:grid; grid-template-columns:var(--mg) var(--hc) var(--nc); column-gap:clamp(20px,2.6vw,40px); padding-bottom:var(--s9)}
+.doc>*{grid-column:2}
+.doc .full{grid-column:1/-1}
+.doc .mg{grid-column:1}
+.doc .nt{grid-column:3}
+.back{display:inline-flex; align-items:center; gap:6px; font:500 var(--t-sm)/1 var(--ui); color:var(--ink-2); min-height:44px; margin-top:var(--s4)}
+.back:hover{color:var(--ink)}
+.dochead{grid-column:1/-1; display:grid; grid-template-columns:subgrid; padding-top:var(--s5); align-items:end}
+.dochead .mg{display:flex; flex-direction:column; gap:6px}
+.dochead .mg .num{font-size:96px; margin-left:-4px}
+.dochead h1{font:400 64px/.95 var(--display); letter-spacing:-.02em; margin:0 0 6px}
+.dochead .acts{grid-column:3; justify-self:end; display:flex; gap:var(--s1); align-self:start}
+.docrule{grid-column:1/-1; height:1px; background:var(--ink); margin:var(--s5) 0 var(--s6)}
+.standfirst{margin:0 0 var(--s3)}
+.standfirst .hers{font-size:var(--t-lede); line-height:1.25}
+.qfold{margin:var(--s2) 0 var(--s7); grid-column:2/4 !important}
+.qfold .foldbtn{max-width:35rem}
+.foldbtn{display:flex; align-items:center; gap:var(--s3); min-height:44px; width:100%; text-align:left; border-top:1px dashed var(--her-rule); border-bottom:1px dashed var(--her-rule); padding:var(--s2) 0}
+.foldbtn .lbl{font:500 var(--t-sm)/1.3 var(--ui); color:var(--her); transition:color 600ms}
+.foldbtn .lbl span{color:var(--ink-3); font-weight:400}
+.foldbtn .chev{margin-left:auto; color:var(--her); transition:transform 420ms var(--e-io)}
+[data-open=true]>.foldbtn .chev,[data-open=true]>.dept-h .chev{transform:rotate(180deg)}
+.fold-b{display:grid; grid-template-rows:0fr; transition:grid-template-rows 520ms var(--e-io)}
+[data-open=true]>.fold-b{grid-template-rows:1fr}
+.fold-i{min-height:0; overflow:hidden}
+.fold-i>*{opacity:0; transform:translateY(10px); transition:opacity 160ms var(--e-in), transform 220ms var(--e-in)}
+[data-open=true]>.fold-b>.fold-i>*{opacity:1; transform:none; transition:opacity 420ms var(--e-out), transform 560ms var(--e-out); transition-delay:calc(140ms + var(--i,0)*55ms)}
+.qsets{columns:2 16rem; column-gap:var(--s7); padding:var(--s5) 0 var(--s3); column-rule:1px solid var(--rule-2)}
+.qset{break-inside:avoid; margin-bottom:var(--s5)}
+.qset h4{font:500 var(--t-xs)/1.3 var(--ui); color:var(--ink-3); margin:0 0 var(--s2)}
+.qset ol{list-style:none; margin:0; padding:0}
+.qset li{display:grid; grid-template-columns:2.2rem 1fr; padding:3px 0}
+.qset li .id{font:400 var(--t-xs)/1.9 var(--ui); color:var(--ink-3)}
+.qset li .hers{font-size:18px; color:var(--her-soft)}
+.qset li.asked .hers{color:var(--her)}
+.qset li.asked .tag{display:block; font:500 11.5px/1.4 var(--ui); color:var(--her); font-style:normal}
+
+/* blocks */
+.blk{display:contents}
+.blk>.mg{padding-top:7px; text-align:right; position:relative}
+.blk .tm{font:500 var(--t-sm)/1.3 var(--ui); color:var(--ink-3); display:block}
+.blk .src{font:400 var(--t-xs)/1.4 var(--ui); color:var(--ink-3); display:block}
+.blk .body{padding-bottom:var(--s6); position:relative}
+.blk .body p{margin:0 0 .7em}
+.blk .body p:last-child{margin-bottom:0}
+.acts-bar{display:flex; flex-direction:column; align-items:flex-end; gap:0; margin-top:var(--s2); opacity:0; transform:translateX(6px); transition:opacity 180ms, transform 240ms var(--e-out); pointer-events:none}
+.acts-bar button{display:inline-flex; align-items:center; gap:6px; font:500 var(--t-xs)/1 var(--ui); color:var(--ink-2); min-height:32px; padding:0 2px}
+.acts-bar button:hover{color:var(--ink)}
+.acts-bar button svg{width:15px; height:15px}
+@media (hover:hover){.blk:hover .acts-bar,.blk:focus-within .acts-bar{opacity:1; transform:none; pointer-events:auto}}
+.blk.held .acts-bar{opacity:1; transform:none; pointer-events:auto}
+.blk.held .body .his{background:color-mix(in srgb,var(--ink) 5%,transparent); border-radius:var(--r1); box-shadow:0 0 0 6px color-mix(in srgb,var(--ink) 5%,transparent)}
+.replyto{display:flex; gap:var(--s2); align-items:baseline; font:400 var(--t-sm)/1.4 var(--ui); color:var(--ink-3); margin-bottom:var(--s2)}
+.replyto .hers{font-size:16px; color:var(--her-soft)}
+.note{padding-top:9px; padding-bottom:var(--s5); border-top:1px dashed var(--her-rule); align-self:start}
+.note .who{display:block; margin-bottom:4px}
+.note .hers{font-size:18px; line-height:1.35}
+.note.her-turn{grid-column:3}
+.confirm{display:flex; align-items:center; gap:var(--s3); margin-top:var(--s3); font:400 var(--t-sm)/1.3 var(--ui); color:var(--ink-2)}
+.editbox{width:100%; border:0; border-bottom:1px solid var(--ink); background:transparent; resize:none; outline:none; padding:0 0 var(--s2); display:block}
+.edit-acts{display:flex; gap:var(--s2); margin-top:var(--s2)}
+
+/* audio */
+.player{display:grid; grid-template-columns:44px 1fr auto; align-items:center; gap:var(--s3); margin-bottom:var(--s3)}
+.play{width:44px; height:44px; border-radius:50%; background:var(--ink); color:var(--ground); display:grid; place-items:center; transition:transform var(--d-xs)}
+.play:active{transform:scale(.94)}
+.play svg{width:18px; height:18px; fill:currentColor; stroke:none}
+.wave{height:36px; display:flex; align-items:center; gap:2px; cursor:pointer; touch-action:none}
+.wave i{flex:1; min-width:1px; border-radius:1px; background:var(--rule); transition:background-color 120ms}
+.wave i.on{background:var(--ink)}
+.ptime{font:500 var(--t-sm)/1 var(--ui); color:var(--ink-3); font-variant-numeric:tabular-nums; display:flex; gap:var(--s2); align-items:center}
+.ptime button{font:500 var(--t-xs)/1 var(--ui); color:var(--ink-2); min-width:36px; min-height:32px; border-radius:var(--r1); box-shadow:inset 0 0 0 1px var(--rule)}
+
+/* departments: analysis, reflection */
+.dept{border-top:1px solid var(--ink); margin-top:var(--s4)}
+.dept+.dept{border-top-color:var(--rule)}
+.dept-h{display:grid; grid-template-columns:1fr auto; align-items:baseline; gap:var(--s3); width:100%; text-align:left; min-height:64px; padding:var(--s4) 0}
+.dept-h h3{font:400 var(--t-h3)/1 var(--display); margin:0; letter-spacing:-.01em}
+.dept-h .kicker{grid-column:1; margin-top:2px}
+.dept-h .chev{grid-column:2; grid-row:1; color:var(--ink-2); transition:transform 420ms var(--e-io)}
+.dept-body{padding:var(--s2) 0 var(--s6)}
+.dept-body ul{margin:0; padding:0; list-style:none}
+.dept-body li{position:relative; padding-left:1.4em; margin-bottom:var(--s3)}
+.dept-body li::before{content:"—"; position:absolute; left:0; color:var(--her-soft); font-style:normal}
+.dept-body p{margin:0 0 var(--s3)}
+.dept-body .src{margin-top:var(--s4)}
+.compose-line{grid-column:2; margin-top:var(--s7); display:flex; align-items:center; gap:var(--s4); border-top:1px solid var(--rule); padding-top:var(--s4)}
+.compose-line .ph{flex:1; text-align:left; font:italic 400 var(--t-his)/1.4 var(--text); color:var(--ink-3); min-height:44px}
+.compose-line .ph:hover{color:var(--ink-2)}
+
+@media (max-width:1100px) and (min-width:761px){
+  .doc{--mg:4.5rem; --nc:minmax(10rem,13rem)}
+}
+@media (max-width:760px){
+  .doc{display:block}
+  .dochead{display:block; padding-top:var(--s2)}
+  .dochead .mg{flex-direction:row; align-items:baseline; gap:var(--s3); margin-bottom:var(--s2)}
+  .dochead .mg .num{font-size:64px}
+  .dochead h1{font-size:44px}
+  .dochead .acts{display:none}
+  .docrule{margin:var(--s4) 0 var(--s5)}
+  .blk>.mg{text-align:left; padding:0 0 var(--s1); display:flex; gap:var(--s2); align-items:baseline}
+  .blk .tm,.blk .src{display:inline}
+  .blk .src::before{content:"· "}
+  .acts-bar{position:absolute; right:0; top:-6px; flex-direction:row; gap:var(--s3); margin:0; background:var(--raised); border:1px solid var(--rule); border-radius:var(--r2); padding:0 var(--s3); box-shadow:0 8px 24px var(--shade)}
+  .acts-bar button{min-height:44px; font-size:var(--t-sm)}
+  .note{margin:0 0 var(--s6) var(--s5); padding-bottom:0}
+  .compose-line{margin-top:var(--s6)}
+  .player{grid-template-columns:44px 1fr; row-gap:6px}
+  .ptime{grid-column:2; justify-content:space-between}
+  .week{margin-top:var(--s5)}
+  .pagehead{padding-bottom:var(--s3)}
+  .qsets{columns:1}
+}
+
+/* ==========================================================================
+   WRITE — the room
+   ========================================================================== */
+.room{position:fixed; inset:0; z-index:90; background:var(--raised); display:grid; grid-template-rows:auto 1fr auto; clip-path:inset(0 0 100% 0); visibility:hidden; transition:background-color 700ms}
+.room.open{clip-path:inset(0 0 0 0); visibility:visible; transition:clip-path 640ms var(--e-io), visibility 0s}
+.room.closing{clip-path:inset(0 0 100% 0); visibility:visible; transition:clip-path 460ms var(--e-io) 120ms}
+.room .rtop,.room .rfoot{transition:opacity 400ms var(--e-io)}
+.rtop{display:flex; align-items:center; gap:var(--s4); height:64px; padding:0 var(--margin); border-bottom:1px solid var(--rule-2)}
+.rtop .fol{font:500 var(--t-sm)/1.2 var(--ui); color:var(--ink-3); flex:1; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.rtop .fol b{color:var(--ink); font-weight:500}
+.saved{font:400 var(--t-sm)/1 var(--ui); color:var(--ink-3); display:flex; align-items:center; gap:6px; min-width:8.5rem; justify-content:flex-end}
+.saved .dot{width:6px; height:6px; border-radius:50%; background:var(--ink-3); transition:background-color 200ms, transform 200ms}
+.saved.saving .dot{background:var(--ink); animation:breathe 900ms ease-in-out infinite}
+@keyframes breathe{50%{transform:scale(.5)}}
+.rscroll{overflow:auto; scroll-padding:30vh}
+.rpage{max-width:40rem; margin:0 auto; padding:clamp(40px,9vh,112px) var(--margin) 30vh}
+.rprompt .who{display:block; margin-bottom:var(--s3)}
+.rprompt .hers{font-size:clamp(28px,3.1vw,38px); line-height:1.18; text-wrap:balance; transition:opacity 500ms var(--e-io), color 600ms}
+.rprompt .more{margin-top:var(--s3)}
+.rrule{height:1px; background:var(--ink); margin:var(--s6) 0 var(--s6); transform-origin:left}
+.rnotes{display:flex; flex-direction:column; gap:var(--s2); margin-bottom:var(--s4)}
+.rnote{display:flex; align-items:center; gap:var(--s3); font:400 var(--t-sm)/1.3 var(--ui); color:var(--ink-2); padding:var(--s2) 0; border-bottom:1px solid var(--rule-2); animation:pop 300ms var(--e-out)}
+.rnote .mini{display:flex; gap:2px; align-items:center; height:18px; width:90px}
+.rnote .mini i{flex:1; background:var(--ink-3); border-radius:1px}
+textarea.rtext{width:100%; border:0; outline:none; background:transparent; resize:none; font-family:var(--text); font-size:clamp(20px,1.9vw,23px); line-height:1.65; color:var(--ink); caret-color:var(--ink); padding:0; min-height:40vh; font-optical-sizing:auto}
+textarea.rtext::placeholder{color:var(--ink-3); font-style:italic}
+.rfoot{display:flex; align-items:center; gap:var(--s4); height:76px; padding:0 var(--margin) env(safe-area-inset-bottom); border-top:1px solid var(--rule-2)}
+.rec{display:flex; align-items:center; gap:var(--s3); height:48px; padding:0 var(--s4) 0 6px; border-radius:var(--r3); box-shadow:inset 0 0 0 1px var(--rule); font:500 var(--t-sm)/1 var(--ui)}
+.rec .mic{width:36px; height:36px; border-radius:50%; display:grid; place-items:center; background:var(--sunk)}
+.rec.on{box-shadow:inset 0 0 0 1.5px var(--ink)}
+.rec.on .mic{background:var(--ink); color:var(--ground)}
+.rec .lv{display:none; gap:2px; height:18px; align-items:center}
+.rec.on .lv{display:flex}
+.rec .lv i{width:2px; background:var(--ink); border-radius:1px; height:30%; animation:lv 700ms ease-in-out infinite alternate}
+@keyframes lv{to{height:100%}}
+.count{font:400 var(--t-sm)/1 var(--ui); color:var(--ink-3); font-variant-numeric:tabular-nums; white-space:nowrap}
+#keepbtn .sh{display:none}
+.rfoot .sp{flex:1}
+.room.focus .rtop,.room.focus .rfoot{opacity:0; pointer-events:none}
+.room.focus .rtop:hover,.room.focus .rfoot:hover{opacity:1; pointer-events:auto}
+.room.focus .rprompt .hers{opacity:.32}
+.room.focus .rprompt .more,.room.focus .rprompt .who{opacity:0}
+.focushint{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); font:400 var(--t-xs)/1 var(--ui); color:var(--ink-3); opacity:0; transition:opacity 400ms; pointer-events:none}
+.room.focus .focushint{opacity:1; transition-delay:600ms}
+.room .rv{opacity:0; transform:translateY(14px)}
+.room.open .rv{opacity:1; transform:none; transition:opacity 520ms var(--e-out), transform 700ms var(--e-out); transition-delay:calc(260ms + var(--i,0)*70ms)}
+.room .rrule{transform:scaleX(0)}
+.room.open .rrule{transform:scaleX(1); transition:transform 900ms var(--e-io) 380ms}
+@media (max-width:760px){
+  .rtop{height:56px; gap:var(--s2)}
+  .rtop .fol{text-align:left}
+  .saved{min-width:auto}
+  .saved .txt{display:none}
+  .rpage{padding-top:var(--s6)}
+  .rfoot{height:68px; gap:var(--s3)}
+  .rec .rlbl{display:none}
+  .rec.on .rlbl{display:inline}
+  #keepbtn .lg{display:none} #keepbtn .sh{display:inline}
+  .rec{padding:0 6px}
+}
+
+/* toast */
+.toast{position:fixed; left:50%; bottom:calc(var(--tab) + 20px); z-index:95; transform:translate(-50%,20px); opacity:0; background:var(--ink); color:var(--ground); font:500 var(--t-sm)/1.3 var(--ui); padding:var(--s3) var(--s4); border-radius:var(--r2); transition:opacity 260ms, transform 360ms var(--e-out); pointer-events:none; max-width:calc(100vw - 40px)}
+.toast.on{opacity:1; transform:translate(-50%,0)}
+
+/* ==========================================================================
+   TODAY (the cover)
+   ========================================================================== */
+.cover{padding-top:var(--s7); row-gap:var(--s6)}
+.cover .bigday{--c:1/6; display:flex; align-items:flex-end; gap:var(--s4)}
+.cover .bigday .num{font-size:var(--t-mega); margin-left:-4px}
+.cover .bigday .side{padding-bottom:14px}
+.cover .bigday .side .w{font:400 var(--t-h3)/1 var(--display); display:block}
+.cover .bigday .side .w em{font-style:italic}
+.cover .carry{--c:7/13; align-self:end; border-left:1px solid var(--rule); padding-left:var(--gutter)}
+.cover .carry .hers{font-size:34px; line-height:1.12; display:block; margin:6px 0 var(--s2)}
+.slots{--c:1/13; border-top:2px solid var(--ink)}
+.slot{display:grid; grid-template-columns:repeat(var(--cols),minmax(0,1fr)); column-gap:var(--gutter); padding:var(--s5) 0; border-bottom:1px solid var(--rule); align-items:start}
+.slot>.num{grid-column:1/3; font-size:56px}
+.slot .what{grid-column:3/8}
+.slot .what h3{font:400 30px/1.05 var(--display); margin:0 0 4px}
+.slot .what .state{font:400 var(--t-sm)/1.4 var(--ui); color:var(--ink-3)}
+.slot .p{grid-column:8/12}
+.slot .p .hers{font-size:21px}
+.slot .go{grid-column:12/13; justify-self:end}
+.slot.quiet>.num,.slot.quiet h3{color:var(--ink-3)}
+@media (max-width:760px){
+  .cover{padding-top:var(--s5)}
+  .cover .bigday .num{font-size:120px}
+  .cover .carry{border-left:0; padding-left:0; border-top:1px solid var(--rule); padding-top:var(--s4)}
+  .cover .carry .hers{font-size:28px}
+  .slot{grid-template-columns:1fr; row-gap:var(--s2)}
+  .slot>.num{grid-column:1; font-size:44px}
+  .slot .what,.slot .p,.slot .go{grid-column:1}
+  .slot .go{justify-self:start}
+  .slot.quiet{grid-template-columns:4.6rem 1fr auto; align-items:center; column-gap:var(--s3)}
+  .slot.quiet>.num{font-size:32px} .slot.quiet .what{grid-column:2} .slot.quiet .p{display:none} .slot.quiet .go{grid-column:3}
+  .slot.quiet .what h3{font-size:24px}
+}
+
+/* ==========================================================================
+   INSIGHTS — the week as a spread
+   ========================================================================== */
+.spread-head{display:flex; align-items:flex-end; justify-content:space-between; gap:var(--s5); padding-top:var(--s7)}
+.spread-head h1{font:400 var(--t-h1)/.88 var(--display); letter-spacing:-.025em; margin:0}
+.spread-head h1 em{font-style:italic}
+.stepper{display:flex; align-items:center; gap:var(--s1); flex:none}
+.stepper .wk{font:500 var(--t-sm)/1 var(--ui); color:var(--ink-2); padding:0 var(--s2); min-width:8.5rem; text-align:center}
+.stepper .iconbtn[disabled]{opacity:.3; cursor:default; background:none}
+.spread{row-gap:0; margin-top:var(--s5); border-top:2px solid var(--ink)}
+.pq{--c:1/8; padding:var(--s7) var(--s6) var(--s7) 0; border-right:1px solid var(--rule); position:relative; display:flex; flex-direction:column}
+.pq .attr{margin-top:auto !important; padding-top:var(--s5)}
+.pq .who{display:block; margin-bottom:var(--s4)}
+.pq blockquote{margin:0 0 var(--s5); font:italic 400 clamp(56px,8.2vw,118px)/.94 var(--display); color:var(--her); letter-spacing:-.02em; text-indent:-.36em; transition:color 600ms; text-wrap:balance}
+.pq .attr{margin-top:var(--s5); font:400 var(--t-sm)/1.4 var(--ui); color:var(--ink-3)}
+.pq .attr a{color:var(--ink-2)}
+.figs{--c:8/13; display:grid; grid-template-columns:1fr 1fr; align-content:start}
+.fig{padding:var(--s5) 0 var(--s5) var(--gutter); border-bottom:1px solid var(--rule)}
+.fig.big{grid-column:1/-1; padding-top:var(--s7)}
+.fig.big .num{font-size:var(--t-mega)}
+.fig .num{font-size:84px; display:block}
+.fig .num sub{font-size:.4em; vertical-align:baseline; color:var(--ink-3); margin-left:4px; bottom:0}
+.fig .cap{font:400 var(--t-sm)/1.4 var(--ui); color:var(--ink-2); margin-top:var(--s2); display:block}
+.fig+.fig:not(.big):nth-child(odd){border-left:1px solid var(--rule)}
+.days7{--c:1/13; display:grid; grid-template-columns:repeat(7,1fr); border-top:1px solid var(--ink); border-bottom:1px solid var(--rule)}
+.d7{padding:var(--s4) var(--s3) var(--s4); border-left:1px solid var(--rule-2); text-align:left; min-height:7.5rem; display:flex; flex-direction:column; gap:6px; position:relative}
+.d7:first-child{border-left:0; padding-left:0}
+.d7 .num{font-size:48px}
+.d7 .wd{font:500 var(--t-xs)/1 var(--ui); color:var(--ink-3)}
+.d7 .bar{display:flex; gap:3px; margin-top:auto}
+.d7 .bar i{display:block; width:14px; height:3px; background:var(--ink)}
+.d7 .bar i.miss{background:none; box-shadow:inset 0 0 0 1px var(--ink-3); height:3px}
+.d7 .fl{font:400 13px/1.3 var(--text); color:var(--ink-2); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+.d7.none .num{color:var(--ink-3)}
+.d7.today::after{content:"today"; position:absolute; top:var(--s4); right:var(--s3); font:500 var(--t-xs)/1 var(--ui); color:var(--ink-3)}
+.word{--c:1/5; padding:var(--s7) var(--s5) var(--s7) 0; border-right:1px solid var(--rule)}
+.word .w{font:400 clamp(56px,6vw,84px)/1 var(--text); letter-spacing:-.03em; display:block; margin:var(--s3) 0 var(--s2); font-optical-sizing:auto}
+.word .x{font:400 var(--t-sm)/1.4 var(--ui); color:var(--ink-2)}
+.word .line{margin-top:var(--s6); padding-top:var(--s4); border-top:1px solid var(--rule)}
+.word .line .his{font-size:24px; line-height:1.35; display:block; margin-top:var(--s2)}
+.review{--c:5/12; padding:var(--s7) 0 var(--s7) var(--gutter)}
+.review h2{font:400 var(--t-h2)/1.02 var(--display); margin:var(--s3) 0 var(--s5); letter-spacing:-.015em; max-width:16ch}
+.review .col{max-width:34rem}
+.review .hers{font-size:21px; line-height:1.48}
+.review p{margin:0 0 .85em}
+.review .first{position:relative}
+.review .first::first-letter{font:400 5.6em/.8 var(--display); font-style:normal; float:left; margin:.06em .1em 0 -.04em; color:var(--her)}
+.review .fade{position:relative}
+.review .unfold{margin-top:var(--s2)}
+.dispatch{--c:1/13; border-top:2px solid var(--ink); padding-top:var(--s3); margin-top:0}
+.dispatch>.kicker{display:flex; justify-content:space-between; padding-bottom:var(--s2)}
+.disp{border-top:1px solid var(--rule)}
+.disp-h{display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); column-gap:var(--gutter); align-items:baseline; width:100%; text-align:left; padding:var(--s4) 0; min-height:64px}
+.disp-h .num{grid-column:1/2; font-size:48px}
+.disp-h .wd{grid-column:2/4; font:500 var(--t-sm)/1.2 var(--ui); color:var(--ink-3)}
+.disp-h .hers{grid-column:4/12; font-size:26px}
+.disp-h .chev{grid-column:12/13; justify-self:end; color:var(--ink-2); transition:transform 420ms var(--e-io)}
+.disp[data-open=true] .disp-h .chev{transform:rotate(180deg)}
+.disp .fold-i>div{display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); column-gap:var(--gutter); padding-bottom:var(--s5)}
+.disp .fold-i .inner{grid-column:4/11}
+@media (max-width:760px){
+  .spread-head{flex-direction:column; align-items:flex-start; padding-top:var(--s5); gap:var(--s4)}
+  .stepper{margin-left:-12px}
+  .pq{border-right:0; padding:var(--s6) 0 var(--s5)}
+  .pq blockquote{font-size:52px; text-indent:-.3em; padding-left:.3em}
+  .figs{border-top:1px solid var(--rule)}
+  .fig{padding-left:0}
+  .fig:nth-child(2){padding-left:0; padding-right:var(--s4)}
+  .fig:nth-child(3){padding-left:var(--s4)}
+  .fig.big{padding-top:var(--s5)}
+  .fig.big .num{font-size:120px}
+  .fig .num{font-size:60px}
+  .days7{margin-top:var(--s6)}
+  .d7{padding:var(--s3) 4px; min-height:5.5rem}
+  .d7 .num{font-size:30px}
+  .d7 .fl,.d7.today::after{display:none}
+  .d7 .bar i{width:8px}
+  .word{border-right:0; padding:var(--s6) 0 var(--s4)}
+  .review{padding:var(--s5) 0 var(--s6); border-top:1px solid var(--rule)}
+  .review h2{font-size:34px}
+  .review .hers{font-size:19.5px}
+  .disp-h{grid-template-columns:52px 1fr 24px; column-gap:var(--s3)}
+  .disp-h .num{grid-column:1; grid-row:1/3; font-size:40px}
+  .disp-h .wd{grid-column:2}
+  .disp-h .hers{grid-column:2; font-size:21px}
+  .disp-h .chev{grid-column:3; grid-row:1}
+  .disp .fold-i>div{display:block; padding-left:64px}
+}
+
+/* ==========================================================================
+   LIBRARY
+   ========================================================================== */
+.libsec{margin-top:var(--s7)}
+.libsec>header{display:flex; justify-content:space-between; align-items:baseline; border-top:2px solid var(--ink); padding-top:var(--s3); margin-bottom:var(--s2)}
+.libsec>header h2{font:400 var(--t-h3)/1 var(--display); margin:0}
+.prow{padding:var(--s5) 0; border-bottom:1px solid var(--rule); align-items:start; row-gap:var(--s2)}
+.prow .when{--c:1/3; --cp:1/2}
+.prow .when .num{font-size:52px; display:block}
+.prow .when .hint{margin-top:6px; display:block}
+.prow .ttl{--c:3/9; --cp:2/5}
+.prow .ttl h3{margin:0 0 6px; font:400 36px/1.02 var(--display); letter-spacing:-.01em}
+.prow.mine .ttl h3{font:400 32px/1.1 var(--text); letter-spacing:-.015em; font-optical-sizing:auto}
+.prow .ttl p{margin:0; font:400 var(--t-ui)/1.5 var(--ui); color:var(--ink-2); max-width:44ch}
+.prov{margin-top:var(--s3); font:500 var(--t-xs)/1.5 var(--ui); color:var(--ink-3)}
+.prov .sig{width:22px; height:0; border-top:1.5px dotted currentColor; display:inline-block; vertical-align:middle; margin-right:8px}
+.prov.mine{color:var(--ink)}
+.prov.mine .sig{border-top-style:solid}
+.prov .moved{color:var(--ink-2); font-weight:400}
+.prow .side{--c:9/13; --cp:2/5; display:flex; flex-direction:column; align-items:flex-end; gap:var(--s2)}
+.prow .side .row{display:flex; align-items:center; gap:var(--s3)}
+.prow .qn{font:400 var(--t-sm)/1.3 var(--ui); color:var(--ink-3); white-space:nowrap}
+.prog{display:flex; gap:3px; margin-top:var(--s3); max-width:22rem}
+.prog i{flex:1; height:3px; background:var(--rule)}
+.prog i.on{background:var(--ink)}
+.prog i.cur{background:linear-gradient(90deg,var(--ink) 50%,var(--rule) 50%)}
+@media (max-width:760px){
+  .prow{grid-template-columns:64px 1fr; column-gap:var(--s3)}
+  .prow .when .num{font-size:30px}
+  .prow .when .hint{font-size:var(--t-xs)}
+  .prow .ttl h3{font-size:28px}
+  .prow.mine .ttl h3{font-size:25px}
+  .prow .side{flex-direction:row; align-items:center; justify-content:space-between; margin-top:var(--s2); gap:0}
+  .prow .side .row{gap:0}
+  .prow .side .row:first-child{gap:var(--s2)}
+  .prow .side .btn.quiet{padding:0 var(--s2)}
+}
+
+/* switch */
+.sw{position:relative; width:52px; height:44px; flex:none; display:inline-grid; place-items:center}
+.sw input{position:absolute; inset:0; opacity:0; margin:0; cursor:pointer}
+.sw .tr{width:44px; height:26px; border-radius:13px; background:var(--sunk); box-shadow:inset 0 0 0 1px var(--rule); position:relative; transition:background-color 260ms var(--e-io), box-shadow 260ms}
+.sw .tr::after{content:""; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:var(--raised); box-shadow:0 1px 2px var(--shade),0 0 0 1px var(--rule); transition:transform 320ms var(--e-out)}
+.sw input:checked+.tr{background:var(--ink); box-shadow:none}
+.sw input:checked+.tr::after{transform:translateX(18px); box-shadow:none; background:var(--ground)}
+.sw input:focus-visible+.tr{outline:2px solid var(--ink); outline-offset:3px}
+
+/* ==========================================================================
+   SETTINGS — the colophon
+   ========================================================================== */
+.set{column-gap:var(--gutter); align-items:start; padding-bottom:var(--s9)}
+.sindex{--c:1/4; position:sticky; top:calc(var(--mast) + var(--s5)); padding-top:var(--s2)}
+.sindex ol{list-style:none; margin:0; padding:0; border-top:2px solid var(--ink)}
+.sindex li a{display:grid; grid-template-columns:2.2rem 1fr; align-items:baseline; min-height:44px; padding:var(--s2) 0; border-bottom:1px solid var(--rule-2); text-decoration:none; color:var(--ink-2); font:500 var(--t-ui)/1.3 var(--ui); transition:color 200ms}
+.sindex li a .n{font:400 22px/1 var(--display); color:var(--ink-3); transition:color 200ms}
+.sindex li a:hover,.sindex li a[aria-current=true]{color:var(--ink)}
+.sindex li a[aria-current=true] .n{color:var(--ink)}
+.sindex li a[aria-current=true]{box-shadow:inset 3px 0 0 var(--ink); padding-left:var(--s3); margin-left:calc(-1 * var(--s3)); transition:all 300ms var(--e-out)}
+.sbody{--c:5/12}
+.ssec{padding-top:var(--s2); margin-bottom:var(--s8); scroll-margin-top:calc(var(--mast) + var(--s5))}
+.ssec>h2{display:flex; align-items:baseline; gap:var(--s4); font:400 var(--t-h2)/1 var(--display); margin:0 0 var(--s2); letter-spacing:-.015em; border-top:2px solid var(--ink); padding-top:var(--s3)}
+.ssec>h2 .n{font-size:.5em; color:var(--ink-3)}
+.ssec>.intro{font:400 var(--t-ui)/1.5 var(--ui); color:var(--ink-2); margin:0 0 var(--s4); max-width:46ch}
+.field{display:grid; grid-template-columns:minmax(0,1fr) auto; column-gap:var(--s5); align-items:center; padding:var(--s4) 0; border-top:1px solid var(--rule-2); min-height:72px}
+.field .lab{font:500 var(--t-ui)/1.35 var(--ui); color:var(--ink)}
+.field .hint{display:block; margin-top:2px}
+.field .hint .dflt{font-style:italic}
+.field .hint .chg{color:var(--ink)}
+.field.locked .lab{color:var(--ink-2)}
+.field .val{font:400 var(--t-ui)/1.3 var(--ui); color:var(--ink); text-align:right}
+.stepper2{display:inline-flex; align-items:center; border-radius:var(--r2); box-shadow:inset 0 0 0 1px var(--rule)}
+.stepper2 button{width:44px; height:44px; display:grid; place-items:center; color:var(--ink-2)}
+.stepper2 button:hover{color:var(--ink)}
+.stepper2 output{min-width:5.2rem; text-align:center; font:500 var(--t-ui)/1 var(--ui); font-variant-numeric:tabular-nums}
+.stepper2 output .u{color:var(--ink-3); font-weight:400}
+.seg{display:inline-flex; position:relative; border-radius:var(--r2); box-shadow:inset 0 0 0 1px var(--rule); padding:3px}
+.seg button{position:relative; z-index:1; min-height:38px; padding:0 var(--s4); font:500 var(--t-sm)/1 var(--ui); color:var(--ink-2); border-radius:3px; transition:color 260ms}
+.seg button[aria-pressed=true]{color:var(--ground)}
+.seg .thumb{position:absolute; top:3px; bottom:3px; left:0; border-radius:3px; background:var(--ink); transition:transform 360ms var(--e-out), width 360ms var(--e-out)}
+.inks{display:grid; grid-template-columns:repeat(4,1fr); gap:0; margin-top:var(--s3); border-top:1px solid var(--rule-2)}
+.inkspec{position:relative; text-align:left; padding:var(--s4) var(--s4) var(--s4) 0; overflow:hidden; display:flex; flex-direction:column; gap:var(--s2); min-height:13rem; border-right:1px solid var(--rule-2)}
+.inkspec+.inkspec{padding-left:var(--s4)}
+.inkspec:last-child{border-right:0}
+.inkspec .aa{font:italic 400 76px/.9 var(--display); color:var(--her); transition:transform 400ms var(--e-out)}
+.inkspec .smp{font:italic 400 17px/1.3 var(--display); color:var(--her)}
+.inkspec .nm{font:500 var(--t-sm)/1.2 var(--ui); color:var(--ink); margin-top:auto}
+.inkspec .nt{font:400 var(--t-xs)/1.3 var(--ui); color:var(--ink-3)}
+.inkspec .uline{position:absolute; left:0; right:var(--s4); bottom:0; height:3px; background:var(--her); transform:scaleX(0); transform-origin:left; transition:transform 520ms var(--e-io)}
+.inkspec+.inkspec .uline{left:var(--s4)}
+.inkspec[aria-checked=true] .uline{transform:scaleX(1)}
+.inkspec[aria-checked=true] .nm::after{content:" · in use"; color:var(--ink-3); font-weight:400}
+.inkspec:hover .aa{transform:translateY(-3px)}
+.inkspec .blot{position:absolute; width:20px; height:20px; border-radius:50%; background:var(--her); opacity:0; pointer-events:none; transform:translate(-50%,-50%) scale(1)}
+.inkspec .blot.go{animation:blot 900ms var(--e-out)}
+@keyframes blot{0%{opacity:.16; transform:translate(-50%,-50%) scale(1)}100%{opacity:0; transform:translate(-50%,-50%) scale(26)}}
+.glance{align-self:end; border-top:2px solid var(--ink); padding-top:var(--s3)}
+.glance a{display:grid; grid-template-columns:20px 1fr; gap:var(--s3); align-items:center; text-decoration:none; padding:var(--s3) 0; border-bottom:1px solid var(--rule-2); min-height:56px}
+.glance a:hover b{text-decoration:underline; text-underline-offset:4px}
+.glance b{display:block; font:500 var(--t-ui)/1.3 var(--ui)}
+.glance .ok{width:10px; height:10px; border-radius:50%; background:var(--ink); box-shadow:0 0 0 4px color-mix(in srgb,var(--ink) 10%,transparent); margin-left:4px}
+.glance .sq{width:10px; height:10px; border:1.5px solid var(--ink); border-radius:2px; margin-left:4px}
+.glance .inkdot{width:14px; height:14px; border-radius:50%; background:var(--her); margin-left:2px; transition:background-color 600ms}
+@media (max-width:760px){.glance{display:none}}
+.health-sum{display:grid; grid-template-columns:auto 1fr auto; gap:var(--s4); align-items:center; width:100%; text-align:left; padding:var(--s4) 0; border-top:1px solid var(--rule-2); min-height:72px}
+.health-sum .ok{width:12px; height:12px; border-radius:50%; background:var(--ink); box-shadow:0 0 0 5px color-mix(in srgb,var(--ink) 10%,transparent)}
+.health-sum strong{display:block; font:400 30px/1.05 var(--display)}
+.health-sum .chev{transition:transform 420ms var(--e-io); color:var(--ink-2)}
+[data-open=true]>.health-sum .chev{transform:rotate(180deg)}
+.checks{list-style:none; margin:0; padding:0 0 var(--s4)}
+.checks li{display:grid; grid-template-columns:18px 11rem 1fr; gap:var(--s3); padding:var(--s3) 0; border-top:1px solid var(--rule-2); font:400 var(--t-sm)/1.45 var(--ui); color:var(--ink-2)}
+.checks li .m{width:8px; height:8px; border-radius:50%; background:var(--ink); margin-top:6px}
+.checks li.warn .m{background:none; box-shadow:inset 0 0 0 1.5px var(--ink-2)}
+.checks li b{font-weight:500; color:var(--ink)}
+.savebar{position:fixed; z-index:50; left:50%; bottom:calc(var(--tab) + 16px); transform:translate(-50%,calc(100% + var(--tab) + 40px)); visibility:hidden; display:flex; align-items:center; gap:var(--s4); background:var(--ink); color:var(--ground); padding:6px 6px 6px var(--s5); border-radius:var(--r2); box-shadow:0 12px 40px var(--shade); transition:transform 460ms var(--e-out); font:500 var(--t-sm)/1 var(--ui); white-space:nowrap}
+.savebar.on{transform:translate(-50%,0); visibility:visible}
+.savebar .btn.solid{background:var(--ground); color:var(--ink); height:40px}
+.savebar .btn.quiet{color:color-mix(in srgb,var(--ground) 75%,var(--ink)); height:40px}
+.textin{font:400 var(--t-ui)/1 var(--ui); color:var(--ink); background:none; border:0; border-bottom:1px solid var(--rule); height:40px; text-align:right; width:12rem; outline:none}
+.textin:focus{border-color:var(--ink)}
+@media (max-width:760px){
+  .sindex{position:sticky; top:var(--mast); z-index:20; background:var(--ground); margin:0 calc(-1 * var(--margin)); padding:0; border-bottom:1px solid var(--rule)}
+  .sindex ol{display:flex; overflow-x:auto; border-top:0; scrollbar-width:none; padding:0 var(--margin); gap:var(--s5)}
+  .sindex ol::-webkit-scrollbar{display:none}
+  .sindex li a{display:flex; align-items:center; gap:6px; border:0; white-space:nowrap; font-size:var(--t-sm); min-height:48px; padding:0}
+  .savebar{padding-left:var(--s4); gap:var(--s2)}
+  .sindex li a .n{font-size:16px}
+  .sindex li a[aria-current=true]{box-shadow:inset 0 -2px 0 var(--ink); padding-left:0; margin-left:0}
+  .ssec{scroll-margin-top:calc(var(--mast) + 64px); margin-bottom:var(--s7)}
+  .ssec:first-child{margin-top:var(--s5)}
+  .field{grid-template-columns:1fr; row-gap:var(--s3)}
+  .field .val,.field>.ctl{justify-self:start; text-align:left}
+  .field.inline{grid-template-columns:1fr auto}
+  .field.inline>.ctl{justify-self:end}
+  .inks{grid-template-columns:1fr 1fr}
+  .inkspec{min-height:11rem; border-bottom:1px solid var(--rule-2)}
+  .inkspec:nth-child(2n){border-right:0}
+  .inkspec:nth-child(3){padding-left:0}
+  .inkspec:nth-child(3) .uline{left:0}
+  .inkspec .aa{font-size:56px}
+  .checks li{grid-template-columns:18px 1fr}
+  .checks li span:last-child{grid-column:2}
+  .textin{text-align:left; width:100%}
+}
+
+/* reduced motion: instant, or a plain fade */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:1ms !important; animation-iteration-count:1 !important; transition-duration:1ms !important; transition-delay:0ms !important}
+  .rv,.room .rv{transform:none !important}
+  .line-wipe>span{transform:none !important}
+  .room.open,.room.closing{transition:opacity 200ms !important}
+  .gridlines{display:none}
+}
+html.rm *,html.rm *::before,html.rm *::after{animation-duration:1ms !important; transition-duration:1ms !important; transition-delay:0ms !important}
+</style>
+</head>
+<body>
+<div class="gridlines" aria-hidden="true"><div class="wrap"><div class="g" id="gl"></div></div></div>
+
+<header class="mast" id="mast">
+  <div class="wrap">
+    <a class="mark" href="#today" data-go="today" aria-label="journal, today"><span class="w">journal</span><span class="no tab" id="issue">No. 288</span></a>
+    <nav class="nav" aria-label="Sections">
+      <a href="#today" data-go="today">Today</a>
+      <a href="#entries" data-go="entries">Entries</a>
+      <a href="#library" data-go="library">Library</a>
+      <a href="#insights" data-go="insights">Insights</a>
+    </nav>
+    <div class="right">
+      <button class="iconbtn" data-act="theme" aria-label="Light or dark" title="Light or dark"><svg class="i" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/></svg></button>
+      <a class="iconbtn" href="#settings" data-go="settings" aria-label="Settings" title="Settings"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></a>
+      <button class="btn solid" data-act="write" style="margin-left:8px"><svg class="i" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></svg>Write</button>
+    </div>
+  </div>
+</header>
+
+<main id="stage" tabindex="-1"></main>
+
+<nav class="tabbar" aria-label="Sections">
+  <a href="#today" data-go="today"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><span class="lbl">Today</span></a>
+  <a href="#entries" data-go="entries"><svg class="i" viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Z"/><path d="M9 9h6M9 13h4"/></svg><span class="lbl">Entries</span></a>
+  <a href="#write" data-act="write" aria-label="Write"><span class="pen"><svg class="i" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></svg></span></a>
+  <a href="#library" data-go="library"><svg class="i" viewBox="0 0 24 24"><path d="M5 4v16M10 4v16M15 5l4 15"/></svg><span class="lbl">Library</span></a>
+  <a href="#insights" data-go="insights"><svg class="i" viewBox="0 0 24 24"><path d="M4 19h16M7 15v-3M12 15V7M17 15v-6"/></svg><span class="lbl">Insights</span></a>
+</nav>
+
+<!-- WRITE: the room -->
+<section class="room" id="room" role="dialog" aria-modal="true" aria-label="Write" aria-hidden="true">
+  <div class="rtop">
+    <button class="iconbtn" data-act="close-room" aria-label="Close and keep the draft" title="Close (Esc)"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <div class="fol" id="rfol"></div>
+    <div class="saved" id="saved" aria-live="polite"><span class="dot"></span><span class="txt">Nothing yet</span></div>
+    <button class="iconbtn" data-act="focus" aria-pressed="false" aria-label="Focus mode" title="Focus (Ctrl/⌘ + .)"><svg class="i" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+  </div>
+  <div class="rscroll" id="rscroll">
+    <div class="rpage">
+      <div class="rprompt" id="rprompt"></div>
+      <div class="rrule"></div>
+      <div class="rnotes" id="rnotes"></div>
+      <label class="sr" for="rtext">Your words</label>
+      <textarea class="rtext rv" id="rtext" style="--i:3" rows="6" placeholder="Begin anywhere. One line is plenty."></textarea>
+    </div>
+  </div>
+  <div class="rfoot">
+    <button class="rec" id="rec" data-act="record" aria-pressed="false"><span class="mic"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span><span class="rlbl" id="reclbl">Record</span><span class="lv" aria-hidden="true"><i></i><i style="animation-delay:-.2s"></i><i style="animation-delay:-.45s"></i><i style="animation-delay:-.1s"></i><i style="animation-delay:-.6s"></i></span></button>
+    <span class="count" id="count">0 words</span>
+    <span class="sp"></span>
+    <button class="btn solid" data-act="keep" id="keepbtn"><span class="lg">Put it in the journal</span><span class="sh">Keep it</span></button>
+  </div>
+  <div class="focushint">Focus. Move to the edges for the controls, or press Esc.</div>
+</section>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+"use strict";
+/* ---------------------------------------------------------------- data (neutral fixtures) */
+const HERS = "Ada";
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const WD = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const ENTRIES = [
+  {stem:"2026-10-15-j", date:"2026-10-15", time:"08:30", label:"Journal note", first:"call the harbour master", flags:[]},
+  {stem:"2026-10-15-fix-life-s01", date:"2026-10-15", time:"06:14", label:"Fix your life · Session 1", practice:"program", first:"The life I do not want.", flags:[]},
+  {stem:"2026-10-14-evening", date:"2026-10-14", time:"23:12", label:"Evening journal", practice:"evening", first:"First words, about the lighthouse.", flags:["voice 2:31","Ada replied","analysed"], audio:true},
+  {stem:"2026-10-13-gratitude", date:"2026-10-13", time:"21:40", label:"Daily gratitude", practice:"gratitude", first:"The ferry was on time, and the man at the kiosk remembered my order.", flags:[]},
+  {stem:"2026-10-13-morning", date:"2026-10-13", time:"06:20", label:"Morning journal", practice:"morning", first:"Slept badly; the foghorn again, around four.", flags:["analysed"]},
+  {stem:"2026-10-12-evening", date:"2026-10-12", time:"23:05", label:"Evening journal", practice:"evening", first:"Long day. The gulls were loud on the pier and I let them be.", flags:["voice 0:48"], audio:true},
+  {stem:"2026-10-10-j", date:"2026-10-10", time:"10:02", label:"Journal note", first:"Painted the shed the colour of the buoys.", flags:[]},
+  {stem:"2026-10-07-evening", date:"2026-10-07", time:"23:30", label:"Evening journal", practice:"evening", first:"Walked the breakwater out and back without once thinking about work.", flags:["analysed"]},
+];
+const DAYREF = {
+  "2026-10-14": {stood:"the harbour, and a beam that does not hurry.", carry:"What does the sea ask?"},
+  "2026-10-12": {stood:"letting the gulls be loud.", carry:"What would you let be, tomorrow?"},
+};
+const QSETS = [
+  ["Brain dump and letting go", [["1.1","What's spinning in your mind?"],["1.2","What do you need to release before sleep?"]]],
+  ["Day review", [["2.1","What went well today?"],["2.2","What challenged you?"],["2.3","What did you learn?"]]],
+  ["Story-worthy moments", [["3.1","What interesting moments happened, even if small?"],["3.2","What made you smile or laugh?"],["3.3","What surprised you?"]]],
+  ["Wins and celebrations", [["4.1","What wins, big or small, did you experience?"],["4.2","What are you proud of?"]]],
+  ["Insights and revelations", [["5.1","What realizations or new understandings emerged?"],["5.2","What did you learn about yourself or others?"]]],
+  ["Values and alignment", [["6.1","How did you honour your values today?"],["6.2","Where did you feel most and least aligned?"]]],
+  ["Energy awareness", [["7.1","What energized you today?"],["7.2","What drained your energy?"]]],
+  ["Connection reflection", [["8.1","What attention bids did you notice?"],["8.2","Which connections did you lean into?"],["8.3","Who showed up for you, and who did you show up for?"]]],
+  ["Gratitude", [["9.1","What moments from today are you thankful for?"],["9.2","What simple joys touched you today?"]]],
+  ["Peace and calming", [["10.1","What brought you peace today?"],["10.2","What's one thing you can appreciate about yourself?"],["10.3","What do you want to carry into your sleep?"]]],
+];
+const EVENING = {
+  opener:"Evening. Let the day land — answer whatever pulls at you; you don't need to do them all.",
+  sent:"23:00",
+  blocks:[
+    {kind:"his", key:"words:0", at:"23:12", source:"typed", text:"First words, about the lighthouse. It was lit early tonight, before the sky had properly gone, and I stood at the window longer than I meant to.", note:{at:"08:02", text:"The lighthouse has come up three times this week."}},
+    {kind:"his", key:"words:1", at:"23:40", source:"voice", audio:151, text:"A spoken thought. I keep coming back to how the beam doesn't hurry. It goes round at its own pace whether anyone is out there or not."},
+    {kind:"his", key:"his:813", at:"23:44", source:"typed", text:"Later I thought of the harbour."},
+    {kind:"hers", key:"her:4815", at:"23:45", text:"The harbour sounds like a word you keep for somewhere safe. What made you think of it tonight?"},
+    {kind:"his", key:"his:816", at:"23:50", source:"typed", reply:"The harbour sounds like…", text:"yes, and the gulls. The noise of them is how I know I'm home."},
+  ],
+  analysis:{at:"08:02", items:["A theme of <span class=\"runin\">steadiness</span>: the beam that does not hurry, the harbour as somewhere kept safe.","He notices sound before sight — the gulls tonight, the foghorn earlier in the week.","The reply came quickly and short; the warmth is in the second sentence."]},
+};
+const REVIEW = [
+  "This was a week that kept returning to the water. On Monday the gulls were loud on the pier and you let them be; by Wednesday the lighthouse was lit early, and you stood at the window longer than you meant to.",
+  "You wrote most at night. The mornings were short and practical — the foghorn, the harbour master — and the evenings opened out into whole paragraphs.",
+  "Four of the five prompts that came were answered. The one that passed was Tuesday's evening, after the long gratitude note; it read as a day already said.",
+  "Something to carry into next week: you notice sound before sight. It may be worth asking what you hear first, when you sit down to write.",
+];
+const WEEK = [
+  {d:12, wd:"Mon", marks:["a"], fl:"Long day. The gulls were loud on the pier."},
+  {d:13, wd:"Tue", marks:["a","a","m"], fl:"Slept badly; the foghorn again."},
+  {d:14, wd:"Wed", marks:["a"], fl:"First words, about the lighthouse."},
+  {d:15, wd:"Thu", marks:["a"], fl:"The life I do not want.", today:true},
+  {d:16, wd:"Fri", marks:[]},{d:17, wd:"Sat", marks:[]},{d:18, wd:"Sun", marks:[]},
+];
+const LIB = {
+  daily:[
+    {id:"morning", when:"06:00", cad:"Every day", title:"Morning journal", desc:"Orientation: where you are, what matters today.", q:11, src:"builtin", on:true},
+    {id:"midweek", when:"12:00", cad:"Wednesdays", title:"Midweek drift check", desc:"Are the days going where you meant them to?", q:6, src:"fork", moved:true, on:true},
+    {id:"gratitude", when:"21:30", cad:"Every day", title:"Daily gratitude", desc:"Three things today, and why each one mattered.", q:2, src:"user", on:true},
+    {id:"evening", when:"23:00", cad:"Every day", title:"Evening journal", desc:"Closure: process the day, release, carry forward one thread.", q:24, src:"builtin", on:true},
+    {id:"weekly", when:"Sun", cad:"Sundays 19:00", title:"Weekly pattern scan", desc:"What repeated, what changed, what to keep.", q:7, src:"builtin", on:false},
+  ],
+  situational:[
+    {id:"before-talk", title:"Before a hard conversation", desc:"Say what you want from it before you are in it.", q:5, src:"builtin"},
+    {id:"tide", title:"Low tide", desc:"For the evenings when everything is far out. Two questions, no more.", q:2, src:"user"},
+  ],
+  frameworks:[
+    {id:"fix-life", title:"Fix your life", desc:"Ten sessions, from the life you do not want to the one you are building.", sessions:10, at:1, phase:"Phase 2 of 5 open since this morning", src:"builtin"},
+    {id:"values", title:"Values, in practice", desc:"Six sessions over three weeks.", sessions:6, at:0, src:"builtin"},
+  ],
+};
+/* ---------------------------------------------------------------- state */
+const S = {
+  screen:"entries", stem:null, params:{},
+  theme:"light", ink:"blue-black", tod:"day",
+  filter:{practice:"all", media:"any", q:""},
+  week:42, settings:{collapse:6, grace:2, quiet:45, settle:2, dayref:true, weekrev:true, today:true, length:"Medium", cache:30, reviewday:"Sun"},
+  saved:null, deleted:new Set(), edited:{},
+  room:{open:false, from:null, prompt:null, recording:false, recT:0, notes:[], focus:false},
+};
+S.saved = JSON.parse(JSON.stringify(S.settings));
+const DEFAULTS = {collapse:6, grace:2, quiet:45, settle:2, dayref:true, weekrev:true, today:true, length:"Medium", cache:30, reviewday:"Sun"};
+const mm = window.matchMedia("(prefers-reduced-motion: reduce)");
+const phone = () => window.innerWidth <= 760;
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+const stage = $("#stage");
+const wait = ms => new Promise(r => setTimeout(r, (mm.matches || document.documentElement.classList.contains("rm")) ? 0 : ms));
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const I = {
+  chev:'<svg class="i chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>',
+  left:'<svg class="i" viewBox="0 0 24 24"><path d="M15 18 9 12l6-6"/></svg>',
+  right:'<svg class="i" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>',
+  back:'<svg class="i" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>',
+  edit:'<svg class="i" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/></svg>',
+  del:'<svg class="i" viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg>',
+  play:'<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>',
+  pause:'<svg viewBox="0 0 24 24"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>',
+  search:'<svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>',
+  minus:'<svg class="i" viewBox="0 0 24 24"><path d="M6 12h12"/></svg>',
+  plus:'<svg class="i" viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg>',
+  pen:'<svg class="i" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></svg>',
+  lock:'<svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px;vertical-align:-2px"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
+};
+const d = iso => { const [y,m,dd] = iso.split("-").map(Number); return new Date(y, m-1, dd); };
+const dayName = iso => WD[d(iso).getDay()];
+
+/* ---------------------------------------------------------------- theme / ink / ground */
+function applyLook(){
+  const h = document.documentElement;
+  h.dataset.theme = S.theme; h.dataset.ink = S.ink; h.dataset.tod = S.tod;
+}
+function todFromClock(){
+  const hr = new Date().getHours();
+  return hr < 5 ? "night" : hr < 10 ? "dawn" : hr < 17 ? "day" : hr < 21 ? "dusk" : "night";
+}
+
+/* ---------------------------------------------------------------- router */
+function parseHash(){
+  const raw = location.hash.replace(/^#/, "") || "today";
+  const [scr, q=""] = raw.split("?");
+  const p = Object.fromEntries(new URLSearchParams(q));
+  return {screen: scr || "today", p};
+}
+function hashFor(screen, extra={}){
+  const keep = {};
+  for (const k of ["theme","ink","tod"]) if (S.params[k]) keep[k] = S.params[k];
+  Object.assign(keep, extra);
+  const q = new URLSearchParams(keep).toString();
+  return "#" + screen + (q ? "?" + q : "");
+}
+function go(screen, extra){ location.hash = hashFor(screen, extra); }
+
+let current = null;
+async function route(first){
+  const {screen, p} = parseHash();
+  S.params = p;
+  if (p.theme === "dark" || p.theme === "light") S.theme = p.theme;
+  if (p.ink && ["blue-black","brown","violet","green"].includes(p.ink)) S.ink = p.ink;
+  if (p.tod && ["dawn","day","dusk","night"].includes(p.tod)) S.tod = p.tod;
+  if (p.motion === "off") document.documentElement.classList.add("rm");
+  applyLook();
+
+  if (screen === "write"){
+    if (!current){ await show("today", {}, true); }
+    openRoom({prompt: "morning"});
+    return;
+  }
+  if (S.room.open) closeRoom(true);
+
+  const fam = s => (s === "entries" || s === "entry") ? "contents" : s;
+  const stem = screen === "entry" ? (p.stem || "2026-10-14-evening") : null;
+  if (current && fam(current) === "contents" && fam(screen) === "contents"){
+    current = screen; markNav(screen);
+    return setReading(stem);
+  }
+  await show(screen, {stem}, first);
+}
+window.addEventListener("hashchange", () => route(false));
+
+function markNav(screen){
+  const s = screen === "entry" ? "entries" : screen;
+  $$("[data-go]").forEach(a => a.getAttribute("data-go") === s ? a.setAttribute("aria-current","page") : a.removeAttribute("aria-current"));
+}
+
+async function show(screen, {stem}, first){
+  const views = {today:vToday, entries:vContents, entry:vContents, insights:vInsights, settings:vSettings, library:vLibrary};
+  const view = views[screen] || vToday;
+  if (!first && current){
+    stage.classList.add("out");
+    await wait(190);
+  }
+  current = screen; markNav(screen);
+  stage.classList.remove("in","out");
+  stage.innerHTML = view({stem});
+  window.scrollTo(0, 0);
+  stagger(stage);
+  after(screen, stem);
+  flashGrid(); drawMast();
+  requestAnimationFrame(() => requestAnimationFrame(() => stage.classList.add("in")));
+}
+function stagger(root){
+  let i = 0;
+  $$(".rv, .line-wipe", root).forEach(el => { if (!el.style.getPropertyValue("--i")) el.style.setProperty("--i", Math.min(i++, 16)); });
+}
+const still = () => mm.matches || document.documentElement.classList.contains("rm");
+function flashGrid(){
+  if (still()) return;
+  const gl = $(".gridlines"); gl.classList.remove("flash"); void gl.offsetWidth; gl.classList.add("flash");
+}
+function drawMast(){
+  if (still()) return;
+  const m = $("#mast"); m.classList.remove("draw"); void m.offsetWidth; m.classList.add("draw");
+}
+function buildGrid(){
+  const n = phone() ? 4 : 12;
+  $("#gl").innerHTML = Array.from({length:n}, (_,k) => `<span style="--k:${k}"></span>`).join("");
+}
+
+/* ---------------------------------------------------------------- TODAY */
+function vToday(){
+  return `
+  <div class="wrap">
+    <div class="g cover">
+      <div class="bigday rv"><span class="num">15</span><div class="side"><span class="kicker">No. 288 of the year · 09:12 · Hillside</span><span class="w">Thursday, <em>October</em></span></div></div>
+      <div class="carry rv"><span class="who">Carried forward <span>· from Wednesday's reflection</span></span><a href="${hashFor("insights")}" data-go="insights" style="text-decoration:none"><span class="hers">What does the sea ask?</span></a></div>
+      <div class="slots rv">
+        <div class="slot">
+          <span class="num">06:00</span>
+          <div class="what"><h3>Morning journal</h3><div class="state">Waiting since 06:00 · reply any time today</div></div>
+          <div class="p"><span class="who">Ada <span>· sent 06:00</span></span><div class="hers">Morning. Start wherever something feels alive — one line or a voice note is plenty.</div></div>
+          <div class="go"><button class="btn solid" data-act="write" data-prompt="morning">Reply</button></div>
+        </div>
+        <div class="slot quiet">
+          <span class="num">21:30</span>
+          <div class="what"><h3>Daily gratitude</h3><div class="state">Comes at 21:30</div></div>
+          <div class="p"></div>
+          <div class="go"><button class="btn quiet" data-act="toast" data-msg="Daily gratitude is on its way">Send now</button></div>
+        </div>
+        <div class="slot quiet">
+          <span class="num">23:00</span>
+          <div class="what"><h3>Evening journal</h3><div class="state">Comes at 23:00</div></div>
+          <div class="p"></div>
+          <div class="go"><button class="btn quiet" data-act="toast" data-msg="Evening journal is on its way">Send now</button></div>
+        </div>
+      </div>
+    </div>
+    <div style="height:96px"></div>
+  </div>`;
+}
+
+/* ---------------------------------------------------------------- CONTENTS */
+function filtered(){
+  const f = S.filter;
+  return ENTRIES.filter(e => {
+    if (f.practice === "notes" && e.practice) return false;
+    if (f.practice === "practices" && (!e.practice || e.practice === "program")) return false;
+    if (f.practice === "programs" && e.practice !== "program") return false;
+    if (f.media === "voice" && !e.audio) return false;
+    if (f.media === "her" && !e.flags.some(x => /Ada|analysed/.test(x))) return false;
+    if (f.q && !e.first.toLowerCase().includes(f.q.toLowerCase())) return false;
+    return true;
+  });
+}
+const FWORDS = {
+  practice:{all:"every practice", practices:"the daily practices", programs:"the programs", notes:"loose notes only"},
+  media:{any:"in whatever form", voice:"spoken aloud", her:"where Ada answered"},
+};
+function filterSentence(){
+  const n = filtered().length;
+  return `<p class="lede-filter rv">${n === ENTRIES.length ? "All" : n} ${n === 1 ? "entry" : "entries"}, from <button class="fword" data-act="fmenu" data-k="practice" aria-haspopup="menu" aria-expanded="false">${FWORDS.practice[S.filter.practice]}</button>, <button class="fword" data-act="fmenu" data-k="media" aria-haspopup="menu" aria-expanded="false">${FWORDS.media[S.filter.media]}</button>.</p>`;
+}
+function listHTML(stem){
+  const items = filtered();
+  const weeks = [["Week 42","12 – 18 October", d => d >= "2026-10-12"],["Week 41","5 – 11 October", d => d < "2026-10-12"]];
+  let out = "";
+  for (const [wk, range, test] of weeks){
+    const wItems = items.filter(e => test(e.date));
+    if (!wItems.length) continue;
+    const days = [...new Set(wItems.map(e => e.date))];
+    out += `<section class="week"><header class="weekhead rv"><h2>${wk}</h2><span class="kicker">${range} · ${wItems.length} ${wItems.length===1?"entry":"entries"}</span></header>`;
+    for (const day of days){
+      const es = wItems.filter(e => e.date === day);
+      const ref = DAYREF[day];
+      out += `<div class="g day rv"><div class="dnum"><span class="num">${d(day).getDate()}</span><span class="kicker"><span class="lg">${dayName(day)}</span><span class="sh">${dayName(day).slice(0,3)}</span></span></div><div class="dentries">`;
+      for (const e of es){
+        out += `<button class="erow" data-act="open" data-stem="${e.stem}" ${e.stem===stem?'aria-current="true"':''}>
+          <span class="t tab">${e.time}</span>
+          <span><span class="prac">${esc(e.label)}<span class="cmp-time"></span></span><span class="hl">${esc(e.first)}</span></span>
+          <span class="meta">${e.flags.map(f => /Ada/.test(f) ? `<span class="her">${f}</span>` : `<span>${f}</span>`).join("")}</span>
+        </button>`;
+      }
+      if (ref) out += `<button class="dayref" data-act="go-insights"><span class="who">Ada<br><span>reflection</span></span><span class="hers"><span class="runin">What stood out —</span> ${esc(ref.stood)}</span></button>`;
+      out += `</div></div>`;
+    }
+    out += `</section>`;
+  }
+  if (!out) out = `<p class="hint rv" style="padding:48px 0">Nothing here with those words. Try fewer, or <button class="textlink" data-act="fclear">show everything</button>.</p>`;
+  return out;
+}
+function vContents({stem}){
+  const reading = !!stem;
+  return `
+  <div class="wrap">
+    <div class="cl ${reading ? "reading compact" + (phone() ? " gone" : "") : ""}" id="cl">
+      <div class="list"><div class="list-in">
+        <header class="pagehead g">
+          <div style="--c:1/8">
+            <h1 class="line-wipe"><span>Entries</span></h1>
+            ${filterSentence()}
+            <label class="search rv"><input type="search" id="q" placeholder="Search his words" value="${esc(S.filter.q)}" aria-label="Search his words">${I.search}</label>
+          </div>
+          ${monthHTML()}
+        </header>
+        <div id="weeks">${listHTML(stem)}</div>
+        <div style="height:80px"></div>
+      </div></div>
+      <article class="pane" id="pane" aria-live="polite">${reading ? vEntry(stem) : ""}</article>
+    </div>
+  </div>`;
+}
+
+function monthHTML(){
+  const has = new Set(ENTRIES.map(e => +e.date.slice(8)));
+  let cells = "";
+  for (let k = 0; k < 3; k++) cells += `<span></span>`; // 1 October 2026 is a Thursday; weeks start Monday
+  for (let n = 1; n <= 31; n++){
+    const cls = n === 15 ? "td" : has.has(n) ? "on" : n > 15 ? "fut" : "";
+    cells += has.has(n) ? `<button class="${cls}" data-act="jump" data-day="${n}" aria-label="${n} October">${n}</button>` : `<span class="${cls}">${n}</span>`;
+  }
+  return `<aside class="month rv" style="--c:9/13" aria-label="October 2026"><div class="mh"><span class="mn">October</span><span class="kicker">2026 · ${has.size} days written</span></div><div class="mg7">${["M","T","W","T","F","S","S"].map(x => `<b>${x}</b>`).join("")}${cells}</div></aside>`;
+}
+
+/* entering and leaving an entry */
+let busy = false, listScroll = 0;
+async function setReading(stem){
+  const cl = $("#cl"), pane = $("#pane");
+  if (!cl) return;
+  const was = cl.classList.contains("reading");
+  $$(".erow", cl).forEach(r => r.dataset.stem === stem ? r.setAttribute("aria-current","true") : r.removeAttribute("aria-current"));
+  if (phone()){
+    if (stem){
+      listScroll = window.scrollY;
+      pane.innerHTML = vEntry(stem); pane.classList.remove("in"); stagger(pane); after("entry", stem);
+      cl.classList.add("anim");
+      requestAnimationFrame(() => { cl.classList.add("reading","compact"); pane.classList.add("in"); });
+      window.scrollTo({top:0, behavior: "instant"});
+      await wait(470); cl.classList.add("gone"); cl.classList.remove("anim");
+    } else {
+      cl.classList.remove("gone"); cl.classList.add("anim");
+      requestAnimationFrame(() => cl.classList.remove("reading","compact"));
+      window.scrollTo({top:listScroll, behavior:"instant"});
+      await wait(470); cl.classList.remove("anim"); pane.innerHTML = "";
+    }
+    return;
+  }
+  if (stem && was){
+    // swap the entry beside the index
+    pane.classList.remove("in"); await wait(150);
+    pane.innerHTML = vEntry(stem); stagger(pane); after("entry", stem);
+    window.scrollTo({top:0, behavior: mm.matches ? "instant" : "smooth"});
+    requestAnimationFrame(() => pane.classList.add("in"));
+    return;
+  }
+  if (stem){
+    window.scrollTo({top:0, behavior:"instant"});
+    cl.classList.add("hush"); await wait(150);
+    cl.classList.add("reading","compact");
+    pane.innerHTML = vEntry(stem); pane.classList.remove("in"); stagger(pane); after("entry", stem);
+    requestAnimationFrame(() => pane.classList.add("in"));
+    flashGrid();
+    await wait(360); cl.classList.remove("hush");
+    const cur = $(".erow[aria-current=true]", cl); cur && cur.scrollIntoView({block:"nearest"});
+  } else {
+    pane.classList.remove("in");
+    cl.classList.add("hush"); await wait(180);
+    cl.classList.remove("reading","compact"); pane.innerHTML = "";
+    flashGrid();
+    await wait(380); cl.classList.remove("hush");
+  }
+}
+
+/* ---------------------------------------------------------------- ENTRY */
+function waveBars(seed, n=72){
+  let out = "";
+  for (let k=0;k<n;k++){
+    const v = 0.22 + 0.78*Math.abs(Math.sin(k*0.37+seed)*Math.cos(k*0.11+seed*2)) * (0.6+0.4*Math.sin(k*1.7));
+    out += `<i style="height:${Math.max(12, Math.round(v*100))}%"></i>`;
+  }
+  return out;
+}
+const fmt = s => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,"0")}`;
+function hisBlock(b, i, turn){
+  if (S.deleted.has(b.key)) return "";
+  const text = S.edited[b.key] || b.text;
+  const paras = text.split(/\n+/).map(p => `<p>${esc(p)}</p>`).join("");
+  const player = b.audio ? `<div class="player" data-dur="${b.audio}"><button class="play" data-act="play" aria-label="Play the voice note">${I.play}</button><div class="wave" data-act="seek" role="slider" aria-label="Position" aria-valuemin="0" aria-valuemax="${b.audio}" aria-valuenow="0" tabindex="0">${waveBars(i+1)}</div><div class="ptime"><span class="cur">0:00</span><span>/ ${fmt(b.audio)}</span><button data-act="speed" aria-label="Playback speed">1×</button></div></div>` : "";
+  return `<div class="blk" data-key="${b.key}">
+    <div class="mg rv"><span class="tm">${b.at}</span><span class="src">${b.source}${b.audio?" · "+fmt(b.audio):""}</span>
+      <div class="acts-bar" role="toolbar" aria-label="This block"><button data-act="edit">${I.edit}Edit</button>${b.audio?"":`<button data-act="del">${I.del}Delete</button>`}</div></div>
+    <div class="body rv">${b.reply ? `<div class="replyto"><span>↩ to ${HERS}</span><span class="hers">“${esc(b.reply)}”</span></div>` : ""}${player}<div class="his">${paras}</div></div>
+    ${b.note ? `<aside class="nt note rv"><span class="who">${HERS} <span>· note, ${b.note.at} next morning</span></span><span class="hers">${esc(b.note.text)}</span></aside>` : ""}${turn ? herTurn(turn) : ""}
+  </div>`;
+}
+function herTurn(b){
+  return `<aside class="nt note her-turn rv"><span class="who">${HERS} <span>· ${b.at}, in the chat</span></span><span class="hers">${esc(b.text)}</span></aside>`;
+}
+function vEntry(stem){
+  const e = ENTRIES.find(x => x.stem === stem) || ENTRIES[2];
+  const full = e.stem === "2026-10-14-evening";
+  const dt = d(e.date);
+  const blocks = full ? EVENING.blocks : [{kind:"his", key:"w0", at:e.time, source:"typed", text:e.first + (e.practice ? " " + "The rest came slower, and I let it." : "")}];
+  let body = "";
+  // her turn in the chat sits beside the block she answered (desktop) or just under it (phone)
+  blocks.forEach((b, i) => {
+    if (b.kind === "hers") return;
+    const nx = blocks[i+1];
+    body += hisBlock(b, i, nx && nx.kind === "hers" ? nx : null);
+  });
+  const sfFull = `
+    <div class="standfirst rv"><span class="who">${HERS} <span>· sent ${EVENING.sent}</span></span><div class="hers">${esc(EVENING.opener)}</div></div>
+    `;
+  const qfold = `
+    <div class="qfold rv" data-open="false" id="qf">
+      <button class="foldbtn" data-act="fold" aria-expanded="false" aria-controls="qfb"><span class="lbl">Her 24 questions, in ten parts <span>· one asked tonight</span></span>${I.chev}</button>
+      <div class="fold-b" id="qfb"><div class="fold-i"><div class="qsets">${QSETS.map(([t, qs]) => `<div class="qset"><h4>${t}</h4><ol>${qs.map(([id, q]) => `<li class="${id==="1.1"?"asked":""}"><span class="id">${id}</span><span class="hers">${esc(q)}${id==="1.1"?'<span class="tag">asked tonight</span>':""}</span></li>`).join("")}</ol></div>`).join("")}</div></div></div>
+    </div>`;
+  const prompt = full ? sfFull : (e.practice ? `<div class="standfirst rv"><span class="who">${HERS} <span>· sent ${e.time}</span></span><div class="hers">${e.practice==="program" ? "Session one. Describe, in plain words, the life you do not want — as if you were already living it." : "Start wherever something feels alive."}</div></div><div style="height:32px"></div>` : `<div class="kicker rv" style="margin-bottom:24px">A note of his own · no prompt</div>`);
+  const depts = full ? `
+    <section class="dept rv" data-open="false">
+      <button class="dept-h" data-act="fold" aria-expanded="false"><h3>Analysis</h3><span class="kicker">by ${HERS} · ${EVENING.analysis.at} the next morning · three observations</span>${I.chev}</button>
+      <div class="fold-b"><div class="fold-i"><div class="dept-body"><ul class="hers">${EVENING.analysis.items.map(t => `<li>${t}</li>`).join("")}</ul></div></div></div>
+    </section>
+    <section class="dept rv" data-open="false">
+      <button class="dept-h" data-act="fold" aria-expanded="false"><h3>Reflection</h3><span class="kicker">by ${HERS} · the day, read whole</span>${I.chev}</button>
+      <div class="fold-b"><div class="fold-i"><div class="dept-body hers"><p><span class="runin">What stood out —</span> the harbour, and a beam that does not hurry.</p><p><span class="runin">To carry forward —</span> What does the sea ask?</p><p class="src" style="font:400 13.5px/1.4 var(--ui);color:var(--ink-3);font-style:normal">Read from this entry and the morning's note.</p></div></div></div>
+    </section>` : "";
+  return `<div class="doc">
+    <div class="full"><button class="back" data-act="close-entry">${I.back}Entries</button></div>
+    <header class="dochead">
+      <div class="mg rv"><span class="num">${dt.getDate()}</span><span class="kicker">${dayName(e.date).slice(0,3)} · ${MONTHS[dt.getMonth()].slice(0,3)}</span></div>
+      <div><div class="kicker rv">${dayName(e.date)} ${dt.getDate()} ${MONTHS[dt.getMonth()]} · ${full ? "23:00 – 23:50 · four blocks, one spoken" : e.time}</div><h1 class="line-wipe" style="margin-top:8px"><span>${esc(e.label)}</span></h1></div>
+      <div class="acts rv"><button class="btn line" data-act="write" data-prompt="${full?"evening-add":"add"}">${I.pen}Add to this</button></div>
+    </header>
+    <div class="docrule full"></div>
+    <div>${prompt}</div>${full ? qfold : ""}
+    ${body}
+    <div>${depts}</div>
+    <div class="compose-line rv"><button class="ph" data-act="write" data-prompt="${full?"evening-add":"add"}">Add to this entry, in your own words…</button><button class="iconbtn" data-act="write" data-prompt="${full?"evening-add":"add"}" data-rec="1" aria-label="Add by voice"><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button></div>
+  </div>`;
+}
+
+/* ---------------------------------------------------------------- INSIGHTS */
+function vInsights(){
+  const w = S.week;
+  if (w !== 42) return vInsightsQuiet(w);
+  return `
+  <div class="wrap">
+    <header class="spread-head">
+      <h1 class="line-wipe"><span>The week <em>of the 12th</em></span></h1>
+      <div class="stepper rv"><button class="iconbtn" data-act="week" data-d="-1" aria-label="Earlier week">${I.left}</button><span class="wk">Week 42 · 12 – 18 Oct</span><button class="iconbtn" data-act="week" data-d="1" aria-label="Later week" disabled>${I.right}</button></div>
+    </header>
+    <div class="g spread">
+      <div class="pq rv"><span class="who">${HERS} <span>· to carry forward</span></span><blockquote>“What does the sea ask?”</blockquote><div class="attr">From her reflection on <a href="${hashFor("entry",{stem:"2026-10-14-evening"})}">Wednesday the 14th</a>, after the evening journal.</div></div>
+      <div class="figs">
+        <div class="fig big rv"><span class="num tab">412</span><span class="cap">words in his hand this week, most of them after dark</span></div>
+        <div class="fig rv"><span class="num">6</span><span class="cap">entries over four days</span></div>
+        <div class="fig rv"><span class="num">4<sub>/ 5</sub></span><span class="cap">prompts answered; one let pass</span></div>
+      </div>
+      <div class="days7 rv" role="list" aria-label="The seven days">
+        ${WEEK.map(x => `<button class="d7 ${x.marks.length?"":"none"} ${x.today?"today":""}" role="listitem" data-act="go-entries"><span class="num">${x.d}</span><span class="wd">${x.wd}</span>${x.fl?`<span class="fl">${esc(x.fl)}</span>`:""}<span class="bar">${x.marks.map(m => `<i class="${m==="m"?"miss":""}" title="${m==="m"?"let pass":"answered"}"></i>`).join("")}</span></button>`).join("")}
+      </div>
+      <div class="word rv"><span class="kicker">The word he came back to</span><span class="w">harbour</span><span class="x">four times, on three different days</span>
+        <div class="line"><span class="kicker">His line of the week</span><span class="his">“Later I thought of the harbour.”</span><span class="hint" style="display:block;margin-top:8px">Wednesday, 23:44</span></div></div>
+      <div class="review rv"><span class="who">${HERS} <span>· the week review, Sunday</span></span>
+        <h2>A week that kept returning to the water</h2>
+        <div class="col hers"><p class="first">${REVIEW[0]}</p>
+          <div data-open="false" id="rev"><div class="fold-b" id="revb"><div class="fold-i">${REVIEW.slice(1).map(p => `<p>${p}</p>`).join("")}</div></div>
+          <button class="textlink unfold" data-act="review" aria-expanded="false" aria-controls="revb" style="font-style:normal">Read the whole review <span class="hint" style="font-style:normal">· three more paragraphs</span></button></div>
+        </div>
+      </div>
+      <section class="dispatch rv"><div class="kicker"><span>Her day reflections</span><span>two this week</span></div>
+        ${dispatch(14,"Wednesday","2026-10-14")}${dispatch(12,"Monday","2026-10-12")}
+      </section>
+    </div>
+    <div style="height:96px"></div>
+  </div>`;
+}
+function dispatch(n, wd, iso){
+  const r = DAYREF[iso];
+  return `<div class="disp" data-open="false"><button class="disp-h" data-act="fold" aria-expanded="false"><span class="num">${n}</span><span class="wd">${wd}</span><span class="hers"><span class="runin">What stood out —</span> ${esc(r.stood)}</span>${I.chev}</button>
+    <div class="fold-b"><div class="fold-i"><div><div class="inner hers" style="font-size:20px"><p style="margin:0 0 12px"><span class="runin">To carry forward —</span> ${esc(r.carry)}</p><a class="textlink" style="font-style:normal" href="${hashFor("entry",{stem:iso+"-evening"})}">Read the evening it came from</a></div></div></div></div></div>`;
+}
+function vInsightsQuiet(w){
+  return `<div class="wrap">
+    <header class="spread-head"><h1 class="line-wipe"><span>The week <em>of the 5th</em></span></h1>
+      <div class="stepper rv"><button class="iconbtn" data-act="week" data-d="-1" aria-label="Earlier week" disabled>${I.left}</button><span class="wk">Week ${w} · 5 – 11 Oct</span><button class="iconbtn" data-act="week" data-d="1" aria-label="Later week">${I.right}</button></div></header>
+    <div class="g spread">
+      <div class="pq rv" style="--c:1/9"><span class="who">${HERS} <span>· no review this week</span></span><blockquote style="font-size:clamp(40px,4.4vw,64px)">“A quieter week. Two entries, both near the water.”</blockquote></div>
+      <div class="figs"><div class="fig big rv"><span class="num">2</span><span class="cap">entries; no prompts were sent while the schedule was paused</span></div></div>
+    </div><div style="height:96px"></div></div>`;
+}
+
+/* ---------------------------------------------------------------- LIBRARY */
+function prov(p){
+  if (p.src === "user") return `<div class="prov mine"><span class="sig"></span>Written by you</div>`;
+  if (p.src === "fork") return `<div class="prov mine"><span class="sig"></span>Edited by you, from the standard${p.moved ? ` <span class="moved">· the standard has changed since. <button class="textlink" style="min-height:0;display:inline" data-act="toast" data-msg="Showing what changed in the standard">See what changed</button></span>` : ""}</div>`;
+  return `<div class="prov"><span class="sig"></span>From the journal's standard set</div>`;
+}
+function prow(p, kind){
+  const mine = p.src === "user" || p.src === "fork";
+  let when = "", side = "";
+  if (kind === "daily"){
+    when = `<div class="when"><span class="num tab">${p.when}</span><span class="hint">${p.cad}</span></div>`;
+    side = `<div class="side"><div class="row"><span class="qn">${p.q} questions</span>${p.src!=="user" ? `<label class="sw" title="${p.on?"On":"Off"}"><input type="checkbox" ${p.on?"checked":""} data-act="libtoggle" aria-label="${esc(p.title)} on"><span class="tr"></span></label>` : ""}</div><div class="row"><button class="btn quiet" data-act="toast" data-msg="${esc(p.title)} is on its way">Send now</button><button class="btn quiet" data-act="toast" data-msg="The editor opens here">Edit</button></div></div>`;
+  } else if (kind === "situational"){
+    when = `<div class="when"><span class="num" style="font-size:40px;color:var(--ink-3)">—</span><span class="hint">When you need it</span></div>`;
+    side = `<div class="side"><span class="qn">${p.q} questions</span><button class="btn line" data-act="write" data-prompt="${p.id}">Start</button></div>`;
+  } else {
+    when = `<div class="when"><span class="num">${p.at}<span style="color:var(--ink-3)">/${p.sessions}</span></span><span class="hint">sessions</span></div>`;
+    side = `<div class="side">${p.at ? `<button class="btn solid" data-act="toast" data-msg="Session 2 opens">Continue</button>` : `<button class="btn line" data-act="toast" data-msg="Starts with session 1">Start</button>`}</div>`;
+  }
+  return `<div class="g prow rv ${mine?"mine":""}">${when}<div class="ttl"><h3>${esc(p.title)}</h3><p>${esc(p.desc)}</p>${kind==="frameworks" ? `<div class="prog" aria-label="${p.at} of ${p.sessions} sessions">${Array.from({length:p.sessions},(_,k)=>`<i class="${k<p.at?"on":k===p.at&&p.at?"cur":""}"></i>`).join("")}</div>${p.phase?`<div class="hint" style="margin-top:8px">${p.phase}</div>`:""}` : ""}${prov(p)}</div>${side}</div>`;
+}
+function vLibrary(){
+  return `<div class="wrap">
+    <header class="pagehead"><h1 class="line-wipe"><span>Library</span></h1>
+      <p class="lede-filter rv">What comes on its own, what you start when you need it, and the frameworks that run over weeks. <span style="color:var(--ink)">Yours are set in your own type.</span></p></header>
+    <section class="libsec"><header class="rv"><h2>Daily</h2><button class="btn line" data-act="toast" data-msg="New practice: title, time, one question">${I.plus}New practice</button></header>${LIB.daily.map(p => prow(p,"daily")).join("")}</section>
+    <section class="libsec"><header class="rv"><h2>When you need it</h2><span class="kicker">situational</span></header>${LIB.situational.map(p => prow(p,"situational")).join("")}</section>
+    <section class="libsec"><header class="rv"><h2>Frameworks</h2><span class="kicker">programs over weeks</span></header>${LIB.frameworks.map(p => prow(p,"frameworks")).join("")}</section>
+    <div style="height:96px"></div></div>`;
+}
+
+/* ---------------------------------------------------------------- SETTINGS */
+const SECS = [["place","Place and time"],["prompts","Prompts"],["reflections","Reflections"],["chat","In the chat"],["today","Today's page"],["ink","Her ink"],["look","Paper and light"],["device","This device"],["health","Health"]];
+function hintFor(k, unit){
+  const v = S.settings[k], dv = DEFAULTS[k];
+  return v === dv ? `<span class="dflt">the default</span>` : `<span class="chg">changed</span> · the default is ${dv}${unit?` ${unit}`:""}`;
+}
+function stepper(k, unit, step=1, min=0, max=999){
+  return `<div class="stepper2 ctl" data-k="${k}" data-step="${step}" data-min="${min}" data-max="${max}"><button data-act="step" data-d="-1" aria-label="Less">${I.minus}</button><output aria-live="polite">${S.settings[k]} <span class="u">${unit}</span></output><button data-act="step" data-d="1" aria-label="More">${I.plus}</button></div>`;
+}
+function seg(k, opts){
+  return `<div class="seg ctl" role="group" data-k="${k}"><span class="thumb"></span>${opts.map(o => `<button data-act="seg" data-v="${o}" aria-pressed="${S.settings[k]===o}">${o}</button>`).join("")}</div>`;
+}
+function toggle(k, label){
+  return `<label class="sw ctl"><input type="checkbox" data-act="settoggle" data-k="${k}" ${S.settings[k]?"checked":""} aria-label="${label}"><span class="tr"></span></label>`;
+}
+function field(lab, hint, ctl, cls=""){
+  return `<div class="field ${cls}"><div><div class="lab">${lab}</div><span class="hint">${hint}</span></div>${ctl}</div>`;
+}
+function vSettings(){
+  const inks = [["blue-black","Blue-black","a typewriter ribbon"],["brown","Brown","iron-gall, as a reader annotates"],["violet","Violet","a carbon copy"],["green","Green","post-office ink"]];
+  return `<div class="wrap">
+    <header class="pagehead g"><div style="--c:1/8"><h1 class="line-wipe"><span>Settings</span></h1><p class="lede-filter rv">How the journal keeps time, when Ada writes, and how her words look on this device.</p></div>
+      <aside class="glance rv" style="--c:9/13"><div class="kicker">At a glance</div>
+        <a href="#s-health" data-act="sjump" data-id="health"><span class="ok"></span><span><b>All is well</b><span class="hint">Last tick 3 minutes ago</span></span></a>
+        <a href="#s-device" data-act="sjump" data-id="device"><span class="sq"></span><span><b>harbour-laptop</b><span class="hint">Signed in through Tailscale</span></span></a>
+        <a href="#s-ink" data-act="sjump" data-id="ink"><span class="inkdot"></span><span><b>Her ink</b><span class="hint" id="glink">${{"blue-black":"Blue-black","brown":"Brown","violet":"Violet","green":"Green"}[S.ink]}</span></span></a>
+      </aside></header>
+    <div class="g set">
+      <nav class="sindex" aria-label="Settings sections"><ol>${SECS.map(([id,t],k) => `<li><a href="#s-${id}" data-act="sjump" data-id="${id}" ${k===0?'aria-current="true"':""}><span class="n">${String(k+1).padStart(2,"0")}</span>${t}</a></li>`).join("")}</ol></nav>
+      <div class="sbody">
+        ${sec("place", 1, "Place and time", "Where you are decides the hour every prompt is sent.",
+          field("Place", "Saved in the file. <button class='textlink' style='min-height:0;display:inline' data-act='toast' data-msg='Asking the browser for your position…'>Use my location</button>", `<input class="textin ctl" value="Hillside" aria-label="Place">`) +
+          field("Time zone", "Follows the place", `<span class="val">Asia/Kolkata · IST</span>`))}
+        ${sec("prompts", 2, "Prompts", "How long a prompt stays open, and how late you may answer.",
+          field("Fold the prompt after", hintFor("collapse","hours"), stepper("collapse","hours",1,1,24)) +
+          field("Grace for a late reply", hintFor("grace","hours"), stepper("grace","hours",1,0,12)) +
+          field("Settle between program phases", hintFor("settle","minutes") + " · not set in any file", stepper("settle","min",1,0,30)))}
+        ${sec("reflections", 3, "Reflections", "Ada reads the day, and the week, and writes back.",
+          field("A reflection on each day", "Written the next morning, from that day's entries", toggle("dayref","Day reflection"), "inline") +
+          field("A review of the week", hintFor("reviewday"), seg("reviewday", ["Sat","Sun","Mon"])) +
+          field("Review the week as a whole", "Turn off to keep only day reflections", toggle("weekrev","Week review"), "inline"))}
+        ${sec("chat", 4, "In the chat", "When a conversation after a prompt counts as finished.",
+          field(`Quiet before the chat is written in ${I.lock}`, `Set in Hermes' settings, so it is changed there · now 45 minutes`, `<span class="val" style="color:var(--ink-2)">45 min</span>`, "locked"))}
+        ${sec("today", 5, "Today's page", "What Ada's opener may draw on.",
+          field("Use today's page", "Tasks, weather and the week in the opener", toggle("today","Today's page"), "inline") +
+          field("How much she reads", hintFor("length"), seg("length", ["Short","Medium","Long"])) +
+          field("Keep it for", hintFor("cache","minutes"), stepper("cache","min",5,5,240)))}
+        <section class="ssec" id="s-ink"><h2><span class="n">06</span>Her ink</h2><p class="intro">The one colour in the journal is hers. Choose the ink her words are written in; it stays on this device.</p>
+          <div class="inks" role="radiogroup" aria-label="Her ink">${inks.map(([id,n,nt]) => `<button class="inkspec" role="radio" data-ink="${id}" aria-checked="${S.ink===id}" data-act="ink"><span class="aa">Aa</span><span class="smp">“The harbour sounds like a word you keep.”</span><span class="nm">${n}</span><span class="nt">${nt}</span><span class="uline"></span><span class="blot"></span></button>`).join("")}</div>
+        </section>
+        ${sec("look", 7, "Paper and light", "The paper warms through the day: dawn, day, dusk and night.",
+          field("Appearance", "Follows the system until you choose", `<div class="seg ctl" data-k="theme-ui"><span class="thumb"></span><button data-act="theme-set" data-v="light" aria-pressed="${S.theme==="light"}">Light</button><button data-act="theme-set" data-v="dark" aria-pressed="${S.theme==="dark"}">Dark</button></div>`) +
+          field("Paper", "Set by the hour; try another", `<div class="seg ctl" data-k="tod-ui"><span class="thumb"></span>${["dawn","day","dusk","night"].map(t => `<button data-act="tod-set" data-v="${t}" aria-pressed="${S.tod===t}">${t[0].toUpperCase()+t.slice(1)}</button>`).join("")}</div>`))}
+        ${sec("device", 8, "This device", "",
+          field("Signed in through Tailscale", "as a device on your private network · nothing to unpair", `<span class="val" style="color:var(--ink-2)">harbour-laptop</span>`) +
+          field("Version", "The web app and the tick agree", `<span class="val tab">0.9.2 · a1b2c3d</span>`))}
+        <section class="ssec" id="s-health"><h2><span class="n">09</span>Health</h2>
+          <div data-open="false" class="hfold">
+            <button class="health-sum" data-act="fold" aria-expanded="false"><span class="ok" aria-hidden="true"></span><span><strong>All is well</strong><span class="hint">The last tick ran 3 minutes ago; one voice note is waiting for its words.</span></span>${I.chev}</button>
+            <div class="fold-b"><div class="fold-i"><ul class="checks">
+              <li><span class="m"></span><b>Tick</b><span>Ran at 09:09; the next at 09:15. Took 1.4 s.</span></li>
+              <li><span class="m"></span><b>Chat capture</b><span>The last reply was captured 9 hours ago, before any model ran.</span></li>
+              <li><span class="m"></span><b>Privacy pass</b><span>Running; nothing marked /x was read.</span></li>
+              <li class="warn"><span class="m"></span><b>Transcription</b><span>One voice note from 23:40 yesterday is waiting. It will be tried again at the next tick.</span></li>
+              <li><span class="m"></span><b>Entries folder</b><span>Writable · 214 entries.</span></li>
+              <li><span class="m"></span><b>Errors</b><span>None in the last seven days.</span></li>
+            </ul></div></div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+  <div class="savebar" id="savebar" role="region" aria-label="Unsaved changes"><span id="savecount">1 change</span><button class="btn quiet" data-act="discard">Discard</button><button class="btn solid" data-act="save">Save</button></div>`;
+}
+function sec(id, n, t, intro, inner){
+  return `<section class="ssec" id="s-${id}"><h2><span class="n">${String(n).padStart(2,"0")}</span>${t}</h2>${intro?`<p class="intro">${intro}</p>`:""}${inner}</section>`;
+}
+function placeThumbs(root=document){
+  $$(".seg", root).forEach(sg => {
+    const on = $("[aria-pressed=true]", sg), th = $(".thumb", sg);
+    if (!on || !th) return;
+    th.style.width = on.offsetWidth + "px";
+    th.style.transform = `translateX(${on.offsetLeft}px)`;
+  });
+}
+function dirtyCount(){ return Object.keys(S.settings).filter(k => S.settings[k] !== S.saved[k]).length; }
+function refreshSave(){
+  const n = dirtyCount(), bar = $("#savebar");
+  if (!bar) return;
+  $("#savecount").textContent = phone() ? (n === 1 ? "1 change" : `${n} changes`) : (n === 1 ? "One change, not saved" : `${n} changes, not saved`);
+  bar.classList.toggle("on", n > 0);
+}
+
+/* ---------------------------------------------------------------- after render */
+let scrollSpy = null;
+function after(screen, stem){
+  if (screen === "settings"){
+    requestAnimationFrame(() => placeThumbs());
+    document.fonts && document.fonts.ready.then(() => placeThumbs());
+    if (scrollSpy) scrollSpy.disconnect();
+    scrollSpy = new IntersectionObserver(es => {
+      es.forEach(en => { if (en.isIntersecting){ const id = en.target.id.slice(2); $$(".sindex a").forEach(a => a.dataset.id === id ? a.setAttribute("aria-current","true") : a.removeAttribute("aria-current")); } });
+    }, {rootMargin:"-30% 0px -60% 0px"});
+    $$(".ssec").forEach(s => scrollSpy.observe(s));
+  }
+  if (screen === "entries" || screen === "entry"){
+    const q = $("#q");
+    q && q.addEventListener("input", () => { S.filter.q = q.value; refreshList(); });
+  }
+  $$(".fold-i").forEach(fi => [...fi.children].forEach((c,k) => c.style.setProperty("--i", k)));
+  
+}
+function refreshList(){
+  const cl = $("#cl"); if (!cl) return;
+  const cur = $(".erow[aria-current=true]");
+  $("#weeks").innerHTML = listHTML(cur ? cur.dataset.stem : null);
+  const lf = $(".lede-filter", cl); if (lf){ const t = document.createElement("div"); t.innerHTML = filterSentence(); lf.replaceWith(t.firstElementChild); }
+  $$("#cl .rv").forEach(el => el.style.transitionDelay = "0ms");
+}
+
+/* ---------------------------------------------------------------- folds */
+function toggleFold(btn){
+  const box = btn.parentElement;
+  const open = box.dataset.open !== "true";
+  box.dataset.open = String(open);
+  btn.setAttribute("aria-expanded", String(open));
+}
+
+/* ---------------------------------------------------------------- audio (simulated) */
+let playing = null;
+function playToggle(btn){
+  const pl = btn.closest(".player"), dur = +pl.dataset.dur;
+  if (playing && playing.pl === pl){ cancelAnimationFrame(playing.raf); playing = null; btn.innerHTML = I.play; btn.setAttribute("aria-label","Play the voice note"); return; }
+  if (playing){ cancelAnimationFrame(playing.raf); $(".play", playing.pl).innerHTML = I.play; }
+  btn.innerHTML = I.pause; btn.setAttribute("aria-label","Pause");
+  const speed = () => parseFloat($(".ptime button", pl).textContent) || 1;
+  let t = +(pl.dataset.t || 0), last = performance.now();
+  paint(pl, t);
+  const tick = now => {
+    t += Math.max(0, now - last) / 1000 * speed() * 6; last = now; // demo runs six times faster than life
+    if (t >= dur){ t = 0; paint(pl, 0); playing = null; btn.innerHTML = I.play; return; }
+    paint(pl, t); playing.raf = requestAnimationFrame(tick);
+  };
+  playing = {pl, raf: requestAnimationFrame(tick)};
+}
+function paint(pl, t){
+  const dur = +pl.dataset.dur; pl.dataset.t = t;
+  const bars = $$(".wave i", pl), n = Math.round(t / dur * bars.length);
+  bars.forEach((b,k) => b.classList.toggle("on", k < n));
+  $(".cur", pl).textContent = fmt(t);
+  $(".wave", pl).setAttribute("aria-valuenow", Math.round(t));
+}
+
+/* ---------------------------------------------------------------- WRITE room */
+const PROMPTS = {
+  morning:{fol:"<b>Morning journal</b> · Thursday 15 October", who:"Ada · sent 06:00", text:"Morning. Start wherever something feels alive — one line or a voice note is plenty.", more:"11 questions if you want them: how you slept, what's on your chest, the one thing that would make today deeply satisfying."},
+  "evening-add":{fol:"Adding to <b>Evening journal</b> · Wednesday 14 October", who:"Ada · 23:45, in the chat", text:"The harbour sounds like a word you keep for somewhere safe. What made you think of it tonight?", more:""},
+  add:{fol:"Adding to this entry", who:"", text:"", more:""},
+  free:{fol:"<b>A note</b> · Thursday 15 October, 09:14", who:"", text:"", more:""},
+  "before-talk":{fol:"<b>Before a hard conversation</b>", who:"Ada · just now", text:"Before you go in: what do you want to be true when it's over?", more:"Five questions; take the first and see."},
+  tide:{fol:"<b>Low tide</b> · your own practice", who:"From your practice", text:"What is far out tonight? What is still close?", more:""},
+};
+let lastFocus = null, saveT = null, recI = null;
+function openRoom({prompt="free", rec=false}={}){
+  const P = PROMPTS[prompt] || PROMPTS.free;
+  const room = $("#room");
+  lastFocus = document.activeElement;
+  $("#rfol").innerHTML = P.fol;
+  $("#rprompt").innerHTML = P.text
+    ? `<span class="who rv" style="--i:0">${P.who.replace("Ada","Ada <span>").replace(/$/,"</span>")}</span><div class="hers rv" style="--i:1">${esc(P.text)}</div>${P.more?`<p class="hint more rv" style="--i:2">${esc(P.more)}</p>`:""}`
+    : `<span class="kicker rv" style="--i:0">Your own words, no prompt</span><div class="rv" style="--i:1;font:400 clamp(34px,4vw,52px)/1 var(--display);margin-top:8px">Thursday, <em>the 15th</em></div>`;
+  room.classList.remove("closing","focus");
+  room.setAttribute("aria-hidden","false");
+  S.room.open = true; S.room.from = prompt;
+  document.body.style.overflow = "hidden";
+  requestAnimationFrame(() => { room.classList.add("open"); });
+  setTimeout(() => $("#rtext").focus({preventScroll:true}), mm.matches ? 0 : 520);
+  if (rec) setTimeout(() => toggleRec(), 600);
+}
+function closeRoom(silent){
+  const room = $("#room");
+  if (!S.room.open) return;
+  if (S.room.recording) toggleRec();
+  S.room.open = false;
+  room.classList.add("closing"); room.classList.remove("open","focus");
+  room.setAttribute("aria-hidden","true");
+  document.body.style.overflow = "";
+  setTimeout(() => room.classList.remove("closing"), mm.matches ? 0 : 640);
+  if (!silent && parseHash().screen === "write") history.replaceState(null, "", hashFor(current || "today"));
+  lastFocus && lastFocus.focus && lastFocus.focus({preventScroll:true});
+}
+function countWords(){
+  const v = $("#rtext").value.trim();
+  const n = v ? v.split(/\s+/).length : 0;
+  $("#count").textContent = `${n} ${n===1?"word":"words"}${S.room.notes.length ? ` · ${S.room.notes.length} spoken` : ""}`;
+  const sv = $("#saved");
+  sv.classList.add("saving"); $(".txt", sv).textContent = "Keeping…";
+  clearTimeout(saveT);
+  saveT = setTimeout(() => { sv.classList.remove("saving"); $(".txt", sv).textContent = "Kept on this device"; }, 700);
+  const ta = $("#rtext"); ta.style.height = "auto"; ta.style.height = Math.max(ta.scrollHeight, window.innerHeight*0.4) + "px";
+}
+function toggleRec(){
+  const b = $("#rec");
+  S.room.recording = !S.room.recording;
+  b.classList.toggle("on", S.room.recording); b.setAttribute("aria-pressed", String(S.room.recording));
+  if (S.room.recording){
+    S.room.recT = 0; $("#reclbl").textContent = "0:00 · tap to stop";
+    recI = setInterval(() => { S.room.recT++; $("#reclbl").textContent = fmt(S.room.recT) + " · tap to stop"; }, 1000);
+  } else {
+    clearInterval(recI); $("#reclbl").textContent = "Record";
+    const secs = Math.max(S.room.recT, 4);
+    S.room.notes.push(secs);
+    const n = document.createElement("div"); n.className = "rnote";
+    n.innerHTML = `<svg class="i" viewBox="0 0 24 24" style="width:16px;height:16px"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/></svg><span class="mini">${Array.from({length:22},(_,k)=>`<i style="height:${25+Math.round(70*Math.abs(Math.sin(k*1.3+secs)))}%"></i>`).join("")}</span><span>Voice note, ${fmt(secs)} · its words will follow</span>`;
+    $("#rnotes").appendChild(n); countWords();
+  }
+}
+
+/* ---------------------------------------------------------------- toast */
+let toastT = null;
+function toast(msg){
+  const t = $("#toast"); t.textContent = msg; t.classList.add("on");
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), 2600);
+}
+
+/* ---------------------------------------------------------------- popover menu (filters) */
+let openPop = null;
+function closePop(){ if (openPop){ openPop.el.remove(); openPop.btn.setAttribute("aria-expanded","false"); openPop = null; } }
+function filterMenu(btn){
+  if (openPop && openPop.btn === btn){ closePop(); return; }
+  closePop();
+  const k = btn.dataset.k, opts = FWORDS[k];
+  const el = document.createElement("div"); el.className = "pop"; el.setAttribute("role","menu");
+  const counts = key => { const keep = S.filter[k]; S.filter[k] = key; const n = filtered().length; S.filter[k] = keep; return n; };
+  el.innerHTML = Object.entries(opts).map(([key, label]) => `<button role="menuitemradio" aria-checked="${S.filter[k]===key}" data-act="fpick" data-k="${k}" data-v="${key}"><span>${label}</span><span class="c">${counts(key)}</span></button>`).join("");
+  document.body.appendChild(el);
+  const r = btn.getBoundingClientRect();
+  el.style.left = Math.min(r.left + window.scrollX, window.innerWidth - el.offsetWidth - 16) + "px";
+  el.style.top = (r.bottom + window.scrollY + 8) + "px";
+  btn.setAttribute("aria-expanded","true");
+  openPop = {el, btn};
+  $("button", el).focus({preventScroll:true});
+}
+
+/* ---------------------------------------------------------------- events */
+document.addEventListener("click", e => {
+  const link = e.target.closest("[data-go]");
+  if (link && !e.target.closest("[data-act]")){ e.preventDefault(); closePop(); return goTo(link.dataset.go); }
+  const a = e.target.closest("[data-act]");
+  if (openPop && !e.target.closest(".pop") && !(a && a.dataset.act === "fmenu")) closePop();
+  if (!a){ $$(".blk.held").forEach(b => b.classList.remove("held")); return; }
+  const act = a.dataset.act;
+  switch (act){
+    case "write": e.preventDefault(); openRoom({prompt: a.dataset.prompt || "free", rec: !!a.dataset.rec}); break;
+    case "close-room": closeRoom(); break;
+    case "focus": { const r = $("#room"); r.classList.toggle("focus"); a.setAttribute("aria-pressed", r.classList.contains("focus")); $("#rtext").focus(); break; }
+    case "record": toggleRec(); break;
+    case "keep": {
+      const n = $("#rtext").value.trim();
+      if (!n && !S.room.notes.length){ toast("Nothing to keep yet"); break; }
+      closeRoom(); $("#rtext").value = ""; $("#rnotes").innerHTML = ""; S.room.notes = []; countWords();
+      setTimeout(() => toast("Kept in Thursday's entry, in your words"), 500); break;
+    }
+    case "theme": S.theme = S.theme === "light" ? "dark" : "light"; S.params.theme = S.theme; applyLook(); history.replaceState(null,"",hashFor(current==="entry"?"entry":current||"today", current==="entry"?{stem:$(".erow[aria-current=true]")?.dataset.stem||""}:{})); placeThumbs(); break;
+    case "theme-set": S.theme = a.dataset.v; S.params.theme = S.theme; applyLook(); setPressed(a); break;
+    case "tod-set": S.tod = a.dataset.v; S.params.tod = S.tod; applyLook(); setPressed(a); break;
+    case "open": e.preventDefault(); go("entry", {stem:a.dataset.stem}); break;
+    case "close-entry": go("entries"); break;
+    case "go-insights": go("insights"); break;
+    case "go-entries": go("entries"); break;
+    case "fold": toggleFold(a); break;
+    case "review": { const box = $("#rev"); const open = box.dataset.open !== "true"; box.dataset.open = String(open); a.setAttribute("aria-expanded", String(open)); a.innerHTML = open ? "Fold the review" : 'Read the whole review <span class="hint" style="font-style:normal">· three more paragraphs</span>'; break; }
+    case "fmenu": filterMenu(a); break;
+    case "fpick": S.filter[a.dataset.k] = a.dataset.v; closePop(); refreshList(); break;
+    case "fclear": S.filter = {practice:"all", media:"any", q:""}; const q = $("#q"); if (q) q.value = ""; refreshList(); break;
+    case "play": playToggle(a); break;
+    case "speed": { const s = {"1×":"1.5×","1.5×":"2×","2×":"1×"}; a.textContent = s[a.textContent]; break; }
+    case "edit": startEdit(a.closest(".blk")); break;
+    case "del": askDelete(a.closest(".blk")); break;
+    case "week": S.week += +a.dataset.d; show("insights", {}, false); break;
+    case "step": {
+      const st = a.closest(".stepper2"), k = st.dataset.k, step = +st.dataset.step;
+      S.settings[k] = Math.min(+st.dataset.max, Math.max(+st.dataset.min, S.settings[k] + step * +a.dataset.d));
+      const unit = $(".u", st).textContent;
+      $("output", st).innerHTML = `${S.settings[k]} <span class="u">${unit}</span>`;
+      st.closest(".field").querySelector(".hint").innerHTML = hintFor(k, unit === "min" ? "minutes" : unit);
+      refreshSave(); break;
+    }
+    case "seg": {
+      const sg = a.closest(".seg"), k = sg.dataset.k;
+      S.settings[k] = a.dataset.v; setPressed(a);
+      const h = sg.closest(".field").querySelector(".hint"); if (k in DEFAULTS) h.innerHTML = hintFor(k);
+      refreshSave(); break;
+    }
+    case "settoggle": S.settings[a.dataset.k] = a.checked; refreshSave(); break;
+    case "libtoggle": toast(a.checked ? "On again; it comes at its hour" : "Off. Nothing is deleted"); break;
+    case "save": S.saved = {...S.settings}; refreshSave(); toast("Saved"); break;
+    case "discard": S.settings = {...S.saved}; show("settings", {}, true); break;
+    case "ink": {
+      S.ink = a.dataset.ink; S.params.ink = S.ink; applyLook();
+      $$(".inkspec").forEach(b => b.setAttribute("aria-checked", String(b === a)));
+      const gl = $("#glink"); if (gl) gl.textContent = $(".nm", a).textContent;
+      const bl = $(".blot", a), r = a.getBoundingClientRect();
+      bl.style.left = (e.clientX - r.left || r.width/2) + "px"; bl.style.top = (e.clientY - r.top || r.height/2) + "px";
+      bl.classList.remove("go"); void bl.offsetWidth; bl.classList.add("go");
+      break;
+    }
+    case "sjump": e.preventDefault(); $("#s-" + a.dataset.id).scrollIntoView({behavior: mm.matches ? "instant" : "smooth"}); break;
+    case "toast": toast(a.dataset.msg); break;
+    case "jump": { const day = "2026-10-" + String(a.dataset.day).padStart(2,"0"); const row = $(`.erow[data-stem^="${day}"]`); row && row.closest(".day").scrollIntoView({behavior: still() ? "instant" : "smooth", block:"start"}); break; }
+    case "confirm-del": {
+      const blk = a.closest(".blk"); S.deleted.add(blk.dataset.key);
+      $$(":scope > *", blk).forEach(c => { c.style.transition = "opacity 260ms, transform 360ms"; c.style.opacity = 0; c.style.transform = "translateY(-6px)"; });
+      setTimeout(() => blk.remove(), 360); toast("Deleted from the entry"); break;
+    }
+    case "keep-del": a.closest(".confirm").remove(); break;
+    case "save-edit": {
+      const blk = a.closest(".blk"), ta = $("textarea", blk);
+      S.edited[blk.dataset.key] = ta.value; $(".his", blk).innerHTML = ta.value.split(/\n+/).map(p => `<p>${esc(p)}</p>`).join("");
+      $(".his", blk).style.display = ""; ta.parentElement.remove(); toast("Saved in your words"); break;
+    }
+    case "cancel-edit": { const blk = a.closest(".blk"); $(".his", blk).style.display = ""; a.closest(".editwrap").remove(); break; }
+  }
+});
+function setPressed(btn){
+  const sg = btn.closest(".seg");
+  $$("button", sg).forEach(b => b.setAttribute("aria-pressed", String(b === btn)));
+  placeThumbs(sg.parentElement);
+}
+function goTo(screen){
+  if (screen === current) { window.scrollTo({top:0, behavior:"smooth"}); if (screen==="entries") return; }
+  go(screen);
+}
+function startEdit(blk){
+  if ($(".editwrap", blk)) return;
+  blk.classList.remove("held");
+  const his = $(".his", blk), text = [...his.querySelectorAll("p")].map(p => p.textContent).join("\n\n");
+  const w = document.createElement("div"); w.className = "editwrap";
+  w.innerHTML = `<textarea class="editbox his" rows="3" aria-label="Edit your words">${esc(text)}</textarea><div class="edit-acts"><button class="btn solid" data-act="save-edit" style="height:40px">Save</button><button class="btn quiet" data-act="cancel-edit" style="height:40px">Cancel</button><span class="hint" style="align-self:center">Only your words are editable. Hers never are.</span></div>`;
+  his.style.display = "none"; his.after(w);
+  const ta = $("textarea", w); ta.style.height = ta.scrollHeight + "px"; ta.focus();
+}
+function askDelete(blk){
+  if ($(".confirm", blk)) return;
+  blk.classList.remove("held");
+  const c = document.createElement("div"); c.className = "confirm";
+  c.innerHTML = `<span>Delete these words from the entry?</span><button class="btn line" data-act="confirm-del" style="height:40px">Delete</button><button class="btn quiet" data-act="keep-del" style="height:40px">Keep</button>`;
+  $(".body", blk).appendChild(c);
+}
+
+/* long-press for block actions (touch) */
+let lp = null;
+document.addEventListener("pointerdown", e => {
+  const blk = e.target.closest(".blk[data-key]");
+  if (!blk || e.pointerType === "mouse" || e.target.closest("button,textarea,.player")) return;
+  lp = setTimeout(() => { $$(".blk.held").forEach(b => b !== blk && b.classList.remove("held")); blk.classList.add("held"); navigator.vibrate && navigator.vibrate(8); }, 450);
+});
+["pointerup","pointercancel","pointermove"].forEach(t => document.addEventListener(t, e => { if (t !== "pointermove" || Math.abs(e.movementY) > 4) clearTimeout(lp); }));
+document.addEventListener("contextmenu", e => { if (e.target.closest(".blk[data-key]") && phone()) e.preventDefault(); });
+
+/* seek on the waveform */
+document.addEventListener("pointerdown", e => {
+  const w = e.target.closest(".wave"); if (!w) return;
+  const pl = w.closest(".player"), r = w.getBoundingClientRect();
+  paint(pl, Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * +pl.dataset.dur);
+});
+document.addEventListener("keydown", e => {
+  const w = e.target.closest && e.target.closest(".wave");
+  if (w && (e.key === "ArrowRight" || e.key === "ArrowLeft")){ const pl = w.closest(".player"); paint(pl, Math.max(0, Math.min(+pl.dataset.dur, +(pl.dataset.t||0) + (e.key==="ArrowRight"?5:-5)))); e.preventDefault(); }
+  if (e.key === "Escape"){
+    if (openPop) return closePop();
+    const room = $("#room");
+    if (S.room.open && room.classList.contains("focus")){ room.classList.remove("focus"); return; }
+    if (S.room.open) return closeRoom();
+    if (current === "entry") return go("entries");
+  }
+  if ((e.metaKey || e.ctrlKey) && e.key === "." && S.room.open){ $("#room").classList.toggle("focus"); e.preventDefault(); }
+  if (e.key === "g" && !/INPUT|TEXTAREA/.test(document.activeElement.tagName) && !e.metaKey && !e.ctrlKey) $(".gridlines").classList.toggle("show");
+});
+$("#rtext").addEventListener("input", countWords);
+window.addEventListener("resize", () => { buildGrid(); placeThumbs(); });
+
+/* ---------------------------------------------------------------- boot */
+const sysDark = window.matchMedia("(prefers-color-scheme: dark)");
+S.theme = sysDark.matches ? "dark" : "light";
+S.tod = todFromClock();
+if (S.theme === "light" && S.tod === "night") S.tod = "dusk";
+sysDark.addEventListener("change", ev => { if (!S.params.theme){ S.theme = ev.matches ? "dark" : "light"; applyLook(); } });
+buildGrid();
+route(true);
+})();
+</script>
+</body>
+</html>

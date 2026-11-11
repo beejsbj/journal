@@ -22,16 +22,22 @@ describe("Document: two voices, one page", () => {
     expect(voice.querySelector(".words")?.textContent).toBe("A spoken thought.");
   });
 
-  it("folds hers: labelled with her name and time, closed by default, never inside his text", () => {
+  // WEB-UX (round 02): her chat replies were folded callouts (details.block.hers); they now stand in the right margin as
+  // her notes (ui/MarginNote), in full, beside the passage they follow. Still labelled, still never inside his text.
+  it("sets hers beside the passage it follows: labelled with her name and time, never inside his text", () => {
     const host = mount(<Document doc={evening} />);
-    const hers = [...host.querySelectorAll("details.block.hers")];
+    const hers = [...host.querySelectorAll(".block.hers")];
     expect(hers).toHaveLength(1);
-    const callout = must(hers[0]);
-    expect(callout.hasAttribute("open")).toBe(false);
-    expect(callout.querySelector("summary .who")?.textContent).toBe("Ada");
-    expect(callout.querySelector("summary time")?.textContent).toBe("23:45");
-    expect(callout.querySelector(".callout-body")?.textContent).toContain("Second line.");
-    expect(host.querySelectorAll("article.his details")).toHaveLength(0);
+    const note = must(hers[0]);
+    expect(note.tagName).toBe("ASIDE");
+    expect(note.getAttribute("aria-label")).toBe("Ada's note");
+    expect(note.querySelector(".margin-note-lab")?.textContent).toBe("Ada · 23:45");
+    expect(note.querySelector(".margin-note-body")?.textContent).toContain("Second line.");
+    // beside the passage it follows, in the same row of the spread, and outside his article
+    const passage = must(note.closest(".passage"));
+    expect(passage.querySelector("article.his .words")?.textContent).toBe("Later I thought of the harbour.");
+    expect(note.closest("article")).toBeNull();
+    expect(host.querySelectorAll("article.his .block.hers")).toHaveLength(0);
     for (const words of host.querySelectorAll("article.his .words")) expect(words.textContent).not.toContain("SECRETHERS");
   });
 
@@ -42,15 +48,22 @@ describe("Document: two voices, one page", () => {
     expect(replying.querySelector("q")?.textContent).toBe("The harbour sounds like");
   });
 
-  it("shows the prompt in a wash with its questions folded and the asked one marked", () => {
+  // WEB-UX: the prompt is the design system's letter (ui/Letter): "From Ada · sent 23:00", sectioned, no fastening.
+  it("shows the prompt as her letter with its questions folded and the asked one marked", () => {
     const host = mount(<Document doc={evening} />);
-    const prompt = must(host.querySelector(".prompt"));
-    expect(prompt.textContent).toContain("Sent 23:00 IST");
-    expect(prompt.querySelector(".opener")?.textContent).toBe("Evening 🌿");
-    const questions = must(prompt.querySelector("details.questions"));
-    expect(questions.hasAttribute("open")).toBe(false);
+    const letter = must(host.querySelector(".document > .doc-letter > .letter"));
+    expect(letter.getAttribute("aria-label")).toBe("Ada's prompt");
+    expect(letter.querySelector(".letter-from")?.textContent).toContain("From Ada");
+    expect(letter.textContent).toContain("sent 23:00 IST");
+    expect(letter.querySelector(".letter-body p")?.textContent).toBe("Evening 🌿");
+    expect(letter.querySelector(".letter-asked")?.textContent).toBe("What's spinning in your mind?");
+    const questions = must(letter.querySelector(".letter-questions"));
+    expect(questions.getAttribute("data-open")).toBe("false");
+    expect(questions.querySelector(".disclosure-head")?.textContent).toContain("All 24 questions, in 10 parts");
     expect(questions.querySelectorAll("li.asked")).toHaveLength(1);
     expect(questions.querySelector("li.asked")?.textContent).toContain("What's spinning in your mind?");
+    // no stamp, clip or tape: the owner's call on round 02
+    expect(letter.querySelector(".postmark, .clip, .tape, .fasten")).toBeNull();
   });
 
   it("puts phase dividers between program blocks and the summary at the end", () => {
@@ -79,9 +92,16 @@ describe("Document: two voices, one page", () => {
     ]);
   });
 
+  // WEB-UX: the recording plays in ui/AudioPlayer (a play button and a speed button over a real <audio>), and the
+  // letter folds its questions behind its head: neither edits anything. Exactly those three buttons are allowed; every
+  // other control is still absent, and her letter holds no field of any kind.
   it("has no control that edits or removes a block of his", () => {
     const host = mount(<Document doc={evening} />);
-    expect(host.querySelectorAll("button, textarea, input, [contenteditable]")).toHaveLength(0);
+    const controls = [...host.querySelectorAll("button, textarea, input, [contenteditable]")]
+      .filter((el) => !el.matches("button.player-play, button.player-rate, .letter-questions > button.disclosure-head"));
+    expect(controls).toHaveLength(0);
+    expect(host.querySelectorAll(".letter textarea, .letter input, .letter [contenteditable]")).toHaveLength(0);
+    expect(host.querySelectorAll(".block-actions, .block-editor")).toHaveLength(0);
   });
 
   it("shows the pictures kept with a block above his caption, served from /media", () => {
@@ -100,13 +120,13 @@ describe("Document: two voices, one page", () => {
     expect(host.querySelector(".words")?.textContent).toBe("The lake.");
   });
 
-  it("shows a badge, not the engine's marker, for a transcript that has not arrived", () => {
+  it("shows a quiet word, not the engine's marker, for a transcript that has not arrived", () => {
     const doc = EntryDoc({
       ...fixtures.entryEvening,
       blocks: [{ kind: "his", key: "words:0", at: "23:40 IST", source: "voice", text: "_(audio file — transcript pending)_", audio: "a.ogg", phase: null }],
     });
     const host = mount(<Document doc={doc} />);
-    expect(host.querySelector(".badge.pending")?.textContent).toBe("transcript pending");
+    expect(host.querySelector(".transcript-pending")?.textContent).toBe("transcript pending");
     expect(host.querySelector(".words")).toBeNull();
   });
 });
