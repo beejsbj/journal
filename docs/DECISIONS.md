@@ -22,19 +22,6 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
 
 ## Raised by packages (open, not decided)
 
-- **X-MEMORY (2026-11-09) — the journal's own model calls load the companion's memory, so `/x` can reach a
-  permanent file.** Every model step (openers, annotations, day reflections, week reviews, program reflections and
-  insights, outage replies) runs `hermes chat --oneshot` in her profile (`hermes/companion.py`). Hermes loads her
-  built-in memory (`MEMORY.md`, `USER.md`) into that call's prompt unless `--ignore-rules` is passed, and
-  `--toolsets none` removes tools, not memory. Since X-SCOPE lets her memory hold what was said off the record,
-  an annotation or reflection written into an entry may carry it in other words; the quote check only catches a
-  literal quote. This widens WEB-DESIGN below (which asked the same of openers alone). To close, one of: run the
-  journal's permanent-writing calls without her memory (`--ignore-rules` drops her persona file too, so the journal
-  would supply her voice itself, or a narrower Hermes switch is found); or refuse her memory tool in an
-  off-the-record turn (Hermes' background memory review would still need checking); or both. **The owner ruled out
-  the first (2026-11-09):** the journal's model calls keep her memory. Still open, and his to decide: refusing her
-  memory tool in an off-the-record turn, at the cost of "/x remember that…" no longer working.
-
 - **OPEN-PROMPTS — a practice can be done without a chat message (design agreed, building; issues #13, #14).**
   Today a practice's prompt exists only once the chat has delivered it (`message_id`), so the web app, the CLI and
   MCP cannot do a practice by themselves, and a web-only install counts every scheduled prompt as a failed send. The
@@ -3091,7 +3078,7 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   block, `today-cache.json` and the web app. The guarantee is about what the journal captures, not about
   what may re-enter as source data. Consequence: her memory may hold what was said off
   the record (Hermes writes it from her memory tool and from its own background review), and that memory is not
-  the journal's to filter. See X-MEMORY, raised above.
+  the journal's to filter. See X-MEMORY, decided below.
 - **NOTEBOOK-NEWEST (2026-11-09) — the notebook block shows due items, then the newest; a repeated item is not added.**
   `notebook.render` took the first `INJECT` (15) items by age, so at the cap (`MAX_OPEN`, 40) the companion saw the
   oldest, which are also the next to be pruned, and none of the recent notes, reminders the owner asked for among
@@ -3979,3 +3966,17 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   - **Tests changed on purpose:** the read-only document test allows exactly the player's two buttons and the fold's
     head, and asserts no field in her letter; Today's card test asserts no fold; the Library's turned-off test waits
     for *Send to chat*. New tests cover each point above.
+- **X-MEMORY (raised 2026-11-09; the owner, 2026-11-11) — the journal's own model calls load the companion's
+  memory, and her memory tool is not refused in an off-the-record turn. Accepted.** Every model step (openers,
+  annotations, day reflections, week reviews, program reflections and insights, outage replies) runs
+  `hermes chat --oneshot` in her profile (`hermes/companion.py`). Hermes loads her built-in memory (`MEMORY.md`,
+  `USER.md`) into that call's prompt unless `--ignore-rules` is passed, and `--toolsets none` removes tools, not
+  memory. Since X-SCOPE lets her memory hold what was said off the record, an annotation or reflection written
+  into an entry may carry it in other words; the quote check only catches a literal quote. Two ways to close
+  this were put to the owner, and he declined both: running the journal's model calls without her memory
+  (2026-11-09: they keep it; the continuity of her voice matters more), and refusing her memory tool in an
+  off-the-record turn (2026-11-11: it is not refused, so "/x remember that…" keeps working). So the limit stands
+  as the guarantee words it (README, *Guarantees*): `/x` keeps a message out of what the journal captures, and
+  what her memory holds can come back in the journal's model calls. This also answers WEB-DESIGN's open point
+  about openers (the one-shot does load her memory). Nothing in the code changes. To revisit: either of the two
+  ways above, or a Hermes switch that drops memory without dropping her persona file, if one appears.
