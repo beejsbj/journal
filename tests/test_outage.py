@@ -328,7 +328,7 @@ class ReflectOutageTest(ReflectBase):
         super().setUp()
         self.down = True
 
-    def ask(self, cfg, query, budget, toolsets=None):
+    def ask(self, cfg, query, budget, toolsets=None, env=None):
         self.asked.append((query, toolsets))
         if self.down:
             raise agent.AgentUnavailable("exit 1: " + UNREACHABLE)
@@ -382,7 +382,8 @@ class ReflectOutageTest(ReflectBase):
     def test_a_bad_answer_still_uses_an_attempt(self):
         self.evening()
         self.reflect(datetime(2026, 10, 14, 23, 45, tzinfo=IST))
-        self.down, self.answer = False, 'You said "I never wrote this at all" and that is a long enough text. ' * 2
+        # (not prose: one kind of bad answer; an invented quote is another: test_continuity, QuotesTest)
+        self.down, self.answer = False, '{"reflection": "a confused model answering in JSON, long enough to count"}'
         alerts, log = self.reflect(datetime(2026, 10, 15, 0, 30, tzinfo=IST))
         self.assertTrue(any("reflection attempt 1/3 failed" in l for l in log))
         rec = self.rec("2026-10-14-reflection")

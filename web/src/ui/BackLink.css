@@ -1,0 +1,10 @@
+/* BackLink, PageBack (ui/BackLink.tsx): the way back, the same on every deeper page */
+.back-link {
+  display: inline-flex; align-items: center; gap: 2px; min-height: var(--tap); padding: 0 10px 0 2px; border-radius: var(--r-m);
+  font: 500 var(--t-ui) / 1 var(--f-ui); color: var(--text-2); text-decoration: none; white-space: nowrap;
+  transition: background var(--d-1), color var(--d-1);
+}
+.back-link:hover { color: var(--text); background: var(--raised); }
+.back-link > svg { flex: none; width: 18px; height: 18px; }
+/* at the head of a page: on its own line, its chevron hung in the gutter so the words align with the title */
+.page-back { margin: 0 0 var(--s4) -6px; }

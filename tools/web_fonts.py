@@ -1,27 +1,32 @@
-"""Remake the two web fonts that are cut down from their Fontsource originals (``web/public/fonts``).
+"""Remake the one web font that is cut down from its Fontsource original (``web/public/fonts``).
 
-The web app serves its faces from its own origin (SIL OFL 1.1; the licences sit beside the files as ``OFL-*.txt``). Four
-of the six files are Fontsource's latin subsets as published; two are made smaller here, since the service worker
-precaches every face:
+The web app serves its faces from its own origin (SIL OFL 1.1; the licences sit beside the files as ``OFL-*.txt``). The
+files are Fontsource's latin subsets as published, except one made smaller here, since the service worker precaches
+every face:
 
-- ``fraunces-digits-normal.woff2``: Fraunces holds only the figures (the week strip's days, the counts). The ten digits
-  are kept, with the optical-size and SOFT axes; WONK is pinned at 0 (it only bends letters) and the weight axis is
-  narrowed to 300-700. 121 KB becomes 9 KB.
-- ``newsreader-latin-italic-400.woff2``: the italic is set at weight 400 only (the wordmark, section heads, the states
-  of a prompt), so the weight axis is pinned there; optical size stays variable. 147 KB becomes 64 KB.
+- ``newsreader-latin-italic-400.woff2``: the italic is set at weight 400 only (the wordmark, book heads, the hours in
+  the margin, hints), so the weight axis is pinned there; optical size stays variable. 147 KB becomes 64 KB.
 
-The inputs are Fontsource's files (jsDelivr, ``https://cdn.jsdelivr.net/fontsource/fonts/<path>``), checked by hash:
+The input is Fontsource's file (jsDelivr, ``https://cdn.jsdelivr.net/fontsource/fonts/<path>``), checked by hash:
 
-    fraunces:vf@latest/latin-full-normal.woff2      7e744849028e2219…
     newsreader:vf@latest/latin-opsz-italic.woff2    5dfcd10d24af8c82…
 
-Run off the journal's host or on it (no Node, no network: download the two files first and pass their paths):
+Her face, IBM Plex Mono, is used as published (no cut): ``@fontsource/ibm-plex-mono@5.3.0``, ``files/`` on jsDelivr
+(``https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-mono@5.3.0/files/ibm-plex-mono-latin-<w>-<style>.woff2``):
 
-    uv run --no-project --with fonttools==4.67.0 --with brotli==1.2.1 python tools/web_fonts.py FRAUNCES.woff2 NEWSREADER_ITALIC.woff2
+    ibm-plex-mono-latin-400-normal.woff2    08949f728dc52d52…
+    ibm-plex-mono-latin-400-italic.woff2    0840095faae86403…
+    ibm-plex-mono-latin-500-normal.woff2    01d285447409c8a5…
 
-The same inputs and these versions make the same bytes (the committed files); another fontTools or brotli may not.
+and its licence is IBM's (``https://github.com/IBM/plex``, ``LICENSE.txt``), as ``OFL-IBMPlexMono.txt``.
 
-The outputs are written to ``web/public/fonts``. Commit them with a rebuilt ``static/`` (the web workflow's artifact).
+Run off the journal's host or on it (no Node, no network: download the file first and pass its path):
+
+    uv run --no-project --with fonttools==4.67.0 --with brotli==1.2.1 python tools/web_fonts.py NEWSREADER_ITALIC.woff2
+
+The same input and these versions make the same bytes (the committed file); another fontTools or brotli may not.
+
+The output is written to ``web/public/fonts``. Commit it with a rebuilt ``static/`` (the web workflow's artifact).
 """
 from __future__ import annotations
 
@@ -29,12 +34,10 @@ import hashlib
 import sys
 from pathlib import Path
 
-from fontTools import subset
 from fontTools.ttLib import TTFont
 from fontTools.varLib import instancer
 
 OUT = Path(__file__).resolve().parents[1] / "web" / "public" / "fonts"
-FRAUNCES_SHA = "7e744849028e2219"
 NEWSREADER_ITALIC_SHA = "5dfcd10d24af8c82"
 
 
@@ -50,31 +53,17 @@ def save(font: TTFont, out: Path) -> None:
     font.save(out)
 
 
-def figures(src: Path, out: Path) -> None:
-    font = instancer.instantiateVariableFont(TTFont(src), {"WONK": 0, "wght": (300, 700)})
-    opts = subset.Options()
-    opts.layout_features = ["*"]
-    opts.name_IDs = ["*"]
-    opts.notdef_outline = True
-    cut = subset.Subsetter(opts)
-    cut.populate(unicodes=list(range(0x30, 0x3A)))   # 0-9
-    cut.subset(font)
-    save(font, out)
-
-
 def italic(src: Path, out: Path) -> None:
     font = instancer.instantiateVariableFont(TTFont(src), {"wght": 400})
     save(font, out)
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) != 2:
+    if len(argv) != 1:
         print(__doc__, file=sys.stderr)
         return 2
-    fraunces, newsreader = Path(argv[0]), Path(argv[1])
-    check(fraunces, FRAUNCES_SHA)
+    newsreader = Path(argv[0])
     check(newsreader, NEWSREADER_ITALIC_SHA)
-    figures(fraunces, OUT / "fraunces-digits-normal.woff2")
     italic(newsreader, OUT / "newsreader-latin-italic-400.woff2")
     print("written to", OUT)
     return 0

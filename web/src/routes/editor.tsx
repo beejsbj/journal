@@ -1,9 +1,8 @@
-import type { ComponentChildren } from "preact";
 import { useLocation } from "preact-iso";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { api, type ApiError, type DefinitionBody } from "../api";
 import { QuestionSet } from "../components/QuestionSet";
-import { Await, Empty, ErrorLine } from "../components/Status";
+import { Check } from "../icons";
 import {
   ID_RULE, addSlot, blankForm, definitionFromForm, formFromDefinition, freeId, removeSlot, setSlot, sortProblems,
   type Form,
@@ -12,6 +11,9 @@ import { asApiError, useAction, useResource } from "../hooks";
 import { isProgramBacked } from "../labels";
 import { useTitle } from "../title";
 import type { LibraryOne } from "../types";
+import { Await, Button, ButtonLink, Disclosure, Empty, ErrorLine, Field, PageBack, Switch, TextButton, TextField } from "../ui";
+import "./library.css";
+import "./editor.css";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -55,16 +57,6 @@ function useValidation(id: string, body: DefinitionBody | null): [Checked | null
   return [checked, failed, key !== "" && checkedKey === key];
 }
 
-function Field(props: { id: string; label: string; hint?: string; children: ComponentChildren }) {
-  return (
-    <div class="field">
-      <label for={props.id}>{props.label}</label>
-      {props.children}
-      {props.hint && <p class="hint">{props.hint}</p>}
-    </div>
-  );
-}
-
 type Tab = "form" | "raw";
 
 /** The mtime a save claims to have read: his file's. A built-in has no file of his yet (the first save makes it), so
@@ -78,12 +70,8 @@ function Conflict({ busy, onOverwrite }: { busy: boolean; onOverwrite: () => voi
   return (
     <div class="error-line" role="alert">
       <p>Changed elsewhere (Obsidian?) since you opened it. Reload to see what is there, or overwrite it with your version.</p>
-      <button type="button" class="button" onClick={() => window.location.reload()}>
-        Reload
-      </button>{" "}
-      <button type="button" class="button danger" disabled={busy} onClick={onOverwrite}>
-        Overwrite
-      </button>
+      <Button size="small" onClick={() => window.location.reload()}>Reload</Button>
+      <Button size="small" variant="danger" disabled={busy} onClick={onOverwrite}>Overwrite</Button>
     </div>
   );
 }
@@ -150,9 +138,10 @@ export function Editor({ base, taken }: { base: LibraryOne | null; taken: string
     else setTab("form");
   };
 
+  const input = (key: keyof Form) => (e: Event) => setFormChecked({ ...form, [key]: (e.currentTarget as HTMLInputElement).value });
   return (
     <>
-      <div class="tabs" role="tablist" aria-label="Editor">
+      <div class="editor-tabs" role="tablist" aria-label="Editor">
         <button type="button" role="tab" id="tab-form" aria-selected={tab === "form"} class={tab === "form" ? "on" : undefined} onClick={showForm}>
           Form
         </button>
@@ -163,19 +152,19 @@ export function Editor({ base, taken }: { base: LibraryOne | null; taken: string
       {leaving && (
         <div class="error-line" role="alert">
           <p>You have edited the file as text. Going back to the form drops those edits; save first to keep them.</p>
-          <button type="button" class="button danger" onClick={() => { setText(null); setLeaving(false); setTab("form"); }}>
+          <Button size="small" variant="danger" onClick={() => { setText(null); setLeaving(false); setTab("form"); }}>
             Drop the text edits
-          </button>{" "}
-          <button type="button" class="button" onClick={() => setLeaving(false)}>
+          </Button>
+          <Button size="small" onClick={() => setLeaving(false)}>
             Keep editing
-          </button>
+          </Button>
         </div>
       )}
       {!idOk && fresh && <p class="hint">Give it a title; the file name follows from it.</p>}
       {validateFailed && <ErrorLine error={validateFailed} />}
       {problems.general.length > 0 && (
-        <section class="problems" role="alert" aria-label="Problems">
-          <h2>What needs fixing</h2>
+        <section class="problems error-line" role="alert" aria-label="Problems">
+          <p><b>What needs fixing</b></p>
           <ul>
             {problems.general.map((p) => (
               <li key={p}>{p}</li>
@@ -186,28 +175,27 @@ export function Editor({ base, taken }: { base: LibraryOne | null; taken: string
 
       {tab === "form" ? (
         <div class="editor-form">
-          <Field id="f-title" label="Title">
-            <input id="f-title" type="text" value={form.title} placeholder="Evening gratitude" onInput={(e) => setFormChecked({ ...form, title: (e.currentTarget as HTMLInputElement).value })} />
-          </Field>
-          <div class="row">
-            <Field id="f-emoji" label="Emoji" hint="Empty uses the companion's.">
-              <input id="f-emoji" type="text" class="short" maxLength={8} value={form.emoji} onInput={(e) => setFormChecked({ ...form, emoji: (e.currentTarget as HTMLInputElement).value })} />
-            </Field>
-            <label class="check">
-              <input type="checkbox" checked={form.enabled} onChange={(e) => setFormChecked({ ...form, enabled: (e.currentTarget as HTMLInputElement).checked })} />
-              Send it (turn off to keep it without sending)
-            </label>
+          <TextField id="f-title" label="Title" voice="his" value={form.title} placeholder="Evening gratitude" onInput={input("title")} />
+          <div class="editor-pair">
+            <TextField id="f-emoji" class="short" label="Emoji" hint="Empty uses the companion's." maxLength={8} value={form.emoji} onInput={input("emoji")} />
+            <div class="editor-switch">
+              <span class="field-label" id="f-enabled-label">Send it</span>
+              <span class="editor-switch-row">
+                <Switch id="f-enabled" labelledBy="f-enabled-label" checked={form.enabled} onChange={(on) => setFormChecked({ ...form, enabled: on })} />
+                <span class="field-hint">{form.enabled ? "On its schedule." : "Kept, and not sent."}</span>
+              </span>
+            </div>
           </div>
 
           <fieldset class="schedule">
-            <legend>When</legend>
+            <legend class="field-label">When</legend>
             {form.schedule.length === 0 && <p class="hint">No time: it is only sent when you ask (Send now), never by itself.</p>}
             {form.schedule.map((s, i) => (
               <div class="slot" key={s.key}>
                 <label class="visually-hidden" for={`t-${s.key}`}>Time {i + 1}</label>
-                <input id={`t-${s.key}`} type="time" value={s.time} onInput={(e) => setFormChecked(setSlot(form, i, { time: (e.currentTarget as HTMLInputElement).value }))} />
+                <input id={`t-${s.key}`} class="input" type="time" value={s.time} onInput={(e) => setFormChecked(setSlot(form, i, { time: (e.currentTarget as HTMLInputElement).value }))} />
                 <label class="visually-hidden" for={`d-${s.key}`}>Day {i + 1}</label>
-                <select id={`d-${s.key}`} value={s.weekday === null ? "" : String(s.weekday)} onChange={(e) => {
+                <select id={`d-${s.key}`} class="input" value={s.weekday === null ? "" : String(s.weekday)} onChange={(e) => {
                   const v = (e.currentTarget as HTMLSelectElement).value;
                   setFormChecked(setSlot(form, i, { weekday: v === "" ? null : Number(v) }));
                 }}>
@@ -216,62 +204,62 @@ export function Editor({ base, taken }: { base: LibraryOne | null; taken: string
                     <option key={d} value={String(n)}>{d}</option>
                   ))}
                 </select>
-                <button type="button" class="link" aria-label={`Remove time ${i + 1}`} onClick={() => setFormChecked(removeSlot(form, i))}>
+                <TextButton aria-label={`Remove time ${i + 1}`} onClick={() => setFormChecked(removeSlot(form, i))}>
                   Remove
-                </button>
+                </TextButton>
                 {(problems.schedule[i + 1] ?? []).map((p) => (
                   <p class="field-error" role="alert" key={p}>{p}</p>
                 ))}
               </div>
             ))}
-            <button type="button" class="link" onClick={() => setFormChecked(addSlot(form))}>
+            <TextButton class="editor-add" onClick={() => setFormChecked(addSlot(form))}>
               + Add a time
-            </button>
+            </TextButton>
           </fieldset>
 
-          <h2 class="form-h">Questions</h2>
+          <h2 class="form-h book-head">Questions</h2>
           <QuestionSet form={form} problems={problems} onChange={setFormChecked} />
 
-          <details class="more">
-            <summary>More options</summary>
-            <Field id="f-collapse" label="Hours a prompt stays open" hint="After this, a reply starts a new entry.">
-              <input id="f-collapse" type="number" step="any" min="0" class="short" value={form.collapse} onInput={(e) => setFormChecked({ ...form, collapse: (e.currentTarget as HTMLInputElement).value })} />
-            </Field>
-            <label class="check">
-              <input type="checkbox" checked={form.annotate} onChange={(e) => setFormChecked({ ...form, annotate: (e.currentTarget as HTMLInputElement).checked })} />
-              Let the companion annotate the entry
-            </label>
-            <Field id="f-closes" label="Closes" hint="The practice whose answer ends the day or the week for a reflection.">
-              <select id="f-closes" value={form.closes} onChange={(e) => setFormChecked({ ...form, closes: (e.currentTarget as HTMLSelectElement).value as Form["closes"] })}>
-                <option value="">Neither</option>
-                <option value="day">The day</option>
-                <option value="week">The week</option>
-              </select>
-            </Field>
-            <Field id="f-mode" label="Opener">
-              <select id="f-mode" value={form.openerMode} onChange={(e) => setFormChecked({ ...form, openerMode: (e.currentTarget as HTMLSelectElement).value })}>
-                <option value="companion">Written by the companion</option>
-                <option value="plain">Plain text</option>
-              </select>
-            </Field>
-            <Field id="f-plain" label="Plain opener" hint="Used when the opener is plain, or when no model is reachable. {title}, {user}, {greet}, {emoji} fill in.">
-              <input id="f-plain" type="text" value={form.openerPlain} onInput={(e) => setFormChecked({ ...form, openerPlain: (e.currentTarget as HTMLInputElement).value })} />
-            </Field>
-            <Field id="f-companion" label="A line for the companion" hint="One line of stance for this practice; empty lists the title only.">
-              <input id="f-companion" type="text" value={form.companion} onInput={(e) => setFormChecked({ ...form, companion: (e.currentTarget as HTMLInputElement).value })} />
-            </Field>
-            {fresh && (
-              <Field id="f-id" label="File name" hint={idOk ? `Saved as ${id}.md` : "Lower-case letters, digits and hyphens; 2 to 31 characters, starting with a letter."}>
-                <input id="f-id" type="text" value={id} onInput={(e) => { setIdTouched(true); setFormChecked({ ...form, id: (e.currentTarget as HTMLInputElement).value.toLowerCase() }); }} />
-                {taken.includes(id) && <p class="field-error" role="alert">A practice named {id} already exists.</p>}
+          <Disclosure class="more" head="More options" peek="How long it stays open, annotation, what it closes, its opener">
+            <div class="editor-more">
+              <TextField id="f-collapse" class="short" label="Hours a prompt stays open" hint="After this, a reply starts a new entry."
+                type="number" step="any" min="0" value={form.collapse} onInput={input("collapse")} />
+              <div class="editor-switch">
+                <span class="field-label" id="f-annotate-label">Let the companion annotate the entry</span>
+                <span class="editor-switch-row">
+                  <Switch id="f-annotate" labelledBy="f-annotate-label" checked={form.annotate} onChange={(on) => setFormChecked({ ...form, annotate: on })} />
+                </span>
+              </div>
+              <Field id="f-closes" label="Closes" hint="The practice whose answer ends the day or the week for a reflection.">
+                <select id="f-closes" class="input" value={form.closes} aria-describedby="f-closes-hint"
+                  onChange={(e) => setFormChecked({ ...form, closes: (e.currentTarget as HTMLSelectElement).value as Form["closes"] })}>
+                  <option value="">Neither</option>
+                  <option value="day">The day</option>
+                  <option value="week">The week</option>
+                </select>
               </Field>
-            )}
-          </details>
+              <Field id="f-mode" label="Opener">
+                <select id="f-mode" class="input" value={form.openerMode} onChange={(e) => setFormChecked({ ...form, openerMode: (e.currentTarget as HTMLSelectElement).value })}>
+                  <option value="companion">Written by the companion</option>
+                  <option value="plain">Plain text</option>
+                </select>
+              </Field>
+              <TextField id="f-plain" label="Plain opener" hint="Used when the opener is plain, or when no model is reachable. {title}, {user}, {greet}, {emoji} fill in."
+                value={form.openerPlain} onInput={input("openerPlain")} />
+              <TextField id="f-companion" label="A line for the companion" hint="One line of stance for this practice; empty lists the title only."
+                value={form.companion} onInput={input("companion")} />
+              {fresh && (
+                <TextField id="f-id" label="File name" hint={idOk ? `Saved as ${id}.md` : "Lower-case letters, digits and hyphens; 2 to 31 characters, starting with a letter."}
+                  error={taken.includes(id) ? `A practice named ${id} already exists.` : undefined}
+                  value={id} onInput={(e) => { setIdTouched(true); setFormChecked({ ...form, id: (e.currentTarget as HTMLInputElement).value.toLowerCase() }); }} />
+              )}
+            </div>
+          </Disclosure>
         </div>
       ) : (
         <div class="editor-raw">
           <label class="visually-hidden" for="f-raw">The file</label>
-          <textarea id="f-raw" class="raw-text" spellcheck={false} rows={18} readOnly={text === null && canonical === null}
+          <textarea id="f-raw" class="input raw-text" spellcheck={false} rows={18} readOnly={text === null && canonical === null}
             value={text ?? canonical ?? ""}
             onInput={(e) => { setText((e.currentTarget as HTMLTextAreaElement).value); setServerProblems([]); save.clear(); }} />
           <p class="hint">
@@ -288,17 +276,17 @@ export function Editor({ base, taken }: { base: LibraryOne | null; taken: string
         </div>
       )}
 
-      {checked?.valid && !error && <p class="hint ok">Looks good.</p>}
+      {checked?.valid && !error && <p class="hint ok"><Check aria-hidden="true" />Looks good.</p>}
       {error && !isConflict && error.status !== 422 && <ErrorLine error={error} onRetry={submit} />}
       {error?.status === 422 && <p class="field-error" role="alert">{error.detail}</p>}
       {isConflict && <Conflict busy={save.busy} onOverwrite={() => void overwrite()} />}
       <div class="editor-actions">
-        <button type="button" class="button primary" disabled={save.busy || !body || (fresh && taken.includes(id))} onClick={submit}>
+        <Button variant="primary" disabled={save.busy || !body || (fresh && taken.includes(id))} onClick={submit}>
           {save.busy ? "Saving…" : fresh ? "Create" : "Save"}
-        </button>
-        <a class="button" href={fresh ? "/library" : `/library/${id}`}>
+        </Button>
+        <ButtonLink variant="quiet" href={fresh ? "/library" : `/library/${id}`} data-vt="pop">
           Cancel
-        </a>
+        </ButtonLink>
       </div>
     </>
   );
@@ -364,9 +352,8 @@ export function FilesEditor({ one }: { one: LibraryOne }) {
           : "The file is Markdown. While a session of it is in progress its phases and question numbers stay as they are; a change of words is sent from the next message."}
       </p>
       {files.length > 1 && (
-        <div class="field">
-          <label for="f-file">File</label>
-          <select id="f-file" value={which} disabled={dirty} onChange={(e) => {
+        <Field id="f-file" label="File" hint={dirty ? "Save or undo your changes to open another file." : undefined}>
+          <select id="f-file" class="input" value={which} disabled={dirty} onChange={(e) => {
             setWhich((e.currentTarget as HTMLSelectElement).value);
             setText(null);
             setServerProblems([]);
@@ -376,18 +363,17 @@ export function FilesEditor({ one }: { one: LibraryOne }) {
               <option key={f.key} value={f.key}>{f.label}</option>
             ))}
           </select>
-          {dirty && <p class="hint">Save or undo your changes to open another file.</p>}
-        </div>
+        </Field>
       )}
       <div class="editor-raw">
         <label class="visually-hidden" for="f-raw">{current.label}</label>
-        <textarea id="f-raw" class="raw-text" spellcheck={false} rows={22} value={value}
+        <textarea id="f-raw" class="input raw-text" spellcheck={false} rows={22} value={value}
           onInput={(e) => { setText((e.currentTarget as HTMLTextAreaElement).value); setServerProblems([]); save.clear(); }} />
       </div>
       {validateFailed && <ErrorLine error={validateFailed} />}
       {problems.length > 0 && (
-        <section class="problems" role="alert" aria-label="Problems">
-          <h2>What needs fixing</h2>
+        <section class="problems error-line" role="alert" aria-label="Problems">
+          <p><b>What needs fixing</b></p>
           <ul>
             {problems.map((p) => (
               <li key={p}>{p}</li>
@@ -395,7 +381,7 @@ export function FilesEditor({ one }: { one: LibraryOne }) {
           </ul>
         </section>
       )}
-      {fresh && checked?.valid && !error && <p class="hint ok">Looks good.</p>}
+      {fresh && checked?.valid && !error && <p class="hint ok"><Check aria-hidden="true" />Looks good.</p>}
       {error?.status === 409 && error.slug === "mtime" ? (
         <Conflict busy={save.busy} onOverwrite={() => void overwrite()} />
       ) : error && error.status !== 422 ? (
@@ -404,21 +390,22 @@ export function FilesEditor({ one }: { one: LibraryOne }) {
         <p class="field-error" role="alert">{error.detail}</p>
       ) : null}
       <div class="editor-actions">
-        <button type="button" class="button primary" disabled={save.busy || !dirty} onClick={submit}>
+        <Button variant="primary" disabled={save.busy || !dirty} onClick={submit}>
           {save.busy ? "Saving…" : "Save"}
-        </button>
+        </Button>
         {dirty && (
-          <button type="button" class="button" onClick={() => { setText(null); setServerProblems([]); save.clear(); }}>
+          <Button onClick={() => { setText(null); setServerProblems([]); save.clear(); }}>
             Undo changes
-          </button>
+          </Button>
         )}
-        <a class="button" href={`/library/${d.id}`}>
+        <ButtonLink variant="quiet" href={`/library/${d.id}`} data-vt="pop">
           Cancel
-        </a>
+        </ButtonLink>
       </div>
     </>
   );
 }
+
 
 /** `/library/:id/edit`: any definition, a built-in included: the first save of a built-in makes his version of it, in
  *  its place (same id, same /start word, same times); Reset to default on its page brings the shipped one back. A
@@ -427,10 +414,8 @@ export function EditorRoute({ id = "" }: { id?: string }) {
   const [res, reload] = useResource((signal) => api.libraryOne(id, signal), [id]);
   useTitle(res.state === "ready" ? `Edit ${res.data.definition.title}` : "Edit");
   return (
-    <div class="page editor">
-      <p class="crumb">
-        <a href={`/library/${id}`}>‹ {res.state === "ready" ? res.data.definition.title : "Library"}</a>
-      </p>
+    <div class="library-page editor-page">
+      <PageBack href={`/library/${id}`}>{res.state === "ready" ? res.data.definition.title : "Library"}</PageBack>
       {res.state === "error" && res.error.status === 404 ? (
         <Empty>No practice or program by that name.</Empty>
       ) : (
@@ -439,9 +424,9 @@ export function EditorRoute({ id = "" }: { id?: string }) {
             const d = one.definition;
             const program = isProgramBacked(d) || one.sessions !== undefined;
             const head = (
-              <header class="page-head">
-                <p class="eyebrow">{d.source === "builtin" ? "Built-in" : d.source === "fork" ? "Edited built-in" : "Yours"}</p>
-                <h1>Edit {d.title}</h1>
+              <header class="page-head editor-head">
+                <p class="kicker">{d.source === "builtin" ? "Built-in" : d.source === "fork" ? "Edited built-in" : "Yours"}</p>
+                <h1 class="display">Edit {d.title}</h1>
                 {d.source === "builtin" && (
                   <p class="sub">
                     Saving edits it in place: the same name and {program ? "/start word" : "times"}, no copy. Reset to default brings the shipped one back.
@@ -453,9 +438,9 @@ export function EditorRoute({ id = "" }: { id?: string }) {
               return (
                 <>
                   {head}
-                  <p>Your edited file does not load, so the built-in is used meanwhile. Mend the file where it is, or reset it to the default from its page.</p>
+                  <p class="editor-note">Your edited file does not load, so the built-in is used meanwhile. Mend the file where it is, or reset it to the default from its page.</p>
                   <p class="actions">
-                    <a class="button" href={`/library/${d.id}`}>Back to {d.title}</a>
+                    <ButtonLink href={`/library/${d.id}`} data-vt="pop">Back to {d.title}</ButtonLink>
                   </p>
                 </>
               );
@@ -478,13 +463,11 @@ export function NewPracticeRoute() {
   useTitle("New practice");
   const [res, reload] = useResource((signal) => api.library(signal), []);
   return (
-    <div class="page editor">
-      <p class="crumb">
-        <a href="/library">‹ Library</a>
-      </p>
-      <header class="page-head">
-        <p class="eyebrow">Library</p>
-        <h1>New practice</h1>
+    <div class="library-page editor-page">
+      <PageBack href="/library">Library</PageBack>
+      <header class="page-head editor-head">
+        <p class="kicker">Yours</p>
+        <h1 class="display">New practice</h1>
         <p class="sub">A title, a time and a question is enough: it is sent from the next tick.</p>
       </header>
       <Await res={res} reload={reload} rows={3}>

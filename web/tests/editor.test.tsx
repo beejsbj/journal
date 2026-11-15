@@ -247,7 +247,7 @@ describe("Edit a practice", () => {
     });
     const host = mount(<App />);
     const title = await until(() => must(host.querySelector<HTMLInputElement>("#f-title")));
-    expect(host.querySelector(".eyebrow")?.textContent).toBe("Built-in");
+    expect(host.querySelector(".kicker")?.textContent).toBe("Built-in");
     expect(host.querySelector(".page-head .sub")?.textContent).toContain("Saving edits it in place");
     await type(title, "Evening, in my words");
     await click(byText(host, "button", "Save"));
@@ -362,7 +362,7 @@ describe("New practice", () => {
     stubApi({ "GET /api/v1/library": fixtures.library, "PUT /api/v1/library/gratitude-2?validate=1": fixtures.libraryValidate });
     const host = mount(<App />);
     await type(await until(() => must(host.querySelector("#f-title"))), "Gratitude");
-    host.querySelector("details.more")?.setAttribute("open", "");
+    await click(host.querySelector(".more .disclosure-head"));   // More options
     await until(() => expect(host.querySelector<HTMLInputElement>("#f-id")?.value).toBe("gratitude-2"));
   });
 

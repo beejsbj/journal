@@ -1,0 +1,24 @@
+/* Switch (ui/Switch.tsx): Night Room's, his lamp when on; the knob stretches while pressed. The button is the full
+   44 px target; the track (::before) and the knob (::after) are drawn inside it. */
+.switch {
+  --track: 32px;
+  position: relative; flex: none; width: 52px; height: var(--tap); padding: 0; border: 0; background: none; cursor: pointer;
+}
+.switch::before {
+  content: ""; position: absolute; left: 0; right: 0; top: calc(50% - var(--track) / 2); height: var(--track);
+  border-radius: var(--r-pill); background: var(--sunk); box-shadow: inset 0 0 0 1px var(--hair-2); transition: background var(--d-2);
+}
+.switch::after {
+  content: ""; position: absolute; top: calc(50% - 13px); left: 3px; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--pane); box-shadow: 0 1px 3px rgb(0 0 0 / 0.22);
+  transition: transform var(--spring-dur) var(--spring), background var(--d-2), width var(--d-1);
+}
+[data-theme="dark"] .switch::after { background: var(--text-2); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .switch::after { background: var(--text-2); } }
+.switch[aria-checked="true"]::before { background: var(--lamp); box-shadow: none; }
+.switch[aria-checked="true"]::after { transform: translateX(20px); background: var(--on-lamp); }
+.switch:active:not(:disabled)::after { width: 30px; }
+.switch[aria-checked="true"]:active:not(:disabled)::after { transform: translateX(16px); }
+.switch:disabled { opacity: 0.45; cursor: default; }
+.switch:focus-visible { outline: none; }
+.switch:focus-visible::before { outline: 2px solid var(--text-2); outline-offset: 2px; }

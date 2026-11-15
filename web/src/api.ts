@@ -78,12 +78,13 @@ export function query(params: Record<string, string | number | boolean | undefin
 }
 
 /** GET `path` and check the answer against `parser`. A 401 marks the browser unpaired; only pairing clears that
- *  (a late answer to a request sent before an unpair must not undo it). */
-export async function get<T>(path: string, parser: Parser<T>, signal?: AbortSignal): Promise<T> {
+ *  (a late answer to a request sent before an unpair must not undo it). `quiet`: a read for the shell's chrome (the
+ *  rail's "Next from"), not for the view on screen, so it never raises or lowers the offline ribbon. */
+export async function get<T>(path: string, parser: Parser<T>, signal?: AbortSignal, quiet = false): Promise<T> {
   const res = await send(path, { method: "GET", headers: { Accept: "application/json" }, signal });
   if (res.status === 401) setAuthLost(true);
   if (!res.ok) throw await failure(res);
-  noteRead(keptAt(res.headers), path);   // a read from the worker's kept copy puts up the ribbon; one from the server takes it down
+  if (!quiet) noteRead(keptAt(res.headers), path);   // a read from the worker's kept copy puts up the ribbon; one from the server takes it down
   let body: unknown;
   try {
     body = await res.json();
@@ -159,9 +160,14 @@ const withMtime = <B extends { mtime?: number | null }>(b: B): B => {
 
 export const api = {
   today: (signal?: AbortSignal) => get("/today", Today, signal),
+  /** Today, read for the rail (what comes next): it leaves the offline ribbon to the view on screen. */
+  todayQuiet: (signal?: AbortSignal) => get("/today", Today, signal, true),
+  libraryQuiet: (signal?: AbortSignal) => get("/library", arr(LibraryItem), signal, true),
   entries: (params: Record<string, string | number | boolean | undefined>, signal?: AbortSignal) =>
     get(`/entries${query(params)}`, EntryPage, signal),
   entry: (stem: string, signal?: AbortSignal) => get(`/entries/${encodeURIComponent(stem)}`, EntryDoc, signal),
+  /** The entry, read for the write room: quiet, so the page behind keeps its own offline marks. */
+  entryQuiet: (stem: string, signal?: AbortSignal) => get(`/entries/${encodeURIComponent(stem)}`, EntryDoc, signal, true),
   reflections: (params: Record<string, string | number | undefined>, signal?: AbortSignal) =>
     get(`/reflections${query(params)}`, arr(Reflection), signal),
   weeks: (params: Record<string, string | number | undefined>, signal?: AbortSignal) =>
@@ -175,8 +181,9 @@ export const api = {
   health: (signal?: AbortSignal) => get("/healthz", Health, signal),
   push: (signal?: AbortSignal) => get("/push", PushInfo, signal),
   /** A practice as Write now shows it, and the slot words saved now would fill. Opening it writes nothing. */
-  openPractice: (id: string, signal?: AbortSignal) => get(`/library/${enc(id)}/open`, PracticeView, signal),
+  openPractice: (id: string, signal?: AbortSignal) => get(`/library/${enc(id)}/open`, PracticeView, signal, true),   // (quiet: the room's)
   runs: (signal?: AbortSignal) => get("/runs", arr(Run), signal),
+  runsQuiet: (signal?: AbortSignal) => get("/runs", arr(Run), signal, true),
   run: (id: string, signal?: AbortSignal) => get(`/runs/${enc(id)}`, RunOne, signal),
   runInsights: (id: string, signal?: AbortSignal) => get(`/runs/${enc(id)}/insights`, obj({ stem: str, body: str }), signal),
 

@@ -9,6 +9,9 @@ next turn).
 
 Nothing here reads the chat transcript or calls a source; every piece comes from state the tick and the
 hooks already wrote. Each piece fails on its own: a notebook that cannot be read costs the notebook, not the pack.
+
+What ``build`` returns is fenced (``contextfence``): the platform may store it with his message, and the fence is how
+a reader of the stored chat tells it from what he wrote.
 """
 from __future__ import annotations
 
@@ -18,6 +21,7 @@ from datetime import datetime
 
 from . import channel, hookstate, notebook, programview, today
 from .config import Config
+from .contextfence import wrap
 
 log = logging.getLogger("journal.turncontext")
 
@@ -37,7 +41,7 @@ class Turn:
 
 
 def build(cfg: Config, turn: Turn) -> str | None:
-    """The context for ``turn``: the blocks joined by blank lines, or None when there are none."""
+    """The context for ``turn``: the blocks joined by blank lines and fenced, or None when there are none."""
     blocks: list[str] = []
     try:
         block = notebook.render(cfg, turn.at.astimezone(cfg.tz).date().isoformat())
@@ -54,7 +58,7 @@ def build(cfg: Config, turn: Turn) -> str | None:
         block = _today(cfg, turn, with_pack=bool(primary))
         if block and (not primary or BUDGET["today_with_pack"]) and len(blocks) < BUDGET["blocks"]:
             blocks.append(block)
-    return "\n\n".join(blocks[:BUDGET["blocks"]]) if blocks else None
+    return wrap("\n\n".join(blocks[:BUDGET["blocks"]])) if blocks else None
 
 
 def _program(cfg: Config, turn: Turn) -> str | None:

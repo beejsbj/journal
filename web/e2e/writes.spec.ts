@@ -50,7 +50,7 @@ test("a built-in is edited in place, then reset to the default", async ({ page }
   await page.goto("/library/weekly");
   await page.getByRole("link", { name: "Edit", exact: true }).click();
   await expect(page).toHaveURL(/\/library\/weekly\/edit$/);
-  await expect(page.locator(".eyebrow")).toHaveText("Built-in");
+  await expect(page.locator(".editor-head .kicker")).toHaveText("Built-in");
   await page.getByLabel("Title", { exact: true }).fill("Sunday scan");
   await expect(page.getByText("Looks good.")).toBeVisible();
   await page.getByRole("button", { name: "Save", exact: true }).click();
@@ -67,15 +67,15 @@ test("a built-in is edited in place, then reset to the default", async ({ page }
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Weekly pattern scan");
 });
 
-test("a note from the + sheet, and a block added to an entry", async ({ page }, info) => {
+test("a note from the write room, and a block added to an entry", async ({ page }, info) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Write", exact: true }).click();
-  await page.getByRole("button", { name: "Quick note" }).click();
   await page.getByLabel("A note", { exact: true }).fill("Buy stamps.");
-  await shot(page, info, "quick-add");
-  await page.getByRole("button", { name: "Save the note" }).click();
+  await shot(page, info, "write-room");
+  await page.getByRole("button", { name: "Put it in the journal" }).click();
   await expect(page.getByText("Saved as a note.")).toBeVisible();
   await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 
   await page.goto("/entries/2026-10-14-evening");
   await expect(page.locator("article.his").first()).toBeVisible();   // the document has been drawn
@@ -104,5 +104,5 @@ test("mood and a star on an entry", async ({ page }) => {
   await page.getByLabel("Mood", { exact: true }).press("Enter");
   await page.getByLabel("Starred", { exact: true }).check();
   await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.locator(".chips .chip")).toContainText(["starred", "calm"]);
+  await expect(page.locator(".entry-tags .entry-tag")).toContainText(["starred", "calm"]);   // WEB-UX: words, not chips
 });

@@ -11,7 +11,8 @@ from zoneinfo import ZoneInfo
 
 from helpers import CHAT, CleanEnv, add_prompt, make_cfg, write_config
 
-from journal import capture, hookstate, ledger, notebook, reflect, sources, status, tick, today, turncontext
+from journal import (capture, contextfence, hookstate, ledger, notebook, reflect, sources, status, tick, today,
+                     turncontext)
 from journal.hermes import hooks
 
 IST = ZoneInfo("Asia/Kolkata")
@@ -21,6 +22,12 @@ SECRET = "SECRET-FROM-THE-CHAT-TRANSCRIPT"
 
 def at(h, m=0, day=15):
     return datetime(2026, 10, day, h, m, tzinfo=IST).astimezone(timezone.utc)
+
+
+def blocks(out):
+    """The blocks of a turn's context, inside the fence ``turncontext.build`` puts around them."""
+    assert out.startswith(contextfence.OPEN + "\n") and out.endswith("\n" + contextfence.CLOSE), out
+    return out[len(contextfence.OPEN) + 1:-len(contextfence.CLOSE) - 1].split("\n\n")
 
 
 def turn(cfg, when, text="hello", platform="telegram"):
@@ -137,11 +144,11 @@ class BudgetTest(Base):
         with mock.patch.object(turncontext, "_pack", return_value="PACK"), \
                 mock.patch.object(turncontext, "_today", return_value="TODAY"):
             out = self.build(at(9, 0))
-        self.assertEqual(out.split("\n\n")[1:], ["PACK"])
+        self.assertEqual(blocks(out)[1:], ["PACK"])
         with mock.patch.dict(turncontext.BUDGET, {"today_with_pack": True}), \
                 mock.patch.object(turncontext, "_pack", return_value="PACK"), \
                 mock.patch.object(turncontext, "_today", return_value="TODAY"):
-            self.assertEqual(len(self.build(at(9, 0)).split("\n\n")), 2)   # notebook + pack; today cut by the budget
+            self.assertEqual(len(blocks(self.build(at(9, 0)))), 2)   # notebook + pack; today cut by the budget
 
     def test_an_exception_builds_no_block_and_costs_nothing_else(self):
         with mock.patch.object(today, "render", side_effect=RuntimeError("boom")):

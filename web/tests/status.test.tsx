@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { useResource } from "../src/hooks";
-import { Await } from "../src/components/Status";
+import { Await } from "../src/ui";
 import { ApiError } from "../src/api";
 import { json, mount, must, stubFetch, until } from "./helpers";
 import { api } from "../src/api";

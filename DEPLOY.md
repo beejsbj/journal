@@ -16,7 +16,163 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
-<<<<<<< HEAD
+## WEB-UX — the web app on its design system (2026-11-10; serve side only; no gateway restart; no config or state change)
+
+**What changes.** The web app's whole look and its write surface: the round-02 design system (`design/DESIGN.md`,
+`web/src/tokens.css`, `web/src/ui/`, `/design`), every screen rebuilt on it, the write room in place of the "+" sheet,
+Entry/Analysis tabs gone (her readings unfold at the entry's end), and the entries list as a sidebar beside an open
+entry (DECISIONS.md, WEB-UX-IDENTITY, WEB-UX-ENTRY-TABS, WEB-UX-WRITE-ROOM, WEB-UX-INTEGRATION). It reaches the browser
+through the committed web build (`src/journal/serve/static/`); the API, the server and the engine are unchanged.
+**Side and restart.** Serve side: `uv tool install --force` at the merge sha, then `systemctl --user restart
+journal-serve`. No gateway restart: the release changes `web/`, the committed build under `src/journal/serve/static/`,
+`tests/` (the build test reads the new token name and the favicon links), `tools/web_fonts.py` (a dev tool that cuts the
+fonts, never imported at run time) and docs; it changes no module under `src/journal` outside `serve/static/`
+(checked against the main it merged into: `git diff --stat <main sha> <merge sha> -- src/
+':!src/journal/serve/static'` lists nothing), and the gateway never reads `serve/static/`. It uses main's
+OPEN-FACES API as it is (`GET /library/{id}/open`, `chat`, `due`) and OPEN-PUSH's (`GET /push`,
+`/push/subscriptions`; Settings' notifications card): an install still before OPEN-CORE/OPEN-FACES deploys their
+sections first (they need the gateway restart, in a window), and OPEN-PUSH's section says what it needs (serve side,
+the optional extra `journal[push]` and `push.*`; without the extra the card says notifications are not set up on the
+server); WEB-UX adds nothing to those. No setting, state file or practice moves. **First checks.** After the restart,
+`curl -s localhost:<port>/healthz` answers, and a fresh load of the app shows the rail (or, on a phone, the tab bar)
+and the paper or the night room; the installed PWA shows "Update available" once and takes the new build on Reload
+(drafts are in `sessionStorage`, so nothing typed is lost). Write opens the room; an entry opens beside its list.
+The device keeps its ink and its theme; the new keys (`journal:theme`, `journal:sidebar`, `journal:room-focus`) start
+at their defaults. **Rollback.** The CLI at the previous sha and the same restart; the browser takes the old build at
+the next "Update available".
+
+## OWN-WORDS — what the engine adds to a turn is never filed as his words (2026-11-09; hook side and tick side; **gateway restart required**; no config or state change)
+
+**What changes.** The context the engine injects into the companion's turn (`pre_llm_call`: notebook, pack, program
+block, today block) is fenced (`<journal-context>` … `</journal-context>`). The chat reader (`hermes/transcript.py`)
+takes off what was added to his message in storage before reading a row: the gateway's notes in front, a natively
+attached picture's notes and what is stored after its placeholders when that is what a turn adds (the fenced context,
+recalled memory, Hermes' own turn note); a list of parts Hermes stored as JSON is read as its text. A row whose words
+still carry such a mark anywhere else (a fenced block or recalled memory ending a message with no picture, and
+anything else after a picture's placeholders, included) is **withheld** whole (never cut, captured, written, packed or
+quoted) and the sweep logs it, so it shows in `errors.jsonl` and `journal status`. The sweep now keeps a native
+picture of a queued message beside its entry (only from Hermes' picture cache) and stamps the capture of one sent with
+no caption with when the picture arrived. Entries already written are not touched. DECISIONS.md, OWN-WORDS.
+
+**Side and restart.** `turncontext.py` and the new `contextfence.py` (the fence) run in the gateway: the companion
+gets fenced context only after `hermes gateway restart`. `privacy.py`, `conversations.py` and `sweep.py` load with
+the plugin, and `hermes/transcript.py` when the hook first reads the chat (the privacy pass); the sweep itself and
+`tick.py` run in the tick, a fresh process, from the next tick after the pin moves. The order is safe either
+way: before the restart the gateway injects unfenced context, and the new reader still cuts a native picture's row at
+its placeholders and withholds an unfenced block by its first line. Rides the next restart window.
+
+1. Install the CLI at `<sha>`, move the plugin pin (`hermes -p <profile> plugins install beejsbj/journal --force
+   --ref <sha>`), restart `journal-serve` so doctor's version rows agree, then `hermes -p <profile> gateway restart`
+   in a window. Nothing is sent.
+2. First checks, without sending: `journal doctor --deep` is as before (its transcript sample counts withheld rows
+   among "read as empty or system"). After the next tick, `errors.jsonl` has no new `sweep: withheld row …` line;
+   one that appears names a row (ids only) Hermes stored with something added: read that row read-only
+   (`?mode=ro`) before deciding anything. It can be a picture's row with something after its placeholders the
+   reader does not know (another plugin's turn context, a new Hermes note): its caption stays out of the journal
+   until the reader is taught that shape (`hermes/transcript.py` `added`). A row the hook already saved and a cron
+   delivery never make such a line; another of Hermes' own rows (a compaction frame, an `[IMPORTANT: …` notice)
+   only when it carries a picture's turn. A `sweep: a picture of message … was not kept (…)` line in the tick's log
+   says why a swept picture stayed out (outside Hermes' picture cache, gone from it, too large, a failed copy). The sweep's watermark is unchanged, so rows it already passed are not read
+   again and nothing is captured twice.
+3. Live check, only with the owner (it sends into his chat): with a vault checksum before and after
+   (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`), he sends a picture with no caption while the companion is still
+   answering an open prompt. The next tick files it into the prompt's entry as a `· photo` block with the picture
+   embedded, at the time he sent it, with nothing else in his block.
+4. Rollback: the CLI and the plugin pin at the previous sha, and a gateway restart. Rows Hermes stored while this
+   release ran carry the fenced context; the previous reader does not strip it (the old behaviour), so keep the
+   sweep's watermark as it is.
+## CONTINUITY — reflections read what came before, `journal_search`, only his words in quotes, one voice (2026-11-09; tick and hook side; **gateway restart needed**; **plugin pin before the CLI**; no config change; three new optional state fields)
+
+**What changes.** The day reflection and week review read the opening and the question of her last few analyses,
+what he wrote back to each, and the notebook threads the engine filed from the journal; their one-shot runs with
+`-t journal_read`, the new read-only `journal_search` tool (his words in the journal's files), with a 480 s budget.
+Quotes are checked against his words only (the period's entries, his replies, his words in any file); a quote
+that is not his, or a stray double quote mark of any kind, is a bad answer and retried, and a reflection that never
+passes is not written, as before. The catch-up and program checks run the same check against their one source (the
+catch-up's: his lines only). One voice description goes into the opener, annotation, reflection and week
+requests. The engine's own one-shots carry `JOURNAL_MODEL_STEP=1`, and the journal's `pre_llm_call` hook adds
+nothing to them (it used to append the whole notebook; the off-the-record mark and voice capture run as before).
+The reflection's one-shot also carries `JOURNAL_SEARCH_UPTO=<its period's last day>`: its search, its quotes and its
+notebook threads stop there, so one written late reads the journal as it stood at the end of its period. New state:
+`origin` on annotation and reflection follow-ups in `notebook.json`; `answers` on the capture of a note that replies
+to a reflection; `rejected_quote` on a reflection's ledger record (the first 60 characters of a quote that was not
+his, shown nowhere, gone once the reflection is written). Older code ignores all three.
+
+**Side and restart.** The tick is a fresh process (reflections, prompts, the follow-ups' `origin`): new code from the
+next tick. Each one-shot `hermes chat` is a fresh process that loads the plugin, so it registers `journal_read` and
+skips the hook as soon as the plugin pin moves. The gateway has imported `tools.py`, `hermes/tools.py`,
+`hermes/hooks.py`, `notebook.py`, `entries.py`, `context.py`, `conversations.py`, `prompts.py`, `plugin.yaml` and the
+skill, so **restart the gateway** for her chat to have `journal_search`, the skill's line about it and the
+conversation writer's `answers`. Ride a restart window, at least an hour from a ritual.
+
+**Order: the plugin pin first, then the CLI.** No process may run the new code (which files a follow-up with an
+on-the-record `origin`) while its one-shots still load the old plugin (whose hook appends the whole notebook,
+chat-made threads included, to the annotation's query): a chat paraphrase could then be filed as on the record. The
+tick described above imports the plugin's own `src/`, so it and its one-shots move together with the pin; a
+deployment whose tick runs the CLI install instead would hit exactly that between the two steps. The old CLI with
+the new plugin is safe, so pin first; if the order cannot be kept, pause the tick across both steps.
+
+1. Move the plugin pin (`hermes -p <profile> plugins install beejsbj/journal --force --ref <sha>`), then install the
+   CLI at `<sha>`, then `hermes -p <profile> gateway restart` in a window; restart `journal-serve` so doctor's version
+   rows agree. Nothing is sent.
+2. First checks, without sending: `journal doctor` as before. A new plugin toolset is on in her chat even when the
+   platform's toolsets were saved, unless the last save already knew it and left it out, so her next chat turn has
+   `journal_search` without a config change. To keep search out of her chat, switch `journal_read` off for that
+   platform in `hermes tools` (the reflection names the toolset itself and keeps it); `agent.disabled_toolsets` would
+   take it from the reflection too.
+3. After the next reflection: the file reads **What I notice** / **What moved** / **To carry forward**; the tick log
+   says `wrote <date>-reflection.md (…)`. A quote that is not his shows as `reflection attempt N/3 failed (a quote not
+   in his words at character 96 (line 3), 23 characters long)`, a stray or odd double quote mark as `… failed
+   (irregular quote mark U+201D at character 216 (line 3))`; after three, the usual alert with the same reason, and
+   no file. Neither line holds a word of the reflection; the quote's first 60 characters are in the ledger record's
+   `rejected_quote`. A run that searches is longer (budget 480 s; the tick waits for it); a timeout after another
+   model step answered in the tick uses an attempt instead of counting as an outage, and the try after a timeout
+   that was deferred goes without the search on 300 s.
+4. Rollback: the CLI and the plugin pin at the previous sha, and a gateway restart. The new state fields are
+   ignored by the old code; nothing needs undoing.
+## NOTEBOOK-NEWEST — the companion sees her newest notes, and a repeated note is not added (2026-11-09; `notebook.py`, `tools.py`, `tick.py`, `reflect.py`; gateway restart needed; no config or state change)
+
+**What changes.** The notebook block in the companion's chat turn (and in the opener pack) listed the 15 oldest open
+items, so at the cap of 40 it hid every recent note and showed the ones about to be pruned. It now lists the items
+that are due (`bring_up_after` reached; oldest due first), then the rest newest first, still with "(+N more)". Adding
+an item whose text equals an open one's (case, spacing and trailing punctuation ignored) adds nothing: the
+`journal_notebook` result carries `"duplicate": true` and the open item, raised again (its stale clock restarts, a
+date given replaces its date, with `"date_changed": true`), and the annotation and reflection passes log it and count
+only what they added. State files are unchanged in shape; open items already stored are read as before.
+
+**Side and restart.** `notebook.py` and `tools.py` are imported by the gateway (`journal.hermes` loads both through
+`tools`, `turncontext` and `context`; check with the import probe in *What needs what*), and the chat turn's block
+and the tool's add are the gateway's own paths, so **a gateway restart is needed**; until it the companion keeps the
+old order and the old add. The tick (`tick.py`, `reflect.py`, `context.py`) is a fresh process and runs the new code
+from the next tick after the pin moves. Serve side: untouched (serve never reads the notebook).
+
+1. Install the CLI at `<sha>`, move the plugin pin (`hermes -p <profile> plugins install beejsbj/journal --force
+   --ref <sha>`), then `hermes gateway restart` in the next window. Nothing is sent.
+2. First check, without sending: `journal doctor` is as before. In the companion's next chat turn the notebook block
+   starts with any due item and then the newest; asking her to note something already open answers "duplicate".
+3. Rollback: the plugin pin and the CLI at the previous sha, and a gateway restart. No state needs undoing: nothing
+   written under the new rules differs from what the old code would have written.
+## MD-ITALICS — `*italic*` renders as italic in Telegram messages (2026-11-09; `compose.py` only; hook side too: a gateway restart; no config or state change)
+
+**What changes.** The companion's Markdown italics written with single asterisks (`*"…"*`, as reflections and
+annotations quote him) now reach Telegram as `<i>…</i>` instead of showing the asterisks. `compose.md_to_html` and
+`compose.md_block_html` (which calls it) do it; `**bold**` still wins, a lone `*` (`5 * 3`, `2*3*4`, a `* ` bullet)
+stays literal, and an italic that would cross another tag stays literal so the HTML is never refused. The plain-text
+forms (`compose._md_plain`, `compose.plain` for a platform without HTML) lose the stars too. Nothing already sent is
+edited, except that a fold of an older opener (`folded_html`) re-renders its stored text with the new rule.
+
+**Side and restart.** `compose.py` is imported by the gateway (the import probe in *What needs what* lists
+`journal.compose`; `inbound`, `tools` and the commands reach it), so this is hook side as well as tick side: the tick
+sends the new rendering from the next tick after the pin moves, and the **gateway restart** brings the companion's own
+paths (annotation and reflection replies, program phases it sends) to it. Until the restart the gateway keeps the old
+rendering; nothing breaks in between. Serve side: untouched (the web app already renders `*italic*`).
+
+1. Install the CLI at `<sha>` and move the plugin pin (`hermes -p <profile> plugins install beejsbj/journal --force
+   --ref <sha>`), then `hermes gateway restart` in the next window. Nothing is sent.
+2. First check, without sending: `python3 -c "from journal import compose; print(compose.md_to_html('*\"a line\"* and 5 * 3'))"`
+   prints `<i>"a line"</i> and 5 * 3`. The next reflection or annotation reply shows its quotes in italic.
+3. Rollback: the plugin pin and the CLI at the previous sha, and a gateway restart.
+
 ## OPEN-PUSH — Web Push from `journal serve` to the installed PWA (2026-11-09; serve side only; **no gateway restart**; a new optional extra `journal[push]`; a new setting `push.*`; no state migration)
 
 **What changes.** `journal serve` can nudge the installed web app when a practice is due (README *Web app*,
@@ -87,7 +243,7 @@ restart). The old server ignores `serve-push.json` and `push-sent.json` (leave t
 means every device turns notifications on again later). The new PWA keeps its subscription, finds no `/push` route
 ("This server does not offer notifications yet") and gets no pushes; turn notifications off on each device first to
 end the subscriptions cleanly. The plugin pin needs no rollback of its own.
-=======
+
 ## OPEN-PROGRAMS — programs and interrupts with no chat (2026-11-09; tick, hook and serve side; **gateway restart required, in a window**; no config change; no state migration)
 
 **What changes.** A program phase becomes current before it is sent: its ledger record is written with no
@@ -122,7 +278,6 @@ is opened and sent by the next tick's step.
    the open phase with `journal program start <program>` (it sends the open phase again) once a chat is set. An interrupt item `open` (no
    chat) or `answered` is not pending to old code and is never sent; its record and any answer stay in the ledger and
    the entry.
->>>>>>> origin/main
 
 ## OPEN-FACES — do and answer a practice from the web app, the CLI and MCP (2026-11-09; serve side, the CLI and MCP; **no gateway restart of its own**: it rides OPEN-CORE's window; no config change; no state migration)
 
@@ -240,6 +395,14 @@ reflection `skipped: "no chat"` (with `skipped_at`); existing records read the s
    a real channel or stop its tick first. Old code does not know the `skipped: "no chat"` mark either: with a real
    channel set, it sends the annotation replies and reflections skipped meanwhile (it checks only for a message id and
    attempts left), so stopping the tick is the safe choice.
+
+## FAVICON — the tab's own mark (2026-11-04; serve side only; no gateway restart; no config or state change)
+
+**What changes.** The web app's favicon is `icons/favicon.svg` (and `icons/favicon-32.png`), through the committed web
+build. **Side and restart.** Serve side: `uv tool install --force` at the merge sha, then
+`systemctl --user restart journal-serve`. **First checks.** `/icons/favicon.svg` answers 200 and a fresh tab shows the
+`j`; browsers cache favicons hard, so an old tab can keep the page mark for a while. **Rollback.** The CLI at the
+previous sha and the same restart.
 
 ## SCRUB-PERSONAL — the repo holds nothing specific to a deployment (2026-10-28; docs, tests and comments, one doctor row; no gateway restart needed; no config or state change)
 

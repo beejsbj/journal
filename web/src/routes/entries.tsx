@@ -1,27 +1,39 @@
 import { useLocation } from "preact-iso";
 import { useEffect, useRef, useState } from "preact/hooks";
-import { api, query } from "../api";
-import { EntryRow } from "../components/EntryRow";
-import { Await, Empty, ErrorLine } from "../components/Status";
+import { api, get, query } from "../api";
+import { EntryRow, dayParts } from "../components/EntryRow";
 import { useLive } from "../events";
 import { dayLabel, weekHeader, weekStart } from "../format";
 import { useResource, asApiError } from "../hooks";
-import { Close, Search } from "../icons";
+import { ChevronDown, Close, Search } from "../icons";
+import { arr, obj, str } from "../schema";
 import { useTitle } from "../title";
 import type { ApiError } from "../api";
 import type { EntrySummary, LibraryItem } from "../types";
+import { Await, Button, Calendar, Empty, ErrorLine, Menu, TextButton, type MenuItem } from "../ui";
+import "./entries.css";
 
 const PAGE = 40;
 
-interface Filters {
-  kind?: string;
-  program?: string;
-  day?: string;
+export interface Filters {
+  kind?: string | undefined;
+  program?: string | undefined;
+  day?: string | undefined;
   audio: boolean;
   q: string;
 }
 
-function params(f: Filters): Record<string, string | boolean | number | undefined> {
+export function filtersOf(q: Record<string, string | undefined>): Filters {
+  return { kind: q.kind || undefined, program: q.program || undefined, day: q.day || undefined, audio: q.audio === "1", q: q.q ?? "" };
+}
+
+/** The filters as the address carries them (`?kind=…&day=…`): replace navigation keeps them, a link can name them. */
+export function filterQuery(f: Filters): string {
+  return query({ kind: f.kind, program: f.program, day: f.day, audio: f.audio ? "1" : undefined, q: f.q || undefined });
+}
+
+/** The filters as the server reads them (`/entries` and `/days`): a day is a range of one. */
+export function params(f: Filters): Record<string, string | boolean | number | undefined> {
   return {
     kind: f.kind,
     program: f.program,
@@ -30,6 +42,58 @@ function params(f: Filters): Record<string, string | boolean | number | undefine
     audio: f.audio ? "1" : undefined,
     q: f.q || undefined,
   };
+}
+
+// The list he opened an entry from: its filters, so the sidebar beside the entry shows the same list and the way back
+// returns to it. Per tab, gone on a reload (a deep link shows every entry).
+let lastQuery = "";
+export function rememberedQuery(): string {
+  return lastQuery;
+}
+/** The sidebar beside an entry narrowed its list (a day on its calendar): the way back keeps that too. */
+export function rememberQuery(q: string): void {
+  lastQuery = q;
+}
+
+/** Wide screens (761 px and up) lay the list beside an open entry; phones push the entry over the list. */
+const WIDE = "(min-width: 761px)";
+export function useWide(): boolean {
+  const [wide, setWide] = useState(() => typeof matchMedia === "function" && matchMedia(WIDE).matches);
+  useEffect(() => {
+    if (typeof matchMedia !== "function") return;
+    const mq = matchMedia(WIDE);
+    const on = () => setWide(mq.matches);
+    on();
+    mq.addEventListener?.("change", on);
+    return () => mq.removeEventListener?.("change", on);
+  }, []);
+  return wide;
+}
+
+/** The device's date as "YYYY-MM-DD". */
+export function localDay(at: Date = new Date()): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${at.getFullYear()}-${p(at.getMonth() + 1)}-${p(at.getDate())}`;
+}
+
+/** The days of a month he wrote on, under the other filters (not the day itself): `/days`, which groups by day. */
+const Days = arr(obj({ date: str, entries: arr(obj({ stem: str })) }));
+function lastDay(month: string): string {
+  const [y, m] = month.split("-").map(Number) as [number, number];
+  return `${month}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+}
+export function useWrittenDays(month: string, f: Filters): Set<string> {
+  const key = JSON.stringify([month, f.kind, f.program, f.audio, f.q]);
+  const [res, reload] = useResource(
+    (signal) => get(`/days${query({ ...params({ ...f, day: undefined }), from: `${month}-01`, to: lastDay(month) })}`, Days, signal)
+      .catch((e: unknown) => {
+        if (e instanceof DOMException) throw e;
+        return [];   // the month is only a way in: without it the list still reads
+      }),
+    [key],
+  );
+  useLive(["entries-changed"], reload);
+  return new Set(res.state === "ready" ? res.data.filter((d) => d.entries.length > 0).map((d) => d.date) : []);
 }
 
 /** Entries by week and day, newest first. The weeks are Monday to Sunday; the day headers are the entries' dates. */
@@ -52,53 +116,62 @@ export function groupByWeek(items: EntrySummary[]): { week: string; days: { date
   return weeks;
 }
 
-function Chips({ library, filters, go }: { library: LibraryItem[]; filters: Filters; go: (next: Partial<Filters>) => void }) {
+type Which = "all" | "audio";
+const WHICH: MenuItem<Which>[] = [
+  { value: "all", label: "every entry" },
+  { value: "audio", label: "entries with your voice" },
+];
+
+/**
+ * "Showing every entry from any practice, newest first." Each choice is a phrase that opens a menu (ui/Menu); the
+ * choices are the same address as ever (`audio`, `kind`, `program`), replaced, not pushed. Kind and program exclude
+ * each other.
+ */
+function FilterSentence({ library, filters, go }: { library: LibraryItem[]; filters: Filters; go: (next: Partial<Filters>) => void }) {
   const mine = library.filter((p) => p.enabled || p.id === filters.kind || p.id === filters.program);
   const plain = mine.filter((p) => p.kind !== "program");
   const programs = mine.filter((p) => p.kind === "program");
-  const none = !filters.kind && !filters.program && !filters.audio;
+  const from: MenuItem<string>[] = [
+    { value: "any", label: "any practice" },
+    ...plain.map((p) => ({ value: `kind:${p.id}`, label: p.title })),
+    ...programs.map((p, i) => ({ value: `program:${p.id}`, label: p.title, rule: i === 0 })),
+  ];
+  const fromValue = filters.kind ? `kind:${filters.kind}` : filters.program ? `program:${filters.program}` : "any";
+  const fromLabel = from.find((o) => o.value === fromValue)?.label ?? filters.kind ?? filters.program ?? "any practice";
+  const which: Which = filters.audio ? "audio" : "all";
   return (
-    <div class="chips filter-chips" role="group" aria-label="Filters">
-      <button type="button" class={`chip${none ? " on" : ""}`} aria-pressed={none} onClick={() => go({ kind: undefined, program: undefined, audio: false })}>
-        All
-      </button>
-      {plain.map((p) => (
-        <button type="button" key={p.id} class={`chip${filters.kind === p.id ? " on" : ""}`} aria-pressed={filters.kind === p.id}
-          onClick={() => go({ kind: filters.kind === p.id ? undefined : p.id, program: undefined })}>
-          {p.emoji} {p.title}
-        </button>
-      ))}
-      {programs.map((p) => (
-        <button type="button" key={p.id} class={`chip${filters.program === p.id ? " on" : ""}`} aria-pressed={filters.program === p.id}
-          onClick={() => go({ program: filters.program === p.id ? undefined : p.id, kind: undefined })}>
-          {p.emoji} {p.title}
-        </button>
-      ))}
-      <button type="button" class={`chip${filters.audio ? " on" : ""}`} aria-pressed={filters.audio} onClick={() => go({ audio: !filters.audio })}>
-        Has audio
-      </button>
-    </div>
+    <p class="filter-sentence">
+      Showing{" "}
+      <Menu label="Which entries" items={WHICH} value={which} onSelect={(v) => go({ audio: v === "audio" })}>
+        <span>{WHICH.find((o) => o.value === which)?.label}</span>
+        <ChevronDown />
+      </Menu>{" "}
+      from{" "}
+      <Menu label="Which practice" items={from} value={fromValue} onSelect={(v) => {
+        const [k, id] = v.split(":") as [string, string | undefined];
+        go(k === "kind" ? { kind: id, program: undefined } : k === "program" ? { program: id, kind: undefined } : { kind: undefined, program: undefined });
+      }}>
+        <span>{fromLabel}</span>
+        <ChevronDown />
+      </Menu>, newest first.
+    </p>
   );
 }
 
 export function EntriesRoute() {
   useTitle("Entries");
   const loc = useLocation();
-  const filters: Filters = {
-    kind: loc.query.kind || undefined,
-    program: loc.query.program || undefined,
-    day: loc.query.day || undefined,
-    audio: loc.query.audio === "1",
-    q: loc.query.q ?? "",
-  };
+  const wide = useWide();
+  const filters = filtersOf(loc.query);
   const key = JSON.stringify(filters);
   const [text, setText] = useState(filters.q);
   const pushed = useRef(filters.q);
+  lastQuery = filterQuery(filters);
 
   const go = (next: Partial<Filters>) => {
     const f = { ...filters, ...next };
     pushed.current = f.q;
-    loc.route(`/entries${query({ kind: f.kind, program: f.program, day: f.day, audio: f.audio ? "1" : undefined, q: f.q || undefined })}`, true);
+    loc.route(`/entries${filterQuery(f)}`, true);
   };
 
   // Typing searches after a short pause; the URL carries the search so a reload or a link keeps it. The pause ends in
@@ -125,6 +198,13 @@ export function EntriesRoute() {
   useLive(["library-changed"], reloadLibrary);
   const [first, reload] = useResource((signal) => api.entries({ ...params(filters), limit: PAGE }, signal), [key]);
   useLive(["entries-changed"], reload);
+
+  // The month on the calendar: the chosen day's, else the one he moved to, else the newest entry's, else this one.
+  const today = localDay();
+  const [month, setMonth] = useState<string | null>(null);
+  const newest = first.state === "ready" ? first.data.items[0]?.date : undefined;
+  const shown = (filters.day && !month ? filters.day : null)?.slice(0, 7) ?? month ?? newest?.slice(0, 7) ?? today.slice(0, 7);
+  const written = useWrittenDays(shown, filters);
 
   // A page of "Load more" belongs to the first page it was asked after (cursors are offsets into that very list), so
   // it is kept with that first page's identity and used only while that first page is the one on screen. When the
@@ -160,26 +240,30 @@ export function EntriesRoute() {
       });
   };
 
+  const vt = wide ? "entry" : "push";
   return (
-    <div class="page entries">
-      <header class="page-head">
-        <p class="eyebrow">History</p>
-        <h1>Entries</h1>
+    <div class="entries-page">
+      <header class="page-head entries-head">
+        <div class="entries-lead">
+          <h1 class="display">Entries</h1>
+          <FilterSentence library={library.state === "ready" ? library.data : []} filters={filters} go={go} />
+          <form class="search" role="search" onSubmit={(e) => { e.preventDefault(); go({ q: text.trim() }); }}>
+            <Search aria-hidden="true" />
+            <input type="search" name="q" value={text} placeholder="Search your words" aria-label="Search your words" autoComplete="off"
+              onInput={(e) => setText((e.target as HTMLInputElement).value)} />
+          </form>
+          {filters.day && (
+            <p class="active-filter">
+              <span>Only {dayLabel(filters.day)}</span>
+              <TextButton onClick={() => go({ day: undefined })}>
+                <Close aria-hidden="true" /> Show all
+              </TextButton>
+            </p>
+          )}
+        </div>
+        <Calendar class="entries-calendar" month={shown} marked={written} selected={filters.day ?? null} today={today}
+          onSelect={(day) => { setMonth(null); go({ day: day ?? undefined }); }} onMonth={setMonth} legend />
       </header>
-      <form class="search" role="search" onSubmit={(e) => { e.preventDefault(); go({ q: text.trim() }); }}>
-        <Search width={16} height={16} />
-        <input type="search" name="q" value={text} placeholder="Search your words" aria-label="Search your words"
-          onInput={(e) => setText((e.target as HTMLInputElement).value)} />
-      </form>
-      <Chips library={library.state === "ready" ? library.data : []} filters={filters} go={go} />
-      {filters.day && (
-        <p class="active-filter">
-          Showing {dayLabel(filters.day)}{" "}
-          <button type="button" class="link" onClick={() => go({ day: undefined })}>
-            <Close width={13} height={13} /> Show all
-          </button>
-        </p>
-      )}
       <Await res={first} reload={reload} rows={5}>
         {(page) => {
           const items = [...page.items, ...more.items];
@@ -187,30 +271,34 @@ export function EntriesRoute() {
           if (items.length === 0) {
             return <Empty>{filters.q || filters.kind || filters.program || filters.audio || filters.day ? "No entries match." : "No entries yet."}</Empty>;
           }
+          let i = 0;
           return (
-            <>
+            <div class="entries-list">
               {groupByWeek(items).map((w) => (
                 <section class="week" key={w.week}>
-                  <h2 class="week-head">{weekHeader(w.week)}</h2>
-                  {w.days.map((d) => (
-                    <div class="day" key={d.date} id={`day-${d.date}`}>
-                      <h3>{dayLabel(d.date)}</h3>
-                      <div class="rows">
-                        {d.items.map((e) => (
-                          <EntryRow key={e.stem} entry={e} />
-                        ))}
+                  <h2 class="book-head week-head">{weekHeader(w.week)}</h2>
+                  {w.days.map((d) => {
+                    const { n, w: wd } = dayParts(d.date);
+                    return (
+                      <div class="day" key={d.date} id={`day-${d.date}`}>
+                        <h3 class="day-tab"><span class="day-n">{n}</span> <span class="day-w">{wd}</span></h3>
+                        <div class="rows">
+                          {d.items.map((e) => (
+                            <EntryRow key={e.stem} entry={e} q={filters.q} i={i++} vt={vt} />
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </section>
               ))}
               {more.error && <ErrorLine error={more.error} onRetry={next ? () => loadMore(next) : undefined} />}
               {next && !more.error && (
-                <button type="button" class="button wide" disabled={more.busy} onClick={() => loadMore(next)}>
+                <Button wide class="load-more" disabled={more.busy} onClick={() => loadMore(next)}>
                   {more.busy ? "Loading…" : "Load more"}
-                </button>
+                </Button>
               )}
-            </>
+            </div>
           );
         }}
       </Await>

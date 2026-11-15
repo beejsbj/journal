@@ -645,12 +645,16 @@ def annotate(cfg: Config, now: datetime, log: list[str]) -> None:
         if ok:
             with ledger.locked(cfg.ledger_path):  # the hook and the conversation writer append under this lock
                 entries.write_annotations(path, text, cfg.names)
+            added = 0
             for f in followups:  # the annotations are written: a notebook failure must not hold back completion
                 try:
-                    notebook.add(cfg, f, source=path.stem)
+                    if notebook.add(cfg, f, source=path.stem, origin="annotation").get("duplicate"):
+                        log.append(f"{p['id']}: follow-up already in the notebook, not added")
+                    else:
+                        added += 1
                 except Exception as e:  # noqa: BLE001
                     log.append(f"{p['id']}: follow-up not saved to the notebook ({type(e).__name__}: {e})")
-            log.append(f"annotated {p['id']}" + (f" (+{len(followups)} notebook)" if followups else ""))
+            log.append(f"annotated {p['id']}" + (f" (+{added} notebook)" if added else ""))
         with ledger.locked(cfg.ledger_path) as data:
             q = ledger.find(data, p["id"])
             if q is not None:
@@ -865,6 +869,12 @@ def _held_off_record(cfg: Config, now: datetime, only: str, log: list[str]) -> b
     return True
 
 
+def files_as_error(line: str) -> bool:
+    """Whether a step's log line also goes to ``errors.jsonl``: one that says something failed, and a row the sweep
+    withheld from his words (``sweep.WITHHELD``), which someone should look at."""
+    return "failed" in line or line.startswith(sweep.WITHHELD)
+
+
 def run(cfg: Config, only: str | None = None, dry_run: bool = False,
         hold_off_record: bool = False) -> tuple[int, list[str]]:
     """One tick (or a manual send of ``only``). Returns (exit code, log lines).
@@ -915,7 +925,7 @@ def run(cfg: Config, only: str | None = None, dry_run: bool = False,
                 broken += 1
                 log.append(f"error: {name}: {type(e).__name__}: {e}")
                 errors.append(f"{name}: {type(e).__name__}: {e}")
-        errors += [l for l in log if "failed" in l and l not in errors]
+        errors += [l for l in log if files_as_error(l) and l not in errors]
         # Exit 1 (so the scheduler's failure delivery fires) for an alert or a step that crashed.
         # Retryable soft failures ("fold failed", a reply that will be retried) stay exit 0.
         code = 1 if alerts or broken else 0

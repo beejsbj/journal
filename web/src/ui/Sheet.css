@@ -1,0 +1,38 @@
+/* Sheet (ui/Sheet.tsx): a native dialog laid over the whole viewport; the scrim and the panel are its children */
+.sheet-layer {
+  position: fixed; inset: 0; z-index: var(--z-sheet); width: 100%; max-width: none; height: 100%; max-height: none;
+  margin: 0; padding: 0; border: 0; background: transparent; color: var(--text); overflow: hidden;
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.sheet-layer:not([open]) { display: none; }
+.sheet-layer::backdrop { background: transparent; }
+.sheet-backdrop {
+  position: absolute; inset: 0; background: var(--scrim);
+  animation: fade-in var(--d-3) var(--e-out) both;
+}
+.sheet {
+  position: relative; display: flex; flex-direction: column; width: 100%; max-height: 92dvh; overflow: auto; overscroll-behavior: contain;
+  margin: 0 8px max(8px, env(safe-area-inset-bottom)); padding: var(--s2) var(--s5) var(--s5);
+  border-radius: var(--r-xl); background: var(--pane); box-shadow: var(--elev-pop);
+  animation: sheet-up var(--spring-soft-dur) var(--spring-soft) both;
+}
+.sheet:focus { outline: none; }
+.sheet::before { content: ""; display: block; flex: none; width: 40px; height: 4px; margin: 2px auto var(--s3); border-radius: 4px; background: var(--hair-2); }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); margin-bottom: var(--s3); }
+.sheet-head h2 { margin: 0; font: italic 400 var(--t-h3) / 1.2 var(--f-his); color: var(--text); }
+.sheet-head .icon-button { margin-right: -8px; }
+
+.sheet-layer.leaving .sheet-backdrop { animation: fade-out var(--d-2) ease both; }
+.sheet-layer.leaving .sheet { animation: sheet-down var(--d-2) var(--e-inout) both; }
+@keyframes sheet-up { from { transform: translateY(105%); } }
+@keyframes sheet-down { to { transform: translateY(105%); } }
+@keyframes fade-out { to { opacity: 0; } }
+
+@media (min-width: 761px) {
+  .sheet-layer { align-items: center; }
+  .sheet { width: min(100% - 48px, 34rem); margin: 0; padding: var(--s4) var(--s6) var(--s6); max-height: 86dvh; animation-name: sheet-in; }
+  .sheet::before { display: none; }
+  .sheet-layer.leaving .sheet { animation-name: sheet-out; }
+  @keyframes sheet-in { from { opacity: 0; transform: translateY(14px) scale(0.98); } }
+  @keyframes sheet-out { to { opacity: 0; transform: translateY(10px) scale(0.98); } }
+}

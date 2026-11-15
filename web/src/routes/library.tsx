@@ -1,18 +1,28 @@
+/**
+ * The Library (round 02: Folio's rows, Night Room's clocks; "fine for now", a later pass will do more). Practices and
+ * programs in their groups, each a row: a ribbon for a page he wrote (solid) or rewrote (outlined), a clock for when
+ * it comes, its title with a dotted leader to its cadence, and its state in quiet words or a strip. No boxed badges,
+ * no emoji tiles. A practice's page, the default beside his edit of a built-in, and the definition itself follow.
+ */
 import { useLocation } from "preact-iso";
 import { useState } from "preact/hooks";
 import { api, type ApiError } from "../api";
 import { ConfirmButton } from "../components/ConfirmButton";
-import { Progress, sessionsDone } from "../components/RunCard";
-import { Await, Empty, ErrorLine } from "../components/Status";
+import { sessionsDone } from "../components/RunCard";
 import { definitionFromForm, formFromDefinition } from "../editorModel";
 import { useLive } from "../events";
 import { cadence, dayLabel, plural } from "../format";
 import { useAction, useResource } from "../hooks";
+import { ChevronRight, Plus } from "../icons";
 import { GROUP_ORDER, groupOf, isProgramBacked, sourceLabel } from "../labels";
 import { useTitle } from "../title";
-import type { LibraryItem, LibraryOne, Run } from "../types";
+import type { LibraryItem, LibraryOne, Run, Slot } from "../types";
+import { Await, Button, ButtonLink, Clock, Disclosure, Empty, ErrorLine, PageBack, ProgressStrip, Ribbon } from "../ui";
+import "./library.css";
 
-/** A program's runs that are in progress, by program id (for the cards' progress bars). */
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/** A program's runs that are in progress, by program id (for the rows' progress). */
 function liveRuns(runs: Run[] | null): Map<string, Run> {
   const by = new Map<string, Run>();
   for (const r of runs ?? []) if ((r.status === "active" || r.status === "paused") && !by.has(r.program)) by.set(r.program, r);
@@ -34,33 +44,47 @@ export function groupLibrary(items: LibraryItem[]): { group: string; items: Libr
 }
 
 const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
+const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-function Card({ it, run }: { it: LibraryItem; run?: Run | undefined }) {
+/** When a definition comes, as a clock: its first time (with the weekday for a weekly one), a run's progress, or a
+ *  dashed rim for one he starts himself. */
+function When({ schedule, run }: { schedule: Slot[]; run?: Run | undefined }) {
+  if (run && run.sessions.length > 0) return <Clock progress={{ done: sessionsDone(run), total: run.sessions.length }} />;
+  const first = schedule[0];
+  if (!first) return <Clock />;
+  return <Clock at={first.time} weekday={first.weekday === null ? undefined : WEEKDAYS[first.weekday]} />;
+}
+
+function Row({ it, run, i }: { it: LibraryItem; run?: Run | undefined; i: number }) {
   const program = isProgramBacked(it);
+  const meta = program
+    ? [it.kind === "situational" ? "On demand" : null, it.sessions ? count(it.sessions, "session") : null, it.phases_total ? count(it.phases_total, "phase") : null].filter(Boolean).join(" · ") || "Program"
+    : cadence(it.schedule);
+  const words = [
+    it.source === "user" && <span key="s" class="source mine">Yours</span>,
+    it.source === "fork" && <span key="s" class="source mine">Edited</span>,
+    it.default_changed && <span key="c" class="changed">default changed</span>,
+    !it.enabled && <span key="o" class="off-word">off</span>,
+    it.active_run && !(run && run.sessions.length > 0) && <span key="r" class="running">running</span>,
+    run && run.sessions.length > 0 && <span key="p" class="sessions">{sessionsDone(run)} of {run.sessions.length} sessions</span>,
+  ].filter(Boolean);
   return (
-    <li>
-      <a class={`card library-card${it.enabled ? "" : " off"}`} href={`/library/${it.id}`}>
-        {it.emoji && <span class="emoji" aria-hidden="true">{it.emoji}</span>}
-        <span class="main">
-          <span class="title">{it.title}</span>
-          <span class="meta">
-            {program
-              ? [it.kind === "situational" ? "On demand" : null, it.sessions ? count(it.sessions, "session") : null, it.phases_total ? count(it.phases_total, "phase") : null].filter(Boolean).join(" · ") || "Program"
-              : cadence(it.schedule)}
+    <li class="rise" style={{ "--i": i }}>
+      <a class={`library-card prac${it.enabled ? "" : " off"}`} href={`/library/${it.id}`} data-vt="push">
+        <span class="prac-ribbon">{it.source === "user" ? <Ribbon kind="own" /> : it.source === "fork" ? <Ribbon kind="edited" /> : null}</span>
+        <When schedule={it.schedule} run={run} />
+        <span class="prac-main">
+          <span class="prac-title">
+            <span class="title">{it.title}</span>
+            <span class="lead" aria-hidden="true" />
+            <span class="meta">{meta}</span>
           </span>
+          {words.length > 0 && <span class="colophon">{words}</span>}
           {run && run.sessions.length > 0 && (
-            <>
-              <Progress done={sessionsDone(run)} total={run.sessions.length} />
-              <span class="meta">{sessionsDone(run)} of {run.sessions.length} sessions</span>
-            </>
+            <ProgressStrip label={`${it.title}, sessions`} done={sessionsDone(run)} total={run.sessions.length} />
           )}
         </span>
-        <span class="badges">
-          <span class={`badge source ${it.source}`}>{sourceLabel(it.source)}</span>
-          {it.default_changed && <span class="badge changed">default changed</span>}
-          {!it.enabled && <span class="badge off">off</span>}
-          {it.active_run && <span class="badge active">running</span>}
-        </span>
+        <ChevronRight class="prac-go" aria-hidden="true" />
       </a>
     </li>
   );
@@ -73,42 +97,46 @@ export function LibraryRoute() {
       api.library(signal),
       api.runs(signal).catch((e: unknown) => {
         if (e instanceof DOMException) throw e;
-        return null;   // the progress bars are a nicety: the cards still read without them
+        return null;   // the progress is a nicety: the rows still read without it
       }),
     ]);
     return { items, runs };
   }, []);
-  useLive(["library-changed", "runs-changed"], reload);   // the "running" badge follows the run files
+  useLive(["library-changed", "runs-changed"], reload);   // "running" follows the run files
   return (
-    <div class="page library">
-      <header class="page-head">
-        <p class="eyebrow">Practices and programs</p>
-        <h1>Library</h1>
-        <p class="head-actions">
-          <a class="button primary" href="/new-practice">
-            New practice
-          </a>
-        </p>
+    <div class="library-page">
+      <header class="lib-head">
+        <div class="lib-head-words">
+          <h1 class="display">Library</h1>
+          <p class="lede">The practices sent to you on a schedule, and the ones you start when you need them.</p>
+        </div>
+        <ButtonLink variant="primary" href="/new-practice" data-vt="push" icon={<Plus />}>New practice</ButtonLink>
       </header>
+      <p class="lib-legend">
+        <Ribbon kind="own" />
+        A ribbon marks a page you wrote, or rewrote. The clock says when it comes.
+      </p>
       <Await res={res} reload={reload} rows={4}>
-        {({ items, runs }) =>
-          items.length === 0 ? (
-            <Empty>The library is empty.</Empty>
-          ) : (
+        {({ items, runs }) => {
+          if (items.length === 0) return <Empty>The library is empty.</Empty>;
+          const live = liveRuns(runs);
+          let i = 0;
+          return (
             <>
               {groupLibrary(items).map((g) => (
-                <section key={g.group} aria-labelledby={`g-${g.group}`}>
-                  <h2 id={`g-${g.group}`}>{g.group}</h2>
-                  <ul class="cards">
-                    {g.items.map((it) => (
-                      <Card key={it.id} it={it} run={liveRuns(runs).get(it.id)} />
-                    ))}
+                <section key={g.group} class="lib-group" aria-labelledby={`g-${g.group}`}>
+                  <h2 id={`g-${g.group}`} class="book-head">
+                    {g.group}
+                    <span class="count" aria-hidden="true">{g.items.length}</span>
+                  </h2>
+                  <ul class="prac-list">
+                    {g.items.map((it) => <Row key={it.id} it={it} run={live.get(it.id)} i={i++} />)}
                   </ul>
                 </section>
               ))}
             </>
-          )
-        }
+          );
+        }}
       </Await>
     </div>
   );
@@ -132,34 +160,40 @@ export function EditedNote({ one, onReset }: { one: LibraryOne; onReset: () => v
   const program = isProgramBacked(d) || one.sessions !== undefined;
   return (
     <section class="edited-note" aria-labelledby="edited-h">
-      <h2 id="edited-h">Edited</h2>
-      <p>
-        {o.in_force
-          ? `Your version is used in place of the built-in: the same name${program ? ", the same /start word" : ", the same times"}.`
-          : "Your edited file does not load, so the built-in is used meanwhile. Mend the file, or reset it."}
-      </p>
-      {o.default_changed === true && (
-        <p class="default-changed">The default has changed since you edited it. Your version is kept until you reset it.</p>
-      )}
-      <div class="actions">
-        <a class="button" href={`/library/${d.id}/default`}>
-          {o.default_changed ? "See what changed" : "View the default"}
-        </a>
-        <ConfirmButton question="Replace your version with the default?" yes="Reset to default" disabled={act.busy} onConfirm={async () => {
-          if (await act.run(async () => (await api.resetLibrary(d.id), true))) onReset();   // (a 204 answers nothing)
-        }}>
-          Reset to default
-        </ConfirmButton>
+      <Ribbon kind="edited" />
+      <div class="edited-words">
+        <h2 id="edited-h">Edited</h2>
+        <p>
+          {o.in_force
+            ? `Your version is used in place of the built-in: the same name${program ? ", the same /start word" : ", the same times"}.`
+            : "Your edited file does not load, so the built-in is used meanwhile. Mend the file, or reset it."}
+        </p>
+        {o.default_changed === true && (
+          <p class="default-changed">The default has changed since you edited it. Your version is kept until you reset it.</p>
+        )}
+        <div class="actions">
+          <ButtonLink href={`/library/${d.id}/default`} data-vt="push">
+            {o.default_changed ? "See what changed" : "View the default"}
+          </ButtonLink>
+          <ConfirmButton question="Replace your version with the default?" yes="Reset to default" disabled={act.busy} onConfirm={async () => {
+            if (await act.run(async () => (await api.resetLibrary(d.id), true))) onReset();   // (a 204 answers nothing)
+          }}>
+            Reset to default
+          </ConfirmButton>
+        </div>
+        {act.error && <ErrorLine error={act.error} />}
       </div>
-      {act.error && <ErrorLine error={act.error} />}
     </section>
   );
 }
 
-/** What can be done with a practice: send it now, switch it, change it, put it back. */
+/** What can be done with a practice: write it now (Today, open on it), send it to the chat, switch it, change it, put
+ *  it back. Send to chat is not offered on a journal with no chat (the day's quiet read says so, as Today reads it). */
 function PracticeActions({ one, reload }: { one: LibraryOne; reload: () => void }) {
   const d = one.definition;
   const act = useAction();
+  const [day] = useResource((signal) => api.todayQuiet(signal).catch(() => null), []);
+  const chat = day.state === "ready" ? day.data?.chat : undefined;
   const { route } = useLocation();
   const [onItsWay, setOnItsWay] = useState(false);
   useLive(["ledger-changed"], () => setOnItsWay(false));
@@ -172,35 +206,31 @@ function PracticeActions({ one, reload }: { one: LibraryOne; reload: () => void 
     return done;
   };
   return (
-    <div class="actions detail-actions">
-      {/* (turned off is not scheduled, nothing more: it is still written and sent from here; the owner, 2026-11-09) */}
-      <a class="button" href={`/today?write=${encodeURIComponent(d.id)}`}>
-        Write now
-      </a>
-      <button
-        type="button"
-        class="button"
-        disabled={act.busy || onItsWay}
-        onClick={async () => {
-          const done = await act.run(() => api.sendNow(d.id));
-          if (done) setOnItsWay(true);
-        }}
-      >
-        {onItsWay ? "On its way…" : "Send to chat"}
-      </button>
-      <a class="button primary" href={`/library/${d.id}/edit`}>
-        Edit
-      </a>
-      <button type="button" class="button" disabled={act.busy} onClick={() => void go(() => setEnabled(one, !d.enabled))}>
-        {d.enabled ? "Turn off" : "Turn on"}
-      </button>
-      {d.source === "user" && (
-        <ConfirmButton question="Delete this practice?" yes="Delete" disabled={act.busy} onConfirm={async () => {
-          if (await go(() => api.resetLibrary(d.id))) route("/library");
-        }}>
-          Delete
-        </ConfirmButton>
-      )}
+    <div class="detail-actions">
+      <div class="actions">
+        <ButtonLink variant="primary" href={`/library/${d.id}/edit`} data-vt="push">Edit</ButtonLink>
+        {/* (turned off is not scheduled, nothing more: it is still written and sent from here; the owner, 2026-11-09) */}
+        <ButtonLink href={`/today?write=${encodeURIComponent(d.id)}`}>Write now</ButtonLink>
+        {day.state !== "loading" && chat !== false && (   /* (asked first: it never shows, then goes, on a journal with no chat) */
+          <Button disabled={act.busy || onItsWay} onClick={async () => {
+            const done = await act.run(() => api.sendNow(d.id));
+            if (done) setOnItsWay(true);
+          }}>
+            {onItsWay ? "On its way…" : "Send to chat"}
+          </Button>
+        )}
+        <Button disabled={act.busy} onClick={() => void go(() => setEnabled(one, !d.enabled))}>
+          {d.enabled ? "Turn off" : "Turn on"}
+        </Button>
+        {d.source === "user" && (
+          <ConfirmButton question="Delete this practice?" yes="Delete" disabled={act.busy} onConfirm={async () => {
+            if (await go(() => api.resetLibrary(d.id))) route("/library");
+          }}>
+            Delete
+          </ConfirmButton>
+        )}
+      </div>
+      {!d.enabled && <p class="hint">Turned off: not sent on its schedule. Write now and Send to chat still work.</p>}
       {act.error && <ErrorLine error={act.error} />}
     </div>
   );
@@ -226,49 +256,47 @@ function ProgramActions({ one, runs, reload }: { one: LibraryOne; runs: Run[] | 
       : null;
   return (
     <div class="detail-actions">
+      {live && live.sessions.length > 0 && (
+        <ProgressStrip title="Where you are" label={`${d.title}, sessions`} done={sessionsDone(live)} total={live.sessions.length}
+          meta={`${sessionsDone(live)} of ${live.sessions.length} sessions done${live.status === "paused" ? ", on a break" : ""}`} />
+      )}
       <div class="actions">
         {live ? (
-          <a class="button primary" href={`/runs/${live.id}`}>
-            Continue
-          </a>
+          <ButtonLink variant="primary" href={`/runs/${live.id}`} data-vt="push">Continue</ButtonLink>
         ) : (
-          <button
-            type="button"
-            class="button primary"
-            disabled={act.busy || starting || !d.enabled || runs === null}
-            onClick={async () => {
-              const done = await act.run(() => api.startRun(d.id));
-              if (done) {
-                setStarting(true);
-                reload();
-              }
-            }}
-          >
+          <Button variant="primary" disabled={act.busy || starting || !d.enabled || runs === null} onClick={async () => {
+            const done = await act.run(() => api.startRun(d.id));
+            if (done) {
+              setStarting(true);
+              reload();
+            }
+          }}>
             {starting ? "Starting…" : "Start"}
-          </button>
+          </Button>
         )}
-        <a class="button" href={`/library/${d.id}/edit`}>
-          Edit
-        </a>
+        <ButtonLink href={`/library/${d.id}/edit`} data-vt="push">Edit</ButtonLink>
       </div>
       {!d.enabled && <p class="hint">This program is turned off.</p>}
       {error &&
         (carryOn ? (
-          <p class="error-line" role="alert">
-            {error.detail} <a href={`/runs/${carryOn}`}>Carry on with it</a>
-          </p>
+          <div class="error-line" role="alert">
+            <p>
+              {error.detail} <a href={`/runs/${carryOn}`}>Carry on with it</a>
+            </p>
+          </div>
         ) : (
           <ErrorLine error={error} />
         ))}
       {past.length > 0 && (
-        <section aria-labelledby="runs-h">
-          <h2 id="runs-h">Earlier runs</h2>
-          <ul class="plain-list runs">
+        <section class="lib-runs" aria-labelledby="runs-h">
+          <h2 id="runs-h" class="book-head">Earlier runs</h2>
+          <ul>
             {past.map((r) => (
               <li key={r.id}>
-                <a href={`/runs/${r.id}`}>
-                  <span class="kind">{STARTED(r)} · {r.status}</span>
-                  <span>{plural(sessionsDone(r), "session")} done{r.insights_entry ? " · insights compiled" : ""}</span>
+                <a href={`/runs/${r.id}`} data-vt="push">
+                  <span class="run-when">{STARTED(r)}</span>
+                  <span class="run-what">{r.status} · {plural(sessionsDone(r), "session")} done{r.insights_entry ? " · insights compiled" : ""}</span>
+                  <ChevronRight aria-hidden="true" />
                 </a>
               </li>
             ))}
@@ -279,15 +307,15 @@ function ProgramActions({ one, runs, reload }: { one: LibraryOne; runs: Run[] | 
   );
 }
 
-/** A definition's questions (a practice's sections, or a program's sessions and phases), her line, the problems in
- *  its file, and the file itself: the Library page's body, and the default's. */
+/** A definition's questions (a practice's sections, or a program's sessions and phases), the line for the companion,
+ *  the problems in its file, and the file itself: the Library page's body, and the default's. */
 export function DefinitionView({ one }: { one: LibraryOne }) {
   const { definition: d, raw, problems, sessions } = one;
   return (
-    <>
+    <div class="definition">
       {problems.length > 0 && (
-        <section class="problems" role="alert">
-          <h2>Problems in the file</h2>
+        <section class="problems error-line" role="alert">
+          <p><b>Problems in the file</b></p>
           <ul>
             {problems.map((p) => (
               <li key={p}>{p}</li>
@@ -298,7 +326,7 @@ export function DefinitionView({ one }: { one: LibraryOne }) {
       {sessions && sessions.length > 0 ? (
         sessions.map((s) => (
           <section key={s.number} class="session-set">
-            <h2>
+            <h2 class="book-head">
               Session {s.number} · {s.title}
             </h2>
             <ol>
@@ -324,7 +352,7 @@ export function DefinitionView({ one }: { one: LibraryOne }) {
       ) : (
         d.sections.map((s, i) => (
           <section key={i} class="question-set">
-            {s.title && <h2>{s.title}</h2>}
+            <h2 class="book-head">{s.title ?? (d.sections.length === 1 ? "The questions" : `Part ${i + 1}`)}</h2>
             <ol>
               {s.questions.map((q) => (
                 <li key={q.id}>
@@ -337,14 +365,13 @@ export function DefinitionView({ one }: { one: LibraryOne }) {
       )}
       {d.companion && (
         <p class="companion-line">
-          <span class="label">For the companion</span> {d.companion}
+          <span class="label">For the companion</span> <span class="companion-words">{d.companion}</span>
         </p>
       )}
-      <details class="raw">
-        <summary>The file</summary>
+      <Disclosure class="raw" head="The file" peek="The Markdown, as it is saved">
         <pre>{raw}</pre>
-      </details>
-    </>
+      </Disclosure>
+    </div>
   );
 }
 
@@ -353,6 +380,14 @@ export function cadenceOf(one: LibraryOne): string {
   const { definition: d, sessions } = one;
   return d.kind === "program" ? "program" : sessions ? `on demand · ${count(sessions.length, "session")}` : cadence(d.schedule);
 }
+
+/** "Built-in · Daily 06:00 · off": where a definition comes from and when, in the line above its title. */
+function kickerOf(one: LibraryOne): string {
+  const d = one.definition;
+  const from = d.source === "fork" ? "edited built-in" : sourceLabel(d.source);
+  return capital(`${from} · ${cadenceOf(one)}${d.enabled ? "" : " · off"}`);
+}
+
 
 export function LibraryDetailRoute({ id = "" }: { id?: string }) {
   const [res, reload] = useResource(async (signal) => {
@@ -368,30 +403,29 @@ export function LibraryDetailRoute({ id = "" }: { id?: string }) {
   useLive(["library-changed", "runs-changed"], reload);
   useTitle(res.state === "ready" ? res.data.one.definition.title : "Library");
   return (
-    <div class="page library-detail">
-      <p class="crumb">
-        <a href="/library">‹ Library</a>
-      </p>
+    <div class="library-page library-detail">
+      <PageBack href="/library">Library</PageBack>
       {res.state === "error" && res.error.status === 404 ? (
         <Empty>No practice or program by that name.</Empty>
       ) : (
         <Await res={res} reload={reload} rows={4}>
           {({ one, runs }) => {
           const { definition: d, sessions } = one;
+          const program = isProgramBacked(d) || !!sessions;
           return (
             <>
-              <header class="page-head">
-                <p class="eyebrow">
-                  {sourceLabel(d.source)} · {cadenceOf(one)}
-                  {!d.enabled && " · off"}
-                </p>
-                <h1>
-                  <span aria-hidden="true">{d.emoji} </span>
-                  {d.title}
-                </h1>
-                {d.opener.plain && <p class="sub">{d.opener.plain}</p>}
+              <header class="lib-detail-head">
+                <div class="lib-detail-clock"><When schedule={d.schedule} run={program ? (runs ?? []).find((r) => r.program === d.id && (r.status === "active" || r.status === "paused")) : undefined} /></div>
+                <div>
+                  <p class="kicker">
+                    {d.emoji && <span class="lib-emoji" aria-hidden="true">{d.emoji}</span>}
+                    {kickerOf(one)}
+                  </p>
+                  <h1 class="display">{d.title}</h1>
+                  {d.opener.plain && <p class="lede">{d.opener.plain}</p>}
+                </div>
               </header>
-              {isProgramBacked(d) || sessions ? (
+              {program ? (
                 <ProgramActions one={one} runs={runs} reload={reload} />
               ) : (
                 <PracticeActions one={one} reload={reload} />
@@ -469,10 +503,8 @@ export function LibraryDefaultRoute({ id = "" }: { id?: string }) {
   const act = useAction();
   const { route } = useLocation();
   return (
-    <div class="page library-detail library-default">
-      <p class="crumb">
-        <a href={`/library/${id}`}>‹ {res.state === "ready" ? res.data.definition.title : "Library"}</a>
-      </p>
+    <div class="library-page library-detail library-default">
+      <PageBack href={`/library/${id}`}>{res.state === "ready" ? res.data.definition.title : "Library"}</PageBack>
       {res.state === "error" && res.error.status === 404 ? (
         <Empty>Nothing ships under that name: only a built-in has a default.</Empty>
       ) : (
@@ -481,39 +513,40 @@ export function LibraryDefaultRoute({ id = "" }: { id?: string }) {
             const { definition: d, diff } = one;
             return (
               <>
-                <header class="page-head">
-                  <p class="eyebrow">The default · {cadenceOf(one)}</p>
-                  <h1>
-                    <span aria-hidden="true">{d.emoji} </span>
-                    {d.title}
-                  </h1>
-                  <p class="sub">As it ships with the journal{diff.yours !== null ? "; your edit is used in its place" : ""}.</p>
+                <header class="lib-detail-head">
+                  <div class="lib-detail-clock"><When schedule={d.schedule} /></div>
+                  <div>
+                    <p class="kicker">The default · {cadenceOf(one)}</p>
+                    <h1 class="display">{d.title}</h1>
+                    <p class="lede">As it ships with the journal{diff.yours !== null ? "; your edit is used in its place" : ""}.</p>
+                  </div>
                 </header>
                 {diff.yours !== null && (
-                  <div class="actions detail-actions">
-                    <ConfirmButton question="Replace your version with the default?" yes="Reset to default" disabled={act.busy} onConfirm={async () => {
-                      if (await act.run(async () => (await api.resetLibrary(d.id), true))) route(`/library/${d.id}`);
-                    }}>
-                      Reset to default
-                    </ConfirmButton>
+                  <div class="detail-actions">
+                    <div class="actions">
+                      <ConfirmButton question="Replace your version with the default?" yes="Reset to default" disabled={act.busy} onConfirm={async () => {
+                        if (await act.run(async () => (await api.resetLibrary(d.id), true))) route(`/library/${d.id}`);
+                      }}>
+                        Reset to default
+                      </ConfirmButton>
+                    </div>
                     {act.error && <ErrorLine error={act.error} />}
                   </div>
                 )}
                 {diff.since && (
                   <section class="diff-section" aria-labelledby="since-h">
-                    <h2 id="since-h">What changed in the default since you edited it</h2>
+                    <h2 id="since-h" class="book-head">What changed in the default since you edited it</h2>
                     <Diff text={diff.since} label="The default when you edited it, against the default now" />
                   </section>
                 )}
                 {diff.yours !== null && (
-                  <details class="diff-section" open={!diff.since}>
-                    <summary>Your version against the default</summary>
+                  <Disclosure class="diff-section" head="Your version against the default" defaultOpen={!diff.since}>
                     {diff.yours ? (
                       <Diff text={diff.yours} label="The default, against your version" />
                     ) : (
                       <p class="hint">Your version is the same as the default.</p>
                     )}
-                  </details>
+                  </Disclosure>
                 )}
                 <DefinitionView one={one} />
               </>

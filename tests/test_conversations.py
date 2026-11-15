@@ -407,8 +407,9 @@ class ReadersTest(Base):
         self.assertNotIn("HER WORDS", seen[0])
         block = reflect._input_block(self.cfg, [self.note()])
         self.assertIn("[Iris's chat reply, 19:31: her words, not Theo's] HER WORDS that are not his", block)
-        self.assertNotIn("HER WORDS", reflect._his_corpus(block))
-        self.assertIn("my follow-up words", reflect._his_corpus(block))
+        his = entries.his_text(self.note())  # what a reflection's quotes are checked against (CONTINUITY): his only
+        self.assertNotIn("HER WORDS", his)
+        self.assertIn("my follow-up words", his)
 
     def test_reflection_trims_her_replies_first(self):
         long_reply = "\n".join(f"her line {i} " + "x" * 80 for i in range(200))
@@ -950,7 +951,7 @@ class CodexReviewTest(Base):
         self.assertIn("> [!note] Important\n> remember this", words)
         self.assertNotIn("I will.", words)
         self.assertIn("remember this", entries.without_companion_replies(body))
-        self.assertIn("remember this", reflect._his_corpus(reflect._input_block(self.cfg, [self.note()])))
+        self.assertIn("remember this", entries.his_text(self.note()))  # (a reflection may quote it: his words)
 
     def test_a_replayed_audio_block_still_queues_its_transcript(self):
         self.cfg.audio["command"] = ["/bin/sh", "-c", "echo 'transcribed'"]

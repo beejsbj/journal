@@ -1,13 +1,15 @@
 /**
  * Make the PNG icons from the SVG mark: `npm run icons` (needs `@resvg/resvg-js`, a dev dependency). The PNGs are
  * committed beside the mark (`public/icons/`), so the build never needs this and a CI run does not rasterise anything;
- * run it when the mark changes. The mark's colours are the paper (`--bg`), his ink (`--ink`) and the default ink of hers
- * (`--accent`, blue-black) of `tokens.css`: an installed icon cannot follow the ink a device chose.
+ * run it when the mark changes. The mark is the "margin j" (design/DESIGN.md, "The mark"); its colours are the paper
+ * (`--pane`), his ink (`--text`) and the default ink of hers (`--her`, blue-black) of `tokens.css`: an installed icon
+ * cannot follow the ink a device chose.
  *
  * - `icon-192.png`, `icon-512.png`: the mark as it is (the browser rounds or masks them as it likes).
  * - `icon-maskable-512.png`: the mark scaled into the middle 72% (Android masks to a circle at worst; the safe
  *   zone is the middle 80%), on the same paper.
  * - `apple-touch-icon.png` (180): iOS wants an opaque square and rounds it itself.
+ * - `favicon-32.png`: the tab's mark (`favicon.svg`, drawn for 16 px, not the page shrunk) for a browser without SVG favicons.
  */
 import { Resvg } from "@resvg/resvg-js";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -27,4 +29,5 @@ writeFileSync(`${dir}icon-192.png`, png(mark, 192));
 writeFileSync(`${dir}icon-512.png`, png(mark, 512));
 writeFileSync(`${dir}icon-maskable-512.png`, png(maskable, 512));
 writeFileSync(`${dir}apple-touch-icon.png`, png(mark, 180));
+writeFileSync(`${dir}favicon-32.png`, png(readFileSync(`${dir}favicon.svg`, "utf-8"), 32));
 console.log("icons written to", dir);

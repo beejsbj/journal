@@ -64,6 +64,9 @@ class AnnotationReplyTest(unittest.TestCase):
         bot = FakeBot()
         log = self.tick_steps(bot)
         self.assertIn("annotated 2026-10-14-morning (+1 notebook)", log)
+        from journal import notebook
+        item = notebook.open_items(self.cfg)[0]  # filed by the engine from the entry: on the record (CONTINUITY)
+        self.assertEqual((item["source"], item["origin"]), ("2026-10-14-morning", "annotation"))
         self.assertIn("replied to 2026-10-14-morning with its annotations", log)
         method, payload = bot.calls[-1]
         self.assertEqual(method, "sendMessage")

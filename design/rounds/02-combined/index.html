@@ -1,0 +1,2049 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-ink="blue-black" data-fasten="postmark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>journal · round 02, combined (Folio × Night Room)</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23f4efe4'/%3E%3Cpath d='M18 14v7.5a5.5 5.5 0 0 1-5.5 5.5H10' fill='none' stroke='%231b1813' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='18' cy='6.5' r='3.25' fill='none' stroke='%2328367f' stroke-width='2.75'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..600;1,6..72,300..500&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=Instrument+Sans:wght@400..600&display=swap" rel="stylesheet">
+<script>
+/* before first paint: theme, ink, sidebar and motion from the hash or this device */
+(function(){var h=document.documentElement,p=new URLSearchParams((location.hash.split('?')[1])||'');
+try{var k=localStorage.getItem('journal:ink');if(k)h.dataset.ink=k}catch(e){}
+if(p.get('ink'))h.dataset.ink=p.get('ink');
+var t=p.get('theme');h.dataset.theme=t==='dark'||t==='light'?t:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+if(p.get('motion')==='off')h.dataset.motion='off';if(p.get('fasten'))h.dataset.fasten=p.get('fasten');})();
+</script>
+
+<style id="tokens">
+/* =====================================================================
+   journal · design tokens, round 02 (Folio × Night Room)
+   One sheet. Lift this block into web/src/tokens.css as it stands.
+   Roles, not colours: components read --room/--pane/--text…, never a hex.
+   Light = Folio's warm paper on a desk. Dark = Night Room's cool room.
+   Her ink (--her) is the only hue; it is registered so a new ink flows.
+   ===================================================================== */
+@property --her { syntax: '<color>'; inherits: true; initial-value: #28367f; }
+
+:root {
+  /* ---- type: three families, one job each ---- */
+  --f-his: "Newsreader", "Iowan Old Style", Charter, Georgia, serif;          /* his words; the book's titles, italic heads, hours */
+  --f-her: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;        /* her words, and only hers: typed letters */
+  --f-ui:  "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif; /* the interface */
+
+  /* ---- type scale (rem at 16) ---- */
+  --t-micro: 0.75rem;     /* 12  margin source, counts, calendar heads */
+  --t-small: 0.8125rem;   /* 13  meta, hints, labels about her */
+  --t-ui: 0.9375rem;      /* 15  interface body, nav, rows */
+  --t-her: 0.9063rem;     /* 14.5 her letters and notes */
+  --t-her-lg: 1.0625rem;  /* 17  the question she asked */
+  --t-read: 1.25rem;      /* 20  his words, reading */
+  --t-write: 1.5rem;      /* 24  his words, writing (you write larger than you read) */
+  --t-h3: 1.25rem;        /* 20  book heads, italic */
+  --t-h2: 1.75rem;        /* 28  section titles (settings) */
+  --t-h1: 2.75rem;        /* 44  page titles */
+  --t-display: 4rem;      /* 64  settings title, insights week */
+  --t-numeral: 5.5rem;    /* 88  Almanac's large numerals */
+  --lh-read: 1.62; --lh-her: 1.72; --lh-write: 1.66; --lh-ui: 1.5;
+
+  /* ---- space (4 px base) and layout measures ---- */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px; --s9: 96px;
+  --tap: 44px;
+  --gutter: 56px;          /* page padding, desktop (20 on a phone) */
+  --measure: 35rem;        /* his column */
+  --margin-l: 72px;        /* the hours */
+  --margin-r: 200px;       /* her notes */
+  --rail: 228px; --rail-compact: 68px;
+  --side-list: 280px; --side-rail: 92px;
+
+  /* ---- radius ---- */
+  --r-xs: 6px; --r-s: 8px; --r-m: 12px; --r-l: 18px; --r-xl: 26px; --r-pill: 999px;
+
+  /* ---- motion ---- */
+  --d-1: 120ms;   /* press, hover */
+  --d-2: 200ms;   /* colour, small fades */
+  --d-3: 340ms;   /* chevrons, knobs */
+  --d-4: 480ms;   /* push, recede */
+  --d-bloom: 640ms; /* the write room opening */
+  --d-ink: 700ms; /* her ink flowing to a new colour */
+  --stagger: 28ms;
+  --e-out: cubic-bezier(.16, 1, .3, 1);        /* arrivals */
+  --e-inout: cubic-bezier(.65, 0, .35, 1);     /* both ends matter */
+  --e-paper: cubic-bezier(.3, .75, .12, 1);    /* anything paper */
+  /* damped springs baked to linear(): k260 c27 (controls) and k170 c21 (panes, disclosures) */
+  --spring: linear(0, 0.031, 0.107, 0.207, 0.316, 0.426, 0.529, 0.622, 0.703, 0.772, 0.829, 0.875, 0.912, 0.94, 0.962, 0.978, 0.99, 0.997, 1.003, 1.006, 1.007, 1.008, 1.008, 1.008, 1.007, 1.006, 1.005, 1.004, 1.003, 1.003, 1.002, 1.002, 1);
+  --spring-dur: 533ms;
+  --spring-soft: linear(0, 0.03, 0.103, 0.201, 0.309, 0.419, 0.523, 0.618, 0.701, 0.773, 0.832, 0.88, 0.919, 0.948, 0.971, 0.987, 0.998, 1.006, 1.011, 1.013, 1.014, 1.014, 1.013, 1.012, 1.01, 1.009, 1.007, 1.006, 1.004, 1.003, 1.003, 1.002, 1);
+  --spring-soft-dur: 642ms;
+}
+
+/* ---- colour roles · light: Folio's paper and desk ---- */
+:root, [data-theme="light"] {
+  --room: #eee7d9;        /* the desk: behind the panes, the rail */
+  --pane: #fbf8f1;        /* the page */
+  --raised: #f5f0e5;      /* hover, the player, cards on the page */
+  --raised-2: #efe8da;
+  --sunk: #ece5d6;        /* inset fields, segmented tracks */
+  --letter: #fffcf6;      /* the base of her letters */
+  --write-room: #fbf8f1;  /* the writing room's ground */
+  --text: #1d1a15;        /* his words, his actions */
+  --text-2: #4c443a;
+  --text-3: #6d6356;      /* >= 4.5:1 on every light ground, the desk included */
+  --hair: #e9e2d3;        /* rules */
+  --hair-2: #dcd2bf;      /* outlines, stronger rules */
+  --lamp: #1d1a15;        /* his primary action: ink on paper by day */
+  --on-lamp: #fbf8f1;
+  --nav-on: var(--pane);
+  --frost: rgb(251 248 241 / .84);
+  --scrim: rgb(40 30 15 / .24);
+  --tape: rgb(236 222 190 / .78);
+  /* glow: warm lamp light on paper */
+  --glow: rgb(255 204 128 / .30);       /* at the head of a page */
+  --glow-room: rgb(255 198 120 / .30);  /* behind the writing column */
+  --glow-desk: rgb(255 214 150 / .22);  /* the desk, top left */
+  --ink-glow-k: 0%;
+  --recede: .94; --focus-dim: .3;
+  --elev-tab: 0 1px 0 rgb(70 50 20 / .04), 0 1px 3px rgb(70 50 20 / .08);
+  --elev-1: 0 0 0 1px rgb(70 50 20 / .05), 0 1px 2px rgb(70 50 20 / .05), 0 16px 48px -16px rgb(70 50 20 / .20);
+  --elev-2: 0 0 0 1px rgb(70 50 20 / .05), 0 2px 4px rgb(70 50 20 / .05), 0 30px 64px -24px rgb(70 50 20 / .30);
+  --elev-pop: 0 0 0 1px rgb(70 50 20 / .07), 0 4px 10px rgb(40 30 10 / .07), 0 22px 54px -10px rgb(40 30 10 / .26);
+  --elev-letter: 0 1px 2px rgb(70 50 20 / .05), 0 10px 26px -16px rgb(70 50 20 / .28);
+  color-scheme: light;
+}
+/* ---- colour roles · dark: Night Room ---- */
+[data-theme="dark"] {
+  --room: #0a0d12;
+  --pane: #141921;
+  --raised: #1a2029;
+  --raised-2: #222935;
+  --sunk: #0f131a;
+  --letter: #1a2029;
+  --write-room: #0a0d12;
+  --text: #ebe8e1;        /* warm paper-white */
+  --text-2: #a9afba;
+  --text-3: #8a91a0;      /* >= 4.8:1 on every dark ground, glow included */
+  --hair: rgb(196 210 235 / .075);
+  --hair-2: rgb(196 210 235 / .13);
+  --lamp: #f1ede4;        /* his primary action: the lamp */
+  --on-lamp: #12161d;
+  --nav-on: var(--raised);
+  --frost: rgb(20 25 33 / .74);
+  --scrim: rgb(5 7 10 / .55);
+  --tape: rgb(200 212 235 / .13);
+  --glow: rgb(255 238 206 / .055);
+  --glow-room: rgb(255 238 206 / .075);
+  --glow-desk: rgb(160 180 230 / .045);
+  --ink-glow-k: 38%;
+  --recede: .7; --focus-dim: .22;
+  --elev-tab: inset 0 1px 0 rgb(255 255 255 / .03);
+  --elev-1: inset 0 1px 0 rgb(255 255 255 / .035), 0 12px 32px -16px rgb(0 0 0 / .7);
+  --elev-2: inset 0 1px 0 rgb(255 255 255 / .045), 0 30px 70px -24px rgb(0 0 0 / .8), 0 2px 10px rgb(0 0 0 / .35);
+  --elev-pop: inset 0 1px 0 rgb(255 255 255 / .06), 0 20px 50px -12px rgb(0 0 0 / .75), 0 0 0 1px var(--hair-2);
+  --elev-letter: inset 0 1px 0 rgb(255 255 255 / .04), 0 14px 30px -18px rgb(0 0 0 / .8);
+  color-scheme: dark;
+}
+
+/* ---- her four inks (Folio's set). Light on paper, dark on the night pane; all AA (>= 7:1 body) ---- */
+[data-ink="blue-black"] { --her: #28367f; }
+[data-ink="brown"]      { --her: #7a4519; }
+[data-ink="violet"]     { --her: #4b2a8a; }
+[data-ink="green"]      { --her: #1b5642; }
+[data-theme="dark"][data-ink="blue-black"], [data-theme="dark"] [data-ink="blue-black"] { --her: #b6c0ff; }
+[data-theme="dark"][data-ink="brown"],      [data-theme="dark"] [data-ink="brown"]      { --her: #dcab78; }
+[data-theme="dark"][data-ink="violet"],     [data-theme="dark"] [data-ink="violet"]     { --her: #d2b4ff; }
+[data-theme="dark"][data-ink="green"],      [data-theme="dark"] [data-ink="green"]      { --her: #8fd3b4; }
+/* derived from her ink (recomputed wherever data-ink is set) */
+:root, [data-ink] {
+  --her-soft: color-mix(in oklab, var(--her) 82%, var(--pane));      /* her labels and times (>= 4.8:1) */
+  --her-edge: color-mix(in oklab, var(--her) 34%, var(--pane));      /* the dashed fold, rules in her letters */
+  --her-line: color-mix(in oklab, var(--her) 50%, transparent);      /* note rules, question dashes */
+  --her-hair: color-mix(in srgb, var(--her) 10%, transparent);       /* the letter's edge */
+  --her-wash: color-mix(in srgb, var(--her) 3%, var(--letter));      /* her letter's ground */
+  --her-wash-2: color-mix(in srgb, var(--her) 8%, var(--letter));
+  --her-glow: color-mix(in oklab, var(--her) var(--ink-glow-k), transparent); /* a halo at night, none by day */
+}
+html { transition: --her var(--d-ink) var(--e-inout); }
+
+/* ---- reduced motion, and the prototype's motion=off ---- */
+@media (prefers-reduced-motion: reduce) {
+  :root { --d-1: 1ms; --d-2: 1ms; --d-3: 1ms; --d-4: 1ms; --d-bloom: 1ms; --d-ink: 1ms; --spring-dur: 1ms; --spring-soft-dur: 1ms; --stagger: 0ms; }
+}
+[data-motion="off"] { --d-1: 1ms; --d-2: 1ms; --d-3: 1ms; --d-4: 1ms; --d-bloom: 1ms; --d-ink: 1ms; --spring-dur: 1ms; --spring-soft-dur: 1ms; --stagger: 0ms; }
+</style>
+
+<style>
+/* =====================================================================
+   base
+   ===================================================================== */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--room); color: var(--text); overflow: hidden; }
+body { font: 400 var(--t-ui)/var(--lh-ui) var(--f-ui); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+body::before { content: ""; position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse 70% 55% at 8% -6%, var(--glow-desk), transparent 70%); }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+a { color: inherit; text-decoration: none; }
+p { margin: 0; }
+h1, h2, h3, h4 { margin: 0; font-weight: inherit; }
+::selection { background: color-mix(in oklab, var(--text) 16%, transparent); }
+:focus-visible { outline: 2px solid var(--text-2); outline-offset: 2px; border-radius: 6px; }
+svg.ic { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; display: block; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.num { font-variant-numeric: tabular-nums lining-nums; }
+[data-motion="off"] *, [data-motion="off"] *::before, [data-motion="off"] *::after { animation-duration: 1ms !important; animation-delay: 0ms !important; transition-duration: 1ms !important; transition-delay: 0ms !important; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 1ms !important; animation-delay: 0ms !important; transition-delay: 0ms !important; } }
+.no-anim, .no-anim * { transition: none !important; animation: none !important; }
+
+/* ---- the two voices ---- */
+.his { font-family: var(--f-his); font-optical-sizing: auto; color: var(--text); }
+.read { font: 400 var(--t-read)/var(--lh-read) var(--f-his); font-optical-sizing: auto; color: var(--text); }
+.her { font-family: var(--f-her); color: var(--her); font-size: var(--t-her); line-height: var(--lh-her); letter-spacing: -0.005em; }
+.her em, .her i, .her.it { font-style: italic; }
+.her-mark { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--her); box-shadow: 0 0 10px var(--her-glow); flex: none; }
+
+/* ---- the book's voice ---- */
+.display { font: 340 var(--t-h1)/1.04 var(--f-his); letter-spacing: -0.018em; font-optical-sizing: auto; margin: 0; }
+.kicker { font: 500 var(--t-small)/1.3 var(--f-ui); color: var(--text-3); display: flex; align-items: center; gap: 8px; }
+.book-head { font: italic 400 var(--t-h3)/1.2 var(--f-his); color: var(--text); display: flex; align-items: baseline; gap: 14px; }
+.book-head::after { content: ""; flex: 1; height: 1px; background: var(--hair-2); transform: translateY(-5px); min-width: 20px; }
+.book-head .count { order: 3; font: 400 var(--t-small) var(--f-ui); color: var(--text-3); font-style: normal; }
+.hint { font-size: var(--t-small); color: var(--text-3); }
+
+/* ---- buttons: his actions are lamp-light, never her ink ---- */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: var(--tap); padding: 0 18px; border-radius: var(--r-pill); font: 550 var(--t-ui)/1 var(--f-ui); white-space: nowrap;
+  transition: transform var(--d-1) var(--e-out), background var(--d-2), box-shadow var(--d-2), color var(--d-2); }
+.btn:active { transform: scale(.97); }
+.btn-lamp { background: var(--lamp); color: var(--on-lamp); box-shadow: 0 8px 22px -12px color-mix(in oklab, var(--lamp) 60%, transparent); }
+.btn-lamp:hover { background: color-mix(in oklab, var(--lamp) 88%, var(--pane)); }
+.btn-line { color: var(--text); box-shadow: inset 0 0 0 1px var(--hair-2); }
+.btn-line:hover { background: var(--raised); }
+.btn-quiet { color: var(--text-2); font-weight: 500; }
+.btn-quiet:hover { color: var(--text); background: var(--raised); }
+.btn.sm { min-height: 38px; padding: 0 14px; font-size: 14px; }
+.btn-text { min-height: var(--tap); padding: 0 10px; border-radius: var(--r-m); font: 500 var(--t-ui) var(--f-ui); color: var(--text-2); display: inline-flex; align-items: center; gap: 6px; }
+.btn-text:hover { color: var(--text); background: var(--raised); }
+.btn-text svg.ic { width: 16px; height: 16px; }
+.icon-btn { width: 40px; height: 40px; border-radius: var(--r-m); display: inline-grid; place-items: center; color: var(--text-2); position: relative; flex: none;
+  transition: background var(--d-1), color var(--d-1), transform var(--d-1); }
+.icon-btn::after { content: ""; position: absolute; inset: -2px; }
+.icon-btn:hover { background: var(--raised); color: var(--text); }
+.icon-btn:active { transform: scale(.94); }
+.icon-btn[aria-pressed="true"] { color: var(--text); }
+.icon-btn.star[aria-pressed="true"] svg path { fill: currentColor; }
+.icon-btn[disabled] { opacity: .3; pointer-events: none; }
+.link { color: var(--text-2); text-decoration: underline; text-decoration-color: var(--hair-2); text-underline-offset: 3px; }
+.link:hover { color: var(--text); text-decoration-color: currentColor; }
+[data-tip]:hover::before { content: attr(data-tip); position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); white-space: nowrap; z-index: 30; pointer-events: none;
+  background: var(--lamp); color: var(--on-lamp); font: 500 12px/1 var(--f-ui); padding: 7px 9px; border-radius: 7px; animation: tipIn .18s var(--e-out) .4s both; }
+@keyframes tipIn { from { opacity: 0; transform: translate(-50%, -3px); } }
+
+/* =====================================================================
+   shell · desktop: the rail on the desk, panes laid on it
+   ===================================================================== */
+#app { height: 100dvh; transform-origin: 50% 40%; transition: transform var(--d-4) var(--e-out), filter var(--d-4); }
+body.room-open #app { transform: scale(.972); filter: brightness(var(--recede)) blur(2px); }
+.desk { display: grid; grid-template-columns: auto minmax(0, 1fr); height: 100dvh; }
+.rail { width: var(--rail); padding: 16px 12px 14px; display: flex; flex-direction: column; gap: 2px; overflow: hidden; position: relative; }
+.rail.compact { width: var(--rail-compact); }
+.brand { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 6px; margin-bottom: 12px; font: italic 400 23px/1 var(--f-his); letter-spacing: -.01em; white-space: nowrap; }
+.brand svg { width: 30px; height: 30px; flex: none; }
+.rail .write { width: 100%; justify-content: flex-start; margin-bottom: 14px; padding: 0 14px; border-radius: var(--r-m); min-height: 46px; }
+.rail .write kbd { margin-left: auto; font: 500 11px/1 var(--f-ui); opacity: .55; border: 1px solid currentColor; border-radius: 4px; padding: 3px 5px; }
+.nav-i { display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 11px; color: var(--text-2); font: 500 var(--t-ui)/1 var(--f-ui); white-space: nowrap; width: 100%; text-align: left;
+  transition: background var(--d-2), color var(--d-2), box-shadow var(--d-2); }
+.nav-i:hover { color: var(--text); background: color-mix(in oklab, var(--nav-on) 55%, transparent); }
+.nav-i.on { color: var(--text); background: var(--nav-on); box-shadow: var(--elev-tab); }
+.nav-i .badge { margin-left: auto; font: 500 12px/1 var(--f-ui); color: var(--text-3); }
+.rail-spacer { flex: 1; }
+.rail-next { margin: 0 4px 10px; padding: 14px 10px 4px; border-top: 1px solid var(--hair-2); font-size: var(--t-small); color: var(--text-3); line-height: 1.45; }
+.rail-next .rn-h { display: flex; align-items: center; gap: 8px; color: var(--text-2); font-weight: 500; margin-bottom: 4px; }
+.rail-next .rn-h svg { width: 12px; height: 12px; }
+.rail-next .rn-t { font-variant-numeric: tabular-nums; color: var(--text-2); }
+.rail-foot { display: flex; align-items: center; gap: 4px; }
+.rail-foot .nav-i { flex: 1; }
+.rail.compact .lbl, .rail.compact .badge, .rail.compact .wordmark, .rail.compact kbd, .rail.compact .rail-next { display: none; }
+.rail.compact .write, .rail.compact .nav-i { width: 44px; padding: 0; justify-content: center; }
+.rail.compact .rail-foot { flex-direction: column; }
+.rail.compact .brand { padding: 0 7px; }
+
+.stage { display: flex; gap: 10px; padding: 10px 10px 10px 0; min-width: 0; height: 100dvh; }
+.pane { position: relative; background: var(--pane); border-radius: var(--r-l); box-shadow: var(--elev-1); outline: 1px solid var(--hair); outline-offset: -1px; min-width: 0; }
+.scroller { overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--hair-2) transparent; }
+.main-pane { flex: 1; }
+.lamp-light { position: absolute; inset: 0 0 auto 0; height: 440px; pointer-events: none; border-radius: inherit;
+  background: radial-gradient(ellipse 58% 100% at 50% 0%, var(--glow), transparent 74%); }
+.page { position: relative; max-width: 1000px; margin: 0 auto; padding: 48px var(--gutter) 120px; }
+.arrive { animation: arrive 460ms var(--e-out) both; }
+@keyframes arrive { from { opacity: 0; transform: translateY(10px); } }
+.rise { animation: rise 520ms var(--e-out) both; animation-delay: calc(var(--i, 0) * var(--stagger)); }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+
+/* =====================================================================
+   her letter (Folio), fastened: a postmark, a clip, or tape
+   ===================================================================== */
+.letter { position: relative; background: var(--her-wash); border-radius: 14px; padding: 22px 26px 20px; isolation: isolate;
+  box-shadow: 0 0 0 1px var(--her-hair), var(--elev-letter); }
+[data-fasten="clip"] .letter { border-radius: 3px 14px 14px 14px; }
+.letter::before { content: ""; position: absolute; left: 16px; right: 16px; top: 0; border-top: 1px dashed var(--her-edge); } /* the crease of a letter opened flat */
+.letter-from { font: 500 var(--t-small)/1.3 var(--f-ui); color: var(--her-soft); display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding-right: 64px; }
+.letter-from .ldot { width: 6px; height: 6px; border-radius: 50%; background: var(--her); box-shadow: 0 0 10px var(--her-glow); }
+.letter .her p { margin: 0 0 .7em; }
+.letter .her p:last-child { margin-bottom: 0; }
+.asked { font-style: italic; font-size: var(--t-her-lg); line-height: 1.6; }
+.fasten { position: absolute; pointer-events: none; z-index: 2; display: none; }
+[data-fasten="postmark"] .fasten.postmark, [data-fasten="clip"] .fasten.clip, [data-fasten="tape"] .fasten.tape { display: block; }
+.fasten.postmark { top: -20px; right: 14px; width: 96px; height: 58px; color: var(--her); opacity: .8; transform: rotate(-7deg); }
+.fasten.postmark circle { fill: none; stroke: currentColor; }
+.fasten.postmark path { fill: none; stroke: currentColor; stroke-width: 1; stroke-linecap: round; opacity: .55; }
+.fasten.postmark text { fill: currentColor; font-family: var(--f-her); text-anchor: middle; }
+.fasten.clip { top: -16px; right: 30px; width: 18px; height: 44px; color: var(--text-3); }
+.fasten.clip path { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
+.fasten.tape { top: -12px; left: 50%; width: 92px; height: 24px; margin-left: -46px; transform: rotate(-2.5deg); background: var(--tape);
+  clip-path: polygon(2% 8%, 0 30%, 3% 55%, 0 80%, 3% 100%, 97% 94%, 100% 70%, 97% 45%, 100% 18%, 98% 0); box-shadow: 0 1px 2px rgb(0 0 0 / .05); }
+.letter-foot { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 14px; padding-top: 10px; border-top: 1px dashed var(--her-edge); }
+.letter-foot .grow { flex: 1; }
+.q-toggle { color: var(--her); font: 500 var(--t-small)/1.2 var(--f-ui); min-height: 40px; gap: 8px; padding: 0 8px 0 0; display: inline-flex; align-items: center; border-radius: 8px; }
+.q-toggle .chev { color: var(--her-soft); width: 16px; height: 16px; }
+.q-toggle:hover .q-label { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.qlist { columns: 2; column-gap: 32px; padding: 10px 0 4px; }
+.qsec { break-inside: avoid; padding: 10px 0 8px; }
+.qsec h4 { margin: 0 0 6px; font: italic 400 16px/1.3 var(--f-his); color: var(--her-soft); }
+.qsec ol { list-style: none; margin: 0; padding: 0; }
+.qsec li { display: grid; grid-template-columns: 34px 1fr; gap: 4px; padding: 3px 0; align-items: baseline; }
+.qsec .qid { font: 500 11.5px/1 var(--f-ui); color: var(--her-soft); font-variant-numeric: tabular-nums; }
+.qsec .qt { font-size: 13.5px; line-height: 1.55; }
+.qsec li.asked-q .qt { font-weight: 500; }
+.qsec .tag-asked { grid-column: 2; justify-self: start; margin-top: 3px; font: 500 11px/1 var(--f-ui); color: var(--her); border-radius: 99px; padding: 3px 7px; background: var(--her-wash-2); }
+
+/* =====================================================================
+   disclosure: height on the soft spring, content settling a beat later
+   ===================================================================== */
+.fold-head { display: flex; align-items: center; gap: 12px; width: 100%; min-height: var(--tap); text-align: left; border-radius: var(--r-m); }
+.chev { transition: transform var(--spring-dur) var(--spring); color: var(--text-3); }
+[data-open="true"] > .fold-head .chev, [data-open="true"] > .fold-head .chevw { transform: rotate(180deg); }
+.chevw { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; color: var(--text-3); flex: none; transition: transform var(--spring-dur) var(--spring), background var(--d-1); }
+.fold-head:hover .chevw { background: var(--raised); color: var(--text); }
+.fold-body { display: grid; grid-template-rows: 0fr; visibility: hidden; transition: grid-template-rows var(--spring-soft-dur) var(--spring-soft), visibility 0s linear var(--spring-soft-dur); }
+[data-open="true"] > .fold-body { grid-template-rows: 1fr; visibility: visible; transition: grid-template-rows var(--spring-soft-dur) var(--spring-soft), visibility 0s; }
+.fold-inner { min-height: 0; overflow: hidden; }
+.fold-inner > * { opacity: 0; transform: translateY(-8px); filter: blur(2px); transition: opacity 160ms, transform 280ms var(--e-out), filter 200ms; }
+[data-open="true"] > .fold-body > .fold-inner > * { opacity: 1; transform: none; filter: none;
+  transition: opacity 360ms 90ms, transform var(--spring-soft-dur) var(--spring-soft) 60ms, filter 300ms 90ms; }
+.settle > * { opacity: 0; transform: translateY(6px); transition: opacity 240ms ease, transform 420ms var(--e-out); }
+[data-open="true"] > .fold-body .settle > * { opacity: 1; transform: none; transition-delay: calc(170ms + var(--i, 0) * 38ms); }
+.fold-sum { transition: opacity var(--d-3); }
+[data-open="true"] > .fold-head .fold-sum { opacity: 0; }
+.flap { transform-origin: 50% 30%; transition: transform var(--d-3) var(--e-paper); }
+[data-open="true"] > .fold-head .flap { transform: scaleY(-1); }
+@media (prefers-reduced-motion: reduce) { .fold-inner > * { transform: none !important; filter: none !important; } }
+</style>
+<style>
+/* =====================================================================
+   ENTRIES · the list, the sentence filter, Almanac's month
+   ===================================================================== */
+.entries-head { display: grid; grid-template-columns: minmax(0, 1fr) 252px; gap: 56px; align-items: end; margin-bottom: 4px; }
+.filter-sentence { font: 400 1.1875rem/1.6 var(--f-his); color: var(--text-2); margin: 14px 0 14px; text-wrap: pretty; }
+.choice { font: inherit; color: var(--text); border-bottom: 1.5px dotted var(--text-3); padding: 0 1px 0 0; display: inline-flex; align-items: baseline; gap: 2px; line-height: 1.25; border-radius: 3px 3px 0 0; transition: border-color var(--d-1), background var(--d-1); }
+.choice:hover, .choice[aria-expanded="true"] { border-bottom-color: var(--text); background: var(--raised); }
+.choice svg.ic { width: 14px; height: 14px; transform: translateY(2px); color: var(--text-3); }
+.searchline { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--hair-2); padding: 4px 2px; min-height: var(--tap); color: var(--text-3); }
+.searchline:focus-within { border-bottom-color: var(--text); }
+.searchline input { flex: 1; border: 0; background: none; font: italic 400 18px/1.3 var(--f-his); color: var(--text); outline: none; min-width: 0; }
+.searchline input::placeholder { color: var(--text-3); }
+.result-note { font-size: var(--t-small); color: var(--text-3); margin-top: 10px; display: flex; align-items: center; gap: 4px; min-height: 28px; }
+.menu { position: fixed; z-index: 60; min-width: 236px; background: var(--frost); backdrop-filter: blur(22px) saturate(1.4); -webkit-backdrop-filter: blur(22px) saturate(1.4);
+  border-radius: 14px; box-shadow: var(--elev-pop); padding: 6px; transform-origin: 20px 0; animation: popIn 300ms var(--spring) both; }
+@keyframes popIn { from { opacity: 0; transform: scale(.95) translateY(-4px); } }
+.menu button { display: flex; width: 100%; align-items: center; gap: 10px; min-height: 40px; padding: 0 12px; border-radius: 9px; font: 400 var(--t-ui) var(--f-ui); color: var(--text-2); text-align: left; }
+.menu button:hover { background: var(--raised-2); color: var(--text); }
+.menu button[aria-checked="true"] { color: var(--text); }
+.menu button .cnt { margin-left: auto; color: var(--text-3); font-size: 12.5px; }
+.menu button svg.ic { width: 16px; height: 16px; margin-left: auto; }
+.menu hr { border: 0; border-top: 1px solid var(--hair); margin: 6px 4px; }
+
+/* the month (Almanac) */
+.mcal { border-top: 2px solid var(--text); padding-top: 10px; }
+.mcal-h { display: flex; align-items: center; gap: 2px; margin-bottom: 6px; }
+.mcal-h .mn { font: 400 28px/1 var(--f-his); letter-spacing: -.01em; }
+.mcal-h .my { font: 500 var(--t-micro)/1.2 var(--f-ui); color: var(--text-3); margin-left: 10px; flex: 1; }
+.mcal-h .icon-btn { width: 32px; height: 32px; }
+.mcal-h .icon-btn svg { width: 16px; height: 16px; }
+.mcal-g { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; row-gap: 1px; }
+.mcal-g b { font: 500 11.5px/2.2 var(--f-ui); color: var(--text-3); }
+.mcal-g span, .mcal-g button { position: relative; height: 34px; display: grid; place-items: center; font: 400 14px/1 var(--f-ui); font-variant-numeric: tabular-nums; color: var(--text-3); border-radius: 50%; }
+.mcal-g .fut { color: color-mix(in oklab, var(--text-3) 55%, var(--pane)); }
+.mcal-g button { color: var(--text); font-weight: 550; transition: background var(--d-1); }
+.mcal-g button::after { content: ""; position: absolute; left: 50%; bottom: 4px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--text); opacity: .75; }
+.mcal-g button:hover { background: var(--raised); }
+.mcal-g .td::before { content: ""; position: absolute; inset: 1px 4px; border: 1px solid var(--text-2); border-radius: 50%; }
+.mcal-g button[aria-pressed="true"] { background: var(--lamp); color: var(--on-lamp); }
+.mcal-g button[aria-pressed="true"]::after { background: var(--on-lamp); }
+.mcal-foot { font: 500 var(--t-micro)/1.3 var(--f-ui); color: var(--text-3); margin-top: 8px; display: flex; gap: 14px; }
+.mcal-foot i { display: inline-block; width: 4px; height: 4px; border-radius: 50%; background: var(--text); vertical-align: middle; margin-right: 6px; }
+.mcal-foot i.r { width: 10px; height: 10px; background: none; border: 1px solid var(--text-2); }
+
+.week { margin-top: 30px; }
+.week > .book-head { margin-bottom: 6px; }
+.day { display: grid; grid-template-columns: 68px minmax(0, 1fr); border-top: 1px solid var(--hair); }
+.week > .book-head + .day { border-top: 0; }
+.day-tab { padding: 16px 0 0 2px; display: grid; align-content: start; gap: 3px; }
+.day-tab .n { font: 300 34px/0.95 var(--f-his); font-variant-numeric: lining-nums; letter-spacing: -0.02em; }
+.day-tab .w { font: 500 12px/1 var(--f-ui); color: var(--text-3); }
+.rows { display: grid; padding: 8px 0; }
+.row { display: block; width: 100%; text-align: left; padding: 11px 14px 12px; margin: 0 -14px; border-radius: 14px; transition: background var(--d-1); cursor: pointer; }
+.row:hover { background: var(--raised); }
+.row-top { display: flex; align-items: center; gap: 10px; }
+.row-title { font: 550 var(--t-ui)/1.3 var(--f-ui); }
+.row-title .sub { font-weight: 400; color: var(--text-3); }
+.row-flags { display: inline-flex; gap: 8px; align-items: center; color: var(--text-3); }
+.row-flags svg.ic { width: 15px; height: 15px; }
+.row-time { margin-left: auto; font-size: var(--t-small); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.row-first { margin: 4px 0 0; font: 400 18px/1.45 var(--f-his); color: var(--text-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.row.note .row-first { font-style: italic; }
+.list-empty { padding: 40px 0; font: italic 400 19px/1.5 var(--f-his); color: var(--text-3); }
+mark.hit { background: var(--sunk); color: inherit; border-radius: 3px; padding: 0 1px; }
+
+/* =====================================================================
+   the sidebar beside an open entry: titles (Folio), dates and dots (Night Room), or none
+   ===================================================================== */
+.side-pane { flex: none; background: color-mix(in oklab, var(--raised) 70%, var(--pane)); box-shadow: none; }
+[data-theme="dark"] .side-pane { background: var(--sunk); }
+.side-pane.list { width: var(--side-list); }
+.side-pane.rail { width: var(--side-rail); }
+.entry-pane { flex: 1; box-shadow: var(--elev-2); container: entry / inline-size; }
+.side-head { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 2px; padding: 12px 8px 8px 16px; background: inherit; }
+.side-pane.list .side-head { background: color-mix(in oklab, var(--raised) 70%, var(--pane)); }
+[data-theme="dark"] .side-pane.list .side-head { background: var(--sunk); }
+.side-head h2 { flex: 1; font: italic 400 21px/1 var(--f-his); }
+.side-list-in { padding: 0 12px 60px; }
+.side-list-in .mcal { margin: 2px 4px 6px; border-top-width: 1px; }
+.side-list-in .mcal-h .mn { font-size: 20px; }
+.side-list-in .mcal-g span, .side-list-in .mcal-g button { height: 30px; font-size: 13px; }
+.sweek { font: 500 var(--t-micro)/1 var(--f-ui); color: var(--text-3); padding: 18px 8px 6px; }
+.sday { display: grid; grid-template-columns: 38px minmax(0, 1fr); padding: 2px 0; }
+.sday .n { font: 300 20px/1 var(--f-his); font-variant-numeric: lining-nums; padding: 10px 0 0 6px; }
+.sday .n small { display: block; font: 500 10.5px/1.5 var(--f-ui); color: var(--text-3); }
+.srow-e { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding: 8px 10px; border-radius: 10px; text-align: left; font: 500 14px/1.25 var(--f-ui); color: var(--text-2); transition: background var(--d-1), color var(--d-1); }
+.srow-e:hover { background: var(--raised-2); color: var(--text); }
+[data-theme="dark"] .srow-e:hover { background: var(--raised); }
+.srow-e time { margin-left: auto; font: 400 12.5px var(--f-ui); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.srow-e .her-mark { width: 5px; height: 5px; }
+.srow-e[aria-current="true"] { background: var(--pane); color: var(--text); box-shadow: var(--elev-tab); }
+[data-theme="dark"] .srow-e[aria-current="true"] { background: var(--raised-2); }
+/* dates and dots */
+.dots { display: flex; flex-direction: column; align-items: center; padding: 12px 0 30px; gap: 2px; }
+.dwk { font: 500 11px/1.2 var(--f-ui); color: var(--text-3); margin: 14px 0 4px; text-align: center; }
+.dday { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0; width: 68px; border-radius: 12px; }
+.dday .dd-n { font: 300 19px/1 var(--f-his); font-variant-numeric: lining-nums; color: var(--text-2); }
+.dday .dd-w { font: 500 10.5px var(--f-ui); color: var(--text-3); }
+.dday.on .dd-n { color: var(--text); font-weight: 450; }
+.dd-dots { display: flex; gap: 0; margin-top: 2px; }
+.dot { width: 22px; height: 26px; display: grid; place-items: center; border-radius: 50%; position: relative; }
+.dot::after { content: ""; position: absolute; inset: -6px -1px; }
+.dot::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--text-3); transition: transform var(--spring-dur) var(--spring), background var(--d-1); }
+.dot:hover::before { transform: scale(1.4); background: var(--text-2); }
+.dot.on::before { background: var(--lamp); box-shadow: 0 0 0 3px color-mix(in oklab, var(--lamp) 18%, transparent); }
+#tip { position: fixed; z-index: 70; pointer-events: none; max-width: 260px; padding: 10px 12px; border-radius: 12px; background: var(--frost); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  box-shadow: var(--elev-pop); opacity: 0; transform: translateX(-4px); transition: opacity var(--d-1), transform var(--d-3) var(--e-out); }
+#tip.on { opacity: 1; transform: none; }
+#tip .t1 { font-size: 12.5px; color: var(--text-3); }
+#tip .t2 { font: 15px/1.4 var(--f-his); margin-top: 3px; }
+
+/* the sidebar switch */
+.sidesw { display: inline-flex; position: relative; padding: 3px; border-radius: 12px; background: var(--sunk); box-shadow: inset 0 0 0 1px var(--hair); }
+.sidesw button { position: relative; z-index: 1; width: 36px; height: 34px; display: grid; place-items: center; border-radius: 9px; color: var(--text-3); transition: color var(--d-2); }
+.sidesw button::after { content: ""; position: absolute; inset: -5px -1px; }
+.sidesw button svg.ic { width: 18px; height: 18px; }
+.sidesw button[aria-checked="true"] { color: var(--text); }
+.sidesw .thumb { position: absolute; top: 3px; left: 3px; width: 36px; height: 34px; border-radius: 9px; background: var(--pane); box-shadow: var(--elev-tab), 0 0 0 1px var(--hair);
+  transform: translateX(calc(var(--idx, 0) * 36px)); transition: transform var(--spring-dur) var(--spring); }
+[data-theme="dark"] .sidesw .thumb { background: var(--raised-2); }
+
+/* =====================================================================
+   ENTRY · hours in the left margin, her notes in the right
+   ===================================================================== */
+.entry-bar { position: sticky; top: 0; z-index: 6; display: flex; align-items: center; gap: 4px; padding: 10px 14px; background: transparent; transition: box-shadow var(--d-2), background var(--d-2); }
+.entry-bar.scrolled { box-shadow: 0 1px 0 var(--hair); background: color-mix(in oklab, var(--pane) 86%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.entry-bar .grow { flex: 1; }
+.entry-bar .sep { width: 1px; height: 22px; background: var(--hair-2); margin: 0 6px; }
+.entry-bar .mini-title { font: italic 400 16px/1 var(--f-his); color: var(--text-2); opacity: 0; transform: translateY(4px); transition: opacity var(--d-2), transform var(--d-2); margin-left: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.entry-bar.titled .mini-title { opacity: 1; transform: none; }
+.doc { position: relative; max-width: calc(var(--margin-l) + var(--measure) + var(--margin-r) + 56px + 96px); margin: 0 auto; padding: 18px 48px 140px; }
+.g3 { display: grid; grid-template-columns: var(--margin-l) minmax(0, 1fr); column-gap: 24px; }
+.g3 > .c1 { grid-column: 1; }
+.g3 > .c2 { grid-column: 2; min-width: 0; position: relative; }
+.g3 > .c3 { grid-column: 2; }
+@container entry (min-width: 840px) {
+  .g3 { grid-template-columns: var(--margin-l) minmax(0, var(--measure)) var(--margin-r); column-gap: 28px; }
+  .g3 > .c3 { grid-column: 3; grid-row: 1; }
+}
+.doc-head { padding: 6px 0 34px; align-items: end; }
+.bignum { text-align: right; font: 300 var(--t-numeral)/.8 var(--f-his); letter-spacing: -.04em; font-variant-numeric: lining-nums; color: var(--text); padding-bottom: 4px; font-optical-sizing: auto; }
+.doc-head .bignum { font-size: 76px; padding-right: 4px; }
+.doc-head .kicker { margin-bottom: 10px; }
+.doc-head .kicker::before { content: ""; width: 18px; height: 1px; background: var(--text-3); }
+.doc-meta { margin-top: 12px; color: var(--text-3); font-size: var(--t-small); display: flex; flex-wrap: wrap; gap: 4px 0; }
+.doc-meta > span:not(:last-child)::after { content: "·"; margin: 0 10px; opacity: .6; }
+.meta-add { margin-top: 6px; font-size: var(--t-small); min-height: 24px; }
+.doc-meta b { font-weight: 500; color: var(--text-2); }
+.mg { text-align: right; position: relative; }
+.mg time { display: block; font: italic 400 15px/1 var(--f-his); color: var(--text-3); font-variant-numeric: tabular-nums lining-nums; padding-top: 8px; }
+.mg .src { display: block; margin-top: 6px; font: 500 11.5px/1.25 var(--f-ui); color: var(--text-3); }
+.mg.her-mg time { color: var(--her-soft); }
+.doc-letter { margin-top: 4px; margin-bottom: 8px; }
+.blk { position: relative; padding-top: 30px; }
+.blk .bd p { margin: 0 0 .75em; }
+.blk .bd p:last-child { margin-bottom: 0; }
+.blk.removing { animation: foldAway 420ms var(--e-inout) forwards; overflow: hidden; }
+@keyframes foldAway { to { opacity: 0; max-height: 0; padding-top: 0; transform: translateY(-6px); } }
+.replyto { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; color: var(--text-3); font: 400 var(--t-small)/1.4 var(--f-ui); }
+.replyto .her { font-size: 13px; font-style: italic; }
+.replyto svg.ic { width: 15px; height: 15px; }
+/* block tools: in the margin, under the hour, never over his words */
+.b-tools { position: absolute; right: -6px; top: 40px; display: flex; flex-direction: column; gap: 2px; padding: 3px; border-radius: 12px; background: var(--frost); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--elev-pop); opacity: 0; transform: translateX(6px) scale(.98); pointer-events: none; transition: opacity var(--d-1), transform var(--spring-dur) var(--spring); z-index: 5; }
+.b-tools .icon-btn { width: 38px; height: 38px; border-radius: 9px; }
+@media (hover: hover) and (min-width: 761px) {
+  .blk.his:hover .b-tools, .blk.his:focus-within .b-tools { opacity: 1; transform: none; pointer-events: auto; transition-delay: 60ms; }
+}
+.confirm { display: flex; align-items: center; gap: 6px; margin-top: 12px; padding: 6px 6px 6px 16px; border-radius: 99px; background: var(--frost); box-shadow: var(--elev-pop); width: fit-content; font: 500 13.5px var(--f-ui); color: var(--text-2); animation: popIn 300ms var(--spring) both; }
+.blk.editing .bd { outline: 0; border-radius: 10px; box-shadow: 0 0 0 1px var(--hair-2), 0 0 0 8px var(--raised); background: var(--raised); caret-color: var(--text); }
+.edit-bar { display: flex; gap: 8px; margin-top: 18px; align-items: center; flex-wrap: wrap; }
+.blk.editing .b-tools { display: none; }
+/* her note in the right margin */
+.mnote { font-size: 13px; line-height: 1.55; padding-top: 6px; }
+.mnote .lab { display: flex; align-items: center; gap: 7px; font: 500 12px/1 var(--f-ui); color: var(--her-soft); margin-bottom: 7px; }
+.mnote .lab .her-mark { width: 5px; height: 5px; }
+.mnote .her { display: block; font-size: 13px; line-height: 1.6; padding-left: 12px; border-left: 1px solid var(--her-line); }
+@container entry (max-width: 839px) { .mnote { margin-top: 16px; max-width: 30rem; } }
+/* her reply in the chat: a slip */
+.slip { background: var(--her-wash); border-radius: 12px; padding: 14px 18px 16px; position: relative; box-shadow: 0 0 0 1px var(--her-hair); }
+.slip .letter-from { margin-bottom: 4px; padding: 0; }
+/* the player (Night Room) */
+.audio { display: flex; align-items: center; gap: 14px; padding: 10px 16px 10px 10px; border-radius: 20px; background: var(--raised); box-shadow: var(--elev-tab); outline: 1px solid var(--hair); outline-offset: -1px; margin: 0 0 16px; max-width: 520px; }
+.audio .play { width: 44px; height: 44px; border-radius: 50%; flex: none; display: grid; place-items: center; background: var(--lamp); color: var(--on-lamp); transition: transform var(--d-1) var(--e-out); }
+.audio .play:active { transform: scale(.93); }
+.audio .play svg.ic { width: 18px; height: 18px; }
+.wave { flex: 1; height: 34px; display: flex; align-items: center; gap: 2px; cursor: pointer; min-width: 0; }
+.wave i { flex: 1; min-width: 2px; border-radius: 2px; background: var(--text-3); opacity: .45; transition: background var(--d-1), opacity var(--d-1); }
+.wave i.done { background: var(--text); opacity: 1; }
+.audio .at { font-size: 12.5px; color: var(--text-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.audio .rate { font: 600 12px/1 var(--f-ui); color: var(--text-2); height: 30px; min-width: 40px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--hair-2); }
+.audio .rate:hover { background: var(--raised-2); }
+/* keep writing */
+.keep { display: flex; align-items: center; gap: 10px; min-height: 64px; padding: 0 8px 0 0; margin: 44px 0 0; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); }
+.keep .ph { flex: 1; font: italic 400 20px var(--f-his); color: var(--text-3); text-align: left; min-height: 62px; transition: color var(--d-2); }
+.keep .ph:hover { color: var(--text-2); }
+.keep kbd { font: 500 11px/1 var(--f-ui); color: var(--text-3); border: 1px solid var(--hair-2); border-radius: 4px; padding: 3px 5px; margin-right: 4px; }
+/* her readings: Analysis and Reflection unfold at the end */
+.readings { margin-top: 56px; }
+.readings > .book-head { margin-bottom: 8px; }
+.reading { border-top: 1px solid var(--hair-2); }
+.reading:last-child { border-bottom: 1px solid var(--hair-2); }
+.reading > .fold-head { padding: 14px 4px; min-height: 76px; align-items: center; }
+.reading > .fold-head:hover { background: color-mix(in oklab, var(--raised) 60%, transparent); }
+.env { width: 34px; height: 26px; color: var(--her); flex: none; }
+.env path, .env rect { fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linejoin: round; }
+.reading .rt { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.reading .rt b { font: 400 20px/1.2 var(--f-his); }
+.reading .rt .rs { font-size: var(--t-small); color: var(--text-3); }
+.reading .rt .fold-sum { font-size: 13px; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.reading .fold-inner > div { padding: 4px 4px 30px 50px; }
+.noticed { list-style: none; margin: 0; padding: 0; counter-reset: n; }
+.noticed li { padding: 14px 0; border-bottom: 1px dashed var(--her-edge); display: grid; grid-template-columns: 26px 1fr; gap: 4px 10px; }
+.noticed li::before { counter-increment: n; content: counter(n); font: 500 12px/1.9 var(--f-ui); color: var(--her-soft); grid-row: span 2; }
+.noticed q { font: italic 400 18px/1.45 var(--f-his); color: var(--text); quotes: "“" "”"; }
+.rd-label { font: 500 var(--t-small)/1 var(--f-ui); color: var(--text-3); margin: 22px 0 10px; }
+.threads a { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; }
+.threads a .her { flex: 1; }
+.threads a .hint { white-space: nowrap; }
+.refl-q { font: italic 400 1.5rem/1.35 var(--f-her); color: var(--her); margin: 10px 0 16px; letter-spacing: -0.02em; }
+.refl-carry { margin-top: 18px; padding: 12px 16px; background: var(--her-wash-2); border-radius: 10px; }
+.refl-carry .letter-from { margin-bottom: 2px; padding: 0; }
+.toast { position: fixed; z-index: 90; left: 50%; bottom: 28px; transform: translate(-50%, 20px); opacity: 0; display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 18px; min-height: 48px;
+  background: var(--lamp); color: var(--on-lamp); border-radius: 99px; box-shadow: var(--elev-pop); transition: transform var(--spring-dur) var(--spring), opacity var(--d-2); pointer-events: none; font: 500 14px var(--f-ui); white-space: nowrap; }
+.toast:not(.show), .sheet:not(.show), .savebar:not(.show) { visibility: hidden; transition-property: transform, opacity, visibility; transition-delay: 0s, 0s, 400ms; }
+.toast.show { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
+.toast .btn-text { color: var(--on-lamp); min-height: 36px; }
+.toast .btn-text:hover { background: color-mix(in oklab, var(--on-lamp) 14%, transparent); color: var(--on-lamp); }
+.scrim { position: fixed; inset: 0; z-index: 80; background: var(--scrim); opacity: 0; pointer-events: none; transition: opacity var(--d-3); }
+.scrim.show { opacity: 1; pointer-events: auto; }
+.sheet { position: fixed; z-index: 81; left: 8px; right: 8px; bottom: 8px; padding: 8px; border-radius: var(--r-xl); background: var(--pane); box-shadow: var(--elev-pop); transform: translateY(115%); transition: transform var(--spring-soft-dur) var(--spring-soft); }
+.sheet.show { transform: none; }
+.sheet .quote { padding: 12px 14px 12px; font: italic 400 16px/1.45 var(--f-his); color: var(--text-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sheet .quote small { display: block; font: 500 12.5px var(--f-ui); font-style: normal; color: var(--text-3); margin-bottom: 4px; }
+.sheet button { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 54px; padding: 0 14px; border-radius: 16px; font: 500 16px var(--f-ui); }
+.sheet button:hover { background: var(--raised); }
+
+/* =====================================================================
+   WRITE · Night Room's room with her letter on top; it blooms out of the button pressed
+   ===================================================================== */
+.room { position: fixed; inset: 0; z-index: 50; background: var(--write-room); display: flex; flex-direction: column; visibility: hidden;
+  clip-path: circle(22px at var(--bx, 50%) var(--by, 90%)); transition: clip-path 460ms cubic-bezier(.4, 0, .2, 1), visibility 0s 460ms; }
+.room.open { visibility: visible; clip-path: circle(150vmax at var(--bx, 50%) var(--by, 90%)); transition: clip-path var(--d-bloom) var(--e-out), visibility 0s; }
+.room::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 46% 62% at 50% 30%, var(--glow-room), transparent 72%); }
+.room-top { position: relative; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; height: 64px; padding: 0 16px; z-index: 2; transition: opacity var(--d-3); }
+.room-top .ctx { font-size: 13.5px; color: var(--text-3); text-align: center; white-space: nowrap; }
+.room-top .ctx b { color: var(--text-2); font: italic 400 16px var(--f-his); }
+.room-top .r { justify-self: end; display: flex; gap: 4px; align-items: center; }
+.saved { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-3); padding: 0 10px; white-space: nowrap; }
+.saved .sd { width: 6px; height: 6px; border-radius: 50%; background: var(--text-3); transition: background var(--d-2); }
+.saved.saving .sd { background: var(--text-2); animation: pulse 1s ease-in-out infinite; }
+@keyframes pulse { 50% { transform: scale(.5); opacity: .4; } }
+.focus-t { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border-radius: 12px; font-size: 13.5px; color: var(--text-3); }
+.focus-t:hover { background: var(--raised); color: var(--text); }
+.focus-t[aria-pressed="true"] { color: var(--text); background: color-mix(in oklab, var(--raised) 70%, transparent); }
+.room-body { position: relative; flex: 1; overflow-y: auto; scrollbar-width: none; }
+.room-col { position: relative; max-width: 720px; margin: 0 auto; padding: 5vh 28px 220px; }
+.room-letter { margin-bottom: 48px; transform: translateY(-12px); opacity: 0; transition: transform 600ms var(--e-paper), opacity 300ms ease; }
+.room.open .room-letter { transform: none; opacity: 1; transition: transform 700ms var(--e-paper) 220ms, opacity 400ms ease 220ms; }
+.room-letter .qlist { columns: 1; }
+.room-letter .asked { transition: opacity 200ms, transform 300ms var(--e-out); }
+.room-none { margin-bottom: 36px; color: var(--text-3); font: italic 400 17px var(--f-his); }
+.room-page { position: relative; }
+.room-mg { position: absolute; left: -92px; top: 0; width: 64px; height: 100%; }
+.room-mg time { position: absolute; right: 0; font: italic 400 15px/1 var(--f-his); color: var(--text-3); font-variant-numeric: tabular-nums lining-nums; animation: rise 400ms var(--e-out) both; transition: opacity var(--d-3); }
+.ed { font: 400 var(--t-write)/var(--lh-write) var(--f-his); letter-spacing: -.004em; outline: 0; min-height: 40vh; caret-color: var(--text); color: var(--text); font-optical-sizing: auto; }
+.ed > p, .ed > div { margin: 0 0 .75em; transition: opacity 500ms var(--e-out); }
+.ed.focus > :not(.cur) { opacity: var(--focus-dim); }
+.ed.blank::before { content: attr(data-ph); color: var(--text-3); font-style: italic; pointer-events: none; position: absolute; }
+.ed .vchip { display: inline-flex; align-items: center; gap: 10px; font: 500 13.5px var(--f-ui); color: var(--text-2); padding: 8px 14px 8px 10px; border-radius: 999px; background: var(--raised); box-shadow: inset 0 0 0 1px var(--hair-2); user-select: none; }
+.ed .vchip svg.ic { width: 16px; height: 16px; }
+.dock { position: absolute; left: 50%; bottom: max(22px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 18px;
+  width: min(720px, calc(100% - 24px)); padding: 10px 10px 10px 22px; border-radius: 30px; background: var(--frost); backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4); box-shadow: var(--elev-pop); z-index: 3; }
+.dock .count { font-size: 13px; color: var(--text-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dock .r { justify-self: end; }
+.orb-wrap { position: relative; display: grid; place-items: center; width: 60px; height: 60px; }
+.orb { position: relative; z-index: 1; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; color: var(--text); background: radial-gradient(circle at 50% 35%, var(--raised-2), var(--raised));
+  box-shadow: inset 0 0 0 1px var(--hair-2), 0 6px 18px -8px rgb(0 0 0 / .4); transition: transform var(--spring-dur) var(--spring), background var(--d-2), color var(--d-2); }
+.orb:hover { transform: scale(1.05); }
+.orb svg.ic { width: 22px; height: 22px; }
+.orb-wrap .ring { position: absolute; inset: 4px; border-radius: 50%; background: color-mix(in oklab, var(--lamp) 14%, transparent); opacity: 0; }
+.orb-wrap.rec .orb { background: var(--lamp); color: var(--on-lamp); animation: breathe 3.2s ease-in-out infinite; }
+.orb-wrap.rec .ring { opacity: 1; transform: scale(calc(1.15 + var(--lvl, 0) * .55)); transition: transform 120ms linear; }
+.orb-wrap.rec .ring.r2 { animation: halo 2.6s ease-out infinite; transform: none; background: none; box-shadow: 0 0 0 1px color-mix(in oklab, var(--lamp) 30%, transparent); }
+@keyframes breathe { 50% { transform: scale(1.07); } }
+@keyframes halo { from { transform: scale(1); opacity: .8; } to { transform: scale(2.1); opacity: 0; } }
+.rec-time { color: var(--text); }
+
+/* =====================================================================
+   TODAY (Folio, in this system)
+   ===================================================================== */
+.today-grid { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 56px; }
+.today-head { display: grid; grid-template-columns: auto 1fr; gap: 0 20px; align-items: end; margin-bottom: 28px; }
+.today-head .bignum { text-align: left; font-size: 104px; padding: 0; }
+.today-head .dl { padding-bottom: 8px; }
+.today-head .dl .display { font-size: 2.5rem; }
+.today-head .dateline { margin: 8px 0 0; color: var(--text-3); font-size: var(--t-small); }
+.weekstrip { list-style: none; margin: 0 0 40px; padding: 0; display: grid; grid-template-columns: repeat(7, 1fr); border-top: 1px solid var(--hair-2); border-bottom: 1px solid var(--hair-2); }
+.weekstrip li { text-align: center; padding: 10px 2px 12px; }
+.weekstrip button { width: 100%; display: grid; justify-items: center; gap: 4px; border-radius: 12px; padding: 6px 0; min-height: var(--tap); transition: background var(--d-1); }
+.weekstrip button:hover { background: var(--raised); }
+.ws-d { font: 500 11.5px/1 var(--f-ui); color: var(--text-3); }
+.ws-n { font: 400 21px/1.1 var(--f-his); font-variant-numeric: lining-nums; }
+.ws-mark { width: 7px; height: 7px; border-radius: 50%; }
+.ws-mark.answered { background: var(--text); }
+.ws-mark.missed { box-shadow: inset 0 0 0 1.3px var(--text-3); }
+.ws-mark.none { width: 10px; height: 1.3px; border-radius: 1px; background: var(--hair-2); margin: 3px 0; }
+.weekstrip .is-today button { background: var(--raised); box-shadow: inset 0 0 0 1px var(--hair-2); }
+.weekstrip .is-today .ws-n { font-weight: 600; }
+.sec { margin-bottom: 40px; }
+.sec > .book-head { margin-bottom: 18px; }
+.prompt-letter { margin-top: 26px; padding: 26px 28px 20px; }
+.letter-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--her-edge); }
+.letter-actions .hint { margin-left: auto; }
+.leaders { list-style: none; margin: 0; padding: 0; }
+.leaders li { display: flex; align-items: baseline; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--hair); }
+.leaders .t { font: 400 18px/1.3 var(--f-his); }
+.leaders .s { display: block; font-size: var(--t-small); color: var(--text-3); }
+.leaders .lead { flex: 1; border-bottom: 1.5px dotted var(--hair-2); transform: translateY(-5px); min-width: 16px; }
+.leaders .v { font-size: var(--t-small); color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.written a { display: block; padding: 12px 10px; margin: 0 -10px; border-radius: 12px; border-bottom: 1px solid var(--hair); transition: background var(--d-1); }
+.written a:hover { background: var(--raised); }
+.written .his { font-size: 17.5px; color: var(--text-2); line-height: 1.45; display: block; margin-top: 2px; }
+.carry { padding: 22px 0 0; border-top: 1px solid var(--hair-2); }
+.carry .her { font-size: 1.2rem; line-height: 1.45; font-style: italic; margin: 10px 0 10px; display: block; }
+/* the programs strip (Night Room) */
+.prog-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; align-items: baseline; padding: 12px 0; }
+.prog-row .pt { font: 400 18px/1.3 var(--f-his); }
+.prog-row .pm { color: var(--text-3); font-size: var(--t-small); }
+.segs { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(var(--n, 10), 1fr); gap: 4px; margin-top: 8px; }
+.segs i { height: 4px; border-radius: 2px; background: var(--hair-2); position: relative; overflow: hidden; }
+.segs i.done { background: var(--text); }
+.segs i.now::after { content: ""; position: absolute; inset: 0; background: var(--text); transform-origin: left; transform: scaleX(.4); animation: segfill 1.4s var(--e-out) both .3s; }
+@keyframes segfill { from { transform: scaleX(0); } }
+.segs i { animation: segin 500ms var(--e-out) both; animation-delay: calc(var(--k) * 40ms); }
+@keyframes segin { from { opacity: 0; transform: scaleY(0); } }
+
+/* =====================================================================
+   INSIGHTS (Folio's page + Night Room's strip + an Almanac numeral)
+   ===================================================================== */
+.ins { max-width: 1080px; }
+.ins-top { display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 8px; }
+.ins-top .kicker { min-width: 120px; justify-content: center; }
+.ins-title { text-align: center; margin: 0 0 44px; }
+.ins-title .nums { font: 300 var(--t-numeral)/.95 var(--f-his); letter-spacing: -.04em; font-variant-numeric: lining-nums; }
+.ins-title em { font: italic 300 3rem/1 var(--f-his); letter-spacing: -.02em; margin-left: 14px; color: var(--text-2); }
+.ins-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 64px; align-items: start; }
+.prose-figs { font: 400 1.7rem/1.42 var(--f-his); color: var(--text-2); margin: 0 0 40px; letter-spacing: -0.01em; text-wrap: pretty; }
+.prose-figs b { font-weight: 500; color: var(--text); font-variant-numeric: lining-nums; }
+.ledger { display: grid; grid-template-columns: repeat(7, 1fr); align-items: end; height: 200px; border-bottom: 1px solid var(--text); position: relative; margin-bottom: 8px; }
+.ledger::before { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(to top, transparent 0 39px, var(--hair) 39px 40px); pointer-events: none; }
+.lcol { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; position: relative; gap: 6px; }
+.lcol .w { font: 500 12px/1 var(--f-ui); color: var(--text-3); font-variant-numeric: tabular-nums; animation: rise 400ms var(--e-out) both; animation-delay: calc(300ms + var(--i) * 60ms); }
+.lcol .bar { flex: none; width: 10px; border-radius: 6px 6px 0 0; background: var(--text); height: var(--h); transform-origin: bottom; animation: grow 700ms var(--e-paper) both; animation-delay: calc(80ms + var(--i) * 60ms); }
+.lcol.future .bar { background: none; border: 1.5px dashed var(--hair-2); border-bottom: 0; height: 26px; }
+.lcol.zero .bar { height: 2px; background: var(--text-3); border-radius: 1px; width: 14px; }
+@keyframes grow { from { transform: scaleY(0); } }
+.ldays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; }
+.ldays div { display: grid; justify-items: center; gap: 3px; padding-top: 6px; }
+.ldays .d { font: 500 12px/1 var(--f-ui); color: var(--text-3); }
+.ldays .n { font: 400 17px/1 var(--f-his); font-variant-numeric: lining-nums; }
+.ldays .rf { width: 6px; height: 6px; border-radius: 50%; background: var(--her); box-shadow: 0 0 8px var(--her-glow); margin-top: 4px; }
+.ldays .rf.no { background: none; box-shadow: none; }
+.ledger-key { display: flex; gap: 22px; flex-wrap: wrap; margin: 16px 0 44px; font-size: var(--t-small); color: var(--text-3); }
+.ledger-key span { display: inline-flex; align-items: center; gap: 7px; }
+.ins-sec { margin-bottom: 40px; }
+.ins-sec > .book-head { margin-bottom: 6px; font-size: 18px; }
+.review .letter { padding: 28px 28px 8px; }
+.pull { font: italic 400 1.3rem/1.5 var(--f-her); color: var(--her); margin: 8px 0 14px 0.4em; letter-spacing: -0.02em; text-wrap: pretty; position: relative; }
+.pull::before { content: "“"; position: absolute; left: -.7em; top: -.05em; opacity: .5; }
+.review .fold-head { color: var(--her); font: 500 var(--t-small) var(--f-ui); border-top: 1px dashed var(--her-edge); border-radius: 0; min-height: 50px; }
+.review .fold-head .chev { color: var(--her-soft); margin-left: auto; }
+.review .fold-inner > div { padding: 4px 0 20px; }
+.review .ask { margin: 4px 0 20px; padding: 14px 0 0; border-top: 1px dashed var(--her-edge); }
+.review-pending { font: italic 400 18px/1.5 var(--f-his); color: var(--text-3); padding: 20px 0; border-top: 1px solid var(--hair-2); border-bottom: 1px solid var(--hair-2); }
+.slips { margin-top: 40px; }
+.slips > .book-head { margin-bottom: 10px; font-size: 18px; }
+.rslip { border-bottom: 1px solid var(--hair); }
+.rslip > .fold-head { padding: 8px 0; min-height: 64px; gap: 14px; }
+.rslip .day-n { font: 300 28px/1 var(--f-his); width: 40px; font-variant-numeric: lining-nums; text-align: center; flex: none; }
+.rslip .day-n small { display: block; font: 500 11px/1.4 var(--f-ui); color: var(--text-3); }
+.rslip .her { flex: 1; font-style: italic; }
+.rslip .fold-inner > div { padding: 0 0 18px 54px; }
+
+/* =====================================================================
+   LIBRARY (Folio's rows, ribbons, Night Room's clocks)
+   ===================================================================== */
+.lib-head { display: flex; align-items: flex-end; gap: 24px; margin-bottom: 10px; }
+.lib-head p { margin: 14px 0 0; color: var(--text-2); font: 400 19px/1.5 var(--f-his); max-width: 34rem; }
+.lib-legend { margin: 0 0 36px; display: flex; align-items: center; gap: 10px; color: var(--text-3); font-size: var(--t-small); }
+.lib-group { margin-bottom: 44px; }
+.lib-group > .book-head { margin-bottom: 4px; }
+.prac { display: grid; grid-template-columns: 22px 44px minmax(0, 1fr) auto; gap: 0 14px; align-items: start; padding: 18px 0; border-bottom: 1px solid var(--hair); position: relative; }
+.prac.off .prac-main { opacity: .55; }
+.ribbon { width: 12px; height: 34px; margin-top: -18px; justify-self: center; color: var(--text); }
+.ribbon path { fill: currentColor; }
+.ribbon.edited path { fill: none; stroke: currentColor; stroke-width: 1.5; }
+.dial { width: 40px; height: 40px; margin-top: 2px; }
+.dial circle.rim { fill: none; stroke: var(--hair-2); stroke-width: 1.2; }
+.dial circle.rim.dash { stroke-dasharray: 2 3.2; }
+.dial circle.rim.night { fill: var(--raised-2); }
+.dial circle.tick { fill: var(--text-3); }
+.dial line { stroke: var(--text); stroke-width: 1.6; stroke-linecap: round; }
+.dial circle.hub { fill: var(--text); }
+.dial circle.arc { fill: none; stroke: var(--text); stroke-width: 2; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 20px 20px; }
+.dial text { font: 600 8.5px var(--f-ui); fill: var(--text-2); text-anchor: middle; }
+.prac-title { display: flex; align-items: baseline; gap: 12px; }
+.prac-title h3 { font: 400 22px/1.25 var(--f-his); letter-spacing: -0.005em; }
+.prac-title .lead { flex: 1; border-bottom: 1.5px dotted var(--hair-2); transform: translateY(-6px); min-width: 20px; }
+.prac-title .cad { font-size: var(--t-small); color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.prac-desc { margin: 4px 0 0; font: 400 16.5px/1.5 var(--f-his); color: var(--text-2); max-width: 36rem; }
+.colophon { margin-top: 8px; font-size: var(--t-small); color: var(--text-3); display: flex; flex-wrap: wrap; align-items: center; }
+.colophon > span + span::before { content: "·"; margin: 0 8px; }
+.colophon .mine { color: var(--text); font-weight: 550; }
+.colophon .segs { display: inline-grid; width: 120px; margin: 0 0 0 10px; vertical-align: middle; }
+.prac-side { display: flex; align-items: center; gap: 6px; }
+.add-prac { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 0 0 0 36px; font: italic 400 19px var(--f-his); color: var(--text-3); border-bottom: 1px solid var(--hair); text-align: left; }
+.add-prac:hover { color: var(--text); }
+/* switch (Night Room's, his lamp when on) */
+.tog { width: 52px; height: 32px; border-radius: 999px; background: var(--sunk); box-shadow: inset 0 0 0 1px var(--hair-2); position: relative; transition: background var(--d-2); flex: none; }
+.tog::before { content: ""; position: absolute; inset: -6px -2px; }
+.tog::after { content: ""; position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 50%; background: var(--pane); box-shadow: 0 1px 3px rgb(0 0 0 / .22); transition: transform var(--spring-dur) var(--spring), background var(--d-2), width var(--d-1); }
+[data-theme="dark"] .tog::after { background: var(--text-2); }
+.tog[aria-checked="true"] { background: var(--lamp); box-shadow: none; }
+.tog[aria-checked="true"]::after { transform: translateX(20px); background: var(--on-lamp); }
+.tog:active::after { width: 30px; }
+.tog[aria-checked="true"]:active::after { transform: translateX(16px); }
+
+/* =====================================================================
+   SETTINGS (Almanac's layout, Folio's warmth and controls)
+   ===================================================================== */
+.set { max-width: 1060px; margin: 0 auto; padding: 48px var(--gutter) 160px; position: relative; }
+.set-head { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 56px; align-items: end; margin-bottom: 52px; }
+.set-head .display { font-size: var(--t-display); letter-spacing: -.03em; font-weight: 300; }
+.set-head .lede { font: 400 19px/1.5 var(--f-his); color: var(--text-2); margin-top: 14px; max-width: 30rem; }
+.glance { border-top: 2px solid var(--text); padding-top: 10px; }
+.glance .kicker { margin-bottom: 4px; }
+.glance a { display: grid; grid-template-columns: 22px 1fr; gap: 12px; align-items: center; padding: 10px 6px; margin: 0 -6px; border-bottom: 1px solid var(--hair); min-height: 58px; border-radius: 10px 10px 0 0; transition: background var(--d-1); }
+.glance a:hover { background: var(--raised); }
+.glance b { display: block; font: 500 var(--t-ui)/1.3 var(--f-ui); }
+.glance .hint { display: block; }
+.glance .g-marks { display: flex; flex-wrap: wrap; gap: 2px; width: 22px; }
+.glance .g-marks .hm { width: 6px; height: 6px; }
+.glance .g-seal { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--text); margin-left: 3px; }
+.glance .g-ink { width: 16px; height: 16px; border-radius: 50%; background: var(--her); margin-left: 2px; box-shadow: 0 0 10px var(--her-glow); }
+.set-grid { display: grid; grid-template-columns: 210px minmax(0, 640px); gap: 56px; }
+.sindex { position: sticky; top: 24px; align-self: start; }
+.sindex ol { list-style: none; margin: 0; padding: 0; border-top: 2px solid var(--text); }
+.sindex a { display: grid; grid-template-columns: 2.3rem 1fr auto; align-items: baseline; min-height: 44px; padding: 10px 0; border-bottom: 1px solid var(--hair); color: var(--text-2); font: 500 var(--t-ui)/1.3 var(--f-ui); transition: color var(--d-2), box-shadow var(--d-3) var(--e-out), padding var(--d-3) var(--e-out); }
+.sindex a .n { font: 300 22px/1 var(--f-his); color: var(--text-3); font-variant-numeric: lining-nums; }
+.sindex a:hover, .sindex a[aria-current="true"] { color: var(--text); }
+.sindex a[aria-current="true"] { box-shadow: inset 2px 0 0 var(--text); padding-left: 10px; }
+.sindex a[aria-current="true"] .n { color: var(--text); }
+.sindex .hd { width: 7px; height: 7px; border-radius: 50%; box-shadow: inset 0 0 0 1.4px var(--text-2); align-self: center; }
+.ssec { margin-bottom: 60px; scroll-margin-top: 30px; }
+.ssec > h2 { display: flex; align-items: baseline; gap: 16px; font: 400 var(--t-h2)/1.1 var(--f-his); letter-spacing: -.01em; border-top: 1px solid var(--hair-2); padding-top: 14px; margin-bottom: 6px; }
+.ssec > h2 .n { font: 300 15px/1 var(--f-his); color: var(--text-3); font-variant-numeric: lining-nums; }
+.ssec > .lede { margin: 0 0 18px; font: 400 17px/1.5 var(--f-his); color: var(--text-2); }
+.group { background: var(--pane); border-radius: 16px; box-shadow: inset 0 0 0 1px var(--hair-2), var(--elev-tab); }
+[data-theme="dark"] .group { background: color-mix(in oklab, var(--raised) 70%, var(--pane)); }
+.srow { display: flex; align-items: center; gap: 16px; padding: 14px 18px; min-height: 70px; }
+.srow + .srow, .srow-fold + .srow, .srow + .srow-fold .srow { box-shadow: 0 -1px 0 var(--hair); }
+.srow .lab { flex: 1; min-width: 0; }
+.srow .lab b { display: block; font: 500 var(--t-ui)/1.35 var(--f-ui); }
+.srow .lab .hint { display: flex; gap: 0 8px; align-items: center; margin-top: 2px; flex-wrap: wrap; line-height: 1.45; }
+.srow .def { color: var(--text-3); font-style: italic; font-family: var(--f-his); font-size: 14px; }
+.srow .reset { font: 500 12.5px var(--f-ui); color: var(--text-2); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--hair-2); padding: 2px 0; display: none; }
+.srow.changed .reset { display: inline; animation: rise 300ms var(--e-out) both; }
+.srow.changed .lab b::after { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--text); margin-left: 8px; vertical-align: middle; }
+.srow.locked .lab b { color: var(--text-2); }
+.lockline { display: inline-flex; align-items: center; gap: 5px; }
+.lockline svg.ic { width: 13px; height: 13px; }
+.srow-fold { display: grid; grid-template-rows: 1fr; transition: grid-template-rows var(--spring-soft-dur) var(--spring-soft), opacity var(--d-2); }
+.srow-fold.shut { grid-template-rows: 0fr; opacity: 0; }
+.srow-fold > div { overflow: hidden; min-height: 0; }
+.stepper { display: inline-flex; align-items: center; border-radius: 99px; box-shadow: inset 0 0 0 1px var(--hair-2); flex: none; }
+.stepper button { width: var(--tap); height: 42px; display: grid; place-items: center; border-radius: 99px; color: var(--text-2); }
+.stepper button:hover { background: var(--raised); color: var(--text); }
+.stepper button:disabled { opacity: .3; pointer-events: none; }
+.stepper button svg.ic { width: 16px; height: 16px; }
+.stepper output { min-width: 78px; text-align: center; font: 500 14.5px var(--f-ui); font-variant-numeric: tabular-nums; }
+.stepper output small { font-weight: 400; color: var(--text-3); margin-left: 3px; font-size: 13px; }
+.stepper[aria-disabled="true"] { opacity: .55; pointer-events: none; }
+.seg { display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--sunk); border-radius: 12px; padding: 3px; position: relative; box-shadow: inset 0 0 0 1px var(--hair); flex: none; }
+.seg button { position: relative; z-index: 1; min-height: 38px; padding: 0 14px; border-radius: 9px; font: 500 13.5px var(--f-ui); color: var(--text-3); transition: color var(--d-2); white-space: nowrap; }
+.seg button[aria-checked="true"] { color: var(--text); }
+.seg .thumb { position: absolute; z-index: 0; top: 3px; bottom: 3px; left: 0; border-radius: 9px; background: var(--pane); box-shadow: var(--elev-tab), 0 0 0 1px var(--hair); transition: transform var(--spring-dur) var(--spring), width var(--spring-dur) var(--spring); }
+[data-theme="dark"] .seg .thumb { background: var(--raised-2); }
+.val { font: 400 17px var(--f-his); color: var(--text); }
+/* her ink: a joy (Folio) */
+.inks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 18px; }
+.inkopt { display: grid; align-content: start; justify-items: center; gap: 6px; padding: 18px 8px 14px; border-radius: 16px; text-align: center; transition: background var(--d-2), box-shadow var(--d-2); position: relative; }
+.inkopt:hover { background: var(--raised); }
+.inkopt[aria-checked="true"] { background: var(--pane); box-shadow: inset 0 0 0 1.5px var(--text), var(--elev-tab); }
+[data-theme="dark"] .inkopt[aria-checked="true"] { background: var(--raised); }
+.blot { width: 54px; height: 48px; color: var(--her); transition: transform 500ms var(--e-paper); filter: drop-shadow(0 0 10px var(--her-glow)); }
+.blot path { fill: currentColor; }
+.inkopt[aria-checked="true"] .blot { transform: scale(1.1) rotate(-4deg); }
+.inkopt b { font: 500 14px/1.2 var(--f-ui); }
+.inkopt small { font: italic 400 14px/1.3 var(--f-his); color: var(--text-3); }
+.ink-proof { padding: 22px 24px; margin-bottom: 16px; }
+.ink-proof .her { min-height: 3.4em; font-size: 15px; }
+.ink-proof .caret { display: inline-block; width: .55em; height: 1.1em; background: var(--her); vertical-align: -2px; margin-left: 1px; animation: blink 1s steps(1) infinite; opacity: .7; }
+@keyframes blink { 50% { opacity: 0; } }
+/* health: status without hue */
+.health-sum { display: flex; align-items: center; gap: 16px; padding: 16px 18px; width: 100%; text-align: left; border-radius: 16px; min-height: 80px; }
+.health-sum:hover { background: var(--raised); }
+.marks { display: flex; gap: 3px; flex-wrap: wrap; width: 92px; flex: none; }
+.hm { display: inline-block; flex: none; width: 8px; height: 8px; border-radius: 50%; box-shadow: inset 0 0 0 1.3px var(--text-3); }
+.hm.ok { background: var(--text-3); box-shadow: none; opacity: .5; }
+.hm.warn { background: linear-gradient(90deg, var(--text) 50%, transparent 50%); box-shadow: inset 0 0 0 1.3px var(--text); }
+.hm.fail { background: var(--text); box-shadow: 0 0 0 2px var(--pane), 0 0 0 3px var(--text); }
+.health-sum .lab { flex: 1; }
+.health-sum .lab b { display: block; font: 400 20px/1.3 var(--f-his); }
+.hlist { list-style: none; margin: 0; padding: 0 18px 10px; }
+.hlist li { display: grid; grid-template-columns: 18px 150px 1fr; gap: 12px; padding: 10px 0; border-top: 1px solid var(--hair); align-items: baseline; font-size: 14px; }
+.hlist li b { font-weight: 500; }
+.hlist li span { color: var(--text-2); font-size: 13.5px; overflow-wrap: anywhere; }
+.hlist li.warn span, .hlist li.fail span { color: var(--text); }
+.hlist .sep { display: block; padding: 14px 0 4px; font: italic 400 15px var(--f-his); color: var(--text-3); }
+.savebar { position: fixed; z-index: 40; left: calc(var(--rail) + (100% - var(--rail)) / 2); bottom: 26px; transform: translate(-50%, 140%); opacity: 0; display: flex; align-items: center; gap: 6px; padding: 6px 6px 6px 20px;
+  background: var(--frost); backdrop-filter: blur(22px) saturate(1.4); -webkit-backdrop-filter: blur(22px) saturate(1.4); border-radius: 99px; box-shadow: var(--elev-pop); transition: transform var(--spring-soft-dur) var(--spring-soft), opacity var(--d-2); font: 500 14px var(--f-ui); color: var(--text-2); white-space: nowrap; }
+.savebar.show { transform: translate(-50%, 0); opacity: 1; }
+.savebar .n { margin-right: 8px; }
+
+/* =====================================================================
+   MARK specimen
+   ===================================================================== */
+.mk-intro { font: 400 19px/1.5 var(--f-his); color: var(--text-2); max-width: 40rem; margin: 14px 0 40px; }
+.mk-opt { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 32px; padding: 30px 0; border-top: 1px solid var(--hair-2); }
+.mk-opt h2 { font: 400 26px/1.15 var(--f-his); }
+.mk-opt h2 .n { font: 300 15px var(--f-his); color: var(--text-3); margin-right: 10px; }
+.mk-opt .why { font: 400 16px/1.5 var(--f-his); color: var(--text-2); margin-top: 10px; }
+.mk-opt .pick { display: inline-block; margin-top: 12px; font: 500 12.5px var(--f-ui); color: var(--on-lamp); background: var(--lamp); border-radius: 99px; padding: 5px 10px; }
+.mk-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.mk-tile { display: grid; justify-items: center; gap: 8px; font: 500 11.5px var(--f-ui); color: var(--text-3); }
+.mk-rail { display: flex; align-items: center; gap: 10px; padding: 10px 14px 10px 10px; border-radius: 12px; font: italic 400 23px/1 var(--f-his); }
+.mk-rail.l { background: #eee7d9; color: #1d1a15; }
+.mk-rail.d { background: #0a0d12; color: #ebe8e1; }
+.mk-rail svg { width: 30px; height: 30px; }
+.mk-px { image-rendering: pixelated; }
+.mk-fav { display: flex; align-items: end; gap: 10px; }
+.mk-big { width: 108px; height: 108px; border-radius: 25px; box-shadow: var(--elev-1); overflow: hidden; }
+.mk-fasten { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 18px; }
+.mk-fasten .letter { padding: 26px 20px 18px; }
+.mk-fasten .cap { font: 500 12.5px var(--f-ui); color: var(--text-3); margin-top: 12px; }
+
+/* =====================================================================
+   PHONE
+   ===================================================================== */
+.phone { height: 100dvh; position: relative; background: var(--pane); }
+.phone > .scroller { height: 100%; padding-bottom: 110px; }
+.tabbar { position: absolute; left: 12px; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); height: 66px; display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; padding: 0 6px; border-radius: 24px;
+  background: var(--frost); backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4); box-shadow: var(--elev-pop); z-index: 20; }
+.tab { height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: var(--text-3); font: 500 10.5px var(--f-ui); border-radius: 16px; }
+.tab.on { color: var(--text); }
+.tab svg.ic { width: 21px; height: 21px; }
+.tab-write { justify-self: center; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; background: var(--lamp); color: var(--on-lamp);
+  box-shadow: 0 0 0 5px color-mix(in oklab, var(--lamp) 8%, transparent), 0 10px 26px -8px color-mix(in oklab, var(--lamp) 50%, transparent); }
+.ph-top { display: flex; align-items: center; justify-content: space-between; height: 52px; padding: 6px 8px 0 14px; position: relative; z-index: 2; }
+.ph-top .brand { margin: 0; padding: 0; height: 40px; font-size: 20px; }
+.ph-top .brand svg { width: 26px; height: 26px; }
+.ph-back { display: inline-flex; align-items: center; gap: 2px; height: 44px; padding: 0 10px 0 4px; color: var(--text-2); font-weight: 500; }
+
+@media (max-width: 1180px) and (min-width: 761px) {
+  .today-grid, .ins-grid { grid-template-columns: 1fr; gap: 24px; }
+  .set-head { grid-template-columns: 1fr; gap: 24px; }
+  .set-grid { grid-template-columns: 170px minmax(0, 1fr); gap: 32px; }
+}
+@media (max-width: 760px) {
+  :root { --gutter: 20px; --t-h1: 2.3rem; }
+  .page, .set { padding: 4px 20px 40px; }
+  .display { font-size: var(--t-h1); }
+  .entries-head { grid-template-columns: 1fr; gap: 18px; }
+  .entries-head .mcal { order: 2; }
+  .filter-sentence { font-size: 1.125rem; }
+  .day { grid-template-columns: 52px minmax(0, 1fr); }
+  .day-tab .n { font-size: 28px; }
+  .row { margin: 0 -10px; padding: 10px; }
+  .row-first { font-size: 17px; }
+  .doc { padding: 0 20px 80px; }
+  .g3 { display: block; }
+  .doc-head { padding-bottom: 26px; }
+  .doc-head .bignum { display: none; }
+  .doc-head .display { font-size: 2rem; }
+  .mg { text-align: left; display: flex; align-items: center; gap: 10px; padding: 0 0 8px; }
+  .mg time { padding: 0; font-size: 14.5px; }
+  .mg .src { margin: 0; }
+  .mg::after { content: ""; flex: 1; height: 1px; background: var(--hair); }
+  .doc-letter > .mg, .blk.hers > .mg { display: none; }
+  .b-tools { display: none; }
+  .blk { padding-top: 26px; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  .blk.editing { -webkit-user-select: text; user-select: text; }
+  .blk.pressing .bd { transform: scale(.985); opacity: .8; transition: transform 400ms var(--e-out), opacity 400ms; }
+  .mnote { margin-top: 16px; }
+  .letter { padding: 22px 18px 16px; }
+  .qlist { columns: 1; }
+  .reading .fold-inner > div { padding-left: 4px; }
+  .audio { gap: 10px; padding-right: 10px; }
+  .audio .rate { display: none; }
+  .keep .ph { font-size: 18px; }
+  .today-grid { grid-template-columns: 1fr; gap: 8px; }
+  .today-head .bignum { font-size: 84px; }
+  .today-head .dl .display { font-size: 2rem; }
+  .ins-title .nums { font-size: 4rem; }
+  .ins-title em { font-size: 2rem; display: block; margin: 6px 0 0; }
+  .ins-title { margin-bottom: 28px; }
+  .ins-grid { display: flex; flex-direction: column; gap: 0; }
+  .ins-grid > div { display: contents; }
+  .prose-figs { font-size: 1.4rem; }
+  .ledger { height: 150px; }
+  .lib-head { display: block; }
+  .prac { grid-template-columns: 14px 40px minmax(0, 1fr); gap: 0 10px; }
+  .prac-side { grid-column: 3; margin-top: 10px; }
+  .prac-title { flex-wrap: wrap; row-gap: 2px; }
+  .prac-title .lead { display: none; }
+  .prac-title .cad { width: 100%; }
+  .prac-title h3 { font-size: 20px; }
+  .ribbon { width: 10px; }
+  .add-prac { padding-left: 24px; }
+  .set-head { grid-template-columns: 1fr; gap: 20px; margin-bottom: 18px; }
+  .set-head .display { font-size: 3rem; }
+  .set-grid { display: block; }
+  .sindex { position: sticky; top: 0; z-index: 4; margin: 0 -20px 18px; background: color-mix(in oklab, var(--pane) 92%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  .sindex ol { display: flex; overflow-x: auto; border-top: 0; border-bottom: 1px solid var(--hair-2); scrollbar-width: none; padding: 0 20px; gap: 18px; }
+  .sindex a { display: flex; gap: 6px; border: 0; white-space: nowrap; font-size: 14px; min-height: 48px; padding: 0; }
+  .sindex a .n { font-size: 16px; }
+  .sindex a[aria-current="true"] { box-shadow: inset 0 -2px 0 var(--text); padding-left: 0; }
+  .sindex .hd { display: none; }
+  .srow { flex-wrap: wrap; padding: 14px 16px; }
+  .srow .lab { flex-basis: 100%; }
+  .srow.inline { flex-wrap: nowrap; }
+  .srow.inline .lab { flex-basis: auto; }
+  .srow .seg { display: flex; width: 100%; }
+  .srow .seg button { flex: 1 1 auto; padding: 0 8px; }
+  .stepper button { width: 42px; }
+  .stepper output { min-width: 64px; }
+  .inks { gap: 4px; }
+  .inkopt { padding: 12px 2px 10px; }
+  .inkopt small { display: none; }
+  .blot { width: 42px; height: 38px; }
+  .hlist li { grid-template-columns: 18px 1fr; }
+  .hlist li span { grid-column: 2; }
+  .savebar { left: 50%; bottom: 92px; }
+  .toast { bottom: 92px; }
+  .room-top { padding: 0 6px; height: 56px; grid-template-columns: auto 1fr; }
+  .room-top .ctx { display: none; }
+  .room-top .focus-t .lbl, .room-top .saved .st { display: none; }
+  .room-col { padding: 2vh 20px 200px; }
+  .room-mg { display: none; }
+  .ed { font-size: 21px; line-height: 1.62; }
+  .room-letter { margin-bottom: 32px; }
+  .room-letter .her p:not(.asked) { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .dock { padding-left: 18px; gap: 10px; }
+  .dock .btn { padding: 0 14px; }
+  .mk-opt { grid-template-columns: 1fr; gap: 16px; }
+  .mk-fasten { grid-template-columns: 1fr; }
+}
+
+/* =====================================================================
+   view transitions (Night Room): panes morph, the entry floats in, phone pushes
+   ===================================================================== */
+@media (min-width: 761px) {
+  .rail { view-transition-name: rail; }
+  .vt-page { view-transition-name: page; }
+  .vt-entry { view-transition-name: entrypane; }
+  .vt-kicker { view-transition-name: entry-kicker; }
+}
+.tabbar { view-transition-name: tabbar; }
+::view-transition-group(*) { animation-duration: var(--spring-soft-dur); animation-timing-function: var(--spring-soft); }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 240ms; }
+::view-transition-image-pair(page), ::view-transition-image-pair(rail), ::view-transition-image-pair(entrypane) { overflow: hidden; border-radius: 18px; }
+::view-transition-old(page), ::view-transition-new(page), ::view-transition-old(rail), ::view-transition-new(rail), ::view-transition-old(entrypane), ::view-transition-new(entrypane) { height: 100%; width: auto; object-fit: none; object-position: left top; }
+::view-transition-old(page) { animation: 200ms ease both vtOut; }
+::view-transition-new(page) { animation: 360ms 60ms ease both vtIn; }
+::view-transition-old(page):only-child { animation: sideOut 300ms var(--e-out) both; }
+::view-transition-new(page):only-child { animation: sideIn var(--spring-soft-dur) var(--spring-soft) both; }
+::view-transition-old(entrypane) { animation: 180ms ease both vtOut; }
+::view-transition-new(entrypane) { animation: 320ms 40ms ease both vtIn; }
+::view-transition-new(entrypane):only-child { animation: paneIn var(--spring-soft-dur) var(--spring-soft) both; }
+::view-transition-old(entrypane):only-child { animation: paneOut 320ms var(--e-out) both; }
+::view-transition-old(rail) { animation: 200ms ease both vtOut; }
+::view-transition-new(rail) { animation: 300ms ease both vtIn; }
+::view-transition-group(rail), ::view-transition-group(tabbar) { z-index: 30; }
+@keyframes vtOut { to { opacity: 0; } }
+@keyframes vtIn { from { opacity: 0; } }
+@keyframes paneIn { from { opacity: 0; transform: translateX(56px) scale(.985); } }
+@keyframes paneOut { to { opacity: 0; transform: translateX(56px) scale(.985); } }
+@keyframes sideIn { from { opacity: 0; transform: translateX(-24px); } }
+@keyframes sideOut { to { opacity: 0; transform: translateX(-24px); } }
+.arrive.entry-pane { animation: paneIn 560ms var(--e-out) both; }
+html[data-vt="push"]::view-transition-old(root) { animation: pushOut 420ms var(--e-out) both; }
+html[data-vt="push"]::view-transition-new(root) { animation: pushIn var(--spring-soft-dur) var(--spring-soft) both; }
+html[data-vt="pop"]::view-transition-old(root) { animation: popOut 360ms var(--e-out) both; z-index: 2; }
+html[data-vt="pop"]::view-transition-new(root) { animation: popIn2 420ms var(--e-out) both; }
+@keyframes pushOut { to { transform: translateX(-28%); filter: brightness(.7); } }
+@keyframes pushIn { from { transform: translateX(100%); box-shadow: -20px 0 40px rgb(0 0 0 / .25); } }
+@keyframes popOut { to { transform: translateX(100%); } }
+@keyframes popIn2 { from { transform: translateX(-28%); filter: brightness(.7); } }
+@media (prefers-reduced-motion: reduce) { ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="room" id="room" role="dialog" aria-modal="true" aria-label="Write" hidden></div>
+<div class="menu" id="menu" role="menu" hidden></div>
+<div id="tip" aria-hidden="true"><div class="t1"></div><div class="t2"></div></div>
+<div class="savebar" id="savebar" role="region" aria-label="Unsaved changes"><span class="n" id="saveN">1 change</span><button class="btn btn-quiet sm" id="discard">Discard</button><button class="btn btn-lamp sm" id="saveBtn">Save</button></div>
+<div class="toast" id="toast" role="status"><span id="toastMsg"></span><button class="btn-text" id="toastUndo">Undo</button></div>
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet" role="dialog" aria-label="Passage actions">
+  <div class="quote" id="shQuote"></div>
+  <button data-sheet="edit"></button><button data-sheet="copy"></button><button data-sheet="delete"></button>
+</div>
+<script>
+/* =======================================================================
+   journal · round 02 prototype. One file, no dependencies.
+   Routes: #today #entries #entry #write #insights #settings #library #mark
+   Params: theme=light|dark  ink=blue-black|brown|violet|green  sidebar=list|rail|hidden
+           motion=off  open=questions,analysis,reflection,review,health,room-q,refl-0…
+           stem=<entry>  from=morning|note|<stem> (write)  over=<route> (write)
+           fasten=postmark|clip|tape  day=YYYY-MM-DD (entries)  sample=0  rec=1  dirty=1  focus=0
+   ======================================================================= */
+const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const root = document.documentElement;
+const mqPhone = matchMedia('(max-width: 760px)'), mqNarrow = matchMedia('(max-width: 1100px)');
+const mqReduce = matchMedia('(prefers-reduced-motion: reduce)'), mqDark = matchMedia('(prefers-color-scheme: dark)');
+const isPhone = () => mqPhone.matches;
+const still = () => mqReduce.matches || root.dataset.motion === 'off';
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+
+/* ---- icons (stroke, 24 grid) ---- */
+const IC = {
+  today: '<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 9.5h16M8.5 3v4M15.5 3v4"/><circle cx="12" cy="14.5" r="1.3" fill="currentColor" stroke="none"/>',
+  entries: '<path d="M7 3.5h8l4 4V20.5H7z"/><path d="M15 3.5v4h4M10 12h6M10 15.5h6"/><path d="M4.5 7v15.5H15" opacity=".55"/>',
+  library: '<path d="M5 4.5h3.5v15H5zM10.5 4.5H14v15h-3.5zM15.6 5.3l3.3-.9 3.6 14.4-3.3.9z"/>',
+  insights: '<path d="M12 6.5C10 5 7 4.5 3.5 5v13c3.5-.5 6.5 0 8.5 1.5 2-1.5 5-2 8.5-1.5V5C17 4.5 14 5 12 6.5zM12 6.5v13"/>',
+  pen: '<path d="M4.5 19.5l1.2-4.6L15.6 5a2.2 2.2 0 013.1 3.1L8.8 18z"/><path d="M13.8 6.8l3.1 3.1"/>',
+  settings: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.2"/><circle cx="9" cy="17" r="2.2"/>',
+  search: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/>',
+  chev: '<path d="M6.5 9.5l5.5 5.5 5.5-5.5"/>',
+  left: '<path d="M14.5 5.5L8 12l6.5 6.5"/>', right: '<path d="M9.5 5.5L16 12l-6.5 6.5"/>',
+  up: '<path d="M6.5 14.5L12 9l5.5 5.5"/>', down: '<path d="M6.5 9.5l5.5 5.5 5.5-5.5"/>',
+  close: '<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
+  play: '<path d="M8.5 5.8v12.4L18.5 12z" fill="currentColor" stroke="none"/>',
+  pause: '<path d="M8 5.5h2.8v13H8zM13.2 5.5H16v13h-2.8z" fill="currentColor" stroke="none"/>',
+  mic: '<rect x="9" y="3.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0013 0M12 18v3"/>',
+  stop: '<rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" stroke="none"/>',
+  trash: '<path d="M5 7h14M10 7V4.5h4V7M7 7l1 13h8l1-13"/>',
+  star: '<path d="M12 4.2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 16.6l-4.8 2.5.9-5.4-3.9-3.8 5.4-.8z"/>',
+  more: '<circle cx="6" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.3" fill="currentColor" stroke="none"/>',
+  focus: '<path d="M4.5 9V5.5a1 1 0 011-1H9M15 4.5h3.5a1 1 0 011 1V9M19.5 15v3.5a1 1 0 01-1 1H15M9 19.5H5.5a1 1 0 01-1-1V15"/><circle cx="12" cy="12" r="2.4"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
+  moon: '<path d="M19 14.5A7.5 7.5 0 019.5 5a7.5 7.5 0 109.5 9.5z"/>',
+  copy: '<rect x="8.5" y="8.5" width="11" height="12" rx="2"/><path d="M5 15.5V6a1.5 1.5 0 011.5-1.5H15"/>',
+  person: '<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c1-3.5 4-5 7-5s6 1.5 7 5"/>',
+  wave: '<path d="M4 12h1M8 8.5v7M12 5.5v13M16 9v6M20 12h-1"/>',
+  chat: '<path d="M5 5.5h14v9.5H10l-5 4z"/>',
+  lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>',
+  pin: '<path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0113 0c0 5-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>',
+  plus: '<path d="M12 5.5v13M5.5 12h13"/>', minus: '<path d="M5.5 12h13"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  reply: '<path d="M9 7.5L4.5 12 9 16.5M4.5 12h9a6 6 0 016 6"/>',
+  send: '<path d="M12 19V6M6.5 11.5L12 6l5.5 5.5"/>',
+  sideList: '<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M10 4.5v15M5.8 8.5h2M5.8 11.5h2M5.8 14.5h2"/>',
+  sideDots: '<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M8 4.5v15"/><circle cx="5.8" cy="8.5" r=".9" fill="currentColor" stroke="none"/><circle cx="5.8" cy="12" r=".9" fill="currentColor" stroke="none"/><circle cx="5.8" cy="15.5" r=".9" fill="currentColor" stroke="none"/>',
+  sideNone: '<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M8 4.5v15" stroke-dasharray="1.4 2.4" opacity=".5"/>',
+  expand: '<path d="M4 6.5h16M4 12h16M4 17.5h10"/>',
+};
+const ic = (n, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true">${IC[n] || ''}</svg>`;
+const ENV = '<svg class="env" viewBox="0 0 34 26" aria-hidden="true"><rect x="2" y="5" width="30" height="19" rx="2"/><path class="flap" d="M2.5 6L17 15.5 31.5 6"/></svg>';
+const RIBBON = (edited) => `<svg class="ribbon ${edited ? 'edited' : ''}" viewBox="0 0 12 34" aria-hidden="true"><path d="M.75 0h10.5v32.5L6 27.3.75 32.5z"/></svg>`;
+const BLOT = '<svg class="blot" viewBox="0 0 60 52" aria-hidden="true"><path d="M31 3c8 .5 15 4 19.5 9.5 4.6 5.6 7.2 13 4.6 19.8-2.3 6-8.3 9.4-13.8 12.6-5.4 3.1-11.7 5.4-17.6 3.6C17.3 46.6 11 43 7 37.6 3 32.2 1.8 24.6 4.6 18.4 7.2 12.6 13 8.6 18.6 5.8 22.5 3.8 26.7 2.8 31 3zm19 39.5c1.6 0 2.8 1.3 2.8 2.8S51.6 48 50 48s-2.8-1.2-2.8-2.7 1.2-2.8 2.8-2.8zM9.5 6.5c1.2 0 2.2 1 2.2 2.2s-1 2.1-2.2 2.1-2.1-1-2.1-2.1 1-2.2 2.1-2.2z"/></svg>';
+/* the fastenings on her letter; all three are drawn, the root's data-fasten picks one */
+function fasten(date = '14 Oct', time = '23:00') {
+  return `<svg class="fasten postmark" viewBox="0 0 96 58" aria-hidden="true"><path d="M2 20q5-3.5 10 0t10 0t10 0t10 0M2 29q5-3.5 10 0t10 0t10 0t10 0M2 38q5-3.5 10 0t10 0t10 0t10 0"/><circle cx="67" cy="29" r="22" stroke-width="1.3"/><circle cx="67" cy="29" r="18" stroke-width=".8" stroke-dasharray="2 2.4"/><text x="67" y="26" font-size="7.5">${date}</text><text x="67" y="37" font-size="10" font-weight="500">${time}</text></svg>`
+    + `<svg class="fasten clip" viewBox="0 0 18 44" aria-hidden="true"><path d="M6 30V8a3.5 3.5 0 017 0v26a5 5 0 01-10 0V12"/></svg><span class="fasten tape"></span>`;
+}
+/* the mark: the notebook's margin rule bends into his j; her ring is its dot */
+const MARK = (s = 30) => `<svg viewBox="0 0 32 32" width="${s}" height="${s}" aria-hidden="true"><rect x="5.5" y="3.5" width="21" height="25" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M14 12.5v8.2a3.6 3.6 0 0 1-3.6 3.6H9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M17.5 12.5h5.5M17.5 16.5h5.5M17.5 20.5h3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" opacity=".45"/><circle cx="14" cy="8" r="2.3" fill="none" stroke="var(--her)" stroke-width="1.7"/></svg>`;
+
+/* =======================================================================
+   fixture content (neutral: lighthouse, harbour, gulls; Ada). Today is Thursday 15 October 2026.
+   ======================================================================= */
+const TODAY = '2026-10-15';
+const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], WDL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const D = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const longDate = (s) => { const d = D(s); return `${WDL[d.getDay()]} ${d.getDate()} ${MONL[d.getMonth()]}`; };
+const fmtDur = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+const hhmm = (d = new Date()) => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+
+const QUESTIONS = [["1.1","What's spinning in your mind?","Brain dump and letting go"],["1.2","What do you need to release before sleep?","Brain dump and letting go"],["2.1","What went well today?","Day review"],["2.2","What challenged you?","Day review"],["2.3","What did you learn?","Day review"],["3.1","What interesting moments happened, even if small?","Story-worthy moments"],["3.2","What made you smile or laugh?","Story-worthy moments"],["3.3","What surprised you?","Story-worthy moments"],["4.1","What wins, big or small, did you experience?","Wins and celebrations"],["4.2","What are you proud of?","Wins and celebrations"],["5.1","What realizations or new understandings emerged?","Insights and revelations"],["5.2","What did you learn about yourself or others?","Insights and revelations"],["6.1","How did you honor your values today?","Values and alignment"],["6.2","Where did you feel most and least aligned?","Values and alignment"],["7.1","What energized you today?","Energy"],["7.2","What drained your energy?","Energy"],["8.1","What attention bids did you notice?","Connection"],["8.2","Which connections did you lean into?","Connection"],["8.3","Who showed up for you, and who did you show up for?","Connection"],["9.1","What moments from today are you thankful for?","Gratitude"],["9.2","What simple joys touched you today?","Gratitude"],["10.1","What brought you peace today?","Peace and calming"],["10.2","What's one thing you can appreciate about yourself?","Peace and calming"],["10.3","What do you want to carry into your sleep?","Peace and calming"]];
+const MORNING_Q = [["1.1","What would make today a good one, even in a small way?","Intention"],["1.2","What's the one thing that matters most today?","Intention"],["2.1","How did you sleep?","Body"],["2.2","Where in your body is the day already sitting?","Body"],["3.1","What are you looking forward to?","Outlook"]];
+
+const ENTRIES = [
+  { stem: '2026-10-15-j', date: '2026-10-15', time: '08:30', title: 'A note', practice: 'note', first: 'call the harbour master', f: {} },
+  { stem: '2026-10-15-fix-life-s01', date: '2026-10-15', time: '06:14', title: 'Fix your life', sub: 'session 3', practice: 'fix-life', first: 'The life I do not want. Mornings that start in the inbox, evenings that end on a screen.', f: { conv: 1 } },
+  { stem: '2026-10-14-evening', date: '2026-10-14', time: '23:12', title: 'Evening journal', practice: 'evening', first: 'First words, about the lighthouse. It came on at dusk the way it always does, without asking anyone, and I stood at the end of the pier longer than I meant to.', f: { audio: 1, her: 1, conv: 1 } },
+  { stem: '2026-10-14-gratitude', date: '2026-10-14', time: '21:34', title: 'Daily gratitude', practice: 'gratitude', first: 'The gulls at the breakwater, loud and certain of themselves. Bread still warm from the corner bakery.', f: {} },
+  { stem: '2026-10-14-morning', date: '2026-10-14', time: '06:41', title: 'Morning journal', practice: 'morning', first: 'Slept badly, woke to rain on the skylight. Want to walk before the ferry.', f: { her: 1 } },
+  { stem: '2026-10-13-evening', date: '2026-10-13', time: '23:05', title: 'Evening journal', practice: 'evening', first: 'Quiet day. Mended the gate; the hinge sang the whole time and I let it.', f: { her: 1 } },
+  { stem: '2026-10-12-morning', date: '2026-10-12', time: '06:20', title: 'Morning journal', practice: 'morning', first: 'Fog over the harbour, the far shore gone entirely. Only the bell buoy to say it was still there.', f: { audio: 1 } },
+  { stem: '2026-10-11-weekly', date: '2026-10-11', time: '18:02', title: 'Weekly pattern scan', practice: 'weekly', first: 'Three evenings this week I meant to call and didn’t. The water helps; the screen doesn’t.', f: { her: 1 } },
+  { stem: '2026-10-09-evening', date: '2026-10-09', time: '23:20', title: 'Evening journal', practice: 'evening', first: 'Walked the long way round the point. The keeper was painting the rail and waved with the brush.', f: { audio: 1, her: 1 } },
+  { stem: '2026-10-08-prep', date: '2026-10-08', time: '17:15', title: 'Conversation prep', practice: 'conversation-prep', first: 'What I want to say to my brother, plainly, before the weekend.', f: {} },
+  { stem: '2026-10-08-midweek', date: '2026-10-08', time: '12:04', title: 'Midweek check-in', practice: 'midweek', first: 'Half the week gone and the boat still out of the water. That’s fine, actually.', f: {} },
+  { stem: '2026-10-06-evening', date: '2026-10-06', time: '22:48', title: 'Evening journal', practice: 'evening', first: 'Rope burn on my palm from the dinghy. A good tired.', f: { her: 1 } },
+  { stem: '2026-10-05-morning', date: '2026-10-05', time: '06:30', title: 'Morning journal', practice: 'morning', first: 'Fog so thick the light stayed on until noon.', f: {} },
+  { stem: '2026-10-02-gratitude', date: '2026-10-02', time: '21:40', title: 'Daily gratitude', practice: 'gratitude', first: 'Soup, and a call that ran an hour over.', f: {} },
+];
+const PRACTICES = [['any', 'any practice'], ['morning', 'Morning journal'], ['evening', 'Evening journal'], ['gratitude', 'Daily gratitude'], ['midweek', 'Midweek check-in'], ['weekly', 'Weekly pattern scan'], ['conversation-prep', 'Conversation prep'], ['fix-life', 'Fix your life'], ['note', 'notes of your own']];
+const KINDS = [['all', 'every entry'], ['audio', 'entries with your voice'], ['her', 'entries Ada wrote back to'], ['starred', 'starred entries']];
+
+const DOC = {
+  '2026-10-14-evening': {
+    span: '23:00 – 23:50',
+    letter: { at: '23:00', opener: 'Evening. The lamp’s on and the harbour’s gone dark. Let the day land; answer whatever pulls at you and leave the rest.', asked: ['1.1'], qs: QUESTIONS },
+    blocks: [
+      { k: 'his', key: 'words:0', at: '23:12', src: 'typed', p: ['First words, about the lighthouse. It came on at dusk the way it always does, without asking anyone, and I stood at the end of the pier longer than I meant to.', 'I think I wanted something to be that certain today. The light doesn’t decide each evening whether it’s worth it.'],
+        note: { at: '08:02', text: 'Certainty you admire in the light, and want for yourself. It comes back on Friday, at the point.' } },
+      { k: 'his', key: 'words:1', at: '23:40', src: 'voice · 2:31', audio: 151, p: ['A spoken thought. I keep meaning to call the harbour master about the mooring and keep not doing it, and the not-doing is louder than the call would be.'],
+        note: { at: '08:02', text: 'The third evening the call comes up. You name its cost plainly here.' } },
+      { k: 'his', key: 'his:813', at: '23:44', src: 'typed', p: ['Later I thought of the harbour. How it holds still while everything in it moves.'] },
+      { k: 'hers', at: '23:45', text: 'The harbour sounds like a word you come back to. What is it holding for you tonight?' },
+      { k: 'his', key: 'his:816', at: '23:50', src: 'in the chat', reply: 'The harbour sounds like a word you come back to', p: ['yes, and the gulls. They argue all evening and then, all at once, stop. I want to learn that.'] },
+    ],
+    analysis: { at: '08:02 the next morning', sum: 'Three things she noticed: the light that doesn’t ask, the call you keep not making, the gulls’ sudden quiet.', noticed: [
+      ['without asking anyone', 'Things that arrive unbidden, the light and the gulls’ sudden quiet, are where tonight’s words settle.'],
+      ['the not-doing is louder than the call would be', 'You name the cost of waiting plainly. It may be smaller to do than to carry.'],
+      ['all at once, stop', 'An ending you admire. Perhaps a way you’d like your evenings to close.']],
+      threads: [['The mooring call', 'third evening running', 'Mon, Tue, Wed'], ['The water as a place to think', 'since 6 October', '5 entries']] },
+    reflection: { sum: 'To carry forward: make the call before the ferry.', q: 'What does the sea ask?', body: ['Wednesday went from rain on the skylight to the gulls going quiet. In between, the same unmade call sat under everything.', 'The lighthouse kept coming back as the thing that doesn’t deliberate. You might borrow a little of that tomorrow.'], carry: 'Make the call before the ferry.' },
+  },
+};
+function docFor(stem) {
+  if (DOC[stem]) return DOC[stem];
+  const e = ENTRIES.find((x) => x.stem === stem) || ENTRIES[2];
+  const at = { morning: '06:00', evening: '23:00', gratitude: '21:30', midweek: '12:00', weekly: '18:00', 'fix-life': '06:00' }[e.practice];
+  return { span: e.time,
+    letter: e.practice === 'note' || e.practice === 'conversation-prep' ? null : { at, opener: e.practice === 'fix-life' ? 'Session 3. Start with the life you do not want, as plainly as you can see it.' : 'A few lines is plenty. Start wherever something feels alive.', asked: ['1.1'], qs: e.practice === 'evening' ? QUESTIONS : MORNING_Q },
+    blocks: [{ k: 'his', key: 'words:0', at: e.time, src: e.f.audio ? 'voice · 1:12' : 'typed', audio: e.f.audio ? 72 : 0, p: [e.first, 'The rest came slower. I sat with the window open and let the sound of the water fill the gaps between sentences.'],
+      note: e.f.her ? { at: '08:10', text: 'The weather is your way in, again. The image does most of the work.' } : null }],
+    analysis: e.f.her ? DOC['2026-10-14-evening'].analysis : null, reflection: null };
+}
+
+const LIB = [
+  ['Every day', [
+    { id: 'morning', t: 'Morning journal', at: '06:00', cad: 'Every day · 06:00', d: 'Start wherever something feels alive. One line is enough.', col: ['Built in', 'Five questions'], on: true },
+    { id: 'gratitude', t: 'Daily gratitude', at: '21:30', cad: 'Every day · 21:30', d: 'A sentence or two, before the evening comes.', col: ['Yours', 'Three questions', 'Written 3 October'], mine: true, on: true },
+    { id: 'evening', t: 'Evening journal', at: '23:00', cad: 'Every day · 23:00', d: 'Let the day land. Answer whatever pulls at you and leave the rest.', col: ['Built in', 'Twenty-four questions in ten parts'], on: true },
+  ]],
+  ['Every week', [
+    { id: 'midweek', t: 'Midweek check-in', at: '12:00', wd: 'Wed', cad: 'Wednesdays · 12:00', d: 'A quick pulse halfway through the week.', col: ['Built in, rewritten by you', 'The default has changed since'], edited: true, on: true },
+    { id: 'weekly', t: 'Weekly pattern scan', at: '20:00', wd: 'Sun', cad: 'Sundays · 20:00', d: 'The week’s patterns as short lines, then the questions.', col: ['Built in', 'Closes with the week'], on: false },
+  ]],
+  ['When you need one', [
+    { id: 'prep', t: 'Conversation prep', cad: 'Two parts', d: 'Before a talk that matters: what you want to say, and what you want to hear.', col: ['Built in'], start: true },
+    { id: 'walk', t: 'Before a long walk', cad: 'Three questions', d: 'Three questions to carry out the door.', col: ['Yours', 'Written 9 October'], mine: true, start: true },
+  ]],
+  ['Programs', [
+    { id: 'fix-life', t: 'Fix your entire life in 1 day', cad: '10 sessions · 51 phases', d: 'A long look at the life you don’t want, the one you do, and the next small step between them.', col: ['Built in', 'Session 3 of 10, open since Sunday'], prog: 2, sessions: 10 },
+  ]],
+];
+
+const WEEKS = [
+  { label: 'Last week', nums: '5 – 11', month: 'October', days: [['Mon', 5, 180, 1], ['Tue', 6, 402, 1], ['Wed', 7, 0, 0], ['Thu', 8, 260, 1], ['Fri', 9, 515, 1], ['Sat', 10, 120, 0], ['Sun', 11, 640, 1]],
+    prose: 'You wrote on <b>six</b> of seven days: <b>2,117</b> words in <b>10</b> entries, <b>4</b> minutes of them spoken. Of the <b>12</b> prompts Ada sent, you answered <b>10</b>; Wednesday’s two went by, and that was all right.',
+    prac: [['Morning journal', '5 of 7'], ['Evening journal', '5 of 7'], ['Midweek check-in', 'answered'], ['Weekly pattern scan', 'answered'], ['Conversation prep', 'once, Thursday']],
+    prog: { done: 2, now: 3, of: 10, line: 'Two sessions done; the third opened on Sunday' },
+    review: { at: 'Sunday night, 20:00', pull: 'You wrote most on the days you went down to the water, and least on the day you meant to call and didn’t.',
+      body: ['The week opened tired and closed easy. Friday was the longest entry you’ve written this month, and almost all of it was the walk round the point.', 'The mooring call came up three times. Each time the words got shorter, which may be its own answer.'],
+      ask: 'What would you let arrive, if you stopped watching for it?' },
+    refl: [['Sun', 11, 'What did the week keep returning to?', 'The water, and the call. Both kept, neither finished.'], ['Fri', 9, 'Where did you feel most like yourself?', 'On the path, before the keeper waved.'], ['Thu', 8, 'What will you say plainly?', 'That you’d like to see him, and that you’re sorry about the summer.'], ['Tue', 6, 'What wore you out?', 'The rope, the cold, the good kind.']] },
+  { label: 'This week', nums: '12 – 18', month: 'October', days: [['Mon', 12, 212, 0], ['Tue', 13, 340, 1], ['Wed', 14, 486, 1], ['Thu', 15, 96, 0], ['Fri', 16, -1, 0], ['Sat', 17, -1, 0], ['Sun', 18, -1, 0]],
+    prose: 'Four days in, you have written on <b>every one</b>: <b>1,134</b> words in <b>8</b> entries. Of the <b>7</b> prompts so far you answered <b>6</b>; Tuesday’s gratitude went by.',
+    prac: [['Morning journal', '3 of 4'], ['Evening journal', '2 of 3'], ['Daily gratitude', '2 of 3'], ['Fix your life', 'session 3 of 10']],
+    prog: { done: 2, now: 3, of: 10, line: 'Session 3 open; phase 2 of 5' },
+    review: null,
+    refl: [['Wed', 14, 'What does the sea ask?', 'Make the call before the ferry.'], ['Tue', 13, 'Where did the day go quiet?', 'At the gate, with the hinge singing.']] },
+];
+
+const SETTINGS = [
+  ['ink', 'Ink and page', 'The colour Ada’s words are typed in, and the page they sit on. On this device only.'],
+  ['place', 'Place and time', 'Prompts are sent by the local time where you are.'],
+  ['prompts', 'Prompts', 'How long a prompt stays open, and when Ada reads what you wrote.'],
+  ['refl', 'Reflections', 'The day’s reflection and the week’s review, in her hand.'],
+  ['chat', 'In the chat', 'The short note about today Ada keeps when a conversation starts.'],
+  ['programs', 'Programs', 'How a program of many sessions moves along.'],
+  ['device', 'This device', ''],
+  ['health', 'Health', ''],
+];
+const ROWS = {
+  prompts: [
+    { id: 'collapse', type: 'step', lab: 'A prompt stays open for', v: 6, def: 6, min: 1, max: 72, step: 1, unit: 'hours', hint: 'After that it folds away in the chat' },
+    { id: 'grace', type: 'step', lab: 'Grace for a late send', v: 2, def: 2, min: .5, max: 24, step: .5, unit: 'hours', hint: 'If the server was asleep at the hour' },
+    { id: 'budget', type: 'step', lab: 'Time Ada may take on an opener', v: 90, def: 90, min: 15, max: 900, step: 15, unit: 'sec', hint: 'After this the plain opener goes instead' },
+    { id: 'annotate', type: 'seg', lab: 'Ada reads what you wrote', v: '30', def: '30', opts: [['0', 'Right away'], ['30', '30 min'], ['60', '1 h'], ['180', '3 h']], hint: 'After you stop writing' },
+  ],
+  refl: [
+    { id: 'day', type: 'toggle', lab: 'A reflection on each day', v: true, def: true, hint: 'Written after the evening entry is read', controls: 'daytime' },
+    { id: 'daytime', type: 'time', lab: 'At the latest by', v: '04:00', def: '04:00', hint: 'The next morning', dep: 'day' },
+    { id: 'week', type: 'toggle', lab: 'A review of the week', v: true, def: true, hint: 'After the weekly scan', controls: 'weektime' },
+    { id: 'weektime', type: 'time', lab: 'At the latest by', v: '20:00', def: '20:00', hint: 'Sunday evening', dep: 'week' },
+  ],
+  chat: [
+    { id: 'todayon', type: 'toggle', lab: 'Send the today note', v: true, def: true, hint: 'Ada starts each conversation knowing the day' },
+    { id: 'chars', type: 'step', lab: 'Its length, at most', v: 1200, def: 1200, min: 200, max: 20000, step: 200, unit: 'chars' },
+    { id: 'cache', type: 'step', lab: 'Kept for', v: 30, def: 30, min: 5, max: 1440, step: 5, unit: 'min', hint: 'Before it is rebuilt' },
+    { id: 'quiet', type: 'step', lab: 'Quiet before the today note', v: 45, def: 30, min: 5, max: 1440, step: 5, unit: 'min', locked: 'Set in Hermes, so it is changed there' },
+  ],
+  programs: [
+    { id: 'settle', type: 'step', lab: 'A phase settles after', v: 2, def: 2, min: 1, max: 60, step: 1, unit: 'min', hint: 'Quiet after your last answer before it moves on' },
+  ],
+};
+const HEALTH = [['ok', 'config', 'loaded from the config file'], ['ok', 'journal folder', 'writable, 214 entries'], ['ok', 'library', '7 practices (5 built in, 2 yours), 1 program'], ['ok', 'channel', 'the chat, through its own sender'], ['fail', 'companion', 'not found: openers fall back to plain, nothing else changes'], ['ok', 'day reflection', 'after the evening entry, by 04:00'], ['ok', 'week review', 'after the weekly scan'], ['ok', 'sweep', 'reads the chat read-only'], ['ok', 'conversations', 'by thread, after 45 minutes of quiet'], ['ok', 'capture', 'every chat thread; /x keeps a message out'], ['warn', 'transcription', 'no backend set: voice is kept, words come later'], ['warn', 'ffprobe', 'not found: voice headings carry no length'], ['ok', 'web app', 'built from the same version'], ['ok', 'last tick', '09:10, two minutes ago']];
+const INKS = [['blue-black', 'Blue-black', 'a typewriter ribbon'], ['brown', 'Brown', 'iron-gall, as a reader annotates'], ['violet', 'Violet', 'a carbon copy'], ['green', 'Green', 'post-office ink']];
+const SAMPLE = ['The ferry horn went twice this morning, which it never does. I took it as a sign to stop putting things off.', 'Called the harbour master at last. Four minutes. The mooring is fine; it was always going to be fine.', 'What would make today good: finishing the gate, and not checking the phone before noon.'];
+const LETTERS = {
+  morning: { where: 'Morning journal', when: 'Thursday 15 October', date: '15 Oct', at: '06:00', from: 'From Ada · Morning journal · 06:00', opener: 'Morning. The fog was still on the water when this went out. Start wherever something feels alive; one line is enough.', qs: MORNING_Q, send: 'Send your answer' },
+  '2026-10-14-evening': { where: 'Evening journal, continued', when: 'adding to Wednesday 14 October', date: '14 Oct', at: '23:45', from: 'From Ada · in the chat · 23:45', opener: 'The harbour sounds like a word you come back to.', qs: QUESTIONS, ask: 'What is it holding for you tonight?', send: 'Add to the entry' },
+};
+
+/* =======================================================================
+   state
+   ======================================================================= */
+const SIDES = ['list', 'rail', 'hidden'];
+const S = {
+  route: 'today', stem: '2026-10-14-evening', theme: null,
+  sidebar: SIDES.includes(store.get('journal:sidebar')) ? store.get('journal:sidebar') : 'list',
+  filt: { kind: 'all', practice: 'any', q: '', day: null }, month: 9,
+  open: new Set(), wk: 0, starred: new Set(['2026-10-14-evening']),
+  room: null, focus: true, qi: 0,
+};
+const isOpen = (id) => S.open.has(id) ? 'true' : 'false';
+const fOpen = (id) => `data-fold="${id}" data-open="${isOpen(id)}"`;
+
+/* =======================================================================
+   router: View Transitions where the browser has them, a settle otherwise
+   ======================================================================= */
+function parseHash() { const raw = location.hash.replace(/^#/, ''); const [path, qs] = raw.split('?'); return { route: path || 'today', p: new URLSearchParams(qs || '') }; }
+function hashFor() {
+  const q = new URLSearchParams(); let r = S.route;
+  if (S.room) { q.set('from', S.room.from || 'note'); if (S.route !== 'today') q.set('over', S.route); r = 'write'; }
+  if (S.route === 'entry') { q.set('stem', S.stem); q.set('sidebar', S.sidebar); }
+  if (S.route === 'entries' && S.filt.day) q.set('day', S.filt.day);
+  if (S.route === 'insights' && S.wk === 1) q.set('week', 'current');
+  if (S.theme) q.set('theme', S.theme);
+  if (root.dataset.ink !== 'blue-black') q.set('ink', root.dataset.ink);
+  if (root.dataset.motion === 'off') q.set('motion', 'off');
+  if (root.dataset.fasten !== 'postmark') q.set('fasten', root.dataset.fasten);
+  const s = q.toString(); return '#' + r + (s ? '?' + s : '');
+}
+const replaceHash = () => history.replaceState(history.state, '', hashFor());
+function applyLook() { root.dataset.theme = S.theme || (mqDark.matches ? 'dark' : 'light'); }
+function transition(vt, apply) {
+  if (!document.startViewTransition || still()) { apply(); if (!still() && vt !== 'none') $$('.vt-page, .vt-entry').forEach((el) => el.classList.add('arrive')); return; }
+  root.dataset.vt = vt;
+  const t = document.startViewTransition(apply);
+  t.finished.finally(() => { if (root.dataset.vt === vt) delete root.dataset.vt; });
+}
+function go(patch, vt = 'fade') {
+  if (isPhone() && vt === 'open') vt = 'push';
+  if (isPhone() && vt === 'close') vt = 'pop';
+  hideMenu();
+  transition(vt, () => {
+    const was = S.route; Object.assign(S, patch);
+    history.pushState({ vt }, '', hashFor()); render();
+    if (patch.route && patch.route !== was && vt !== 'pop' && vt !== 'close') $$('.scroller').forEach((s) => { if (!s.classList.contains('side-pane')) s.scrollTop = 0; });
+  });
+}
+
+/* =======================================================================
+   shells
+   ======================================================================= */
+function render() {
+  applyLook();
+  const keep = $$('.scroller').map((el) => [el.dataset.k, el.scrollTop]);
+  $('#app').innerHTML = isPhone() ? phoneShell() : deskShell();
+  keep.forEach(([k, t]) => { const el = $(`.scroller[data-k="${k}"]`); if (el && k) el.scrollTop = t; });
+  after();
+}
+const navItems = [['today', 'Today', 'today'], ['entries', 'Entries', 'entries'], ['library', 'Library', 'library'], ['insights', 'Insights', 'insights']];
+function deskShell() {
+  const compact = S.route === 'entry' || mqNarrow.matches;
+  const cur = S.route === 'entry' ? 'entries' : S.route;
+  const rail = `<nav class="rail ${compact ? 'compact' : ''}" aria-label="Main">
+    <a class="brand" href="#today" data-nav="today" aria-label="journal, Today">${MARK(30)}<span class="wordmark">journal</span></a>
+    <button class="btn btn-lamp write" data-write="note" title="Write (N)">${ic('pen')}<span class="lbl">Write</span><kbd>N</kbd></button>
+    ${navItems.map(([r, l, i]) => `<a href="#${r}" class="nav-i ${cur === r ? 'on' : ''}" data-nav="${r}" ${cur === r ? 'aria-current="page"' : ''} title="${l}">${ic(i)}<span class="lbl">${l}</span>${r === 'today' ? '<span class="badge">1 waiting</span>' : ''}</a>`).join('')}
+    <div class="rail-spacer"></div>
+    <div class="rail-next"><div class="rn-h"><svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="var(--her)" stroke-width="1.6"/></svg>Next from Ada</div>Daily gratitude at <span class="rn-t">21:30</span>, then the evening journal at <span class="rn-t">23:00</span>.</div>
+    <div class="rail-foot">
+      <a href="#settings" class="nav-i ${cur === 'settings' ? 'on' : ''}" data-nav="settings" title="Settings">${ic('settings')}<span class="lbl">Settings</span></a>
+      <button class="icon-btn" data-act="theme" aria-label="Switch light or dark" title="Light or dark">${ic(root.dataset.theme === 'dark' ? 'sun' : 'moon')}</button>
+    </div></nav>`;
+  let stage = '';
+  const main = (k, html, glow = true) => `<section class="pane main-pane scroller vt-page" data-k="${k}">${glow ? '<div class="lamp-light"></div>' : ''}${html}</section>`;
+  if (S.route === 'today') stage = main('today', viewToday());
+  else if (S.route === 'entries') stage = main('entries', viewEntries());
+  else if (S.route === 'entry') {
+    const side = S.sidebar === 'list' ? `<section class="pane side-pane list scroller vt-page" data-k="side-list" aria-label="Entries">${sideList()}</section>`
+      : S.sidebar === 'rail' ? `<section class="pane side-pane rail scroller vt-page" data-k="side-rail" aria-label="Entries by day">${sideDots()}</section>` : '';
+    stage = side + `<section class="pane entry-pane scroller vt-entry" data-k="entry-${S.stem}" id="entryPane"><div class="lamp-light"></div>${entryBar()}${entryDoc(S.stem)}</section>`;
+  }
+  else if (S.route === 'insights') stage = main('insights', viewInsights());
+  else if (S.route === 'library') stage = main('library', viewLibrary());
+  else if (S.route === 'settings') stage = main('settings', viewSettings());
+  else if (S.route === 'mark') stage = main('mark', viewMark());
+  return `<div class="desk">${rail}<main class="stage">${stage}</main></div>`;
+}
+function phTop(right = '') {
+  return `<div class="ph-top"><a class="brand" href="#today" data-nav="today">${MARK(26)}<span>journal</span></a><span>${right}<button class="icon-btn" data-act="theme" aria-label="Switch light or dark">${ic(root.dataset.theme === 'dark' ? 'sun' : 'moon')}</button><a class="icon-btn" href="#settings" data-nav="settings" aria-label="Settings">${ic('settings')}</a></span></div>`;
+}
+function phoneShell() {
+  const cur = S.route === 'entry' ? 'entries' : S.route;
+  let body = '';
+  if (S.route === 'entry') body = `<div class="lamp-light"></div>${entryBar()}${entryDoc(S.stem)}`;
+  else body = '<div class="lamp-light"></div>' + phTop() + ({ today: viewToday, entries: viewEntries, insights: viewInsights, library: viewLibrary, settings: viewSettings, mark: viewMark }[S.route] || viewToday)();
+  const tabs = [['today', 'Today', 'today'], ['entries', 'Entries', 'entries'], null, ['library', 'Library', 'library'], ['insights', 'Insights', 'insights']];
+  return `<div class="phone"><div class="scroller" data-k="ph-${S.route}" id="${S.route === 'entry' ? 'entryPane' : ''}">${body}</div>
+    <nav class="tabbar" aria-label="Main">${tabs.map((t) => t ? `<a href="#${t[0]}" class="tab ${cur === t[0] ? 'on' : ''}" data-nav="${t[0]}">${ic(t[2])}<span>${t[1]}</span></a>` : `<button class="tab-write" data-write="note" aria-label="Write">${ic('pen')}</button>`).join('')}</nav></div>`;
+}
+
+/* =======================================================================
+   TODAY
+   ======================================================================= */
+const segs = (done, now, of) => `<div class="segs" style="--n:${of}" role="img" aria-label="${done} of ${of} sessions done">${Array.from({ length: of }, (_, i) => `<i class="${i < done ? 'done' : i === now - 1 ? 'now' : ''}" style="--k:${i}"></i>`).join('')}</div>`;
+function viewToday() {
+  const days = [['Fri', 9, 'answered', '2026-10-09'], ['Sat', 10, 'none', '2026-10-10'], ['Sun', 11, 'answered', '2026-10-11'], ['Mon', 12, 'answered', '2026-10-12'], ['Tue', 13, 'missed', '2026-10-13'], ['Wed', 14, 'answered', '2026-10-14'], ['Thu', 15, 'none', '2026-10-15']];
+  return `<div class="page"><div class="today-grid"><div>
+    <header class="today-head"><span class="bignum" aria-hidden="true">15</span><div class="dl"><div class="kicker">Thursday</div><h1 class="display">October<span class="sr"> 15</span></h1><p class="dateline num">09:12 · Hillside</p></div></header>
+    <ol class="weekstrip">${days.map(([w, n, s, ds], i) => `<li class="${i === 6 ? 'is-today' : ''}"><button data-day="${ds}" aria-label="${w} ${n} Oct: ${s === 'none' ? 'nothing sent' : s}" ${i === 6 ? 'aria-current="date"' : ''}><span class="ws-d">${w}</span><span class="ws-n">${n}</span><span class="ws-mark ${s}"></span></button></li>`).join('')}</ol>
+    <section class="sec"><h2 class="book-head">Waiting for you<span class="count">since 06:00</span></h2>
+      <article class="letter prompt-letter">${fasten('15 Oct', '06:00')}<div class="letter-from"><span class="ldot"></span>From Ada · Morning journal · 06:00</div>
+        <div class="her"><p>${esc(LETTERS.morning.opener)}</p><p class="asked">What would make today a good one, even in a small way?</p></div>
+        <div class="letter-actions"><button class="btn btn-lamp" data-write="morning">${ic('pen')}Answer</button><button class="btn-text" data-write="morning" data-voice="1">${ic('mic')}Speak it</button><span class="hint">Open until noon</span></div></article></section>
+    <section class="sec written"><h2 class="book-head">Written today</h2>
+      <a href="#entry" data-open="2026-10-15-j"><div class="kicker">A note · 08:30</div><span class="his">call the harbour master</span></a>
+      <a href="#entry" data-open="2026-10-15-fix-life-s01"><div class="kicker">Fix your life, session 3 · 06:14</div><span class="his">The life I do not want. Mornings that start in the inbox, evenings that end on a screen.</span></a></section>
+  </div><aside>
+    <section class="sec"><h2 class="book-head">Later today</h2><ul class="leaders">
+      <li><span><span class="t">Daily gratitude</span><span class="s">Yours · three questions</span></span><span class="lead"></span><span class="v">21:30</span></li>
+      <li><span><span class="t">Evening journal</span><span class="s">Built in · twenty-four questions</span></span><span class="lead"></span><span class="v">23:00</span></li></ul></section>
+    <section class="sec"><h2 class="book-head">Programs</h2>
+      <div class="prog-row"><span class="pt">Fix your life</span><span class="pm num">3 of 10</span>${segs(2, 3, 10)}</div>
+      <p class="hint" style="margin:2px 0 8px">Session 3 open since Sunday; phase 2 of 5.</p>
+      <button class="btn btn-line sm" data-act="run">Continue the session</button></section>
+    <section class="sec carry"><div class="kicker">Carry forward</div><p class="her">“Make the call before the ferry.”</p>
+      <button class="btn-text" style="padding-left:0" data-open="2026-10-14-evening" data-fold-target="reflection">From Wednesday’s reflection ${ic('right')}</button></section>
+  </aside></div></div>`;
+}
+
+/* =======================================================================
+   ENTRIES
+   ======================================================================= */
+function filtered() {
+  const q = S.filt.q.trim().toLowerCase();
+  return ENTRIES.filter((e) => (S.filt.practice === 'any' || e.practice === S.filt.practice)
+    && (S.filt.kind === 'all' || (S.filt.kind === 'audio' && e.f.audio) || (S.filt.kind === 'her' && e.f.her) || (S.filt.kind === 'starred' && S.starred.has(e.stem)))
+    && (!S.filt.day || e.date === S.filt.day)
+    && (!q || e.first.toLowerCase().includes(q)));
+}
+function grouped(list) {
+  const weeks = [];
+  for (const e of list) {
+    const d = D(e.date); const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    const k = mon.getDate() + ' ' + MONL[mon.getMonth()];
+    let w = weeks.find((x) => x.k === k); if (!w) weeks.push(w = { k, mon, days: [] });
+    let day = w.days.find((x) => x.date === e.date); if (!day) w.days.push(day = { date: e.date, items: [] });
+    day.items.push(e);
+  }
+  return weeks;
+}
+function calendar(mini = false) {
+  const y = 2026, m = S.month, first = new Date(y, m, 1), n = new Date(y, m + 1, 0).getDate();
+  const has = new Set(ENTRIES.filter((e) => D(e.date).getMonth() === m).map((e) => D(e.date).getDate()));
+  let cells = ''; for (let k = 0; k < (first.getDay() + 6) % 7; k++) cells += '<span></span>';
+  for (let d = 1; d <= n; d++) {
+    const ds = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`; const td = ds === TODAY ? 'td' : '';
+    cells += has.has(d) ? `<button class="${td}" data-day="${ds}" aria-pressed="${S.filt.day === ds}" aria-label="${longDate(ds)}, written">${d}</button>`
+      : `<span class="${td} ${ds > TODAY ? 'fut' : ''}">${d}</span>`;
+  }
+  return `<div class="mcal" id="${mini ? 'calMini' : 'cal'}" aria-label="${MONL[m]} ${y}"><div class="mcal-h"><span class="mn">${MONL[m]}</span><span class="my">${mini ? `${has.size} days` : y}</span>
+    <button class="icon-btn" data-act="mprev" aria-label="Earlier month">${ic('left')}</button><button class="icon-btn" data-act="mnext" aria-label="Later month">${ic('right')}</button></div>
+    <div class="mcal-g">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((x) => `<b>${x}</b>`).join('')}${cells}</div>
+    ${mini ? '' : `<div class="mcal-foot"><span><i></i>written, ${has.size} days</span><span><i class="r"></i>today</span></div>`}</div>`;
+}
+function resultNote() {
+  const list = filtered(); const any = S.filt.kind !== 'all' || S.filt.practice !== 'any' || S.filt.q.trim() || S.filt.day;
+  if (!any) return '';
+  return `${S.filt.day ? `Showing ${longDate(S.filt.day)}: ` : ''}${list.length} of ${ENTRIES.length} entries<button class="btn-text" data-act="clear" style="min-height:28px;padding:0 6px">Show all</button>`;
+}
+function listHTML() {
+  const list = filtered(); const q = S.filt.q.trim(); let i = 0;
+  if (!list.length) return `<p class="list-empty">Nothing here with those words. Try fewer, or another practice.</p>`;
+  return grouped(list).map((w) => { const n = w.days.reduce((a, d) => a + d.items.length, 0);
+    return `<section class="week"><h2 class="book-head">Week of ${w.k}<span class="count">${n} ${n === 1 ? 'entry' : 'entries'}</span></h2>${w.days.map((d) => { const dd = D(d.date);
+      return `<div class="day"><div class="day-tab"><span class="n">${dd.getDate()}</span><span class="w">${WD[dd.getDay()]}</span></div><div class="rows">${d.items.map((e) => {
+        const first = q ? esc(e.first).replace(new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'ig'), '<mark class="hit">$1</mark>') : esc(e.first);
+        return `<a class="row rise ${e.practice === 'note' ? 'note' : ''}" style="--i:${i++}" href="#entry?stem=${e.stem}" data-open="${e.stem}"><div class="row-top"><span class="row-title">${esc(e.title)}${e.sub ? ` <span class="sub">${e.sub}</span>` : ''}</span><span class="row-flags">${e.f.her ? '<span class="her-mark" title="Ada wrote back"></span>' : ''}${e.f.audio ? `<span title="Has your voice">${ic('wave')}</span>` : ''}${e.f.conv ? `<span title="A conversation followed">${ic('chat')}</span>` : ''}</span><span class="row-time">${e.time}</span></div><p class="row-first">${first}</p></a>`; }).join('')}</div></div>`; }).join('')}</section>`; }).join('');
+}
+function viewEntries() {
+  return `<div class="page"><header class="entries-head"><div>
+      <h1 class="display">Entries</h1>
+      <p class="filter-sentence">Showing ${choice('kind')} from ${choice('practice')}, newest first.</p>
+      <label class="searchline">${ic('search')}<span class="sr">Search your words</span><input id="q" type="search" placeholder="Search your words" autocomplete="off" value="${esc(S.filt.q)}"></label>
+      <div class="result-note" id="resultNote">${resultNote()}</div></div>
+    <div id="calWrap">${calendar()}</div></header>
+    <div id="list">${listHTML()}</div></div>`;
+}
+function choice(which) {
+  const opts = which === 'kind' ? KINDS : PRACTICES; const cur = opts.find((o) => o[0] === S.filt[which]);
+  return `<button class="choice" data-menu="${which}" aria-haspopup="menu" aria-expanded="false"><span>${esc(cur[1])}</span>${ic('chev')}</button>`;
+}
+/* the sidebar, titled (Folio) */
+function sideBody() {
+  const list = filtered();
+  return `${calendar(true)}${S.filt.day || list.length !== ENTRIES.length ? `<div class="result-note" style="padding:0 8px">${resultNote()}</div>` : ''}${grouped(list).map((w) => `<div class="sweek">Week of ${w.k}</div>${w.days.map((d) => { const dd = D(d.date);
+    return `<div class="sday"><span class="n">${dd.getDate()}<small>${WD[dd.getDay()]}</small></span><div>${d.items.map((e) => `<button class="srow-e" data-open="${e.stem}" aria-current="${e.stem === S.stem}"><span>${esc(e.title)}</span>${e.f.her ? '<span class="her-mark" title="Ada wrote back"></span>' : ''}<time>${e.time}</time></button>`).join('')}</div></div>`; }).join('')}`).join('')}`;
+}
+function sideList() {
+  return `<div class="side-head"><h2>Entries</h2><button class="icon-btn" data-act="back-list" data-tip="All entries" aria-label="All entries">${ic('expand')}</button></div><div class="side-list-in" id="sideBody">${sideBody()}</div>`;
+}
+/* the sidebar, dates and dots (Night Room) */
+function sideDots() {
+  return `<div class="dots"><button class="icon-btn" data-act="back-list" aria-label="All entries" title="All entries">${ic('left')}</button>
+    ${grouped(ENTRIES).map((w) => `<div class="dwk">${w.mon.getDate()} ${MON[w.mon.getMonth()]}</div>${w.days.map((d) => { const dd = D(d.date); const on = d.items.some((e) => e.stem === S.stem);
+      return `<div class="dday ${on ? 'on' : ''}"><span class="dd-n">${dd.getDate()}</span><span class="dd-w">${WD[dd.getDay()]}</span><span class="dd-dots">${d.items.map((e) => `<button class="dot ${e.stem === S.stem ? 'on' : ''}" data-open="${e.stem}" data-tip1="${esc(e.title)} · ${e.time}" data-tip2="${esc(e.first)}" aria-label="${esc(e.title)}, ${longDate(e.date)}, ${e.time}"></button>`).join('')}</span></div>`; }).join('')}`).join('')}</div>`;
+}
+
+/* =======================================================================
+   ENTRY
+   ======================================================================= */
+function entryBar() {
+  const e = ENTRIES.find((x) => x.stem === S.stem) || ENTRIES[2];
+  const idx = SIDES.indexOf(S.sidebar);
+  const lead = isPhone() ? `<button class="ph-back" data-act="back-list">${ic('left')}Entries</button>`
+    : `<button class="icon-btn" data-act="back-list" data-tip="All entries" aria-label="All entries">${ic('left')}</button>
+      <div class="sidesw" role="radiogroup" aria-label="Beside the entry" style="--idx:${idx}"><span class="thumb"></span>
+        <button role="radio" data-side="list" aria-checked="${idx === 0}" aria-label="Titles beside the entry" data-tip="Titles">${ic('sideList')}</button>
+        <button role="radio" data-side="rail" aria-checked="${idx === 1}" aria-label="Dates and dots beside the entry" data-tip="Dates and dots">${ic('sideDots')}</button>
+        <button role="radio" data-side="hidden" aria-checked="${idx === 2}" aria-label="The entry alone" data-tip="Entry alone">${ic('sideNone')}</button></div>
+      <span class="sep"></span><button class="icon-btn" data-step="-1" data-tip="Newer" aria-label="Newer entry">${ic('up')}</button><button class="icon-btn" data-step="1" data-tip="Older" aria-label="Older entry">${ic('down')}</button>`;
+  return `<div class="entry-bar" id="entryBar">${lead}<span class="mini-title">${longDate(e.date)}</span><span class="grow"></span>
+    <button class="icon-btn star" data-act="star" aria-pressed="${S.starred.has(S.stem)}" data-tip="Star" aria-label="Star">${ic('star')}</button>
+    <button class="icon-btn" data-act="meta" data-tip="Mood and people" aria-label="Mood and people">${ic('person')}</button>
+    <button class="icon-btn" data-act="meta" data-tip="More" aria-label="More">${ic('more')}</button></div>`;
+}
+function wave(n, seed) {
+  let s = seed; const r = () => (s = (s * 9301 + 49297) % 233280) / 233280;
+  return Array.from({ length: n }, (_, i) => { const env = 0.35 + 0.65 * Math.sin(Math.PI * (i + .5) / n) ** .6; return Math.max(.14, Math.min(1, env * (0.35 + r() * .75))); });
+}
+function player(sec) {
+  return `<div class="audio" data-dur="${sec}" data-pos="0"><button class="play" data-act="play" aria-label="Play your voice">${ic('play')}</button>
+    <div class="wave" data-act="seek" role="slider" tabindex="0" aria-label="Position" aria-valuemin="0" aria-valuemax="${sec}" aria-valuenow="0">${wave(isPhone() ? 34 : 54, sec).map((h) => `<i style="height:${(h * 100).toFixed(0)}%"></i>`).join('')}</div>
+    <span class="at"><span class="pos">0:00</span> / ${fmtDur(sec)}</span><button class="rate" data-act="rate" aria-label="Speed">1×</button></div>`;
+}
+function qSections(qs, asked = []) {
+  const secs = []; qs.forEach(([id, t, s]) => { let x = secs.find((y) => y.s === s); if (!x) secs.push(x = { s, qs: [] }); x.qs.push([id, t]); });
+  return { n: secs.length, html: secs.map((s) => `<div class="qsec"><h4>${esc(s.s)}</h4><ol>${s.qs.map(([id, t]) => `<li class="${asked.includes(id) ? 'asked-q' : ''}"><span class="qid">${id}</span><span class="qt her">${esc(t)}</span>${asked.includes(id) ? '<span class="tag-asked">asked tonight</span>' : ''}</li>`).join('')}</ol></div>`).join('') };
+}
+function entryDoc(stem) {
+  const e = ENTRIES.find((x) => x.stem === stem) || ENTRIES[2]; const doc = docFor(e.stem); const d = D(e.date); const L = doc.letter;
+  const his = doc.blocks.filter((b) => b.k === 'his'); const words = his.reduce((n, b) => n + b.p.join(' ').split(/\s+/).length, 0);
+  let h = `<article class="doc"><header class="g3 doc-head"><div class="c1 bignum" aria-hidden="true">${d.getDate()}</div><div class="c2">
+    <div class="kicker vt-kicker">${esc(e.title)}${e.sub ? ', ' + e.sub : ''}</div><h1 class="display">${WDL[d.getDay()]}<span class="sr"> ${d.getDate()} ${MONL[d.getMonth()]}</span></h1>
+    <div class="doc-meta num"><span>${MONL[d.getMonth()]} 2026</span><span>${doc.span}</span><span><b>${his.length}</b> ${his.length === 1 ? 'passage' : 'passages'}</span><span><b>${words}</b> words</span>${his.some((b) => b.audio) ? `<span>your voice, <b>${fmtDur(his.find((b) => b.audio).audio)}</b></span>` : ''}</div><button class="link meta-add" data-act="meta">Add mood or people</button></div></header>`;
+  if (L) { const asked = L.qs.filter((q) => L.asked.includes(q[0])).map((q) => q[1]); const Q = qSections(L.qs, L.asked);
+    h += `<section class="g3 doc-letter"><div class="c1 mg her-mg"><time>${L.at}</time></div><div class="c2"><div class="letter">${fasten(`${d.getDate()} ${MON[d.getMonth()]}`, L.at)}<div class="letter-from"><span class="ldot"></span>From Ada · sent ${L.at}</div>
+      <div class="her"><p>${esc(L.opener)}</p>${asked.map((t) => `<p class="asked">${esc(t)}</p>`).join('')}</div>
+      <div class="fold" ${fOpen('questions')}><button class="fold-head q-toggle" data-fold-toggle aria-expanded="${isOpen('questions')}">${ic('chev', 'chev')}<span class="q-label">All ${L.qs.length} questions${Q.n > 1 ? `, in ${Q.n} parts` : ''}</span></button>
+        <div class="fold-body"><div class="fold-inner"><div class="qlist">${Q.html}</div></div></div></div></div></div></section>`; }
+  doc.blocks.forEach((b) => {
+    if (b.k === 'hers') { h += `<div class="g3 blk hers"><div class="c1 mg her-mg"><time>${b.at}</time></div><div class="c2"><div class="slip"><div class="letter-from"><span class="ldot"></span>Ada, in the chat</div><p class="her">${esc(b.text)}</p></div></div></div>`; return; }
+    h += `<div class="g3 blk his" data-key="${b.key}"><div class="c1 mg"><time>${b.at}</time><span class="src">${b.src}</span>
+        <div class="b-tools" role="toolbar" aria-label="This passage"><button class="icon-btn" data-bact="edit" title="Edit" aria-label="Edit">${ic('pen')}</button><button class="icon-btn" data-bact="copy" title="Copy" aria-label="Copy">${ic('copy')}</button><button class="icon-btn" data-bact="delete" title="Delete" aria-label="Delete">${ic('trash')}</button></div></div>
+      <div class="c2">${b.reply ? `<div class="replyto">${ic('reply')}<span>replying to <span class="her">“${esc(b.reply)}…”</span></span></div>` : ''}${b.audio ? player(b.audio) : ''}<div class="bd read">${b.p.map((p) => `<p>${esc(p)}</p>`).join('')}</div></div>
+      ${b.note ? `<aside class="c3 mnote" aria-label="Ada’s note"><div class="lab"><span class="her-mark"></span>Ada · ${b.note.at}</div><span class="her">${esc(b.note.text)}</span></aside>` : ''}</div>`;
+  });
+  h += `<div class="g3"><div class="c2"><div class="keep"><button class="ph" data-write="${stem}">Keep writing…</button><kbd>N</kbd><button class="icon-btn" data-write="${stem}" data-voice="1" aria-label="Speak instead">${ic('mic')}</button></div></div></div>`;
+  if (doc.analysis || doc.reflection) {
+    h += `<section class="g3 readings"><div class="c2"><h2 class="book-head">Her readings</h2>`;
+    if (doc.analysis) { const A = doc.analysis;
+      h += `<div class="reading" ${fOpen('analysis')}><button class="fold-head" data-fold-toggle aria-expanded="${isOpen('analysis')}">${ENV}<span class="rt"><b>What she noticed</b><span class="rs">Analysis · Ada, ${A.at}</span><span class="her fold-sum">${esc(A.sum)}</span></span><span class="chevw">${ic('chev')}</span></button>
+        <div class="fold-body"><div class="fold-inner"><div class="settle">
+          <ol class="noticed" style="--i:0">${A.noticed.map(([q, n]) => `<li><q>${esc(q)}</q><p class="her">${esc(n)}</p></li>`).join('')}</ol>
+          <div style="--i:1"><div class="rd-label">Threads across days</div><div class="threads">${A.threads.map(([t, s, dd]) => `<a href="#entries" data-nav="entries"><span class="her">${esc(t)}, <em>${esc(s)}</em></span><span class="hint">${esc(dd)}</span></a>`).join('')}</div></div>
+        </div></div></div></div>`; }
+    if (doc.reflection) { const R = doc.reflection;
+      h += `<div class="reading" ${fOpen('reflection')}><button class="fold-head" data-fold-toggle aria-expanded="${isOpen('reflection')}">${ENV}<span class="rt"><b>${WDL[d.getDay()]}’s reflection</b><span class="rs">Ada, 04:00 · the day as a whole</span><span class="her fold-sum">${esc(R.sum)}</span></span><span class="chevw">${ic('chev')}</span></button>
+        <div class="fold-body"><div class="fold-inner"><div class="settle"><p class="refl-q" style="--i:0">${esc(R.q)}</p>${R.body.map((p, i) => `<p class="her" style="--i:${i + 1};margin:0 0 12px">${esc(p)}</p>`).join('')}
+          <div class="refl-carry" style="--i:4"><div class="letter-from">Carry forward</div><p class="her it" style="margin:0">${esc(R.carry)}</p></div>
+          <a class="btn-text" style="--i:5;padding-left:0;margin-top:8px" href="#insights" data-nav="insights">The week, in Insights ${ic('right')}</a></div></div></div></div>`; }
+    h += '</div></section>';
+  }
+  return h + '</article>';
+}
+
+/* =======================================================================
+   INSIGHTS
+   ======================================================================= */
+function insBody() {
+  const W = WEEKS[S.wk]; const max = Math.max(...W.days.map((d) => d[2]));
+  return `<h1 class="ins-title"><span class="nums">${W.nums}</span><em>${W.month}</em></h1>
+  <div class="ins-grid"><div>
+    <p class="prose-figs" style="order:1">${W.prose}</p>
+    <div style="order:2"><div class="ledger" role="img" aria-label="Words written each day">${W.days.map(([w, n, words], i) => `<div class="lcol ${words < 0 ? 'future' : words === 0 ? 'zero' : ''}" style="--i:${i}"><span class="w">${words > 0 ? words.toLocaleString('en') : words === 0 ? '—' : ''}</span><span class="bar" style="--h:${words > 0 ? Math.max(8, words / max * 80) : 0}%"></span></div>`).join('')}</div>
+      <div class="ldays">${W.days.map(([w, n, words, r]) => `<div><span class="d">${w}</span><span class="n">${n}</span><span class="rf ${r ? '' : 'no'}"></span></div>`).join('')}</div>
+      <div class="ledger-key"><span><i style="display:inline-block;width:8px;height:14px;border-radius:4px 4px 0 0;background:var(--text)"></i>your words that day</span><span><i class="her-mark" style="width:6px;height:6px"></i>Ada wrote a reflection</span></div></div>
+    <section class="ins-sec" style="order:4"><h2 class="book-head">Programs</h2><div class="prog-row"><span class="pt">Fix your life</span><span class="pm num">${W.prog.now} of ${W.prog.of}</span>${segs(W.prog.done, W.prog.now, W.prog.of)}</div><p class="hint">${W.prog.line}.</p></section>
+    <section class="ins-sec" style="order:6"><h2 class="book-head">By practice</h2><ul class="leaders">${W.prac.map(([t, v]) => `<li><span class="t" style="font-size:17px">${t}</span><span class="lead"></span><span class="v">${v}</span></li>`).join('')}</ul></section>
+  </div><div>
+    <section class="review" style="order:3"><div class="kicker" style="margin-bottom:22px">Her review of the week</div>
+    ${W.review ? `<div class="letter">${fasten('11 Oct', '20:00')}<div class="letter-from"><span class="ldot"></span>From Ada · ${W.review.at}</div><p class="pull">${esc(W.review.pull)}</p>
+      <div class="fold" ${fOpen('review')}><button class="fold-head" data-fold-toggle aria-expanded="${isOpen('review')}">Read the whole review${ic('chev', 'chev')}</button><div class="fold-body"><div class="fold-inner"><div class="settle">${W.review.body.map((p, i) => `<p class="her" style="--i:${i};margin:0 0 12px">${esc(p)}</p>`).join('')}
+        <div class="ask" style="--i:3"><div class="letter-from" style="margin-bottom:4px">For the week ahead</div><p class="her it" style="font-size:16px">${esc(W.review.ask)}</p></div></div></div></div></div></div>`
+      : `<p class="review-pending">Her review comes on Sunday night, after the weekly scan. Until then, the days speak for themselves.</p>`}</section>
+    <section class="slips" style="order:5"><h2 class="book-head">Day by day, from Ada</h2>${W.refl.map(([w, n, q, c], i) => `<div class="rslip" ${fOpen('refl-' + i)}><button class="fold-head" data-fold-toggle aria-expanded="${isOpen('refl-' + i)}"><span class="day-n">${n}<small>${w}</small></span><span class="her">${esc(q)}</span><span class="chevw">${ic('chev')}</span></button><div class="fold-body"><div class="fold-inner"><div class="settle"><p class="her" style="--i:0;margin:0 0 6px">${esc(c)}</p><button class="btn-text" style="--i:1;padding-left:0" data-open="2026-10-14-evening" data-fold-target="reflection">Read it with the day ${ic('right')}</button></div></div></div></div>`).join('')}</section>
+  </div></div>`;
+}
+function viewInsights() {
+  return `<div class="page ins"><div class="ins-top"><button class="icon-btn" data-wk="-1" aria-label="Earlier week" ${S.wk === 0 ? 'disabled' : ''}>${ic('left')}</button><div class="kicker">${WEEKS[S.wk].label}</div><button class="icon-btn" data-wk="1" aria-label="Later week" ${S.wk === WEEKS.length - 1 ? 'disabled' : ''}>${ic('right')}</button></div>
+    <div id="insBody">${insBody()}</div></div>`;
+}
+
+/* =======================================================================
+   LIBRARY
+   ======================================================================= */
+function dial(p) {
+  if (p.prog) { const C = 2 * Math.PI * 15; const f = p.prog / p.sessions;
+    return `<svg class="dial" viewBox="0 0 40 40" aria-hidden="true"><circle class="rim" cx="20" cy="20" r="15"/><circle class="arc" cx="20" cy="20" r="15" stroke-dasharray="${(C * f).toFixed(1)} ${C.toFixed(1)}"/><text x="20" y="23">${p.prog}/${p.sessions}</text></svg>`; }
+  if (!p.at) return `<svg class="dial" viewBox="0 0 40 40" aria-hidden="true"><circle class="rim dash" cx="20" cy="20" r="15"/><circle class="hub" cx="20" cy="20" r="2"/></svg>`;
+  const [h, m] = p.at.split(':').map(Number); const a = (((h % 12) + m / 60) / 12) * 2 * Math.PI - Math.PI / 2;
+  const x = 20 + Math.cos(a) * 10, y = 20 + Math.sin(a) * 10; const night = h >= 18 || h < 6;
+  return `<svg class="dial" viewBox="0 0 40 40" aria-hidden="true"><circle class="rim ${night ? 'night' : ''}" cx="20" cy="20" r="15"/>${[0, 3, 6, 9].map((k) => { const t = (k / 12) * 2 * Math.PI - Math.PI / 2; return `<circle class="tick" cx="${(20 + Math.cos(t) * 12.5).toFixed(1)}" cy="${(20 + Math.sin(t) * 12.5).toFixed(1)}" r=".9"/>`; }).join('')}<line x1="20" y1="20" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/><circle class="hub" cx="20" cy="20" r="2"/>${p.wd ? `<text x="20" y="${y > 22 ? 15 : 31}">${p.wd}</text>` : ''}</svg>`;
+}
+function viewLibrary() {
+  return `<div class="page" style="max-width:900px"><header class="lib-head"><div style="flex:1"><h1 class="display">Library</h1><p>The practices Ada sends on a schedule, and the ones you start when you need them.</p></div>${isPhone() ? '' : `<button class="btn btn-line" data-act="todo">${ic('plus')}New practice</button>`}</header>
+    <p class="lib-legend"><svg class="ribbon" viewBox="0 0 12 34" style="margin:0;height:20px;width:9px" aria-hidden="true"><path d="M0 0h12v34l-6-6-6 6z"/></svg>A ribbon marks a page you wrote, or rewrote. The clock says when Ada sends it.</p>
+    ${LIB.map(([g, ps]) => `<section class="lib-group"><h2 class="book-head">${g}<span class="count">${ps.length}</span></h2>${ps.map((p) => `
+      <div class="prac ${p.on === false ? 'off' : ''}">${p.mine || p.edited ? RIBBON(p.edited) : '<span></span>'}${dial(p)}
+        <div class="prac-main"><div class="prac-title"><h3>${esc(p.t)}</h3><span class="lead"></span><span class="cad">${p.cad}</span></div>
+          <p class="prac-desc">${esc(p.d)}</p>
+          <div class="colophon">${p.col.map((c, i) => `<span class="${i === 0 && (p.mine || p.edited) ? 'mine' : ''}">${c}</span>`).join('')}${p.prog ? segs(p.prog, p.prog + 1, p.sessions) : ''}</div></div>
+        <div class="prac-side">${p.start ? '<button class="btn btn-line sm" data-act="todo">Start</button>' : p.prog ? '<button class="btn btn-lamp sm" data-act="run">Continue</button>' : `<button class="btn-text" style="font-size:13.5px;color:var(--text-3)" data-write="morning">Send now</button><button class="tog" role="switch" aria-checked="${p.on}" aria-label="${esc(p.t)} on schedule" data-act="lib-tog"></button>`}</div>
+      </div>`).join('')}${g === 'Every day' ? `<button class="add-prac" data-act="todo">${ic('plus')}Write a practice of your own</button>` : ''}</section>`).join('')}</div>`;
+}
+
+/* =======================================================================
+   SETTINGS
+   ======================================================================= */
+const allRows = () => Object.values(ROWS).flat();
+const initial = Object.fromEntries(allRows().map((r) => [r.id, r.v]));
+const fmtV = (r, v) => r.type === 'step' ? (r.unit === 'chars' ? v.toLocaleString('en') : String(v)) : v;
+function fmtDef(r) { return r.type === 'step' ? `${r.def.toLocaleString('en')} ${r.unit === 'min' ? 'minutes' : r.unit === 'sec' ? 'seconds' : r.unit === 'chars' ? 'characters' : r.unit}` : r.type === 'toggle' ? (r.def ? 'on' : 'off') : r.type === 'seg' ? r.opts.find((o) => o[0] === r.def)[1].toLowerCase() : r.def; }
+function hintFor(r) {
+  if (r.locked) return `<span class="lockline">${ic('lock')}${r.locked}</span>`;
+  const same = r.v === r.def;
+  return `${r.hint ? `<span>${r.hint}</span>` : ''}<span class="def">${same ? 'the default' : 'default ' + fmtDef(r)}</span><button class="reset" data-reset>Use default</button>`;
+}
+function rowHTML(r) {
+  const ctl = r.type === 'step' ? `<div class="stepper" ${r.locked ? 'aria-disabled="true"' : ''}><button data-dec aria-label="Less" ${r.v <= r.min ? 'disabled' : ''}>${ic('minus')}</button><output>${fmtV(r, r.v)}<small>${r.unit}</small></output><button data-inc aria-label="More" ${r.v >= r.max ? 'disabled' : ''}>${ic('plus')}</button></div>`
+    : r.type === 'time' ? `<div class="stepper"><button data-dec aria-label="Earlier">${ic('minus')}</button><output>${r.v}</output><button data-inc aria-label="Later">${ic('plus')}</button></div>`
+    : r.type === 'toggle' ? `<button class="tog" role="switch" aria-checked="${r.v}" aria-label="${esc(r.lab)}"></button>`
+    : `<div class="seg" role="radiogroup" aria-label="${esc(r.lab)}"><span class="thumb"></span>${r.opts.map(([v, l]) => `<button role="radio" data-v="${v}" aria-checked="${r.v === v}">${l}</button>`).join('')}</div>`;
+  const row = `<div class="srow ${r.locked ? 'locked' : ''} ${r.type !== 'seg' ? 'inline' : ''} ${r.v !== r.def && !r.locked ? 'changed' : ''}" data-row="${r.id}"><div class="lab"><b>${esc(r.lab)}</b><div class="hint">${hintFor(r)}</div></div>${ctl}</div>`;
+  if (r.dep) { const dep = allRows().find((x) => x.id === r.dep); return `<div class="srow-fold ${dep.v ? '' : 'shut'}" data-fold-of="${r.dep}"><div>${row}</div></div>`; }
+  return row;
+}
+const sec = (id, n, inner) => { const s = SETTINGS.find((x) => x[0] === id); return `<section class="ssec" id="s-${id}"><h2><span class="n">${String(n).padStart(2, '0')}</span>${s[1]}</h2>${s[2] ? `<p class="lede">${s[2]}</p>` : ''}${inner}</section>`; };
+function healthSorted() { const o = { fail: 0, warn: 1, ok: 2 }; return [...HEALTH].sort((a, b) => o[a[0]] - o[b[0]]); }
+function viewSettings() {
+  const ink = INKS.find((i) => i[0] === root.dataset.ink) || INKS[0]; const hs = healthSorted();
+  const nOk = hs.filter((h) => h[0] === 'ok').length, nWarn = hs.filter((h) => h[0] === 'warn').length, nFail = hs.filter((h) => h[0] === 'fail').length;
+  const th = S.theme || 'system';
+  return `<div class="set">
+    <header class="set-head"><div><h1 class="display">Settings</h1><p class="lede">How the journal keeps time, when Ada writes back, and how her words look on this device.</p></div>
+      <aside class="glance" aria-label="At a glance"><div class="kicker">At a glance</div>
+        <a href="#s-health" data-jump="health"><span class="g-marks"><i class="hm warn" style="width:10px;height:10px;margin-left:4px"></i></span><span><b>Nearly everything is well</b><span class="hint">${nFail} not working, ${nWarn} to look at · last tick 2 min ago</span></span></a>
+        <a href="#s-device" data-jump="device"><span class="g-seal"></span><span><b>Paired with this browser</b><span class="hint">Since 12 October</span></span></a>
+        <a href="#s-ink" data-jump="ink"><span class="g-ink"></span><span><b>Her ink</b><span class="hint" id="glInk">${ink[1]}, ${ink[2]}</span></span></a></aside></header>
+    <div class="set-grid"><nav class="sindex" aria-label="Settings sections"><ol>${SETTINGS.map(([id, t], k) => `<li><a href="#s-${id}" data-jump="${id}" aria-current="${k === 0}"><span class="n">${String(k + 1).padStart(2, '0')}</span>${t}${id === 'health' ? '<span class="hd" title="Something to look at"></span>' : ''}</a></li>`).join('')}</ol></nav>
+    <div class="sbody">
+      ${sec('ink', 1, `<div class="inks" role="radiogroup" aria-label="Her ink">${INKS.map(([id, n, note]) => `<button class="inkopt" role="radio" data-ink="${id}" aria-checked="${root.dataset.ink === id}">${BLOT}<b>${n}</b><small>${note}</small></button>`).join('')}</div>
+        <div class="letter ink-proof">${fasten('15 Oct', '09:12')}<div class="letter-from"><span class="ldot"></span>From Ada</div><p class="her" id="inkProof"></p></div>
+        <div class="group"><div class="srow"><div class="lab"><b>Page</b><div class="hint">Warm paper by day, the night room after dark, or as this device is set</div></div>
+          <div class="seg" role="radiogroup" id="themeSeg" aria-label="Page"><span class="thumb"></span><button role="radio" data-theme-set="system" aria-checked="${th === 'system'}">System</button><button role="radio" data-theme-set="light" aria-checked="${th === 'light'}">Paper</button><button role="radio" data-theme-set="dark" aria-checked="${th === 'dark'}">Night</button></div></div></div>`)}
+      ${sec('place', 2, `<div class="group"><div class="srow inline"><div class="lab"><b>Place</b><div class="hint">Its coordinates and time zone are looked up for you</div></div><span class="val">Hillside</span></div>
+        <div class="srow inline"><div class="lab"><b>Use my location</b><div class="hint">Asks this browser once; the position is not kept</div></div><button class="btn btn-line sm" data-act="todo">${ic('pin')}Find me</button></div>
+        <div class="srow inline"><div class="lab"><b>Time zone</b><div class="hint">From the place <span class="def">the default</span></div></div><span class="val num">UTC+5:30</span></div></div>`)}
+      ${sec('prompts', 3, `<div class="group">${ROWS.prompts.map(rowHTML).join('')}</div>`)}
+      ${sec('refl', 4, `<div class="group">${ROWS.refl.map(rowHTML).join('')}</div>`)}
+      ${sec('chat', 5, `<div class="group">${ROWS.chat.map(rowHTML).join('')}</div>`)}
+      ${sec('programs', 6, `<div class="group">${ROWS.programs.map(rowHTML).join('')}</div>`)}
+      ${sec('device', 7, `<div class="group"><div class="srow inline"><div class="lab"><b>Paired with this browser</b><div class="hint">Since 12 October, until you unpair or the token is rotated</div></div><button class="btn btn-line sm" data-act="todo">Unpair</button></div>
+        <div class="srow inline"><div class="lab"><b>Version 2.0.0</b><div class="hint">The server and the last tick agree</div></div><span class="hint num">d62c151</span></div></div>`)}
+      ${sec('health', 8, `<div class="group" ${fOpen('health')}><button class="health-sum fold-head" data-fold-toggle aria-expanded="${isOpen('health')}"><span class="marks">${hs.map((x) => `<i class="hm ${x[0]}"></i>`).join('')}</span>
+          <span class="lab"><b>Nearly everything is well.</b><span class="hint">${nOk} checks fine, ${nWarn} to look at, ${nFail} not working</span></span><span class="chevw">${ic('chev')}</span></button>
+        <div class="fold-body"><div class="fold-inner"><ul class="hlist">${hs.map((x, i) => (i > 0 && hs[i - 1][0] !== 'ok' && x[0] === 'ok' ? '<li class="sep">Working as it should</li>' : '') + `<li class="${x[0]}"><i class="hm ${x[0]}" aria-label="${x[0]}"></i><b>${x[1]}</b><span>${x[2]}</span></li>`).join('')}</ul></div></div></div>`)}
+    </div></div></div>`;
+}
+
+/* =======================================================================
+   MARK specimen
+   ======================================================================= */
+const PAPER = '#f4efe4', NIGHT = '#141921';
+function markSVG(opt, { ink = 'currentColor', her = 'var(--her)', fav = false } = {}) {
+  if (opt === 'a') return `<rect x="5.5" y="3.5" width="21" height="25" rx="3" fill="none" stroke="${ink}" stroke-width="${fav ? 2.2 : 1.6}"/><path d="M14 12.5v8.2a3.6 3.6 0 0 1-3.6 3.6H9" fill="none" stroke="${ink}" stroke-width="${fav ? 3.2 : 2.4}" stroke-linecap="round"/>${fav ? '' : `<path d="M17.5 12.5h5.5M17.5 16.5h5.5M17.5 20.5h3.5" stroke="${ink}" stroke-width="1.3" stroke-linecap="round" opacity=".45"/>`}<circle cx="14" cy="8" r="${fav ? 2.6 : 2.3}" fill="none" stroke="${her}" stroke-width="${fav ? 2.2 : 1.7}"/>`;
+  if (opt === 'b') return `<rect x="5.5" y="3.5" width="21" height="25" rx="3" fill="none" stroke="${ink}" stroke-width="${fav ? 2.2 : 1.6}"/>${fav ? '' : `<path d="M10.5 3.5v25" stroke="${ink}" stroke-width="1.1" opacity=".55"/>`}<path d="M18.5 13v7a4 4 0 0 1-4 4H12.5" fill="none" stroke="${ink}" stroke-width="${fav ? 3.4 : 2.8}" stroke-linecap="round"/><circle cx="18.5" cy="8.2" r="${fav ? 2.7 : 2.4}" fill="none" stroke="${her}" stroke-width="${fav ? 2.3 : 1.9}"/>`;
+  return `${fav ? '' : `<path d="M8 5v22" stroke="${ink}" stroke-width="1" opacity=".35"/>`}<path d="M18 14v7.5a5.5 5.5 0 0 1-5.5 5.5H10" fill="none" stroke="${ink}" stroke-width="4" stroke-linecap="round"/><circle cx="18" cy="6.5" r="3.25" fill="none" stroke="${her}" stroke-width="2.75"/>`;
+}
+const markTile = (opt, size, dark, fav) => `<svg viewBox="0 0 32 32" width="${size}" height="${size}" aria-hidden="true"><rect width="32" height="32" rx="7" fill="${dark ? NIGHT : PAPER}"/>${opt === 'c' ? markSVG(opt, { ink: dark ? '#ebe8e1' : '#1b1813', her: dark ? '#b6c0ff' : '#28367f', fav }) : `<g transform="translate(1.6 1.6) scale(.9)">${markSVG(opt, { ink: dark ? '#ebe8e1' : '#1b1813', her: dark ? '#b6c0ff' : '#28367f', fav })}</g>`}</svg>`;
+function fastenOne(kind, date, time) {
+  if (kind === 'postmark') return fasten(date, time).split('<svg class="fasten clip"')[0];
+  if (kind === 'clip') return `<svg class="fasten clip" viewBox="0 0 18 44" aria-hidden="true"><path d="M6 30V8a3.5 3.5 0 017 0v26a5 5 0 01-10 0V12"/></svg>`;
+  return '<span class="fasten tape"></span>';
+}
+function viewMark() {
+  const opts = [
+    ['a', 'Margin j', 'The notebook’s margin rule bends into his j, and her ring is its dot: the page and the letter are one drawing, which is the whole product in a glyph.', true],
+    ['b', 'A j on the page', 'The notebook keeps its margin and the j is written on the page with her ring above it; the most literal, and the j stays legible at 16 px.', false],
+    ['c', 'The favicon, kept', 'The current favicon as the mark, with a faint margin rule to nod to the notebook; strongest at 16 px, but the notebook is nearly gone.', false],
+  ];
+  const tile = (o) => `<div class="mk-row">
+      <div class="mk-tile"><span class="mk-rail l"><svg viewBox="0 0 32 32" style="--her:#28367f">${markSVG(o, { ink: '#1d1a15', her: '#28367f' })}</svg>journal</span>rail, paper</div>
+      <div class="mk-tile"><span class="mk-rail d"><svg viewBox="0 0 32 32">${markSVG(o, { ink: '#ebe8e1', her: '#b6c0ff' })}</svg>journal</span>rail, night</div>
+      <div class="mk-tile"><span class="mk-fav">${markTile(o, 32, false, true)}${markTile(o, 16, false, true)}${markTile(o, 32, true, true)}${markTile(o, 16, true, true)}</span>favicon 32 and 16</div>
+      <div class="mk-tile"><span class="mk-big">${markTile(o, 108, false)}</span>app icon 512</div>
+      <div class="mk-tile"><span class="mk-big">${markTile(o, 108, true)}</span>on the night</div></div>`;
+  return `<div class="page" style="max-width:1080px"><h1 class="display">The mark</h1>
+    <p class="mk-intro">Folio’s notebook and the favicon’s j: his j in his ink, its dot her ring in her ink. Three ways to join them, each at rail size, as a favicon at 32 and 16, and as the 512 app icon.</p>
+    ${opts.map(([o, name, why, pick], i) => `<section class="mk-opt"><div><h2><span class="n">0${i + 1}</span>${name}</h2><p class="why">${why}</p>${pick ? '<span class="pick">In use in the rail</span>' : ''}</div>${tile(o)}</section>`).join('')}
+    <section class="mk-opt"><div><h2><span class="n">04</span>Her letter’s fastening</h2><p class="why">“It doesn’t need to be a paper clip.” The postmark is her ring again, stamped with the hour she wrote; it is the default here. Switch with <code>fasten=</code> in the address.</p></div>
+      <div class="mk-fasten">${[['postmark', 'Postmark (default)'], ['clip', 'Paper clip (Folio)'], ['tape', 'A strip of tape']].map(([k, cap]) => `<div><div class="letter" ${k === 'clip' ? 'style="border-radius:3px 14px 14px 14px"' : ''}>${fastenOne(k, '14 Oct', '23:00').replace('class="fasten', 'style="display:block" class="fasten')}<div class="letter-from"><span class="ldot"></span>From Ada · sent 23:00</div><p class="her asked">What’s spinning in your mind?</p></div><div class="cap">${cap}</div></div>`).join('')}</div></section>
+  </div>`;
+}
+
+/* =======================================================================
+   after each render
+   ======================================================================= */
+function after() {
+  $$('.seg').forEach((s) => syncSeg(s));
+  const ep = $('#entryPane'); if (ep) ep.addEventListener('scroll', () => { const b = $('#entryBar'); if (b) { b.classList.toggle('scrolled', ep.scrollTop > 40); b.classList.toggle('titled', ep.scrollTop > 160); } }, { passive: true });
+  const q = $('#q'); if (q) q.addEventListener('input', () => { S.filt.q = q.value; refreshEntries(false); });
+  if (S.route === 'settings') { typeProof(); markDirty(); const sc = $('.scroller[data-k="settings"]') || $('.phone > .scroller'); if (sc) sc.addEventListener('scroll', spy, { passive: true }); }
+  else $('#savebar').classList.remove('show');
+}
+function syncSeg(seg) {
+  const on = $('button[aria-checked="true"]', seg), th = $('.thumb', seg);
+  if (on && th) { th.style.width = on.offsetWidth + 'px'; th.style.transform = `translateX(${on.offsetLeft}px)`; }
+}
+function refreshEntries(anim = true) {
+  const l = $('#list'); if (l) { l.innerHTML = listHTML(); if (!anim) $$('.rise', l).forEach((r) => r.classList.remove('rise')); }
+  const rn = $('#resultNote'); if (rn) rn.innerHTML = resultNote();
+  const cw = $('#calWrap'); if (cw) cw.innerHTML = calendar();
+  const sb = $('#sideBody'); if (sb) sb.innerHTML = sideBody();
+  $$('[data-menu]').forEach((c) => { const w = c.dataset.menu; $('span', c).textContent = (w === 'kind' ? KINDS : PRACTICES).find((o) => o[0] === S.filt[w])[1]; });
+  if (S.route === 'entries') replaceHash();
+}
+
+/* =======================================================================
+   ink and theme
+   ======================================================================= */
+let typeTimer;
+function typeProof() {
+  const el = $('#inkProof'); if (!el) return;
+  const text = 'How did today go? A line or two is plenty; I’ll read it in the morning.';
+  clearInterval(typeTimer);
+  if (still()) { el.textContent = text; return; }
+  let i = 0; el.innerHTML = '<span class="caret"></span>';
+  typeTimer = setInterval(() => { i += 1; el.innerHTML = esc(text.slice(0, i)) + '<span class="caret"></span>'; if (i >= text.length) clearInterval(typeTimer); }, 26);
+}
+function setInk(id) {
+  if (!INKS.some((i) => i[0] === id)) return;
+  root.dataset.ink = id; store.set('journal:ink', id);
+  $$('.inkopt').forEach((b) => b.setAttribute('aria-checked', b.dataset.ink === id));
+  const n = INKS.find((i) => i[0] === id); const gl = $('#glInk'); if (gl) gl.textContent = `${n[1]}, ${n[2]}`;
+  typeProof(); replaceHash();
+}
+function setTheme(t) { transition('fade', () => { S.theme = t === 'system' ? null : t; replaceHash(); render(); }); }
+mqDark.addEventListener('change', () => { if (!S.theme) render(); });
+
+/* =======================================================================
+   the write room: blooms out of whatever was pressed, folds back into it
+   ======================================================================= */
+const room = $('#room');
+function letterFor(from) {
+  if (!from) return null;
+  if (LETTERS[from]) return LETTERS[from];
+  const e = ENTRIES.find((x) => x.stem === from); if (!e) return null; const doc = docFor(from); if (!doc.letter) return null;
+  return { where: e.title + ', continued', when: 'adding to ' + longDate(e.date), date: `${D(e.date).getDate()} ${MON[D(e.date).getMonth()]}`, at: doc.letter.at, from: 'From Ada · sent ' + doc.letter.at, opener: doc.letter.opener, qs: doc.letter.qs, send: 'Add to the entry' };
+}
+function originOf(el) {
+  if (el && document.contains(el) && el.offsetParent) { const r = el.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }
+  return [innerWidth / 2, innerHeight - 60];
+}
+function openRoom(from, trigger, opts = {}) {
+  const L = letterFor(from); S.room = { from, trigger }; S.qi = 0;
+  const ask = (L && (L.ask || L.qs[0][1])) || '';
+  const narrow = isPhone();
+  const send = L ? (narrow ? (from === 'morning' ? 'Send' : 'Add') : L.send) : (narrow ? 'Keep' : 'Keep this note');
+  const sample = opts.sample && from === 'morning';
+  room.innerHTML = `<header class="room-top"><span><button class="icon-btn" data-act="close-room" aria-label="Close" data-tip="Close (Esc)">${ic('close')}</button></span>
+      <span class="ctx"><b>${L ? esc(L.where) : 'A note'}</b> · ${L ? esc(L.when) : 'Thursday 15 October, just for you'}</span>
+      <span class="r"><span class="saved" id="saved"><span class="sd"></span><span class="st">${sample ? 'Draft kept · 09:14' : 'Nothing written yet'}</span></span>
+        <button class="focus-t" id="focusBtn" aria-pressed="${S.focus}" title="Focus: grey all but the paragraph you’re in (⌘ .)">${ic('focus')}<span class="lbl">Focus</span></button></span></header>
+    <div class="room-body" id="roomBody"><div class="room-col">
+      ${L ? `<div class="letter room-letter">${fasten(L.date, L.at)}<div class="letter-from"><span class="ldot"></span>${esc(L.from)}</div>
+        <div class="her"><p>${esc(L.opener)}</p><p class="asked" id="roomAsked">${esc(ask)}</p></div>
+        ${L.ask ? '' : `<div class="fold" ${fOpen('room-q')}><div class="letter-foot"><button class="btn-text" data-act="q-next" style="color:var(--her);padding-left:0">Another of her questions</button><span class="grow"></span>
+          <button class="q-toggle" data-fold-toggle aria-expanded="${isOpen('room-q')}">${ic('chev', 'chev')}<span class="q-label">All ${L.qs.length}</span></button></div>
+          <div class="fold-body"><div class="fold-inner"><div class="qlist">${qSections(L.qs).html}</div></div></div></div>`}</div>`
+        : `<p class="room-none">No prompt, no questions: just you. <button class="link" data-act="room-prompt">Answer this morning’s instead</button></p>`}
+      <div class="room-page"><div class="room-mg" id="roomMg"></div>
+        <div class="ed ${S.focus ? 'focus' : ''} ${sample ? '' : 'blank'}" id="ed" contenteditable="true" spellcheck="true" role="textbox" aria-multiline="true" aria-label="Your words" data-ph="Begin anywhere. It’s yours.">${sample ? SAMPLE.map((p, i) => `<p class="${i === SAMPLE.length - 1 ? 'cur' : ''}">${esc(p)}</p>`).join('') : '<p class="cur"><br></p>'}</div></div>
+    </div></div>
+    <div class="dock"><span class="count" id="count"></span>
+      <div class="orb-wrap" id="orb"><span class="ring"></span><span class="ring r2"></span><button class="orb" data-act="rec" aria-label="Record your voice">${ic('mic')}</button></div>
+      <span class="r"><button class="btn btn-lamp" data-act="room-send">${ic('send')}${send}</button></span></div>`;
+  const [x, y] = trigger ? originOf(trigger) : [innerWidth / 2, innerHeight - 60];
+  room.style.setProperty('--bx', x + 'px'); room.style.setProperty('--by', y + 'px');
+  room.hidden = false;
+  if (opts.instant) root.classList.add('no-anim');
+  void room.offsetWidth; room.classList.add('open'); document.body.classList.add('room-open'); $('#app').inert = true;
+  if (opts.instant) requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('no-anim')));
+  const ed = $('#ed'); STAMPS = new WeakMap(); stampBase = sample ? 9 * 60 + 2 : null;
+  countWords(); requestAnimationFrame(paintMargin);
+  setTimeout(() => { if (!opts.noFocus && !isPhone()) { ed.focus({ preventScroll: true }); const r = document.createRange(); r.selectNodeContents(ed.lastElementChild || ed); r.collapse(false); const s = getSelection(); s.removeAllRanges(); s.addRange(r); } }, opts.instant ? 0 : 440);
+  if (opts.voice) setTimeout(toggleRec, opts.instant ? 50 : 640);
+  history.replaceState(history.state, '', hashFor());
+}
+function closeRoom(msg) {
+  if (!S.room) return; if (rec) toggleRec(true);
+  const t = msg ? $('[data-act="room-send"]', room) && S.room.trigger : S.room.trigger;
+  const [x, y] = originOf(t); room.style.setProperty('--bx', x + 'px'); room.style.setProperty('--by', y + 'px');
+  room.classList.remove('open'); document.body.classList.remove('room-open'); $('#app').inert = false; S.room = null;
+  setTimeout(() => { if (!S.room) room.hidden = true; }, 470);
+  history.replaceState(history.state, '', hashFor());
+  if (msg) setTimeout(() => toast(msg), 420);
+}
+function countWords() {
+  const ed = $('#ed'), c = $('#count'); if (!ed || !c || rec) return;
+  const n = (ed.innerText.trim().match(/\S+/g) || []).length;
+  c.textContent = n ? `${n} ${n === 1 ? 'word' : 'words'} · ${Math.max(1, Math.round(n / 200))} min` : 'Begin anywhere';
+}
+let STAMPS = new WeakMap(), stampBase = null;
+function paintMargin() {
+  const ed = $('#ed'), mg = $('#roomMg'); if (!ed || !mg) return; let html = '', last = '';
+  [...ed.children].forEach((k, i) => {
+    if (!k.textContent.trim()) return;
+    if (!STAMPS.has(k)) STAMPS.set(k, stampBase != null ? `${String(Math.floor((stampBase + i * 3) / 60)).padStart(2, '0')}:${String((stampBase + i * 3) % 60).padStart(2, '0')}` : hhmm());
+    const t = STAMPS.get(k); if (t !== last) html += `<time style="top:${k.offsetTop + 12}px">${t}</time>`; last = t;
+  });
+  mg.innerHTML = html;
+}
+function markCurrent() {
+  const ed = $('#ed'); if (!ed) return; const sel = getSelection(); if (!sel.rangeCount) return;
+  let n = sel.anchorNode; if (!ed.contains(n)) return; while (n && n.parentNode !== ed) n = n.parentNode;
+  [...ed.children].forEach((p) => p.classList.toggle('cur', p === n));
+}
+let saveT;
+function autosave() {
+  const s = $('#saved'); if (!s) return; s.classList.add('saving'); $('.st', s).textContent = 'Keeping the draft…';
+  clearTimeout(saveT); saveT = setTimeout(() => { s.classList.remove('saving'); $('.st', s).textContent = `Draft kept · ${hhmm()}`; }, 800);
+}
+room.addEventListener('input', (e) => {
+  const ed = e.target.closest('#ed'); if (!ed) return;
+  if (!ed.firstElementChild) { const p = document.createElement('p'); p.textContent = ed.textContent; ed.textContent = ''; ed.appendChild(p); const r = document.createRange(); r.selectNodeContents(p); r.collapse(false); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+  ed.classList.toggle('blank', !ed.innerText.trim()); countWords(); autosave(); markCurrent(); paintMargin();
+});
+document.addEventListener('selectionchange', () => { if (S.room) markCurrent(); });
+function setFocus(on) { S.focus = on; const b = $('#focusBtn'); if (b) b.setAttribute('aria-pressed', on); const ed = $('#ed'); if (ed) ed.classList.toggle('focus', on); }
+let rec = null;
+function toggleRec(discard) {
+  const w = $('#orb'); if (!w) return;
+  if (rec) {
+    cancelAnimationFrame(rec.raf); clearInterval(rec.tick); const secs = rec.secs; rec = null; w.classList.remove('rec'); $('.orb', w).innerHTML = ic('mic'); countWords();
+    if (discard === true) return;
+    const ed = $('#ed'); ed.classList.remove('blank'); if (!ed.innerText.trim()) ed.innerHTML = '';
+    const p = document.createElement('p'); p.innerHTML = `<span class="vchip" contenteditable="false">${ic('wave')}Your voice · ${fmtDur(Math.max(1, secs))} · the words arrive once it’s sent</span>`;
+    [...ed.children].forEach((x) => x.classList.remove('cur')); p.className = 'cur'; ed.appendChild(p); paintMargin(); autosave(); return;
+  }
+  w.classList.add('rec'); $('.orb', w).innerHTML = ic('stop'); rec = { secs: 0, lvl: 0, raf: 0, tick: 0 };
+  $('#count').innerHTML = '<span class="rec-time">0:00</span> · tap to stop';
+  rec.tick = setInterval(() => { rec.secs++; const t = $('.rec-time'); if (t) t.textContent = fmtDur(rec.secs); }, 1000);
+  const loop = (t) => { if (!rec) return; const target = Math.abs(Math.sin(t / 310) * Math.sin(t / 970)) * (.4 + Math.random() * .6); rec.lvl += (target - rec.lvl) * .18; w.style.setProperty('--lvl', rec.lvl.toFixed(3)); rec.raf = requestAnimationFrame(loop); };
+  rec.raf = requestAnimationFrame(loop);
+}
+
+/* =======================================================================
+   menus, toast, sheet, tooltips
+   ======================================================================= */
+const menu = $('#menu');
+function hideMenu() { if (!menu.hidden) { menu.hidden = true; $$('[data-menu][aria-expanded="true"]').forEach((c) => c.setAttribute('aria-expanded', 'false')); } }
+function showMenu(c) {
+  const which = c.dataset.menu, opts = which === 'kind' ? KINDS : PRACTICES, r = c.getBoundingClientRect();
+  const count = (v) => ENTRIES.filter((e) => which === 'kind' ? (v === 'all' || (v === 'audio' && e.f.audio) || (v === 'her' && e.f.her) || (v === 'starred' && S.starred.has(e.stem))) : (v === 'any' || e.practice === v)).length;
+  menu.innerHTML = opts.map(([v, l], i) => (which === 'practice' && i === 1 ? '<hr>' : '') + `<button role="menuitemradio" data-v="${v}" aria-checked="${S.filt[which] === v}">${l[0].toUpperCase() + l.slice(1)}${S.filt[which] === v ? ic('check') : `<span class="cnt">${count(v)}</span>`}</button>`).join('');
+  menu.dataset.which = which; menu.hidden = false; c.setAttribute('aria-expanded', 'true');
+  menu.style.left = Math.max(8, Math.min(r.left - 8, innerWidth - 252)) + 'px'; menu.style.top = (r.bottom + 6) + 'px';
+  menu.style.animation = 'none'; void menu.offsetWidth; menu.style.animation = '';
+}
+let toastT, undoFn = null;
+function toast(msg, undo) { const t = $('#toast'); $('#toastMsg').textContent = msg; $('#toastUndo').hidden = !undo; undoFn = undo || null; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), undo ? 5000 : 2200); }
+$('#toastUndo').addEventListener('click', () => { if (undoFn) undoFn(); undoFn = null; $('#toast').classList.remove('show'); });
+document.addEventListener('pointerover', (ev) => {
+  const d = ev.target.closest('.dot[data-tip1]'); const tip = $('#tip');
+  if (!d) { tip.classList.remove('on'); return; }
+  const r = d.getBoundingClientRect(); $('.t1', tip).textContent = d.dataset.tip1; $('.t2', tip).textContent = d.dataset.tip2;
+  tip.style.left = r.right + 12 + 'px'; tip.style.top = Math.max(8, r.top - 10) + 'px'; tip.classList.add('on');
+});
+
+/* =======================================================================
+   settings behaviour
+   ======================================================================= */
+function markDirty() {
+  let n = 0; allRows().forEach((r) => { if (r.v !== initial[r.id]) n++; });
+  $('#saveN').textContent = `${n} ${n === 1 ? 'change' : 'changes'} not saved`;
+  $('#savebar').classList.toggle('show', n > 0 && S.route === 'settings');
+}
+function updateRow(r) {
+  const el = $(`[data-row="${r.id}"]`); if (!el) return;
+  el.classList.toggle('changed', r.v !== r.def && !r.locked);
+  $('.hint', el).innerHTML = hintFor(r);
+  const out = $('output', el);
+  if (out) { out.innerHTML = r.type === 'step' ? `${fmtV(r, r.v)}<small>${r.unit}</small>` : r.v; if (!still()) out.animate([{ transform: 'translateY(-3px)', opacity: .4 }, { transform: 'none', opacity: 1 }], { duration: 220, easing: 'ease-out' });
+    if (r.type === 'step') { $('[data-dec]', el).disabled = r.v <= r.min; $('[data-inc]', el).disabled = r.v >= r.max; } }
+  const tg = $('.tog', el); if (tg) tg.setAttribute('aria-checked', r.v);
+  const sg = $('.seg', el); if (sg) { $$('button', sg).forEach((b) => b.setAttribute('aria-checked', b.dataset.v === r.v)); syncSeg(sg); }
+  if (r.controls) { const f = $(`[data-fold-of="${r.id}"]`); if (f) f.classList.toggle('shut', !r.v); }
+  markDirty();
+}
+const addTime = (t, mins) => { const [h, m] = t.split(':').map(Number); const x = (h * 60 + m + mins + 1440) % 1440; return `${String(Math.floor(x / 60)).padStart(2, '0')}:${String(x % 60).padStart(2, '0')}`; };
+$('#discard').addEventListener('click', () => { allRows().forEach((r) => { r.v = initial[r.id]; updateRow(r); }); });
+$('#saveBtn').addEventListener('click', () => { allRows().forEach((r) => initial[r.id] = r.v); markDirty(); toast('Settings saved'); });
+function spy() {
+  const sc = $('.scroller[data-k="settings"]') || $('.phone > .scroller'); if (!sc) return;
+  let cur = 'ink'; $$('.ssec').forEach((s) => { if (s.getBoundingClientRect().top < 200) cur = s.id.slice(2); });
+  $$('.sindex a').forEach((a) => a.setAttribute('aria-current', a.dataset.jump === cur));
+}
+
+/* =======================================================================
+   entry behaviour: open, step, block actions, player
+   ======================================================================= */
+function openEntry(stem, foldTarget) {
+  if (foldTarget) S.open.add(foldTarget);
+  if (S.route === 'entry') { S.stem = stem; transition('doc', () => { replaceHash(); render(); const ep = $('#entryPane'); if (ep) ep.scrollTop = 0; }); }
+  else { S.from = S.route; go({ route: 'entry', stem }, 'open'); }
+  if (foldTarget) setTimeout(() => { const f = $(`[data-fold="${foldTarget}"]`); if (f) f.scrollIntoView({ behavior: still() ? 'auto' : 'smooth', block: 'center' }); }, still() ? 0 : 650);
+}
+function closeEntry() { go({ route: 'entries' }, 'close'); }
+function setSidebar(v) {
+  if (!SIDES.includes(v) || v === S.sidebar) return; store.set('journal:sidebar', v);
+  transition('side', () => { S.sidebar = v; replaceHash(); render(); });
+}
+function blockAct(blk, act) {
+  const bd = $('.bd', blk), c2 = $('.c2', blk);
+  if (act === 'edit') { blk.classList.add('editing'); bd.dataset.orig = bd.innerHTML; bd.contentEditable = 'true'; bd.focus();
+    c2.insertAdjacentHTML('beforeend', `<div class="edit-bar"><button class="btn btn-lamp sm" data-edit="save">Save</button><button class="btn btn-quiet sm" data-edit="cancel">Cancel</button><span class="hint">Only this passage changes; Ada’s words stay as they are.</span></div>`); }
+  if (act === 'copy') { navigator.clipboard?.writeText(bd.innerText).catch(() => {}); toast('Copied your words'); }
+  if (act === 'delete') { if ($('.confirm', blk)) return; c2.insertAdjacentHTML('beforeend', `<div class="confirm" role="group" aria-label="Delete this passage?">Delete this passage?<button class="btn btn-lamp sm" data-bact="really">Delete</button><button class="btn btn-quiet sm" data-bact="keep">Keep</button></div>`); }
+  if (act === 'keep') $('.confirm', blk)?.remove();
+  if (act === 'really') { $('.confirm', blk)?.remove(); blk.style.maxHeight = blk.offsetHeight + 'px'; blk.classList.add('removing');
+    const t = setTimeout(() => { blk.hidden = true; }, 430);
+    toast('Passage deleted', () => { clearTimeout(t); blk.hidden = false; blk.classList.remove('removing'); blk.style.maxHeight = ''; }); }
+}
+let sheetBlk = null, pressT;
+function openSheet(blk) {
+  sheetBlk = blk; navigator.vibrate?.(8);
+  $('#shQuote').innerHTML = `<small>Your words · ${esc($('.mg time', blk).textContent)}</small>${esc($('.bd', blk).innerText)}`;
+  $$('#sheet [data-sheet]').forEach((b) => { const k = b.dataset.sheet; b.innerHTML = ic(k === 'edit' ? 'pen' : k === 'copy' ? 'copy' : 'trash') + (k === 'edit' ? 'Edit these words' : k === 'copy' ? 'Copy' : 'Delete…'); });
+  $('#scrim').classList.add('show'); $('#sheet').classList.add('show');
+}
+function closeSheet() { $('#scrim').classList.remove('show'); $('#sheet').classList.remove('show'); }
+$('#scrim').addEventListener('click', closeSheet);
+$('#sheet').addEventListener('click', (e) => { const b = e.target.closest('[data-sheet]'); if (!b || !sheetBlk) return; const blk = sheetBlk; closeSheet(); setTimeout(() => blockAct(blk, b.dataset.sheet === 'delete' ? 'delete' : b.dataset.sheet), 250); });
+document.addEventListener('pointerdown', (ev) => {
+  const b = ev.target.closest('.blk.his'); if (!b || !isPhone() || ev.target.closest('.audio,.edit-bar,.confirm,[contenteditable="true"]')) return;
+  b.classList.add('pressing'); pressT = setTimeout(() => { b.classList.remove('pressing'); openSheet(b); }, 480);
+});
+['pointerup', 'pointercancel', 'pointerleave'].forEach((t) => document.addEventListener(t, () => { clearTimeout(pressT); $$('.pressing').forEach((x) => x.classList.remove('pressing')); }, true));
+document.addEventListener('scroll', () => clearTimeout(pressT), true);
+document.addEventListener('contextmenu', (e) => { if (isPhone() && e.target.closest('.blk.his')) e.preventDefault(); });
+const playing = new Map();
+function setPos(au, s) {
+  const dur = +au.dataset.dur; s = Math.max(0, Math.min(dur, s)); au.dataset.pos = s;
+  const bars = $$('.wave i', au), k = Math.round((s / dur) * bars.length); bars.forEach((b, i) => b.classList.toggle('done', i < k));
+  $('.pos', au).textContent = fmtDur(s); $('.wave', au).setAttribute('aria-valuenow', Math.round(s));
+}
+function playToggle(au) {
+  const btn = $('.play', au);
+  if (playing.has(au)) { cancelAnimationFrame(playing.get(au)); playing.delete(au); btn.innerHTML = ic('play'); btn.setAttribute('aria-label', 'Play your voice'); return; }
+  btn.innerHTML = ic('pause'); btn.setAttribute('aria-label', 'Pause'); let last = performance.now();
+  const step = (now) => { const rate = parseFloat($('.rate', au).textContent) || 1; setPos(au, +au.dataset.pos + ((now - last) / 1000) * rate * 4); last = now; if (+au.dataset.pos >= +au.dataset.dur) { playToggle(au); setPos(au, 0); return; } playing.set(au, requestAnimationFrame(step)); };
+  playing.set(au, requestAnimationFrame(step));
+}
+
+/* =======================================================================
+   one click handler
+   ======================================================================= */
+document.addEventListener('click', (ev) => {
+  const t = ev.target;
+  if (!t.closest('#menu') && !t.closest('[data-menu]')) hideMenu();
+  const m = t.closest('#menu button'); if (m) { S.filt[menu.dataset.which] = m.dataset.v; hideMenu(); refreshEntries(); return; }
+  const mc = t.closest('[data-menu]'); if (mc) { ev.preventDefault(); if (!menu.hidden && menu.dataset.which === mc.dataset.menu) hideMenu(); else showMenu(mc); return; }
+  const w = t.closest('[data-write]'); if (w && !t.closest('.tog')) { ev.preventDefault(); const f = w.dataset.write; openRoom(f === 'note' ? null : f, w, { voice: !!w.dataset.voice }); return; }
+  const ft = t.closest('[data-fold-toggle]'); if (ft) { const f = ft.closest('[data-fold]'); const o = f.dataset.open !== 'true'; f.dataset.open = o; ft.setAttribute('aria-expanded', o); o ? S.open.add(f.dataset.fold) : S.open.delete(f.dataset.fold); return; }
+  const ba = t.closest('[data-bact]'); if (ba) { blockAct(ba.closest('.blk'), ba.dataset.bact); return; }
+  const ed = t.closest('[data-edit]'); if (ed) { const blk = ed.closest('.blk'); const bd = $('.bd', blk); if (ed.dataset.edit === 'cancel') bd.innerHTML = bd.dataset.orig; bd.contentEditable = 'false'; blk.classList.remove('editing'); $('.edit-bar', blk)?.remove(); if (ed.dataset.edit === 'save') toast('Saved to the entry'); return; }
+  const day = t.closest('[data-day]'); if (day) {
+    const ds = day.dataset.day;
+    if (day.closest('.weekstrip')) { S.filt.day = ENTRIES.some((e) => e.date === ds) ? ds : null; S.month = D(ds).getMonth(); go({ route: 'entries' }); return; }
+    S.filt.day = S.filt.day === ds ? null : ds; refreshEntries(); return; }
+  const op = t.closest('[data-open]'); if (op) { ev.preventDefault(); openEntry(op.dataset.open, op.dataset.foldTarget); return; }
+  const nav = t.closest('[data-nav]'); if (nav) { ev.preventDefault(); const r = nav.dataset.nav; if (S.room) closeRoom(); if (r === S.route) return; go({ route: r }); return; }
+  const sd = t.closest('[data-side]'); if (sd) { setSidebar(sd.dataset.side); return; }
+  const st = t.closest('[data-step]'); if (st) { const vis = filtered().map((e) => e.stem); const i = vis.indexOf(S.stem) + Number(st.dataset.step); if (vis[i]) openEntry(vis[i]); return; }
+  const wk = t.closest('[data-wk]'); if (wk) { const n = S.wk + Number(wk.dataset.wk); if (!WEEKS[n]) return; S.wk = n; S.open.delete('review'); const b = $('#insBody'); b.innerHTML = insBody(); if (!still()) { b.classList.remove('arrive'); void b.offsetWidth; b.classList.add('arrive'); } $('.ins-top .kicker').textContent = WEEKS[n].label; $('[data-wk="-1"]').disabled = n === 0; $('[data-wk="1"]').disabled = n === WEEKS.length - 1; replaceHash(); return; }
+  const ink = t.closest('.inkopt'); if (ink) { setInk(ink.dataset.ink); return; }
+  const ts = t.closest('[data-theme-set]'); if (ts) { setTheme(ts.dataset.themeSet); return; }
+  const jp = t.closest('[data-jump]'); if (jp) { ev.preventDefault(); const s = $('#s-' + jp.dataset.jump); if (s) s.scrollIntoView({ behavior: still() ? 'auto' : 'smooth', block: 'start' }); if (jp.dataset.jump === 'health' && jp.closest('.glance')) { const f = $('[data-fold="health"]'); f.dataset.open = 'true'; S.open.add('health'); } return; }
+  const row = t.closest('.srow[data-row]'); if (row) { const r = allRows().find((x) => x.id === row.dataset.row); if (!r || r.locked) return;
+    if (t.closest('[data-inc],[data-dec]')) { const d = t.closest('[data-inc]') ? 1 : -1; r.v = r.type === 'time' ? addTime(r.v, d * 15) : Math.min(r.max, Math.max(r.min, +(r.v + d * r.step).toFixed(2))); }
+    else if (t.closest('.tog')) r.v = !r.v;
+    else if (t.closest('.seg button')) r.v = t.closest('.seg button').dataset.v;
+    else if (t.closest('[data-reset]')) r.v = r.def;
+    else return;
+    updateRow(r); return; }
+  const a = t.closest('[data-act]'); if (!a) return;
+  switch (a.dataset.act) {
+    case 'theme': setTheme(root.dataset.theme === 'dark' ? 'light' : 'dark'); break;
+    case 'back-list': closeEntry(); break;
+    case 'clear': { S.filt = { kind: 'all', practice: 'any', q: '', day: null }; const qi = $('#q'); if (qi) qi.value = ''; refreshEntries(); break; }
+    case 'mprev': S.month = Math.max(0, S.month - 1); refreshEntries(false); break;
+    case 'mnext': S.month = Math.min(11, S.month + 1); refreshEntries(false); break;
+    case 'star': { const on = !S.starred.has(S.stem); on ? S.starred.add(S.stem) : S.starred.delete(S.stem); a.setAttribute('aria-pressed', on); toast(on ? 'Starred' : 'Star removed'); break; }
+    case 'meta': toast('The mood and people sheet is not drawn in this round'); break;
+    case 'run': toast('The run screen is not drawn in this round'); break;
+    case 'todo': toast('Not drawn in this round'); break;
+    case 'lib-tog': { const on = a.getAttribute('aria-checked') !== 'true'; a.setAttribute('aria-checked', on); a.closest('.prac').classList.toggle('off', !on); break; }
+    case 'play': playToggle(a.closest('.audio')); break;
+    case 'rate': { const r = ['1×', '1.25×', '1.5×', '2×']; a.textContent = r[(r.indexOf(a.textContent) + 1) % r.length]; break; }
+    case 'seek': { const au = a.closest('.audio'); const r = a.getBoundingClientRect(); setPos(au, ((ev.clientX - r.left) / r.width) * +au.dataset.dur); break; }
+    case 'close-room': closeRoom(); break;
+    case 'room-send': { const has = $('#ed')?.innerText.trim(); const from = S.room.from; closeRoom(has ? (from ? (from === 'morning' ? 'Sent to the morning journal' : 'Added to the entry') : 'Kept as a note') : null); break; }
+    case 'room-prompt': { const tr = S.room.trigger; closeRoom(); setTimeout(() => openRoom('morning', tr), 480); break; }
+    case 'rec': toggleRec(); break;
+    case 'q-next': { const L = letterFor(S.room?.from); if (!L) break; S.qi = (S.qi + 1) % L.qs.length; const q = $('#roomAsked');
+      if (still()) { q.textContent = L.qs[S.qi][1]; break; }
+      q.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-6px)' }], { duration: 160, easing: 'ease-in' }).onfinish = () => { q.textContent = L.qs[S.qi][1]; q.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 360, easing: 'cubic-bezier(.16,1,.3,1)' }); }; break; }
+  }
+});
+room.addEventListener('click', (e) => { if (e.target.closest('#focusBtn')) setFocus(!S.focus); });
+
+/* =======================================================================
+   keys
+   ======================================================================= */
+document.addEventListener('keydown', (e) => {
+  const typing = e.target.closest && e.target.closest('input, textarea, [contenteditable="true"]');
+  if (e.key === 'Escape') {
+    if (!menu.hidden) hideMenu(); else if ($('#sheet').classList.contains('show')) closeSheet(); else if (S.room) closeRoom(); else if (S.route === 'entry' && !typing) closeEntry();
+    return; }
+  if ((e.metaKey || e.ctrlKey) && e.key === '.') { e.preventDefault(); if (S.room) setFocus(!S.focus); return; }
+  if (typing || e.metaKey || e.ctrlKey || e.altKey || S.room) return;
+  if (e.key === 'n' || e.key === 'N') { e.preventDefault(); const from = S.route === 'entry' ? S.stem : null; openRoom(from, S.route === 'entry' ? $('.keep .ph') : $('.rail .write, .tab-write')); }
+  if (e.key === '[' && S.route === 'entry' && !isPhone()) setSidebar(SIDES[(SIDES.indexOf(S.sidebar) + 1) % 3]);
+});
+
+/* =======================================================================
+   boot and hash routing
+   ======================================================================= */
+function fromHash() {
+  const { route, p } = parseHash();
+  const t = p.get('theme'); S.theme = t === 'light' || t === 'dark' ? t : null;
+  root.dataset.ink = INKS.some((i) => i[0] === p.get('ink')) ? p.get('ink') : (INKS.some((i) => i[0] === store.get('journal:ink')) ? store.get('journal:ink') : 'blue-black');
+  if (p.get('motion') === 'off') root.dataset.motion = 'off'; else delete root.dataset.motion;
+  root.dataset.fasten = ['postmark', 'clip', 'tape'].includes(p.get('fasten')) ? p.get('fasten') : 'postmark';
+  if (SIDES.includes(p.get('sidebar'))) S.sidebar = p.get('sidebar');
+  S.open = new Set((p.get('open') || '').split(',').filter(Boolean));
+  if (p.get('stem')) S.stem = p.get('stem');
+  S.filt.day = p.get('day') || null; if (S.filt.day) S.month = D(S.filt.day).getMonth();
+  S.wk = p.get('week') === 'current' ? 1 : 0;
+  if (p.get('focus') === '0') S.focus = false;
+  if (p.get('dirty')) { ROWS.prompts[0].v = 8; ROWS.refl[2].v = false; }
+  let r = route, write = null;
+  if (r === 'write') { write = p.get('from') || 'morning'; r = p.get('over') || (ENTRIES.some((e) => e.stem === write) ? 'entry' : 'today'); if (r === 'entry' && ENTRIES.some((e) => e.stem === write)) S.stem = write; }
+  S.route = ['today', 'entries', 'entry', 'insights', 'settings', 'library', 'mark'].includes(r) ? r : 'today';
+  if (S.room) { root.classList.add('no-anim'); closeRoom(); room.hidden = true; }
+  root.classList.add('no-anim');
+  render();
+  if (write) openRoom(write === 'note' ? null : write, null, { instant: true, sample: p.get('sample') !== '0', noFocus: true, voice: p.get('rec') === '1' });
+  if (p.get('scroll')) setTimeout(() => { const el = $(p.get('scroll')); if (el) el.scrollIntoView({ block: 'start' }); }, 60);
+  requestAnimationFrame(() => requestAnimationFrame(() => { root.classList.remove('no-anim'); $$('.seg').forEach(syncSeg); paintMargin(); }));
+}
+addEventListener('popstate', (ev) => {
+  const vt = ev.state?.vt; const back = vt === 'open' ? 'close' : vt === 'push' ? 'pop' : 'fade';
+  if (vt) transition(isPhone() && back === 'close' ? 'pop' : back, () => { const { route, p } = parseHash(); S.route = route === 'write' ? (p.get('over') || 'today') : route; if (p.get('stem')) S.stem = p.get('stem'); render(); });
+  else fromHash();
+});
+let lastShape = isPhone() + '|' + mqNarrow.matches;
+addEventListener('resize', () => { const sh = isPhone() + '|' + mqNarrow.matches; if (sh !== lastShape) { lastShape = sh; render(); } else { $$('.seg').forEach(syncSeg); paintMargin(); } });
+fromHash();
+</script>
+</body>
+</html>

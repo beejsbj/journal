@@ -1,0 +1,51 @@
+/* EntryRow, SideRow (components/EntryRow.tsx): an entry in the list, and in the titled sidebar beside an open one */
+
+.entry-row {
+  display: block; margin: 0 -14px; padding: 11px 14px 12px; border-radius: 14px; color: var(--text); text-decoration: none;
+  transition: background var(--d-1);
+}
+.entry-row:hover { background: var(--raised); }
+.entry-row .row-top { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.entry-row .title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 550 var(--t-ui) / 1.3 var(--f-ui); }
+/* the time leads the line, with the day's numeral beside it: date and time in one place (the owner's rule) */
+.entry-row time { flex: none; font: 400 var(--t-small) / 1 var(--f-ui); font-variant-numeric: tabular-nums; color: var(--text-3); }
+.entry-row time::after { content: "·"; margin-left: 10px; opacity: 0.6; }
+.entry-row .marks { align-self: center; opacity: 0.8; }
+.entry-row .first-line {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 4px;
+  font: 400 18px / 1.45 var(--f-his); color: var(--text-2); text-wrap: pretty;
+}
+.entry-row.note .first-line { font-style: italic; }
+.entry-row .row-tags { display: block; margin-top: 4px; font: 400 var(--t-small) / 1.4 var(--f-ui); color: var(--text-3); }
+mark.hit { padding: 0 1px; border-radius: 3px; background: var(--sunk); color: inherit; }
+
+.marks { display: inline-flex; flex: none; align-items: center; gap: 8px; color: var(--text-3); }
+.marks svg { width: 15px; height: 15px; }
+.marks .her-mark { width: 6px; height: 6px; }
+
+/* the titled sidebar: the date and the time stacked in the left column, the title beside them */
+.side-row {
+  display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; column-gap: 8px; min-height: 48px;
+  padding: 7px 10px 7px 8px; border-radius: 10px; color: var(--text-2); text-decoration: none;
+  transition: background var(--d-1), color var(--d-1), box-shadow var(--d-2);
+}
+.side-row:hover { background: var(--raised-2); color: var(--text); }
+.side-row[aria-current="page"] { background: var(--pane); color: var(--text); box-shadow: var(--elev-tab), 0 0 0 1px var(--hair); }
+.side-when { display: grid; gap: 3px; align-self: start; padding-top: 1px; }
+.side-date { font: 500 11.5px / 1 var(--f-ui); color: var(--text-3); white-space: nowrap; }
+.side-date b { font: 300 19px / 0.9 var(--f-his); font-variant-numeric: lining-nums; color: var(--text); margin-right: 1px; }
+.side-when time { font: 400 12px / 1 var(--f-ui); color: var(--text-3); }
+.side-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 14px / 1.25 var(--f-ui); }
+.side-row .marks { gap: 6px; }
+.side-row .marks svg { width: 14px; height: 14px; }
+.side-row .marks .her-mark { width: 5px; height: 5px; }
+
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .side-row:hover { background: var(--raised); } }
+[data-theme="dark"] .side-row:hover { background: var(--raised); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .side-row[aria-current="page"] { background: var(--raised-2); } }
+[data-theme="dark"] .side-row[aria-current="page"] { background: var(--raised-2); }
+
+@media (max-width: 760px) {
+  .entry-row { margin: 0 -10px; padding: 12px 10px; }
+  .entry-row .first-line { font-size: 17px; }
+}

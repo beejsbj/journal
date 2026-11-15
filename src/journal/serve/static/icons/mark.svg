@@ -1,9 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <rect width="512" height="512" fill="#f4efe4"/>
+  <rect width="512" height="512" fill="#fbf8f1"/>
   <g id="mark" fill="none" stroke-linecap="round">
-    <rect x="96" y="58" width="320" height="396" rx="24" stroke="#1b1813" stroke-width="32"/>
-    <path d="M198 58v396" stroke="#1b1813" stroke-width="20" stroke-linecap="butt"/>
-    <path d="M252 170h112M252 246h112M252 322h70" stroke="#1b1813" stroke-width="32"/>
-    <circle cx="149" cy="170" r="27" stroke="#28367f" stroke-width="18"/>
+    <g transform="translate(25.6 25.6) scale(14.4)">
+      <rect x="5.5" y="3.5" width="21" height="25" rx="3" stroke="#1d1a15" stroke-width="1.6" stroke-linecap="butt"/>
+      <path d="M14 12.5v8.2a3.6 3.6 0 0 1-3.6 3.6H9" stroke="#1d1a15" stroke-width="2.4"/>
+      <path d="M17.5 12.5h5.5M17.5 16.5h5.5M17.5 20.5h3.5" stroke="#1d1a15" stroke-width="1.3" opacity=".45"/>
+      <circle cx="14" cy="8" r="2.3" stroke="#28367f" stroke-width="1.7"/>
+    </g>
   </g>
 </svg>

@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
+from functools import lru_cache
 
 from . import library
 from .agent import is_failure_text
@@ -170,13 +172,26 @@ def asked(practice: Practice | str, data: dict) -> list[dict]:
 
 
 # ── reflections ──────────────────────────────────────────────────────────────
-# A reflection is free Markdown, so grounding is checked on what it quotes: every passage in double
-# quotes (straight or curly) and every blockquote line must appear in the supplied inputs. One
-# misquote rejects the whole reflection; the caller writes nothing and tries again later.
+# A reflection is free Markdown, so grounding is checked on what it quotes. Only well-formed double
+# quotation counts as quotation: a straight "…" or curly “…” pair on one line whose inside is not empty
+# and neither starts nor ends with a space, and a blockquote (``_BLOCKQUOTE``, as Obsidian renders one).
+# A double quote mark of any other kind, or outside such a pair, is irregular (``quote_like``): it cannot
+# be checked, so it never passes. One case is read again: a quotation whose inside holds marks of its
+# own is one quotation when the whole of it is his verbatim (``_scan``: a sentence of his that quotes
+# someone). Single quotes, HTML and paraphrase are not judged here (open).
+# A day reflection or week review checks each quotation against his words, file by file and paragraph
+# by paragraph (``unfound``); one problem makes the answer a bad one, retried, and one that never
+# passes is never written (``reflect.write_one``). A program's synthesis (``insights``), the catch-up
+# and a program's construction and bridge reject the whole text on one (``_misquote``: the same check,
+# against their one source). What is said of a problem outside the ledger is numbers (``place``,
+# ``problem``): a rejected text's words, which may be his, go to no log line and no alert.
 
 REFLECTION_LIMITS = {"reflection": 3500, "week": 6000, "insights": 5000}  # insights: a program's synthesis
-_QUOTED = re.compile(r"“([^”]{4,})”|\"([^\"\n]{4,})\"")
-_TYPO = str.maketrans({"’": "'", "‘": "'", "“": '"', "”": '"', "—": "-", "–": "-", " ": " "})
+QUOTE_GAP = 300  # characters of his at most between two parts of one quote stitched with "…"
+_DOUBLE_NAMES = ("DOUBLE PRIME", "TRIPLE PRIME", "QUADRUPLE PRIME", "DOUBLE APOSTROPHE", "CORNER BRACKET")
+_BLOCKQUOTE = re.compile(r"[ ]{0,3}(?:[-*+]\s+|\d+[.)]\s+)?>")  # a blockquote line, in a list item or not
+_BLOCKQUOTE_MARKS = re.compile(r"[ ]{0,3}(?:[-*+]\s+|\d+[.)]\s+)?(?:>[ \t]?)+")
+_TYPO = str.maketrans({"’": "'", "‘": "'", "“": '"', "”": '"', "—": "-", "–": "-", " ": " "})
 _ELLIPSIS = re.compile(r"\s*(?:\.\.\.|…|\[\.\.\.\]|\[…\])\s*")
 
 
@@ -184,26 +199,213 @@ def _plain(s: str) -> str:
     return _norm((s or "").translate(_TYPO))
 
 
-def quotes(text: str) -> list[str]:
-    """Passages a reflection presents as quoted: double-quoted spans and blockquote lines."""
-    out = [a or b for a, b in _QUOTED.findall(text or "")]
-    out += [l.lstrip("> ").strip() for l in (text or "").splitlines() if l.startswith(">") and l.lstrip("> ").strip()]
+@lru_cache(maxsize=4096)
+def quote_like(c: str) -> bool:
+    """Whether character ``c`` is a double quote mark of any kind: the straight " and fullwidth ＂, anything Unicode
+    names a double quotation mark (“ ” „ ‟ « » ❝ ❞ 〝 〞 〟 🙶 ⹂ …), the double, triple and quadruple primes (″ ‴ ⁗ ‶ ‷
+    ʺ), the double apostrophe ˮ, and the corner brackets CJK writing quotes with (「 」 『 』 ﹁ ﹂ ｢ ｣). A class, not a
+    list. Single quote marks, apostrophes, backticks and HTML are not judged here (an open point: DECISIONS.md,
+    CONTINUITY)."""
+    if c in '"＂':
+        return True
+    name = unicodedata.name(c, "")
+    return ("QUOTATION" in name and "DOUBLE" in name) or any(n in name for n in _DOUBLE_NAMES)
+
+
+def _scan(text: str, his=None) -> tuple[list[tuple[int, int, str]], list[int]]:
+    """(the well-formed quotations of ``text`` as (start, end, inside), where every irregular mark is). A quotation is
+    a straight "…" or curly “…” pair on one line, closed by the next double quote mark on that line (``quote_like``),
+    with an inside that is not empty and does not start or end with whitespace. Every other double quote mark is
+    irregular: one that opens no such pair, the one that closes it wrongly (a mixed pair, a quote inside a quote, a
+    quote across a line break), and every other kind wherever it stands (« », „, ″, ˮ, 「 」 …).
+
+    ``his`` (a test: is this passage, exactly as it stands, in his words?) gives a line that has irregular marks one
+    more reading (``_pairs``): an opening mark may close at a later mark of the line when everything between the
+    two, the marks inside included, is his verbatim. A sentence of his that itself holds quotation marks can then
+    be quoted whole; nothing else changes, since a line without irregular marks is never read again."""
+    text = text or ""
+    pairs: list[tuple[int, int, str]] = []
+    odd: list[int] = []
+    pos = 0
+    for line in text.splitlines(keepends=True):
+        body = line.rstrip("\r\n")
+        marks = [i for i, c in enumerate(body) if quote_like(c)]
+        found, bad = _pairs(body, marks)
+        if bad and his is not None:
+            found, bad = _pairs(body, marks, his)
+        pairs += [(pos + i, pos + j, inner) for i, j, inner in found]
+        odd += [pos + i for i in bad]
+        pos += len(line)
+    return pairs, odd
+
+
+def _pairs(body: str, marks: list[int], his=None) -> tuple[list[tuple[int, int, str]], list[int]]:
+    """One line's quotations and irregular marks (``_scan``), ``marks`` being where its double quote marks are. With
+    ``his``, an opening mark first tries the later marks of the line, the farthest first, and closes at one when the
+    whole span between them is his verbatim (his own marks lie inside it); otherwise at the next mark, as always."""
+    pairs: list[tuple[int, int, str]] = []
+    odd: list[int] = []
+    k = 0
+    while k < len(marks):
+        i = marks[k]
+        if body[i] in '"“':
+            close = '"' if body[i] == '"' else "”"
+            ends = [k + 1]
+            if his is not None:
+                ends = [m for m in range(len(marks) - 1, k + 1, -1) if _closes(body, i, marks[m], close)
+                        and his(body[i + 1:marks[m]])][:1] + ends
+            m = ends[0]
+            if m < len(marks) and _closes(body, i, marks[m], close):
+                pairs.append((i, marks[m] + 1, body[i + 1:marks[m]]))
+                k = m + 1
+                continue
+        odd.append(i)
+        k += 1
+    return pairs, odd
+
+
+def _closes(body: str, i: int, j: int, close: str) -> bool:
+    """Whether the mark at ``j`` closes a quotation opened at ``i``: the matching mark, around an inside that is not
+    empty and neither starts nor ends with whitespace."""
+    inner = body[i + 1:j]
+    return body[j] == close and bool(inner) and inner == inner.strip()
+
+
+def _blockquotes(text: str) -> list[tuple[int, int, str]]:
+    """Each blockquote of ``text`` as (start, end, what it says): a run of lines that starts with a blockquote line
+    (``_BLOCKQUOTE``: up to three spaces, perhaps a list item's marker, then ``>``) and goes on through every
+    non-blank line straight after it (more ``>`` lines, or lazy continuation, which Obsidian renders inside it). Its
+    span takes whole lines; what it says is its lines without their markers, joined."""
+    out, block, pos = [], None, 0
+    for line in text.splitlines(keepends=True):
+        content = line.strip()
+        if block is not None and content:
+            block[1] = pos + len(line)
+            block[2].append(_BLOCKQUOTE_MARKS.sub("", line, count=1).strip() if _BLOCKQUOTE.match(line) else content)
+        else:
+            if block is not None:
+                out.append((block[0], block[1], " ".join(t for t in block[2] if t)))
+                block = None
+            if _BLOCKQUOTE.match(line):
+                block = [pos, pos + len(line), [_BLOCKQUOTE_MARKS.sub("", line, count=1).strip()]]
+        pos += len(line)
+    if block is not None:
+        out.append((block[0], block[1], " ".join(t for t in block[2] if t)))
     return out
 
 
-def _misquote(text: str, corpus: str) -> str | None:
-    """The first quoted passage of ``text`` that is not in ``corpus`` (None: every quote is real)."""
-    haystack = _plain(corpus)
-    for q in quotes(text):
-        for part in _ELLIPSIS.split(q):  # "I … think": each fragment must be there
-            frag = _plain(part).strip(" .,;:!?'\"-")
-            if len(frag) >= 3 and frag not in haystack:
-                return part.strip()[:60]
-    return None
+def _misquote(text: str, corpus: str, source: str) -> str | None:
+    """The first problem with what ``text`` quotes, checked as a reflection's quotes are (``unfound``) against its one
+    source ``corpus`` (his messages, his answers, the compiled document), as a reason: an irregular double quote mark
+    (in numbers only: the mark and where it stands, ``place``), or ``quote not in <source>:`` with the start of the
+    quoted passage that is not there, as before. None: there is none."""
+    bad = unfound(text, [corpus])
+    if not bad:
+        return None
+    what = bad[0][2]
+    return what if is_mark(what) else f"quote not in {source}: {what[:60]!r}"
 
 
-def check_reflection(kind: str, text: str | None, corpus: str) -> tuple[bool, str]:
-    """(ok, reason) for a model-written day reflection or week review against its inputs."""
+def _patterns(q: str) -> list[re.Pattern]:
+    """A quoted passage as the patterns its parts around "…" must match, folded as the check compares them: a part of
+    three characters or more anywhere, a shorter one only as a whole word ("No" must be a word of his, not the end of
+    "know"). Empty when nothing is left to look for (a quote of punctuation alone)."""
+    parts = [f for f in (_plain(p).strip(" .,;:!?'\"-") for p in _ELLIPSIS.split(q)) if f]
+    return [re.compile(re.escape(f) if len(f) >= 3 else r"(?<!\w)" + re.escape(f) + r"(?!\w)") for f in parts]
+
+
+def _in_order(rxs: list[re.Pattern], para: str) -> bool:
+    """Whether ``para`` holds every pattern in order, each within ``QUOTE_GAP`` characters of the one before."""
+    first = rxs[0]
+    for m in first.finditer(para):
+        at, ok = m.end(), True
+        for rx in rxs[1:]:
+            n = rx.search(para, at)
+            if n is None or n.start() - at > QUOTE_GAP:
+                ok = False
+                break
+            at = n.end()
+        if ok:
+            return True
+    return False
+
+
+def _paragraphs(docs) -> list[str]:
+    return [_plain(p) for d in docs if d for p in re.split(r"\n[ \t]*\n", d) if p.strip()]
+
+
+def unfound(text: str, docs: list[str], wider=None) -> list[tuple[int, int, str]]:
+    """What in ``text`` cannot stand as his words, as (start, end, what), in order: every irregular mark (``_scan``;
+    its span the mark; a quotation that holds marks of its own is one quotation when the whole of it is his
+    verbatim), every quotation and blockquote (its span its whole lines) that no single paragraph of ``docs``
+    holds with its parts around "…" in order and close together (``_in_order``, ``_patterns``). ``wider`` (a
+    callable returning more documents, called at most once and only when a passage is missing from ``docs``) is his
+    words in every file of the journal, for what a reflection reached through ``journal_search``: a quote stitched
+    from several files, or from far apart, is not his."""
+    text = text or ""
+    paras = _paragraphs(docs)
+    more: list[str] | None = None
+
+    def found(q: str) -> bool:
+        nonlocal more
+        rxs = _patterns(q)
+        if not rxs or any(_in_order(rxs, p) for p in paras):
+            return True
+        if wider is None:
+            return False
+        if more is None:
+            more = _paragraphs(wider() or [])
+        return any(_in_order(rxs, p) for p in more)
+
+    def whole(q: str) -> bool:
+        """Whether ``q`` exactly as it stands (its own quotation marks included, no "…" stitching) is in one paragraph
+        of his: what lets a quotation close at a later mark of its line (``_scan``)."""
+        nonlocal more
+        f = _plain(q).strip(" .,;:!?-")
+        if not f or any(f in p for p in paras):
+            return bool(f)
+        if wider is None:
+            return False
+        if more is None:
+            more = _paragraphs(wider() or [])
+        return any(f in p for p in more)
+
+    pairs, odd = _scan(text, whole)
+    blocks = _blockquotes(text)
+    out = [(i, i + 1, f"irregular quote mark U+{ord(text[i]):04X} at {place(text, i)}") for i in odd]
+    out += [(a, b, inner) for a, b, inner in pairs if not found(inner)]
+    out += [(a, b, said or "(an empty blockquote)") for a, b, said in blocks if not said or not found(said)]
+    return sorted(out)
+
+
+def place(text: str, start: int, end: int | None = None) -> str:
+    """Where ``text[start:end]`` stands, in numbers only: ``character 412 (line 3)``, and its length when ``end`` is
+    given. What a log line, a ledger record or an alert may say of a rejected text: never its words, which may be
+    his."""
+    at = f"character {start + 1} (line {text.count(chr(10), 0, start) + 1})"
+    return at if end is None else f"{at}, {end - start} characters long"
+
+
+_MARK = re.compile(r"irregular quote mark U\+[0-9A-F]{4,6} at character \d+ \(line \d+\)")
+
+
+def is_mark(what: str) -> bool:
+    """Whether a finding of ``unfound`` is an irregular mark (said in numbers alone, so it may go anywhere), not a
+    quoted passage (words: a passage that merely begins with the word "irregular" is still one)."""
+    return _MARK.fullmatch(what or "") is not None
+
+
+def problem(text: str, bad: tuple[int, int, str]) -> str:
+    """One finding of ``unfound`` in numbers only, for a log line, a ledger record's ``error`` or an alert: an
+    irregular mark is said that way already; a quotation that is not his is named by where it stands and how long
+    it is."""
+    start, end, what = bad
+    return what if is_mark(what) else f"a quote not in his words at {place(text, start, end)}"
+
+
+def check_reflection(kind: str, text: str | None, corpus: str, misquotes: bool = True) -> tuple[bool, str]:
+    """(ok, reason) for a model-written day reflection or week review against its inputs (``misquotes=False``: the
+    quotes were checked already, by ``unfound``)."""
     text = (text or "").strip()
     if len(text) < 80:
         return False, "empty or too short"
@@ -212,9 +414,9 @@ def check_reflection(kind: str, text: str | None, corpus: str) -> tuple[bool, st
     limit = REFLECTION_LIMITS[kind]
     if len(text) > limit:
         return False, f"too long ({len(text)} > {limit})"
-    bad = _misquote(text, corpus)
+    bad = _misquote(text, corpus, "the entries") if misquotes else None
     if bad is not None:
-        return False, f"quote not in the entries: {bad!r}"
+        return False, bad
     return True, "ok"
 
 
@@ -237,9 +439,9 @@ def check_catchup(text: str | None, corpus: str) -> tuple[bool, str]:
     m = _TECHNICAL.search(text)
     if m and m.group(0).lower() not in _plain(corpus).split():
         return False, f"technical detail ({m.group(0)!r})"
-    bad = _misquote(text, corpus)
+    bad = _misquote(text, corpus, "his messages")
     if bad is not None:
-        return False, f"quote not in his messages: {bad!r}"
+        return False, bad
     return True, "ok"
 
 
@@ -261,9 +463,9 @@ def check_reflect_phase(text: str | None, answers: str) -> tuple[bool, str]:
         return False, "agent error text"
     if len(text) > REFLECT_PHASE_LIMIT:
         return False, f"too long ({len(text)} > {REFLECT_PHASE_LIMIT})"
-    bad = _misquote(text, answers)
+    bad = _misquote(text, answers, "his answers")
     if bad is not None:
-        return False, f"quote not in his answers: {bad!r}"
+        return False, bad
     return True, "ok"
 
 
@@ -280,7 +482,7 @@ def check_bridge(text: str | None, last_answer: str) -> tuple[bool, str]:
         return False, f"too long ({len(text)} > {BRIDGE_LIMIT})"
     if "?" in text:
         return False, "asks a question"
-    bad = _misquote(text, last_answer)
+    bad = _misquote(text, last_answer, "his answer")
     if bad is not None:
-        return False, f"quote not in his answer: {bad!r}"
+        return False, bad
     return True, "ok"

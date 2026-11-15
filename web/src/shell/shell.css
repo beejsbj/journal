@@ -1,0 +1,197 @@
+/* The shell (app.tsx, shell/): the rail on the desk and the pane laid on it (wide screens); the page with a top bar
+   and a floating tab bar (phones, 760 px and under). Breakpoints: phone <= 760; the rail folds to icons <= 1100 or
+   when a route asks (data-rail="compact"); a route can take the stage for panes of its own (data-stage="panes"). */
+
+.skip-link {
+  position: fixed; z-index: calc(var(--z-toast) + 1); left: 12px; top: 12px; display: inline-flex; align-items: center;
+  min-height: var(--tap); padding: 0 16px; border-radius: var(--r-pill); background: var(--lamp); color: var(--on-lamp);
+  font: 550 var(--t-ui) / 1 var(--f-ui); text-decoration: none; transform: translateY(-160%); transition: transform var(--d-2) var(--e-out);
+}
+.skip-link:focus { transform: none; }
+/* out of sight and of size until a keyboard reaches it */
+.skip-link:not(:focus) { width: 0; height: 0; min-height: 0; padding: 0; overflow: hidden; }
+
+.brand {
+  display: flex; align-items: center; gap: 10px; min-height: var(--tap); padding: 0 6px; color: var(--text); text-decoration: none;
+  font: italic 400 23px / 1 var(--f-his); letter-spacing: -0.01em; white-space: nowrap;
+}
+.brand svg { flex: none; }
+.nav-icon { flex: none; }
+
+/* ---------- wide screens: the desk ---------- */
+@media (min-width: 761px) {
+  html, body { height: 100%; overflow: hidden; background: var(--room); }
+  /* a faint lamp at the top left of the desk (amber by day, moonlight at night) */
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse 70% 55% at 8% -6%, var(--glow-desk), transparent 70%);
+  }
+  .phone-top { display: none; }
+
+  .shell { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); height: 100dvh; }
+
+  .rail {
+    position: relative; display: flex; flex-direction: column; gap: 2px; width: var(--rail); height: 100dvh; padding: 16px 12px 14px;
+    overflow: hidden; transition: width var(--spring-soft-dur) var(--spring-soft); view-transition-name: rail;
+  }
+  .rail .brand { margin-bottom: 12px; }
+  .rail-write { justify-content: flex-start; width: 100%; min-height: 46px; margin-bottom: 14px; padding: 0 14px; border-radius: var(--r-m); }
+  .rail-write kbd {
+    margin-left: auto; padding: 3px 5px; border: 1px solid currentColor; border-radius: 4px; opacity: 0.55;
+    font: 500 11px / 1 var(--f-ui); background: none;
+  }
+  .nav { display: flex; flex-direction: column; gap: 2px; }
+  .nav .plus { display: none; }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px; width: 100%; min-height: 42px; padding: 0 12px; border-radius: 11px;
+    color: var(--text-2); font: 500 var(--t-ui) / 1 var(--f-ui); text-decoration: none; white-space: nowrap;
+    transition: background var(--d-2), color var(--d-2), box-shadow var(--d-2);
+  }
+  .nav-item:hover { color: var(--text); background: color-mix(in oklab, var(--nav-on) 55%, transparent); }
+  .nav-item[aria-current="page"] { color: var(--text); background: var(--nav-on); box-shadow: var(--elev-tab); }
+  .nav-badge { margin-left: auto; font: 500 12px / 1 var(--f-ui); color: var(--text-3); }
+  .rail-spacer { flex: 1; }
+  .rail-next {
+    margin: 0 4px 10px; padding: 14px 10px 4px; border-top: 1px solid var(--hair-2);
+    font-size: var(--t-small); line-height: 1.45; color: var(--text-3); animation: fade-in var(--d-3) both;
+  }
+  .rail-next-head { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; font-weight: 500; color: var(--text-2); }
+  .rail-next-head .her-mark { width: 6px; height: 6px; }
+  .rail-next ul { list-style: none; }
+  .rail-next li { padding: 2px 0; color: var(--text-2); }
+  .rail-next-at { color: var(--text-3); }
+  .rail-next time { font-variant-numeric: tabular-nums; }
+  .rail-next-none { margin: 0; }
+  .rail-foot { display: flex; align-items: center; gap: 4px; }
+  .rail-foot .nav-item { flex: 1; }
+
+  /* folded to icons: an open entry, or a narrower window. The labels stay for assistive technology. */
+  .shell[data-rail="compact"] .rail { width: var(--rail-compact); }
+  .shell[data-rail="compact"] :is(.wordmark, .nav-label, .nav-badge) {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+  }
+  .shell[data-rail="compact"] .rail-write kbd, .shell[data-rail="compact"] .rail-next { display: none; }
+  .shell[data-rail="compact"] :is(.rail-write, .nav-item) { width: var(--tap); padding: 0; justify-content: center; }
+  .shell[data-rail="compact"] .rail-foot { flex-direction: column; align-items: flex-start; }
+  .shell[data-rail="compact"] .rail .brand { padding: 0 7px; }
+
+  .stage { display: flex; gap: 10px; min-width: 0; height: 100dvh; padding: 10px 10px 10px 0; }
+  .pane {
+    position: relative; min-width: 0; border-radius: var(--r-l); background: var(--pane); box-shadow: var(--elev-1);
+    outline: 1px solid var(--hair); outline-offset: -1px;
+  }
+  .pane.scroll { overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+  .pane.raised-pane { box-shadow: var(--elev-2); }
+  .main-pane { flex: 1; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+  .main-pane:focus { outline: 1px solid var(--hair); }
+  /* a route that lays its own panes: the shell's pane steps back and only holds them */
+  .shell[data-stage="panes"] .main-pane {
+    display: flex; gap: 10px; overflow: hidden; background: none; box-shadow: none; outline: 0; border-radius: 0;
+  }
+  .shell[data-stage="panes"] .main-pane > .lamp-light { display: none; }
+  /* the pane gives up its view-transition name while a route lays panes: a pane of the route's takes "page" (the
+     entries list becomes the sidebar beside an entry), and two elements may not share one name */
+  .shell[data-stage="panes"] .main-pane { view-transition-name: none; }
+  /* the offline ribbon floats over the route's panes instead of taking a column of its own */
+  .shell[data-stage="panes"] .main-pane > .ribbon {
+    position: absolute; z-index: var(--z-pop); top: 18px; left: 50%; transform: translateX(-50%); border-radius: var(--r-pill);
+    box-shadow: var(--elev-pop);
+  }
+}
+@media (min-width: 761px) and (max-width: 1100px) {
+  .rail { width: var(--rail-compact); }
+  :is(.wordmark, .nav-label, .nav-badge) {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+  }
+  .rail-write kbd, .rail-next { display: none; }
+  :is(.rail-write, .nav-item) { width: var(--tap); padding: 0; justify-content: center; }
+  .rail-foot { flex-direction: column; align-items: flex-start; }
+  .rail .brand { padding: 0 7px; }
+}
+
+.main-pane { view-transition-name: page; }
+
+/* the lamp's light at the head of the page: the only gradient in the app, and it always means light falling on paper.
+   Under the page's words (z-index -1 inside the pane's own stacking context), over its paper. */
+.pane, .main-pane { isolation: isolate; }
+.lamp-light {
+  position: absolute; inset: 0 0 auto 0; z-index: -1; height: 440px; pointer-events: none; border-radius: inherit;
+  background: radial-gradient(ellipse 58% 100% at 50% 0%, var(--glow), transparent 74%);
+}
+
+/* ---------- phones: the page, a top bar, a floating tab bar ---------- */
+@media (max-width: 760px) {
+  .rail { display: contents; }
+  .rail > :not(.nav) { display: none; }
+  .main-pane { position: relative; min-height: 100dvh; padding-bottom: calc(var(--bar-h) + env(safe-area-inset-bottom) + var(--s5)); }
+  .lamp-light { height: 360px; }
+
+  .phone-top {
+    position: relative; z-index: 2; display: flex; align-items: center; gap: 2px; height: calc(52px + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) max(8px, env(safe-area-inset-right)) 0 max(14px, env(safe-area-inset-left));
+    background: var(--pane);
+  }
+  .phone-top .brand { margin-right: auto; padding: 0; font-size: 20px; }
+  .phone-top .icon-button[aria-current="page"] { color: var(--text); background: var(--raised); }
+
+  /* the bar: a frosted capsule floating above the home indicator. The nav element itself reaches the screen's foot
+     (web/e2e holds it there) and lets taps through around the capsule. No view-transition-name here: it would make the
+     nav a backdrop root and the capsule's blur would see nothing behind it. */
+  .nav {
+    position: fixed; z-index: var(--z-bar); left: 0; right: 0; bottom: 0; pointer-events: none;
+    padding: 0 max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+    display: grid; grid-template-columns: repeat(5, 1fr); align-items: center;
+  }
+  .nav::before {
+    content: ""; position: absolute; z-index: -1; left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right));
+    top: 0; bottom: max(12px, env(safe-area-inset-bottom)); border-radius: 24px; background: var(--frost); box-shadow: var(--elev-pop);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4); backdrop-filter: blur(20px) saturate(1.4);
+  }
+  .nav > * { pointer-events: auto; }
+  .nav-item {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; height: 66px;
+    color: var(--text-3); font: 500 10.5px / 1 var(--f-ui); text-decoration: none; border-radius: 16px;
+  }
+  .nav-item .nav-icon { width: 21px; height: 21px; }
+  .nav-item[aria-current="page"] { color: var(--text); }
+  .nav-item[aria-current="page"] .nav-icon { stroke-width: 2; }
+  .nav-badge { display: none; }
+  .nav .plus {
+    justify-self: center; display: grid; place-items: center; width: 52px; height: 52px; padding: 0; border: 0; border-radius: 50%;
+    background: var(--lamp); color: var(--on-lamp); cursor: pointer;
+    box-shadow: 0 0 0 5px color-mix(in oklab, var(--lamp) 8%, transparent), 0 10px 26px -8px color-mix(in oklab, var(--lamp) 50%, transparent);
+    transition: transform var(--d-1) var(--e-out);
+  }
+  .nav .plus:active { transform: scale(0.94); }
+  .plus-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+
+/* ---------- page transitions (shell/transition.ts) ---------- */
+::view-transition-group(*) { animation-duration: var(--spring-soft-dur); animation-timing-function: var(--spring-soft); }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: var(--d-2); }
+::view-transition-image-pair(page), ::view-transition-image-pair(entrypane) { overflow: hidden; border-radius: var(--r-l); }
+::view-transition-old(page), ::view-transition-new(page), ::view-transition-old(entrypane), ::view-transition-new(entrypane) {
+  height: 100%; width: auto; object-fit: none; object-position: left top;
+}
+::view-transition-old(page) { animation: var(--d-2) ease both vt-out; }
+::view-transition-new(page) { animation: var(--d-3) var(--d-0) ease both vt-in; }
+::view-transition-new(entrypane):only-child { animation: pane-in var(--spring-soft-dur) var(--spring-soft) both; }
+::view-transition-old(entrypane):only-child { animation: pane-out var(--d-3) var(--e-out) both; }
+::view-transition-group(rail) { z-index: 30; }
+@keyframes vt-out { to { opacity: 0; } }
+@keyframes vt-in { from { opacity: 0; } }
+@keyframes pane-in { from { opacity: 0; transform: translateX(56px) scale(0.985); } }
+@keyframes pane-out { to { opacity: 0; transform: translateX(56px) scale(0.985); } }
+@media (max-width: 760px) {
+  html[data-vt="push"]::view-transition-old(page) { animation: push-out var(--d-4) var(--e-out) both; }
+  html[data-vt="push"]::view-transition-new(page) { animation: push-in var(--spring-soft-dur) var(--spring-soft) both; }
+  html[data-vt="pop"]::view-transition-old(page) { animation: pop-out var(--d-3) var(--e-out) both; z-index: 2; }
+  html[data-vt="pop"]::view-transition-new(page) { animation: pop-in-page var(--d-4) var(--e-out) both; }
+  @keyframes push-out { to { transform: translateX(-28%); filter: brightness(0.7); } }
+  @keyframes push-in { from { transform: translateX(100%); } }
+  @keyframes pop-out { to { transform: translateX(100%); } }
+  @keyframes pop-in-page { from { transform: translateX(-28%); filter: brightness(0.7); } }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}

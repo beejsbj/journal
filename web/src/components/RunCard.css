@@ -1,0 +1,11 @@
+/* RunCard (components/RunCard.tsx): a program on Today. Night Room's strip under its name, the words of where it is,
+   Continue and Pause. A passage between rules, not a box. */
+.run-card { display: grid; gap: var(--s2); padding: var(--s4) 0; border-bottom: 1px solid var(--hair); }
+.run-card:first-child { padding-top: var(--s1); }
+.run-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s4); }
+.run-card h3 { margin: 0; font: 400 18px / 1.3 var(--f-his); font-optical-sizing: auto; color: var(--text); }
+.run-card-at { margin: 0; flex: none; font-size: var(--t-small); color: var(--text-3); }
+.run-card-text { margin: 2px 0 0; font-size: var(--t-small); line-height: 1.45; color: var(--text-3); }
+.run-card-state { margin: 0; font: italic 400 1rem / 1.3 var(--f-his); color: var(--text-2); }
+.run-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); margin-top: var(--s1); }
+.run-card .error-line { margin-top: var(--s2); }

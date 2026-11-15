@@ -238,7 +238,8 @@ def run(cfg: Config, now: datetime, log: list[str], db: Path | None = None) -> N
     if not rec.get("outage_seen"):  # the model answered at once and no row says it had failed
         _skip(cfg, rec, now, "no sign of an outage: the turn failed for another reason", log)
         return
-    corpus = "\n".join([m["text"] for m in rec["messages"]] + [c[2] for c in rec.get("context") or []])
+    his = cfg.names.user or "them"  # (the label ``scan`` gives his lines of the conversation before; hers say her name)
+    corpus = "\n".join([m["text"] for m in rec["messages"]] + [c[2] for c in rec.get("context") or [] if c[0] == his])
     ok, reason = validate.check_catchup(raw, corpus)
     with ledger.locked(cfg.ledger_path) as d:
         r = find(d, rec["id"])

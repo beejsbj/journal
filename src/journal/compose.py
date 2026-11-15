@@ -38,12 +38,32 @@ def header(practice: Practice | str, local_dt: datetime, status: str = "", names
     return f"{lead}{p.title} · {day}{suffix}"
 
 
+# ``*italic*``: the star opens before a non-space and closes after one, and sits at a word edge on both sides, so
+# ``5 * 3``, ``2*3*4`` and a ``* `` bullet stay as written. One line only (``.`` stops at a newline).
+_STAR = re.compile(r"(?<![\w*])\*(?![\s*])(.+?)(?<![\s*])\*(?![\w*])")
+
+
+def _nested(markup: str) -> bool:
+    """Whether every tag in ``markup`` closes in the order it opened (Telegram refuses a message that does not)."""
+    stack: list[str] = []
+    for m in _TAG.finditer(markup):
+        if not m.group(1):
+            stack.append(m.group(2))
+        elif not stack or stack.pop() != m.group(2):
+            return False
+    return not stack
+
+
 def md_to_html(text: str) -> str:
-    """Escape model text, keeping **bold** and _italic_ as the only markup."""
+    """Escape model text, keeping **bold**, _italic_ and *italic* as the only markup. A ``*italic*`` that would cross
+    another tag stays literal rather than make HTML Telegram refuses."""
     out = html.escape(text, quote=False)
-    out = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", out)
-    out = re.sub(r"(?<![\w*])_(.+?)_(?![\w*])", r"<i>\1</i>", out)
-    return out
+
+    def convert(s: str) -> str:
+        s = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", s)
+        return re.sub(r"(?<![\w*])_(.+?)_(?![\w*])", r"<i>\1</i>", s)
+    starred = convert(_STAR.sub(r"<i>\1</i>", out))  # before bold: ``**`` never opens an italic
+    return starred if _nested(starred) else convert(out)
 
 
 def bank_html(practice: Practice | str) -> str:
@@ -301,7 +321,7 @@ def schedule_confirmed_html(rows: list[tuple[str, str, str]], day: str, past: in
 
 
 def md_block_html(text: str) -> str:
-    """Authored Markdown as Telegram HTML: ``**bold**``, ``_italic_``, ``- `` bullets as •, and ``> `` lines as one
+    """Authored Markdown as Telegram HTML: ``**bold**``, ``_italic_``, ``*italic*``, ``- `` bullets as •, and ``> `` lines as one
     blockquote; everything else escaped and kept line for line."""
     out, quote = [], []
 
@@ -321,7 +341,7 @@ def md_block_html(text: str) -> str:
 
 
 def _md_plain(text: str) -> str:
-    plain = re.sub(r"\*\*(.+?)\*\*", r"\1", text or "")
+    plain = _STAR.sub(r"\1", re.sub(r"\*\*(.+?)\*\*", r"\1", text or ""))
     return re.sub(r"(?<![\w*])_(.+?)_(?![\w*])", r"\1", plain).strip()
 
 

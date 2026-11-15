@@ -3,11 +3,12 @@
  * names a host or a port: `start_url`, `scope` and `id` are `/` and the icons are relative to the manifest, so the
  * same build installs from any origin that serves it (a tailnet address with a port, a published host, loopback).
  * `tests/pwa.test.ts` pins these properties and the colours; `tests/test_web_build.py` checks the committed build.
+ * The colour is the page's (`--pane`): on a phone the status bar sits over the page.
  */
 
 export interface Palette {
-  light: { bg: string; accent: string };
-  dark: { bg: string; accent: string };
+  light: { pane: string };
+  dark: { pane: string };
 }
 
 function value(block: string, name: string): string {
@@ -16,16 +17,13 @@ function value(block: string, name: string): string {
   return m[1].toLowerCase();
 }
 
-/** The paper and the accent of the light sheet (the `:root` block) and of the dark one (`prefers-color-scheme: dark`). */
+/** The page colour of the light sheet (the `:root` block) and of the dark one (`prefers-color-scheme: dark`). */
 export function palette(tokens: string): Palette {
   const at = tokens.indexOf("prefers-color-scheme: dark");
   if (at < 0) throw new Error("tokens.css has no dark block");
   const light = tokens.slice(0, at);
   const dark = tokens.slice(at);
-  return {
-    light: { bg: value(light, "bg"), accent: value(light, "accent") },
-    dark: { bg: value(dark, "bg"), accent: value(dark, "accent") },
-  };
+  return { light: { pane: value(light, "pane") }, dark: { pane: value(dark, "pane") } };
 }
 
 export const ICONS = [
@@ -45,8 +43,8 @@ export function buildManifest(tokens: string) {
     scope: "/",
     display: "standalone" as const,
     orientation: "any" as const,
-    background_color: light.bg,
-    theme_color: light.bg,
+    background_color: light.pane,
+    theme_color: light.pane,
     icons: [...ICONS],
   };
 }

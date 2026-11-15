@@ -1,0 +1,26 @@
+/* QuestionSet (components/QuestionSet.tsx): the practice's questions as a form, each on a ruled line of his roman,
+   numbered in the margin, moved with the arrows beside it. */
+.question-editor { display: grid; gap: var(--s5); }
+.q-section { display: grid; gap: var(--s2); }
+.q-section-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
+.q-section-head .section-title { flex: 1 1 12rem; width: auto; font-style: italic; }
+.q-list { list-style: none; display: grid; gap: var(--s2); margin: 0; padding: 0; }
+.q-row { display: grid; grid-template-columns: 1.6rem minmax(0, 1fr) auto; gap: var(--s2); align-items: start; }
+.q-n { padding-top: 14px; font: 400 var(--t-small) / 1 var(--f-ui); color: var(--text-3); text-align: right; font-variant-numeric: tabular-nums; }
+.q-row .input.his { min-height: 0; resize: vertical; font-size: 19px; }
+.q-tools { display: flex; align-items: center; gap: 2px; padding-top: 8px; }
+.q-tools .link { margin-left: var(--s2); font-size: var(--t-small); }
+.q-list .hint, .q-list .field-error { margin: 4px 0 0 calc(1.6rem + var(--s2)); }
+.q-list .field-error, .q-section > .field-error { display: flex; align-items: baseline; gap: var(--s2); font: 500 var(--t-small) / 1.45 var(--f-ui); color: var(--text); }
+.q-list .field-error::before, .q-section > .field-error::before {
+  content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--text);
+  box-shadow: 0 0 0 2px var(--pane), 0 0 0 3px var(--text); transform: translateY(-1px);
+}
+.q-add { justify-self: start; margin-left: calc(1.6rem + var(--s2)); }
+.q-structure { display: flex; flex-wrap: wrap; gap: var(--s4); }
+@media (max-width: 760px), (pointer: coarse) {
+  .q-row { grid-template-columns: minmax(0, 1fr); }
+  .q-n { display: none; }
+  .q-tools { padding-top: 0; }
+  .q-list .hint, .q-list .field-error, .q-add { margin-left: 0; }
+}

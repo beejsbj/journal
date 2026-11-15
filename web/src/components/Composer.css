@@ -1,0 +1,61 @@
+/* Composer (components/Composer.tsx): his words at the foot of an entry and under a program's phase. His page, so the
+   box is a ruled line in his roman; Voice and the lamp's send under it. design/DESIGN.md, "Forms". */
+
+.composer { display: grid; gap: var(--s3); margin-top: var(--s3); }
+.composer-box {
+  width: 100%; min-height: 6.5rem; padding: var(--s3) 0; border: 0; border-radius: 0; background: transparent; resize: vertical;
+  color: var(--text); font: 400 var(--t-read) / var(--lh-read) var(--f-his); font-optical-sizing: auto;
+  box-shadow: inset 0 -1px 0 var(--hair-2); transition: box-shadow var(--d-2);
+}
+.composer-box::placeholder { color: var(--text-3); font-style: italic; }
+.composer-box:hover:not(:disabled) { box-shadow: inset 0 -1px 0 var(--text-3); }
+.composer-box:focus { outline: none; box-shadow: inset 0 -1.5px 0 var(--text); }
+.composer-box:disabled { opacity: 0.6; }
+
+.composer-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s2); }
+.composer-actions .recorder { flex: 0 1 auto; }
+
+/* a recording waiting to go: the native player, its length, Discard */
+.clip { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); }
+.clip audio { flex: 1 1 14rem; height: 40px; }
+.clip .hint { margin: 0; }
+
+/* the box moved on under his words: they wait here, quietly, to be put back */
+.composer-kept {
+  margin-top: var(--s4); padding: var(--s3) var(--s4); border-radius: var(--r-m); background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--hair); font-size: var(--t-small); color: var(--text-2);
+  animation: rise var(--d-4) var(--e-out) both;
+}
+.composer-kept p { margin: 0 0 var(--s2); }
+.composer-kept-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s4); }
+
+/* nothing can be written here now, and why */
+.composer-closed {
+  margin: var(--s5) 0 0; padding-top: var(--s4); border-top: 1px solid var(--hair);
+  font: italic 400 1.0625rem / 1.5 var(--f-his); color: var(--text-2);
+}
+.composer-closed a { color: var(--text); }
+
+
+@media (max-width: 760px), (pointer: coarse) {
+  .composer-box { font-size: max(1.1875rem, 16px); min-height: var(--tap); }
+}
+@media (max-width: 760px) {
+  .composer { margin-top: 0; }
+  /* at rest (the `rest` prop, `data-rest`): one quiet line, the placeholder and a round Voice, so the box never covers
+     the page. The moment it is used (focused, words or a recording in it, recording, offline, an error, words kept
+     from another box) Composer drops the attribute, or :focus-within lifts it, and the whole box is back. */
+  .composer[data-rest]:not(:focus-within) { display: flex; align-items: center; gap: var(--s2); }
+  .composer[data-rest]:not(:focus-within) .composer-box {
+    flex: 1; min-width: 0; height: var(--tap); min-height: var(--tap); padding: 11px 0; resize: none;
+    box-shadow: none; overflow: hidden; white-space: nowrap;
+  }
+  .composer[data-rest]:not(:focus-within) .composer-actions { flex: none; }
+  .composer[data-rest]:not(:focus-within) .composer-actions > .button.primary,
+  .composer[data-rest]:not(:focus-within) .recorder > .hint:not(.recorder-problem) { display: none; }
+  .composer[data-rest]:not(:focus-within) .recorder .button { width: var(--tap); padding: 0; gap: 0; font-size: 0; border-radius: 50%; }
+  .composer[data-rest]:not(:focus-within) .recorder .button > svg { width: 20px; height: 20px; }
+  .composer-actions { flex-wrap: nowrap; }
+  .composer-actions .recorder { flex: 0 0 auto; }
+  .composer-actions > .button.primary { flex: 1; min-height: 48px; }
+}

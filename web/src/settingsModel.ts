@@ -13,7 +13,7 @@ export const GROUPS = [
   { id: "prompts", title: "Prompts", note: "How long a prompt stays open, and when the companion reads what you wrote." },
   { id: "reflections", title: "Reflections", note: "The day's reflection and the week's review." },
   { id: "chat", title: "In the chat", note: "The short note about today the companion gets when a conversation starts." },
-  { id: "programs", title: "Programs", note: "" },
+  { id: "programs", title: "Programs", note: "How a program moves on once you have answered a phase." },
 ] as const;
 export type GroupId = (typeof GROUPS)[number]["id"];
 
@@ -27,24 +27,33 @@ export interface SettingField {
   /** Strictly more than this (the server refuses 0 minutes for the quiet and cache windows: `_number`'s minimum is exclusive). */
   above?: number;
   max?: number;
+  // Presentation only (the Settings page): nothing below changes what is checked or sent.
+  /** The value that applies when nobody set one (`config.DEFAULTS`), said beside the field, never as a placeholder. */
+  def?: number | boolean | string;
+  /** How far one press of a stepper moves the value (typing reaches any value the range allows). */
+  step?: number;
+  /** The unit a number is in, shown after it. */
+  unit?: string;
+  /** A flag this field only matters under: the field folds away while that flag is off. */
+  under?: string;
 }
 
 export const FIELDS: SettingField[] = [
   { path: ["location"], label: "Place", group: "place", kind: "text", hint: "Looked up for its coordinates and time zone." },
   { path: ["timezone"], label: "Time zone", group: "place", kind: "text", hint: "An IANA name such as Asia/Kolkata; overrides the place's." },
-  { path: ["windows", "collapse_hours"], label: "Hours a prompt stays open", group: "prompts", kind: "number", min: 0.25, max: 72 },
-  { path: ["windows", "grace_hours"], label: "Hours of grace for a send", group: "prompts", kind: "number", min: 0.25, max: 24 },
-  { path: ["windows", "opener_budget_seconds"], label: "Seconds an opener may take", group: "prompts", kind: "whole", min: 1, max: 900 },
-  { path: ["windows", "annotate_after_minutes"], label: "Minutes before annotating", group: "prompts", kind: "whole", min: 0, max: 10080 },
-  { path: ["reflections", "day", "enabled"], label: "Day reflection", group: "reflections", kind: "flag" },
-  { path: ["reflections", "day", "fallback_time"], label: "Day reflection, latest time", group: "reflections", kind: "clock" },
-  { path: ["reflections", "week", "enabled"], label: "Week review", group: "reflections", kind: "flag" },
-  { path: ["reflections", "week", "fallback_time"], label: "Week review, latest time", group: "reflections", kind: "clock" },
-  { path: ["conversations", "quiet_minutes"], label: "Minutes of quiet before the today block", group: "chat", kind: "number", above: 0, max: 1440 },
-  { path: ["programs", "settle_minutes"], label: "Minutes of quiet before a phase settles", group: "programs", kind: "number", above: 0, max: 1440 },
-  { path: ["today", "enabled"], label: "Today block in the chat", group: "chat", kind: "flag" },
-  { path: ["today", "max_chars"], label: "Today block, characters", group: "chat", kind: "whole", min: 200, max: 20000 },
-  { path: ["today", "cache_minutes"], label: "Today block, minutes cached", group: "chat", kind: "number", above: 0, max: 1440 },
+  { path: ["windows", "collapse_hours"], label: "Hours a prompt stays open", group: "prompts", kind: "number", min: 0.25, max: 72, def: 6, step: 0.5, unit: "hours" },
+  { path: ["windows", "grace_hours"], label: "Hours of grace for a send", group: "prompts", kind: "number", min: 0.25, max: 24, def: 2, step: 0.25, unit: "hours" },
+  { path: ["windows", "opener_budget_seconds"], label: "Seconds an opener may take", group: "prompts", kind: "whole", min: 1, max: 900, def: 240, step: 10, unit: "seconds" },
+  { path: ["windows", "annotate_after_minutes"], label: "Minutes before annotating", group: "prompts", kind: "whole", min: 0, max: 10080, def: 20, step: 5, unit: "minutes" },
+  { path: ["reflections", "day", "enabled"], label: "Day reflection", group: "reflections", kind: "flag", def: true },
+  { path: ["reflections", "day", "fallback_time"], label: "Day reflection, latest time", group: "reflections", kind: "clock", def: "04:00", under: "reflections.day.enabled" },
+  { path: ["reflections", "week", "enabled"], label: "Week review", group: "reflections", kind: "flag", def: true },
+  { path: ["reflections", "week", "fallback_time"], label: "Week review, latest time", group: "reflections", kind: "clock", def: "04:00", under: "reflections.week.enabled" },
+  { path: ["conversations", "quiet_minutes"], label: "Minutes of quiet before the today block", group: "chat", kind: "number", above: 0, max: 1440, def: 45, step: 5, unit: "minutes" },
+  { path: ["programs", "settle_minutes"], label: "Minutes of quiet before a phase settles", group: "programs", kind: "number", above: 0, max: 1440, def: 2, step: 1, unit: "minutes" },
+  { path: ["today", "enabled"], label: "Today block in the chat", group: "chat", kind: "flag", def: true },
+  { path: ["today", "max_chars"], label: "Today block, characters", group: "chat", kind: "whole", min: 200, max: 20000, def: 1200, step: 100, unit: "characters", under: "today.enabled" },
+  { path: ["today", "cache_minutes"], label: "Today block, minutes cached", group: "chat", kind: "number", above: 0, max: 1440, def: 30, step: 5, unit: "minutes", under: "today.enabled" },
 ];
 
 export const keyOf = (f: SettingField): string => f.path.join(".");

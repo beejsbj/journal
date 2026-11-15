@@ -1,0 +1,24 @@
+/* MetaSheet (components/MetaSheet.tsx), in ui/Sheet: a star, his moods and the people in it, set by hand. Tags are
+   words (no pills): each one is its own remove button, the word and a small cross. */
+.meta-form { display: grid; gap: var(--s5); }
+.meta-star {
+  display: grid; grid-template-columns: auto auto 1fr; align-items: center; column-gap: var(--s2); min-height: var(--tap);
+  font: 500 var(--t-ui) / 1.3 var(--f-ui); color: var(--text); cursor: pointer;
+}
+.meta-star input { width: 20px; height: 20px; margin: 0; accent-color: var(--lamp); }
+.meta-star svg { width: 18px; height: 18px; color: var(--text-2); }
+.meta-field { display: grid; gap: 8px; }
+.meta-tags { display: flex; flex-wrap: wrap; gap: 2px 14px; margin: 0; }
+.meta-tag {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 2px; border: 0; background: none; cursor: pointer;
+  font: 400 1.0625rem / 1.3 var(--f-his); color: var(--text); text-decoration: underline; text-decoration-color: var(--hair-2);
+  text-underline-offset: 4px;
+}
+.meta-tag svg { width: 13px; height: 13px; color: var(--text-3); transition: color var(--d-1); }
+.meta-tag:hover svg { color: var(--text); }
+.meta-actions { display: flex; justify-content: flex-end; }
+.meta-form .error-line { margin: 0; }
+@media (max-width: 760px), (pointer: coarse) {
+  .meta-tag { min-height: var(--tap); }
+  .meta-actions .button { flex: 1; }
+}

@@ -50,6 +50,22 @@ The centre **+** opens a sheet: *Quick note* (a `/j` note: text), *Voice* (recor
 then POST block/entry), *Answer today's prompt* (lists open prompts), *Start* (situational sessions and
 programs with no active run).
 
+**As built (WEB-UX, 2026-11-10; `design/DESIGN.md` §3).** On a wide screen (761 px and up) a **rail** stands on the
+desk: the mark, **Write** (the lamp; the `N` key anywhere but a field), Today ("1 waiting"), Entries, Library,
+Insights, and at its foot **Next from <her name>** (what she sends next today; one quiet read a minute at most) and
+Settings with the theme toggle; the page is a pane laid beside it, and the rail folds to icons while an entry is open
+and under 1100 px. On a phone the page has a top bar (the mark, the theme, Settings) and a floating tab bar at the foot:
+Today, Entries, **Write** (a lamp disc in the middle), Library, Insights. **Write opens the write room**, which
+replaces the + sheet (DECISIONS.md, WEB-UX-WRITE-ROOM): a full-screen page for his words, large in the book's roman,
+with every paragraph but the one he is in greyed (Focus, on by default; turning it off is kept on the device,
+`localStorage["journal:room-focus"]`). It opens on a new note; from Today's *Write now* / *Speak it* and from
+`/today?write=<id>` on a practice (OPEN-FACES, as built in the room: the practice as a view, `GET /library/{id}/open`,
+her letter (the card's prompt when it was sent, else the view's plain opener and questions), the line saying which slot
+the words fill, then *Save*; a practice the view refuses shows why and no box; recording at once for *Speak it*); and
+from an entry's *In the writing room* (more for that entry). Its quiet start offers the prompts still open or due and
+the programs to start. Drafts, retries, uploads and the offline line are the
+composer's own (`useCompose`). `/design` (linked from Settings) draws every part of the system.
+
 ### 1.1 Today
 
 - Header: weekday, date, local time and location from `/today`.
@@ -76,6 +92,11 @@ programs with no active run).
 - Tasks due today (plain lines from the tick cache; read-only; absent when the source is off).
 - Empty states: "Nothing scheduled today" / "No program running — start one from the Library".
 - Loading: skeleton cards; offline: last cached `/today` with an "offline, as of 09:12" ribbon.
+- As built (WEB-UX): the day as a numeral with the weekday and month beside it, the week between rules, "Waiting for
+  you" (open and due) and "Earlier today" with her letters in full (`ui/Letter`; *Write now* the lamp, *Speak it*,
+  *Send to chat*), "Written today", and on a wide page a right-hand column: what is still to come with leaders to the
+  hour (*Write now*, *Send to chat*), the programs as
+  strips, "Carry forward". States are quiet words in the book's italic, never pills.
 
 ### 1.2 Entries (History)
 
@@ -85,6 +106,9 @@ programs with no active run).
 - Filter chips: practice, program, has audio; search field (`q=`; his words only).
 - Pages by cursor (a "Load more" button; no infinite scroll to fight the browser's back button); offline shows the
   pages read before.
+- As built (WEB-UX): the filters are a sentence with menus ("Showing every entry from any practice, newest first"),
+  a search line, and a month calendar (`/days`, written days marked) on the same address; weeks, then days as numerals,
+  then his first lines with the time beside the practice. No chips.
 
 ### 1.3 Entry (the two-voice document)
 
@@ -105,6 +129,15 @@ programs with no active run).
   everything else escaped), her notes with times, the day's reflection (link + inline body), the program summary.
 - States: loading skeleton; 404 "Not an engine entry"; offline (cached document with the ribbon); write failure
   (composer keeps the text, shows the error line, Retry).
+- As built (WEB-UX; DECISIONS.md, WEB-UX-ENTRY-TABS): **no tabs**. A spread: the hours in the left margin, his column,
+  her notes standing in the right margin beside the passage they follow (under it when the pane is under 840 px); her
+  letter at the head (questions folded, "All 24 questions, in 10 parts"); "Her readings" unfold at the end (*What she
+  noticed*, her reflection on the day). On a wide screen the list slides into a sidebar beside the entry (titles,
+  dates and dots, or none; kept on the device; the entry bar's switch, or `[` as a shortcut), with newer/older in the
+  entry bar; on a phone the entry is pushed over
+  the list. A passage's tools stand in the left margin on hover or focus, and in a sheet on a long press. "Keep
+  writing" over the composer leads into the write room (wide screens); on a phone the composer rests as one line above
+  the tab bar until it is used (Composer's `rest`).
 
 ### 1.4 Library
 
@@ -125,6 +158,12 @@ programs with no active run).
   (`POST /entries/{stem}/blocks` with `phase`), buttons *Next*, *Skip*, *Back*, *Pause*; a phase strip across the top;
   after `202` the screen waits on `runs-changed`. A reflect phase shows the companion's text when present or the
   template with its note.
+- As built (WEB-UX): Library rows are Folio's with Night Room's clocks (when a practice comes, a weekday for a weekly
+  one, a dashed rim for one on demand, an arc for a program) and a bookmark ribbon for his own or his edited ones (no
+  source badges). A deeper page (a practice, its default, the editor, a run, an entry, `/design`) has the same way back
+  at its head (`ui/BackLink`). The run screen: the sessions as a strip, the phase as a strip of its own, her phase text
+  as her letter (her Markdown through the safe renderer, a quote as a quote), his box under it, Next the lamp and
+  Abandon apart.
 
 ### 1.5 Question-set editor
 
@@ -150,6 +189,9 @@ programs with no active run).
 
 - Week stepper; per week: counts (entries, words, answered/missed), program progress, the week review inline
   (collapsible), the week's day reflections as a list. No charts in v1.
+- As built (WEB-UX): the week set large in numerals, the figures as a sentence ("You wrote 80 words in 4 entries…"),
+  the programs as strips, her review of the week as her letter (its first paragraph large, the rest folded), and her
+  days as slips that unfold.
 
 ### 1.7 Settings
 
@@ -173,37 +215,30 @@ programs with no active run).
   pushes nothing under `push.when: no-chat`. The service worker shows a push as the practice's title and "due now"
   (one per practice, `swCore.nudge`), and a tap opens `/today?write=<id>` in an open page or a new one
   (`swCore.openTarget`, this site only).
+- As built (WEB-UX): a large title with "At a glance" beside it (health, how this browser signs in, her ink), a
+  numbered index that follows the scroll (a strip on a phone), and the sections as quiet cards of rows: switches,
+  steppers (`ui/Stepper`, and `ui/TypedStepper` where the value is typed), her four inks as blots with a letter of hers
+  retyping in the one chosen, the theme. A change raises a save bar docked across the foot of the page ("2 changes not
+  saved · Discard · Save"), with its own backing, so it never floats over a row; at the foot of the page it sits under
+  the last row. Notifications are a card of their own at the head of *07 This device*: the state in words (On, Off,
+  checking, or why it cannot be offered), *Turn on notifications* or *Turn off*, a blocked permission or a failed
+  change said under it, and what a notification carries.
 
-## 2. Visual direction (in words)
+## 2. Visual direction
 
-Quiet, paper-like, dark and light themes from one token sheet. His text is the only thing at full contrast: a
-humanist serif or a soft grotesque at 17–18 px, generous leading, full width. Everything the engine or the
-companion adds is secondary: prompt blocks in a muted accent wash, her callouts in a thin-bordered card with a
-small name label and time, collapsed by default so a day reads as his day. One accent colour (the companion's,
-configurable later) used for actions and the prompt wash only. No illustrations in v1, no streak flame, no
-confetti. Motion is limited to disclosure (expand/collapse at 160 ms ease-out) and list entry; `prefers-reduced-
-motion` disables both. Icons are a small inline set (send, mic, fold, chevron, filter). Typography carries the
-hierarchy; cards are borders and spacing, not shadows.
+**The language is [`design/DESIGN.md`](../design/DESIGN.md)**: intent, type, colour, her inks, the mark, layout,
+motion, components, web rules and the owner's vetoes (no letter-spaced capitals, no stamps or fastenings, no pill rows,
+no boxed badges, no emoji labels, no gamification). Its tokens are `web/src/tokens.css`, its parts `web/src/ui/`, and
+`/design` in the running app draws every part with its states. The owner's verdicts behind it are in `design/state.md` (paraphrased);
+the decision is DECISIONS.md, WEB-UX-IDENTITY (round 02, "Folio × Night Room": Folio's warm paper by day, Night Room's
+cool room at night, the reader's choice of theme on the device).
 
-As built (WEB-DESIGN, 2026-10-26): `tokens.css` holds the whole scale (type `--text-xs`…`--text-3xl`, space
-`--s1`…`--s7`, radii, paper, ink, the accent with its wash and edge, light and dark) and `app.css` consumes only
-tokens. On a phone the bar at the foot carries an icon and a label per place; only floating things (a sheet, a toast)
-have a shadow. (Its faces and her callout are superseded by the identity below.)
-
-As built (IDENTITY, 2026-10-27; DECISIONS.md, IDENTITY): one identity, **Margin × Letters**, the owner's pick from the
-exploration. The page is his book page: his words in **Newsreader** roman at full ink, the hours hung in a ruled margin,
-rules and space instead of boxes, section heads in the book's italic with a rule running out. Her words are a letter:
-typed in **Courier Prime** in her ink under a "From <name>" line that runs out as a dashed fold, wherever they appear
-(Today's prompts, the entry's prompt and notes, a run's phase text, the Analysis tab, reflections, the carry-forward
-line), never editable. Her ink is the only hue and is hers alone; his actions are in his ink. **Her ink is the
-reader's choice** (Settings, *Ink*: blue-black, the default; brown; violet; green), kept on the device in
-`localStorage` (`web/src/ink.ts`), each held at AA in light and dark by `web/tests/ink.test.tsx`. **Figures are
-typed** (every `time` in Courier Prime; the week's days and the counts in Fraunces' soft figures; small labels in
-Courier capitals). **On a wide screen (1024 px and up)** Today and an entry open into a spread: the hour, his column,
-and her letter and notes in a column beside it, each note where she spoke (from the end of the paragraph it follows);
-from 641 px the page is two columns, on a phone one. The engine's interface is **Instrument Sans**. All faces are SIL OFL, served from the app
-(`web/public/fonts`, licences beside them; two cut down by `tools/web_fonts.py`) and precached. The mark is his ruled
-page with a postmark ring in her ink in its margin, with no date in it.
+History, superseded where they differ: v1 asked for a quiet paper-like page with her words folded (WP11); WEB-DESIGN
+(2026-10-26) put the scale in one token sheet; IDENTITY (2026-10-27) chose **Margin × Letters** (Newsreader for him,
+her words typed as letters in her ink, the reader's choice of ink, the hours in a margin). WEB-UX keeps those and
+replaces the rest: her voice is IBM Plex Mono (Courier Prime and the Fraunces figures are gone), her letter has no
+fastening, the mark is the "margin j", and a wide screen is a rail and panes on a desk while a phone keeps its tab bar
+at the foot.
 
 ## 3. Build and repository layout
 
@@ -212,17 +247,25 @@ web/
   package.json           preact, preact-iso, vite, typescript, vitest
   src/
     api.ts               typed client + runtime shape checks (unknown fields dropped)
-    routes/              today.tsx entries.tsx entry.tsx library.tsx editor.tsx run.tsx insights.tsx settings.tsx pair.tsx
-    components/          Document.tsx (two-voice), Composer.tsx, Recorder.tsx, QuestionSet.tsx, WeekStrip.tsx, Sheet.tsx,
-                         QuickAdd.tsx, MetaSheet.tsx, RunCard.tsx, ConfirmButton.tsx, Status.tsx, Markdown.tsx,
-                         OfflineRibbon.tsx, UpdateToast.tsx
+    routes/              one TSX and one CSS per screen, the sheet scoped under the route's root class: today, entries,
+                         entry, library, editor, run, insights, settings, pair (also "Not here"), design (/design)
+    components/          the app's own parts, a TSX and a CSS each: Document (the two-voice spread), BlockActions,
+                         Composer (useCompose; `rest` on a phone), WriteRoom (the write room), Recorder, Prompt,
+                         QuestionSet, WeekStrip, MetaSheet, RunCard, ConfirmButton, EntryRow, Markdown (the safe
+                         renderer's view), OsmCredit, UpdateToast
     editorModel.ts settingsModel.ts drafts.ts   the editor's form and moves, the settings the server allows, unsent drafts
     sw.ts swCore.ts      the service worker (Workbox precache + the runtime rules) and its testable rules
     offline.ts pwa.ts    what the page knows about cached answers and being offline; registration and the update prompt
-  public/icons/          mark.svg and the PNGs made from it (scripts/make-icons.mjs)
+    tokens.css           the design tokens (design/DESIGN.md); theme.ts and ink.ts keep the device's theme and her ink
+    styles/              base.css (reset, element defaults, focus, the two voices, the touch floor, reduced motion)
+    ui/                  the design system's components, one TSX and one CSS each (index.ts); drawn at /design
+    shell/               the rail, panes, page transitions, Next from her, the write room's seam (app.tsx lays them out)
+  public/icons/          mark.svg, favicon.svg and the PNGs made from them (scripts/make-icons.mjs)
   scripts/               source-hash.ts, manifest.ts (the manifest, colours read from tokens.css), make-icons.mjs
-    tokens.css, app.css
   tests/                 vitest on fixture JSON from tests/fixtures/ (shared with the Python suite)
+  e2e/                   Playwright against tools/serve_fixture.py: smoke, writes, settings, the PWA, the mobile pass
+  shots/                 the design screenshots (not CI): every screen and its states, phone and desktop, light and dark,
+                         reduced motion, over `serve_fixture.py --demo`; writes shots/out/<project>-<scheme>-<screen>[-<state>].png
 .github/workflows/web.yml   npm ci && npm run build; `git diff --exit-code src/journal/serve/static` fails the PR;
                             Playwright smoke against `journal serve --dev` on an ephemeral port (CI only, never the host)
 ```
@@ -234,7 +277,7 @@ step is the pinned install; the PWA is already in the package.
 ## 4. Offline behaviour, in detail
 
 - **Install.** `manifest.webmanifest`: `name` Journal, `start_url` and `scope` `/`, `id` `/`, `display: standalone`,
-  `theme_color` and `background_color` from `tokens.css` (`--bg`; a test pins them), icons made from `public/icons/mark.svg`
+  `theme_color` and `background_color` from `tokens.css` (`--pane`; a test pins them), icons made from `public/icons/mark.svg`
   (192, 512, a maskable 512, and the iOS touch icon). Nothing in it names a host or a port: the same build installs
   from the tailnet origin (`https://<name>.ts.net:8790`), from a published host or from loopback. The route is served at
   `/` with no path prefix (`Host` routing at the reverse proxy). A phone must be on the tailnet to reach it; a service
@@ -271,9 +314,13 @@ step is the pinned install; the PWA is already in the package.
 ## 5. Mobile UX
 
 Phone-first, the same document at every width. Touch targets are at least 44 x 44 px (a Playwright test measures every
-control on every route at 390 px); the page respects the safe-area insets (`viewport-fit=cover`, `env(safe-area-inset-*)`
-on the top bar, the bottom bar, sheets and the composer); under 640 px the navigation is a bar at the foot (Today,
-Entries, +, Library, Insights; Settings behind the gear) and the **+** sits in its middle where a thumb lands; body
-type is 16 px or more (his words 17-18 px) and form fields are at least 16 px so the browser does not zoom on focus;
-the entry's composer sticks above the bottom bar, and the recorder button is a full-height control beside Add, so one
-hand writes, records and sends. Motion respects `prefers-reduced-motion`. The visual language stays in `tokens.css`.
+control on every route at 390 px, `/design` included, and that nothing runs sideways at 390 and 360 px, measured
+against the width the test set); the page respects the safe-area insets (`viewport-fit=cover`,
+`env(safe-area-inset-*)` on the top bar, the tab bar, sheets, the toast and the composer). At 760 px and under the
+page has a top bar (the mark, the theme, Settings) and a floating tab bar at the foot (Today, Entries, **Write**,
+Library, Insights), Write a lamp disc in its middle where a thumb lands. Interface type is 15 px, his words 19–21 px,
+and every field is 16 px or more so the browser does not zoom on focus. The entry's and the run's composers stick
+above the tab bar and rest as one line ("Add more, in your own words" and a round Voice) until they are used; then the
+whole box opens. A passage's tools come in a sheet on a long press; Settings' save bar docks above the tab bar. Motion
+respects `prefers-reduced-motion` (every duration 1 ms, no View Transitions; the shots check it). The visual language
+is `design/DESIGN.md`.

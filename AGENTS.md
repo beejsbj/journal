@@ -13,13 +13,8 @@ One engine in `src/journal`, four faces over the same config, state and entry fi
 | Face | Where | What it is |
 | --- | --- | --- |
 | `journal` CLI | `cli.py` (console script `journal`) | `journal tick`, run every five minutes, does all scheduled work; the other subcommands inspect and maintain (`journal --help`). |
-<<<<<<< HEAD
-| Hermes plugin | repo root: `plugin.yaml`, `__init__.py` → `hermes/` | The companion's integration: hooks (`pre_gateway_dispatch` capture, `pre_llm_call` context, `pre_tool_call` guard), the companion's tools, slash commands, the `skills/journal-system` skill, `hermes journal …`. The journal works in one chat on any gateway platform (the `channel` setting; default Telegram and `telegram.chat_id`): `channel.py` decides which messages and turns are the journal's (platform, chat, owners), and every send goes through the `Channel` port (`telegram.TelegramChannel`, else `hermes/channel.py` through `hermes journal deliver`). With `channel.platform: none` there is no chat at all: prompts, annotation replies, reflections, program summaries and notes are not sent, attempted, counted or alerted, and practices are done on the other faces (program phases still need a chat until OPEN-PROGRAMS). |
-| `journal serve` + PWA | `serve/` (stdlib HTTP server and API); `web/` (Preact source) built into `serve/static/` | A private web app over the same files. Reads entries and state JSON, never the chat transcript; calls no model; sends by spawning `journal send`. With the extra `journal[push]` it nudges the installed PWA by Web Push when a slot comes (`serve/push.py` over `serve/webpush.py`; `push.when`): a push is no delivery, writes no prompt record and is never a chat boundary (OPEN-PROMPTS rule 12). |
-=======
 | Hermes plugin | repo root: `plugin.yaml`, `__init__.py` → `hermes/` | The companion's integration: hooks (`pre_gateway_dispatch` capture, `pre_llm_call` context, `pre_tool_call` guard), the companion's tools, slash commands, the `skills/journal-system` skill, `hermes journal …`. The journal works in one chat on any gateway platform (the `channel` setting; default Telegram and `telegram.chat_id`): `channel.py` decides which messages and turns are the journal's (platform, chat, owners), and every send goes through the `Channel` port (`telegram.TelegramChannel`, else `hermes/channel.py` through `hermes journal deliver`). With `channel.platform: none` there is no chat at all: prompts, annotation replies, reflections, program summaries and notes are not sent, attempted, counted or alerted, and practices are done on the other faces. A program phase becomes current with no delivery (`programs._open`; `send_due` is "owed a delivery") and an interrupt opens at its time, so a run is done on the web app with no chat too. |
-| `journal serve` + PWA | `serve/` (stdlib HTTP server and API); `web/` (Preact source) built into `serve/static/` | A private web app over the same files. Reads entries and state JSON, never the chat transcript; calls no model; sends by spawning `journal send`. |
->>>>>>> origin/main
+| `journal serve` + PWA | `serve/` (stdlib HTTP server and API); `web/` (Preact source) built into `serve/static/` | A private web app over the same files. Reads entries and state JSON, never the chat transcript; calls no model; sends by spawning `journal send`. With the extra `journal[push]` it nudges the installed PWA by Web Push when a slot comes (`serve/push.py` over `serve/webpush.py`; `push.when`): a push is no delivery, writes no prompt record and is never a chat boundary (OPEN-PROMPTS rule 12). |
 | `journal mcp` | `mcp/` (optional extra `journal[mcp]`) | The engine's calls as MCP tools over stdio, under serve's rules. |
 
 Adapters stay thin: the seam is `inbound`, `turncontext`, `tools`, `commands` and the two ports in `ports.py`
@@ -93,6 +88,10 @@ Read `docs/DECISIONS.md` before changing anything, and your package's section of
 - The spec, as each package references it: `docs/ARCHITECTURE.md`, `docs/PRACTICES.md` (definition format, programs,
   the today block), `docs/API.md` (serve routes, privacy at the surface, locking), `docs/FRONTEND.md` (the PWA),
   `docs/DEPLOY-FRONTEND.md` (exposing serve on a private name).
+- **Design system (the web app).** `design/DESIGN.md` is the design language (and its agent guide);
+  `web/src/tokens.css` the tokens; `web/src/ui/` the components; `/design` in the running app draws every one. New
+  web work draws from these: a missing part is added to `ui/` and shown on `/design`, not invented in a route, and a
+  route's sheet scopes every rule under the route's root class (every sheet loads on every page).
 - `tests/golden/` freezes the built-in rituals byte for byte (`tests/test_golden.py`, `tests/test_golden_engine.py`);
   `tools/gen_builtins.py --check` keeps the files canonical. A deliberate change to a built-in edits its file,
   regenerates the goldens, and says why in the commit.

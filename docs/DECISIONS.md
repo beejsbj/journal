@@ -466,6 +466,34 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   heading and would take the line for summary text. To close: decide whether either is worth the work (a summary that
   stops at the line, then the line in session files too).
 
+- **OWN-WORDS — four things around a queued picture and her context, left open.** (1) *The privacy pass reads a captionless
+  picture at its stored time.* Hermes stores the event's time with a message that has text, but a picture sent with
+  no caption at the time its turn ran; queued behind a stuck turn, that can be long after he sent it. A picture sent
+  inside a bare-`/x` window and run after the window closed is public to the pass, and so is her reply to it. The
+  sweep no longer captures such a picture (it checks the arrival time against the windows, Taken below), but the pass
+  and the conversation writer still read the stored time. To close: give the row its arrival time in the adapter
+  (`Row.at` from the cached file, as the sweep's `arrival` does), and re-check the saved pass's rule for a row whose
+  time changes when Hermes clears its cache. (An outage catch-up may read such a reply too: CodeRabbit raised it on the
+  PR; deferred here, not dismissed.) (2) *The conversation writer keeps no picture of a queued message in
+  ordinary chat*: the hook never saw it, so nothing was stashed; its caption is written, the picture is not. To close:
+  carry `Row.meta["images"]` on the writer's event and let `_keep_images` copy from Hermes' cache when there is no
+  stash. (3) *Her notebook is stored in the
+  companion's other sessions.* `turncontext.build` gives the notebook to every turn of hers, not only turns in the
+  journal's chat, and Hermes stores it with the user's message in some of them: a read-only count of one live
+  database found it in the `content` of over two hundred user rows of `tool`-source sessions (her one-shot runs) and
+  in the `api_content` of several hundred more. No reader of the journal opens those sessions (the transcript reads the
+  journal's chat only), so nothing of it reaches an entry; it is her private notebook copied where it need not be. To
+  close: decide whether the notebook belongs in turns outside the journal's chat (`channel.turn_ours`), as the pack
+  and today block already do not. (4) *Hermes' own turn note in a row with no picture* (the review of 2026-11-10).
+  Hermes puts its notes for a turn (`[System: …`: the skills that changed, another interface) in a part of their own
+  between his words and the injected part. In a picture's row that is after the placeholders and is cut. If Hermes
+  ever stores a list of text parts with no picture (its gateway builds a list only for a native picture), a fence or
+  recalled memory after the note withholds the row, but the note alone would read as his words
+  (`my words` and under it `[System: …]`). A user row Hermes writes itself that opens `[System: ` (its compressor
+  counts that prefix among its own) is not among the reader's skip prefixes either, as before this package. To close:
+  count such rows read-only in a live database, then add `[System: ` to the skip prefixes and to the marks
+  (`_LEFTOVER`).
+
 ## Taken by packages (recorded here; later packages follow them)
 
 - **WP0 — an unknown entry id is recognised only with the engine's authorship marker.** The spec's fallback
@@ -3044,6 +3072,36 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   situational session interrupts a program's open phase, the program does not resend that phase by itself;
   `/start <word>` brings it back. Manual by design. Closes the open point in ONE-PROGRAM-RUN, review fixes (6) ("whether
   the engine should re-send it on its own").
+- **FAVICON (2026-11-04) — the tab has its own mark.** The page mark (`mark.svg`) shrunk to 16 px loses its rule, lines
+  and ring, so the favicon is drawn for that size (`public/icons/favicon.svg`, with `favicon-32.png` for a browser without
+  SVG favicons): a `j` in his ink whose dot is the postmark ring in her default ink, on the paper. Its colours are fixed,
+  on an opaque tile, so it reads on light and dark tabs with no style in the SVG. The installed app's icons and `Mark` in
+  `icons.tsx` stay the page; **open:** whether they follow it belongs to the WEB-UX identity pass.
+- **X-SCOPE (the owner, 2026-11-09) — `/x` keeps a message out of the journal, not out of the agent.** An audit of
+  the live chat found an off-the-record turn in which the companion wrote to her own memory and to a task inbox:
+  the tool guard refuses only the journal's writes (`journal_add_note`, notebook writes, `journal_set_location`).
+  Asked whether `/x` should mean "not stored anywhere" (refuse every write tool in the turn, so "/x remind me to…"
+  stops working) or "not in the journal", the owner chose the journal. README's guarantee now says so: nothing marked
+  `/x` is saved in the journal, read back into the journal's context or quoted; tools that are not the journal's are
+  not refused, and a connected source does not know where its data came from: with `sources.tududi` on, a task
+  made from an `/x` turn can come back through the context pack (and an opener written from it), the Today
+  block, `today-cache.json` and the web app. The guarantee is about what the journal captures, not about
+  what may re-enter as source data. Consequence: her memory may hold what was said off
+  the record (Hermes writes it from her memory tool and from its own background review), and that memory is not
+  the journal's to filter. See X-MEMORY, decided below.
+- **NOTEBOOK-NEWEST (2026-11-09) — the notebook block shows due items, then the newest; a repeated item is not added.**
+  `notebook.render` took the first `INJECT` (15) items by age, so at the cap (`MAX_OPEN`, 40) the companion saw the
+  oldest, which are also the next to be pruned, and none of the recent notes, reminders the owner asked for among
+  them. Now: items whose `bring_up_after` has come (oldest due first), then the rest newest first; the "(+N more)"
+  tail stays. `notebook.add` compares an item's text, case folded, whitespace collapsed and trailing punctuation
+  stripped, with the open items', and a match adds nothing: the open item comes back marked `duplicate`, the tool
+  result says so, and the annotation and reflection passes log the repeat and count only what they added. A repeat
+  raises the open item again: `touched_at` becomes now (the stale sweep and the cap prune count from the repeat, as
+  they did when a repeat was a new item), a `bring_up_after` given replaces its date (the latest ask wins, earlier or
+  later; the tool result says `date_changed`), and a `source` given replaces its source. The comparison also applies
+  NFKC, makes curly quotes straight and drops a leading list marker; a text that compares as empty matches nothing.
+  **Not done, on purpose:**
+  notebook items are still not fed into the annotation or reflection prompts (a separate privacy decision).
 - **OPEN-CORE (2026-11-09) — slot states, slot resolution, the engine's write of his words, attach-only delivery and
   `channel.platform: none`** (docs/OPEN-PROMPTS.md, package 1; issue #17). What the package built, and what it
   decided where the doc left room:
@@ -3485,6 +3543,454 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
      `/start` (as built in OPEN-PROGRAMS, #29). Recorded only.
   6. **The PWA control for answering an interrupt** comes as a small separate package after #28 and #29 merge.
      Recorded only.
+- **OWN-WORDS (2026-11-09) — what the engine and Hermes add to a turn is never read as his words.** Found by an audit
+  of the live chat: a picture sent while a turn was stuck was queued, and its stored row (the turn as Hermes keeps a
+  natively attached picture: his caption or Hermes' stand-in "What do you see in this image?", a line naming the
+  cached file, a `[screenshot]` placeholder, then the turn's injected context, the companion's private notebook among
+  it) was swept into an entry as his reply. Revised in review (an independent pass and CodeRabbit): the first version
+  took a fence off wherever it sat, which cut his own words when he typed a tag. What holds now:
+  - **The engine fences what it injects.** `turncontext.build` returns its blocks between `<journal-context>` and
+    `</journal-context>` (`contextfence.wrap`); `contextfence.HEADS` are the blocks' first lines, for rows stored
+    without the fence (pinned against the renderers in `test_own_words.FenceTest` and `test_programview`). The marks
+    are a module of their own, so the chat reader does not load the turn's builders.
+  - **The adapter reads his part of a row only where the turn put it** (`hermes/transcript.py` `read`). A list of
+    parts Hermes stored as JSON (`\x00json:` and the list: an in-place compaction, a compaction's copies) is read as
+    Hermes' own text of it first (`decode`; one it cannot read is withheld). Then the envelopes in front come off: the
+    origin note, the `[Note: model was just switched …]` of a `/model` switch (only that note: a first line of his
+    that opens `[Note: ` is his), Hermes' timestamps (`[Tue 2026-04-28 13:40:53 CEST] `, or the older ISO form, with
+    `gateway.message_timestamps` on), a skills reload note, Hermes' note in front of a resumed turn ("A new message has
+    arrived …", "The previous turn was interrupted by …", when a message follows it; the note alone stays a system
+    row) and the group context around a message addressed to her (all stored in a picture's row, since Hermes' clean
+    transcript replaces text only), the reply quote (hers: kept as the quote, never checked as his). In a native picture's row nothing after the placeholders is his (`native`: the last
+    run of picture lines and placeholders, when they agree in number; a run leaves its last line break, so a caption
+    shaped like one does not hide the real one); Hermes' stand-in is no caption, and the files go in
+    `Row.meta["images"]` (`meta["native"]`: the row is such a picture's). In a row with no such picture, an injected
+    block that **ends** the text, at a line start, comes off (`trailing`): the engine's closed fence, the same cut
+    short by Hermes (its header, then a head and a tail, either possibly empty: only when it holds the engine's
+    fence), recalled memory (`<memory-context>`). After a native cut nothing is taken off the caption: everything
+    injected came after the placeholders, so a block ending the caption is his, and a leftover. `loose` (packs, the
+    quote checker, the outage catch-up) peels the envelopes in the same order as the reader (it kept the model note
+    and, behind it, her quoted opener, which the quote checker then took for his words); `loose` otherwise keeps
+    what it always kept (steer markers, audio placeholders, a voice note's quotes: `tests/golden/hermes_rows.json`).
+    The one golden value that changed on purpose: the model-switch row's `loose` and `his_text` are now his words
+    alone ("after the note"), no longer the note in front of them.
+  - **Any other mark fails closed.** If what is left of his words still holds a fence tag (an unclosed one with no
+    cut-short header in front included: CodeRabbit's question, taken this way), a memory tag, a picture line or
+    placeholder, a cut-short header, a gateway note or a line opening with one of `HEADS`, or a native picture's row
+    opens with a platform note this reader does not know (`[System note: …`, `[IMPORTANT: …` and the other
+    `_SKIP_PREFIXES`), the row is **withheld**:
+    `kind` `system` with no caption (a row the hook saved stays `handled`), `meta["withheld"]` names what was found,
+    `loose` is empty. Nothing writes it, packs and the quote checker skip it, and the sweep logs one line per row (row
+    and message id and the reason, never words) under `sweep.WITHHELD`, which the tick files in `errors.jsonl`
+    (`tick.files_as_error`). The privacy pass still reads the whole of it for an opt-out (`privacy._said`), so
+    withholding never hides a `/x` (a withheld delivery or platform frame excepted: no message of his, unless it
+    carries his native picture). **The cost, named, and kept on purpose** (the owner's delegate, review round 3: the
+    same rule guards against a later Hermes storing its additions in a new place): a message he types that holds
+    `<journal-context>` or `<memory-context>` anywhere, a line `[screenshot]`, a line starting `[Image attached: ` or
+    `[Image attached at: `, a line starting `## Journal: today — ` (or another head) or one of the gateway's note
+    openings is not saved, whole rather than cut: it stays in the chat, and the sweep's errors line names the row
+    (ids only). The trade-off for an unclosed fence: Hermes cuts the engine's context
+    short only with its header in front, so an unclosed tag without one is his, or something unknown: withheld.
+  - **A swept picture is kept and stamped when it arrived.** The sweep takes a native picture's row with or without a
+    caption, copies each named file that lies in Hermes' picture cache (`<home>/cache/images` or the older
+    `image_cache`, the path resolved: a row can name any path) beside the entry as the hook does (a `/j` picture
+    makes a note), and stamps the capture with the earliest such file's time between the sweep's horizon and the row's
+    own time (Hermes writes each inbound picture to a new cache file as it arrives); a picture whose arrival falls
+    inside an off-the-record window is not captured. A picture not kept (outside the cache, gone from it, too large,
+    a failed copy) is said in the sweep's log, and his caption is still saved; copies are removed again when the
+    record fails. `Row.at` is unchanged (the open point above). The conversation writer takes a captionless native
+    picture as his message, so one the sweep captured starts the thread in that entry. This revises the IMAGES
+    entries of 2026-10-20 where they say native mode stores no placeholder and the sweep keeps no picture: the
+    Hermes in use stores the parts as text.
+  - **Not changed:** entries written before this release (the one found stays as it is: cleaning it is the owner's
+    decision); `Row.source` (a native picture's row stays `text`; the sweep writes `photo` when it kept a picture).
+  - **Review fixes (2026-11-10), after an independent review of the merge with main.** Where they differ, these
+    replace what is said above.
+    1. *Nothing is cut off a row with no picture.* The reader no longer takes a fenced block, a cut-short one or
+       recalled memory off the end of a row with no picture (`trailing` is gone from `read` and from `loose`).
+       Hermes stores what a turn adds in his row only for a natively attached picture, so such a block at the end of
+       a text message is his or unknown: the row is withheld whole. A list of text parts with no picture reads the
+       same way.
+    2. *After a picture's placeholders, only what a turn adds is cut* (`added`): nothing; the fenced context and
+       recalled memory, all of it; text that opens with Hermes' own turn note (`[System: `) or with a block's head (a
+       row stored before the fence, behind recalled memory or not). Anything else there (his own words in a message
+       that only looks like a picture's turn, another plugin's turn context, a note this reader does not know)
+       leaves the row uncut and withheld whole, with the errors line. **The cost, named:** on a turn that carries
+       an addition the reader does not know, a real picture's caption stays out of the journal until the reader is
+       taught the shape.
+    3. *The opt-out reads what was cut.* The cut-off part goes to the privacy pass (`Row.meta["cut"]`); a line of it
+       that opens with the opt-out makes the whole row private (`privacy._in_cut`: in `row_marked`, and in the pass
+       for a row with no words in front of the placeholders), so the pass is at least as strict as when the row was
+       read whole. What the review found: a typed picture run followed by a `/x` line was saved up to the run, and
+       the `/x` was not read.
+    4. *What cannot be told apart, said as it is.* A message he types that itself ends with a picture's lines (a
+       blank line, `[Image attached at: …]`, `[screenshot]`), or goes on after them only with what a turn adds, reads
+       as a picture's turn: those lines and what follows them are not read as his words (they are still read for the
+       opt-out). README's guarantee says so. "Whole rather than cut" above holds for every other mark.
+    5. *The platform's own rows are not withheld for a mark* (`_FRAMES`: a compaction frame, a cron delivery, an
+       `[IMPORTANT: …` notice, the task list). No reader takes them for his message, and Hermes' notice of a finished
+       background process cuts its output short under a header shaped like the hook spill's
+       (`[… output truncated — `), which filed a false `sweep: withheld` line. An attachment placeholder and a
+       `[System note: …` that his caption or message can follow still fail closed, and a picture's turn under any
+       of them is withheld as before, cut or not. A cron delivery is a thread boundary whatever it holds: it is
+       never a turn, so no picture is read in it. The sweep does not log a row the hook already saved (`handled`):
+       his words are in the entry as he sent them.
+    6. *`arrival` is for a row with no words.* A row with a caption is stored at the time he sent it; a cache file's
+       time no longer moves its capture (an older file time could put it before the prompt was sent, and the
+       capture was dropped without a line).
+
+    Pinned by `test_own_words.py` (the cases under "review fixes", and the three older cases they changed). The
+    fourth open point above (Hermes' own turn note in a row with no picture) came from the same review.
+- **CONTINUITY (2026-11-09) — reflections read what came before, can search his entries, quote only his words, and
+  share one voice.** The owner found the day reflections and week reviews were not a continuous partner: they quoted
+  him at length and said little of their own. The writer saw one period's files plus a single earlier analysis, had
+  no tools, and lost the whole reflection on one misquote, so the safe answer was to stitch his quotes together and
+  hedge. The owner asked for this work on 2026-11-09 and had already turned per-entry annotation replies off in his
+  deployment, so the reflection is now the one analytical message of the day. Five review rounds shaped it (below:
+  replies, quotes, copies, the run budget); the quote machinery that tried to keep a reflection with a bad quote was
+  split out to #26.
+  - **Inputs (`reflect.continuity`).** Her last three day reflections within seven days plus the latest week review
+    of the six days before (a week review: the last two reviews within three weeks), oldest first. Three days show a
+    run (a habit forming, a thread dropped) without outweighing the day's own entries; two weeks show a trend without
+    turning a review into a history. Of each, only its opening paragraph and the question it left him (**To carry
+    forward**), 600 characters each: her whole earlier prose, often longer than the day's entries, invited her to echo
+    herself; the opening says where she stood and the question what she asked. Then what he wrote back to it in the
+    chat (three replies, 600 characters each), found two ways, as the conversation writer files them: a reply that
+    starts a thread becomes a note of its own whose capture records the analysis it answers (`answers`, set by
+    `conversations._Writer.new_note` with `answers_ours`' own test), and the note's words are his reply; a reply
+    inside a thread filed elsewhere is one of his blocks quoting that analysis. "None in the chat" is said as such,
+    since he may have taken it up in an entry instead.
+  - **The notebook into permanent files (a new path).** Only a thread the engine filed from a journal file reaches a
+    reflection (`notebook.on_record`): an annotation's or a reflection's `FOLLOW-UP:` line, which now carries
+    `origin` (`annotation`, `reflection`), with a `source` that names a file still in the journal folder. A thread
+    she adds in chat (`journal_notebook`) is **excluded, not passed through `privacy.py`**: the pass judges chat rows,
+    and an item is her paraphrase, written in a turn whose context may hold what was said off the record earlier in
+    the conversation, so no check can tell which of its words came from where. Exclusion fails closed. The tool has
+    no `origin` parameter, so a model cannot claim one; items written before this package have none and count as
+    hers from chat (they age out within `STALE_DAYS`, 21 days). Her chat turns and the opener pack keep the whole
+    notebook as before (Decision 2). The deploy moves the plugin pin before the CLI, so no process files an
+    on-the-record follow-up while its one-shots still get the whole notebook from the old hook (DEPLOY.md).
+  - **Found on the way: the journal's hook gave every one-shot the whole notebook.** Hermes fires `pre_llm_call` in
+    `hermes chat --oneshot` too (platform `cli`), and `turncontext.build` adds the notebook on every turn, so each
+    engine model step (opener, annotation, reflection, catch-up, a program's construction) got every open item,
+    chat ones included, appended to its query; `reflect.py` said the notebook was not an input, which did not hold
+    under Hermes. Every run `agent.CommandCompanion` starts now carries `JOURNAL_MODEL_STEP=1`, and
+    `hermes.hooks.on_llm_call` adds nothing to such a turn: a model step gets only what the engine wrote. The opener
+    loses only a duplicate (its pack holds the notebook); the other steps lose an input they were never meant to
+    have. Her own Hermes memory is outside this package (X-MEMORY, PR #21): the one-shots load it as before.
+  - **Search: a read-only tool, not a retrieval step.** `journal_search` (`search.py`, stdlib) searches his words in
+    the journal's dated files (`entries.his_text`, moved there from `context.py`: an entry's words section and his
+    conversation lines, a dated file of his own whole; never her annotations, notes, folded replies or analyses). It
+    never opens the chat transcript, a pack, the notebook or her memory, and writes nothing, so it is allowed in an
+    off-record turn like any read. It is registered in a toolset of its own, `journal_read` (`tools.READ_TOOLSET`):
+    Hermes resolves a plugin toolset by name, so the reflection's one-shot runs with `-t journal_read` and has that
+    tool and nothing that writes. A new plugin toolset is on in her chat too, even where the platform's toolsets were
+    saved, unless the last save already knew it and left it out (Hermes' `known_plugin_toolsets`); switching
+    `journal_read` off for the platform in `hermes tools` keeps search out of her chat and leaves the reflection's,
+    which `agent.disabled_toolsets` would not. Chosen over a deterministic keyword step because the model knows what
+    is worth looking up (a person, a phrase, "the last time"), where code would guess from word counts. Not added to
+    MCP: `journal_entries` already searches his words there.
+  - **A sync conflict's copy** (`2026-10-14-evening (1).md`, `… (1) (2).md`, `… 2.md`, a Dropbox `(… conflicted copy
+    …)`, a Syncthing `.sync-conflict-…`) is read as the file it copies (`entries.original_name`), by that name and its
+    own front matter (`entries._copy_text`): a copy of her analysis gives nothing, a copy laid out as an entry gives
+    the entry's words. Before, a copy had no name the engine knew and was read whole as his, opener and annotations
+    included. Files are still recognised by name and front matter together, so a hand-written file with an
+    analysis's front matter stays his, and so does one merely named like a copy (`2026-10-14-evening 3.md` with no
+    entry layout, `notes (1).md`, `2026-10-14 (draft).md`).
+  - **Only his words in quotation marks; a bad quote is a bad answer, as on main.** A day reflection's or week
+    review's quotes are checked against his words only: the period's entries (`entries.his_text`), his replies above,
+    and his words in every file of the journal (what search can reach, read only when needed); her earlier analyses,
+    notes, annotations and notebook never count, even when she was given them. Quotation is a straight `"…"` or curly
+    `“…”` pair on one line, closed by the next double quote mark on that line, its inside neither empty nor starting
+    or ending with a space, and a blockquote as Obsidian renders one (`_BLOCKQUOTE`: up to three spaces, perhaps a
+    list item's marker, then `>`, with the non-blank lines straight after it as lazy continuation), checked as one
+    passage. A quote with "…" must have its parts in one paragraph of one file, in order, each within 300 characters
+    of the one before; a part under three characters must be a whole word of his ("No" is not the end of "know").
+    **Every double quote mark outside such a pair is irregular**, as a class (`validate.quote_like`): `"` and `＂`,
+    anything Unicode names a double quotation mark (`“ ” „ ‟ « » ❝ ❞ 〝 〞 〟`), the double, triple and quadruple
+    primes (`″ ‴ ⁗ ‶ ‷ ʺ`), the double apostrophe `ˮ`, and the corner brackets CJK quotes with (`「 」 『 』`). A
+    quote that is not his, or an irregular mark, makes the answer a bad one: nothing is written and it is retried,
+    `ATTEMPTS` times, then alerted; **a reflection that never passes is not written**, exactly as on main. The prompt
+    asks for straight double quotes only, few short quotes, and no "you wrote" without a quote. The program checks
+    and the catch-up (`_misquote`) run the same check against their one source: every quote whatever its length,
+    "…" parts together, and any irregular double mark fails the text. The catch-up's source was his messages *and*
+    the conversation before the outage in both voices, so a line of hers passed as his; it is now his lines only.
+    **Split out (2026-11-09).** Four reviews in a row broke a "keep the reflection" design: unquoting (invented words
+    stayed as reported speech), dropping stray marks (`You wrote "X”` reached him as `You wrote X`), a denylist of
+    odd marks (18 shapes outside it), then a class rule with sentence striking and attribution markers (a striking
+    span that kept a middle sentence, markers satisfied by any quote in the sentence, homoglyphs such as `ˮ` and
+    `ʼ`, missed phrasings, and false positives on possessives, `'90s`, backticks and autolinks). The writer is a
+    cooperative model and the realistic risk, attribution in paraphrase, is semantic, so this package keeps main's
+    behaviour for a bad quote with the checks above, and drops striking, unquoting and the attribution rule.
+    **Open (#26):** paraphrase is not policed (a sentence that says he wrote something, without quotation marks);
+    single quotes, backticks and HTML used as quotation are not judged; and a reflection with a bad quote is still
+    lost once its attempts run out. #26 records what the four reviews found and proposes a semantic check (a small
+    model asked whether a sentence attributes words or claims to him that his words do not hold) instead of more
+    patterns. **Not flagged here, on purpose:** single quotes, apostrophes and possessives (`the kids’ room`,
+    `'90s`, `'cause`), backticks, autolinks and HTML, since a false positive now costs the whole reflection. Tests
+    changed on purpose: `test_reflect.py`'s invented-quote test (a bad answer is now one that is not prose; the
+    invented quote is `test_continuity.py`'s), `test_outage.py`'s bad answer, and two `test_conversations.py` tests
+    that now read the corpus as `entries.his_text`.
+  - **A long run is not an outage.** The reflection's budget is 480 s (annotations 180, openers 240), since it may
+    search first; the tick waits for it. A run that still times out after another model step answered in the same
+    tick uses an attempt, instead of being deferred as "model unreachable" and stopping the tick's other analyses;
+    with no other answer in the tick it is treated as an outage, as before. After a timeout was deferred that way,
+    the next try runs without the search and on the old 300 s budget (`reflect.RETRY_BUDGET`): a hang of the search's
+    own then clears, and the tick is held for at most 360 s a try instead of 540 s. **Still open:** a hang specific to
+    the reflection that is not the search's (the model hangs on this prompt alone) is labelled "model unreachable" and
+    holds the tick for up to 360 s every 30 minutes for up to 7 days, as any outage does; telling it from a real
+    outage would need a second, cheap model call on each deferral.
+  - **One voice (`prompts.voice`).** One description of how she writes, carried by the opener, annotation, day
+    reflection and week review requests; each keeps its own form (the annotation: about him in the third person, her
+    reading in the first). It asks for her own reading in the first person, positions taken, doubt said once in
+    plain words, and names the stock hedges as things not to write; "mark inference as inference" is gone from the
+    four. The reflection asks for **What I notice**, **What moved** and **To carry forward** (the today block and the
+    web app read only the last), at most three short quotes, no retelling, and the search. The four
+    `opener_request` goldens were regenerated for the voice line; no built-in practice file changed.
+  - **Transcription guesses** belong in the entry file, never in a chat message: an annotation may note an obvious
+    mis-hearing once only when annotations stay in the file (`telegram.annotation_replies: false`); otherwise, and
+    always in a reflection, she reads past it.
+  - **Review fixes (2026-11-10).** An independent review of this branch merged with main (OPEN-CORE, OPEN-FACES,
+    OPEN-PROGRAMS, OPEN-PUSH) found nothing blocking and seven smaller things; this is how each was settled. Where a
+    bullet above says otherwise, this one holds. (1) *The model-step switch skips only the injection.*
+    `hooks.on_llm_call` returned on `JOURNAL_MODEL_STEP=1` before `inbound.begin_turn`. Harmless in a one-shot (a CLI
+    turn has no voice note and no mark), but a gateway that carried the variable by mistake would have lost the
+    off-the-record mark and the voice capture of every turn of his. `begin_turn` now runs first and the switch skips
+    `turncontext.build` alone. (2) *A rejection is said in numbers, never in the reflection's words.* A quote check's
+    reason goes to the tick's output, to the ledger record's `error` (which `journal status` and the web app's status
+    show), to `errors.jsonl` and, after three attempts, to the alert; a failing tick's notice carries the start of
+    that tick's output off the host. This package's irregular-mark branch put 48 characters of the reflection around
+    the mark there, often his words. Now an irregular mark is named by code point and place (`irregular quote mark
+    U+201D at character 216 (line 3)`; `validate.place`), everywhere it is reported, the catch-up and program checks
+    included, and a reflection's quote that is not his as `a quote not in his words at character 96 (line 3), 23
+    characters long` (`validate.problem`) in the log line, `error` and the alert. **Main's excerpt, where it stays:**
+    main put the first 60 characters of an unfound quote in the reason. For a reflection those characters now stay in
+    the ledger alone, in `rejected_quote` (a new optional field, shown on no surface, dropped once the reflection is
+    written), since its reason is alerted. For the catch-up, a program's construction and bridge and the synthesis the
+    reason is **unchanged from main** (`quote not in his messages: '…'` and the like, in their log lines, their
+    records, the mirrored note and the entry's reflect note): none of them raises an alert with it. **Open:** such a
+    log line can still leave the host inside the notice of a tick that fails for another reason; and the model is told
+    nothing on a retry (the request is the same), so a retry repeats a mistake as easily as it mends it. A request
+    that names the last rejection may show the model its own text; it would need the rejected text kept in the state
+    dir. (3) *A sentence of his that holds quotation marks can be quoted whole.* His entry says `She said "come home"
+    and I said no`. Quoted verbatim, the inner marks were irregular; with single marks inside, the quote was not his
+    words; three such answers lost the reflection. A line that has irregular marks now gets one more reading
+    (`validate._scan`, `_pairs`): an opening mark may close at a later mark of the line when the whole span between
+    them, the marks inside included, is in one paragraph of his verbatim (no "…" stitching; the same folding of case,
+    spaces and curly marks as any quote), and the quotation then passes the usual check as well. This is containment
+    in his words, not another pattern rule: a line without irregular marks is never read again, so nothing that passed
+    or failed before changes. Still a bad answer: an invented sentence with marks inside, one stitched with "…", and
+    his sentence with its marks changed to single ones (he must be copied as he wrote). (4) *Every request states the
+    rule its check applies.* The catch-up, a program's construction and bridge and the synthesis took the reflection's
+    check in this package while their requests still said only "copy the words exactly": a catch-up that put her own
+    earlier line in double quotes was not used, unwarned, and after three he got no reply. `prompts.quote_rule` says
+    it in all four: double quotation marks only around his exact words from the named source, never an earlier line of
+    hers, a title or a term, no other double mark, no blockquotes. (5) *A reflection written late is held to its own
+    period.* The morning fallback, and an outage's retry up to seven days on, could search and quote what he wrote
+    after the period: his replies were bounded by its end, the search and the wider quote corpus were not. The
+    reflection's one-shot now carries `JOURNAL_SEARCH_UPTO` (its period's last day; `search.UPTO_ENV`, passed through
+    `agent.ask(env=…)`), and `journal_search` finds nothing dated after it whatever `date_to` says, names the bound in
+    its result (`through`) and refuses to search under a bound that is no date. The bound is the engine's, in the
+    run's environment, because the tool is called by the model inside that run and a prompt line alone would be a
+    request, not a bound; the request says it too. The wider corpus is his words in files dated the period's end or
+    before, and `reflect.continuity` leaves out a notebook thread filed from a later file, as it left out a later
+    reply. Her chat carries no such variable and searches everything. Dates are file names': a note written after
+    midnight belongs to the next day here, as it does in `entries_on`. (6) *Wording.* The reflection request used
+    "knows" and "doesn't" with any pronoun ("They knows what they wrote"): `Names.verb` for the one, a modal for the
+    other. With `channel.platform: none` it said "in the journal and in None" and spoke of what he "wrote back to it
+    in the chat": the chat is left out of the request, and `reflect.continuity` leaves out the reply block.
+    **Unchanged:** the opener request's "Quotes from journal entries and None" on a no-chat install is OPEN-CORE's
+    line, not this package's. (7) *Leftovers of the split.* A test docstring and two comments still said a bad quote
+    costs a sentence or its marks, not the reflection; a negative assertion pinned a wording that exists nowhere;
+    `validate.quotes` had no caller; README's module tree had no `search.py`. All gone or corrected.
+  - **Open:** whether to add a deterministic "echoes" step (older entries sharing the day's rarer words) if she
+    seldom searches; `journal_search` in MCP; whether 480 s is the right budget once real runs are seen; the
+    reflection-only hang above; paraphrase, single quotes and HTML as quotation, and keeping a reflection with a bad
+    quote (#26); the summaries in a synthesis's source; from the review fixes: a retry that tells the model what was
+    rejected, and main's quote excerpt in the catch-up's and the programs' log lines (#26 for the first).
+- **WEB-UX-IDENTITY (2026-11-09) — the web app's design system: round 02, "Folio × Night Room".** The owner accepted
+  the round-02 prototype (`design/rounds/02-combined/`) with four changes; his verdict is in `design/state.md`, *Round 02
+  result*, paraphrased (he liked the sectioned letter from her but not its stamp and wavy lines; he chose the "margin j"
+  for the mark; Today, Entries, the entry in all three sidebar modes, dark, Insights and Settings each approved by name).
+  `design/DESIGN.md` is now the written language, `web/src/tokens.css` its tokens, `web/src/ui/` its components and
+  `/design` draws them. What changes from IDENTITY (2026-10-27), and why:
+  - **Her voice moves from Courier Prime to IBM Plex Mono** (400, 400 italic, 500): typed still, but a quieter, more
+    even face that sits with Newsreader on warm paper and reads at 13–14.5 px in her margin notes. A round-01 call he
+    left standing in round 02. Her ink keeps its four values; `--her-soft` is now mixed in oklab and every ink is held
+    at AA on every ground and on her letter's wash (`web/tests/ink.test.tsx`).
+  - **The Fraunces figures are dropped**, and **times are no longer typed**: figures are Newsreader (lining, tabular
+    where they align) or the interface's sans; her face never sets interface text. Courier Prime and Fraunces leave
+    `web/public/fonts`; `tools/web_fonts.py` now cuts only the Newsreader italic. The faces served stay about the
+    same: 273 KB before, 272 KB now (Plex Mono is three latin files of 15–16 KB).
+  - **No fastening on her letter** (no postmark, wavy lines, clip or tape) and **no dated stamps**, as before.
+  - **The theme can be chosen on the device**: System (the default, `prefers-color-scheme`), Paper or Night, kept like
+    the ink (`web/src/theme.ts`, `localStorage["journal:theme"]`, `<html data-theme>`), never sent to the server, for
+    the same reasons as the ink (DECISIONS IDENTITY, *Her ink is the reader's choice*). The dark roles are written twice
+    in `tokens.css` (the media query and `[data-theme="dark"]`); the test holds the copies equal. The browser's
+    theme colour follows the choice, and the manifest's is the page (`--pane`, `#fbf8f1`), not the old paper.
+  - **The mark is the "margin j"** (round 02, option 01): the in-app `Mark`, `mark.svg` and the installed icons. The tab
+    keeps the small `j` (FAVICON), which closes FAVICON's open point.
+  - **Layout:** a rail and floating panes on the desk on a wide screen (the rail folds to icons while an entry is open
+    and under 1100 px); the page, a top bar and a floating tab bar on a phone. The e2e check that the desktop navigation
+    sits in a header (`web/e2e/smoke.spec.ts`) now checks the rail.
+  - **Still open, for the route builders of this pass:** the entry's Analysis and Reflection unfolding at the end
+    (replacing FRONTEND §1.3's tabs), the write room replacing the + sheet, the sidebar beside an entry. Each is
+    recorded with its route when it lands.
+- **WEB-UX-ENTRY-TABS (2026-11-09) — the entry has no Entry/Analysis tabs; her readings unfold at its end.** FRONTEND
+  §1.3 put an entry's analysis on a second tab. Round 02 drew it as her readings at the foot of the entry instead, and
+  the owner accepted round 02 with this call left uncontested (`design/state.md`, *Round 02 result*: among the calls he
+  did not contest, which stand and are reversible, Analysis and Reflection unfold at the end of the entry, with no tabs). So the entry page
+  (`web/src/routes/entry.tsx`) ends with "Her readings": *What she noticed* (her annotations and her notes) and *her
+  reflection on the day*, each a disclosure (`ui/Disclosure`) that unfolds in place; the reflection is read when its
+  fold first opens. The data and the empty text are as they were ("Nothing here yet: Ada adds notes after the entry
+  settles."); the program summary stays at the end of the document, where it was already shown. Nothing hides the
+  composer any more (it was hidden while the Analysis tab was open). The tests that clicked the tab now open the
+  folds (`web/tests/routes.test.tsx`, `web/e2e/smoke.spec.ts`, `web/e2e/mobile.spec.ts`).
+  The same pass, recorded here as they land with the entry: her chat replies in an entry, folded `<details>` callouts
+  until now, stand **in the right margin beside the passage they follow** (`ui/MarginNote`; under the passage when the
+  page is under 840 px wide), shown in full, still read-only; the list slides into a **sidebar beside an open entry**
+  on a wide screen, in one of three modes the reader picks in the entry bar (titles, dates and dots, none; default
+  titles) and that this device keeps (`localStorage["journal:sidebar"]`, never sent); the Entries filters are a
+  sentence with menus and a month calendar (`/days`), on the same address as before. **Not done:** Delete keeps its
+  question in place and has no Undo, since the server has no undo for a block and a delayed delete would change
+  when the file is written.
+- **WEB-UX-WRITE-ROOM (2026-11-09) — Write opens a room, not the "+" sheet.** FRONTEND §1 put a sheet behind the tab
+  bar's +: Quick note, Voice, Answer today's prompt, Start. The owner asked for immersive, inviting writing (it is
+  a writing app) and found the write modal ugly (`design/state.md`, WEB-UX); round 02 drew a room, and
+  he accepted it with focus greying on by default left uncontested. So everything that says Write (the rail's lamp, the
+  tab bar's disc, the `N` key, Today's *Write now* and *Speak it*, `/today?write=<id>`, an entry's *In the writing room*) calls
+  `openWrite` (`web/src/shell/write.ts`), and the shell draws `components/WriteRoom.tsx`: a native modal dialog that
+  blooms out of the control pressed, his words large in a real textarea over a mirror that greys every paragraph but
+  his own, her letter at its head when he answers, and a quiet start on a new note that offers what the sheet did (the
+  prompts still open, the programs to start). The sheet's other jobs keep their writes: a note is `POST /entries`, an
+  answer `POST /entries` with `practice`, more for an entry `POST /entries/{stem}/blocks`, through the composer's own
+  rules (`useCompose`: the draft per box, the same `client_id` on a retry, the upload reused, the offline line, a `422`
+  without Retry). Turning Focus off is a display preference of the device, kept like the ink and the sidebar
+  (`localStorage["journal:room-focus"]`, "off" while off; never sent). `QuickAdd.tsx` is gone; the tests that drove the
+  sheet drive the room (`web/tests/writes.test.tsx`, `web/e2e/mobile.spec.ts`, `web/e2e/writes.spec.ts`).
+- **WEB-UX-INTEGRATION (2026-11-10) — the three route builds as one app.** Merging the entries, write and pages builds
+  showed what each had hidden alone, and the pass settled it:
+  - **The old sheet is gone.** `web/src/styles/legacy.css` (the pre-WEB-UX rules and the alias block of old token
+    names) is deleted: its live rules moved to the components that need them (the done line `.saved` and the offline
+    line in `ui/Status.css`, the error under a field in `ui/Field.css`, the place credit in `components/OsmCredit.css`,
+    the touch floor for a link on its own line in `styles/base.css`), the rest had no reader. With it went the global
+    `section > h2` head (every head is `.book-head`, `.kicker` or a route's own) and its `!important` 16 px floor on
+    fields, which had flattened the write room's 21 px box on a phone under its 21 px mirror. A merge had left that
+    sheet with an unclosed rule that swallowed every sheet after it; the browser runs caught it.
+  - **Route sheets are scoped** under their root class (`.today-page …`): every route's sheet loads on every page, and
+    unscoped names collided (`.day-n` in Entries and Insights, `.phase-title` in the Library and the run, `.more`,
+    `.actions`, `.confirm`). `design/DESIGN.md`, *Agent guide*, now says so.
+  - **One way back** (`ui/BackLink`, `PageBack`): the Library's, the editor's, the run's and the entry's back links
+    were three looks; `/design` gets one to Settings. **One page rhythm**: `--page-top` / `--page-foot` in
+    `tokens.css` set every page's first and last line; page titles are `.display` at `--t-h1` everywhere but the two
+    the system names for `--t-display` (Settings, Insights' week) and Today's numeral.
+  - **Settings' save bar is docked**: a bar with its own backing across the foot of the page, the page's last child
+    (outside the form; Save names it with `form=`), instead of a pill floating over the steppers' column mid-scroll.
+  - **The composer's resting line is Composer's own**: `rest` puts `data-rest` on the form while nothing is in it or
+    happening, and `Composer.css` draws the one line on a phone; the entry and the run ask for it. (The entry had keyed
+    it on Composer's class names from outside.)
+  - **Smaller fixes:** her letter's question fold is 44 px on touch in `ui/Letter.css` alone; Settings' typed stepper is
+    `ui/TypedStepper`; a weekday on a Library clock sits in the half of the face the hand is not in; her Markdown
+    renders `> ` as a quote (`markdown.ts`, a quote nested at most three deep); a browser that refuses the service
+    worker no longer leaves an uncaught error (`pwa.ts`); the rail's *Next from* read is no longer thrown away when he
+    moves on before it lands; the 360/390 px sideways check measures against the width the test set, not
+    `innerWidth`, which grows with the overflow.
+  - **Tests changed on purpose:** presentation only, each in its commit: the transcript-pending word's class
+    (`.transcript-pending`, was `.badge.pending`); the save dock is the page's last child; the "Saved: …" line is read
+    from the dock; the e2e mobile pass covers `/design` and "Not here" and fails on an uncaught page error; the shots are
+    one suite (`web/shots/`: `screens`, `entries`, `pages`, `write`, `shell`, with `lib.ts`) under stable names.
+- **WEB-UX-OPEN-FACES (2026-11-10) — main's OPEN-FACES web behaviour, inside the redesign.** Main (OPEN-CORE,
+  OPEN-FACES, OPEN-PROGRAMS) moved while WEB-UX was built; its merge keeps main's behaviour and WEB-UX's presentation:
+  - **Write now on every Today card**, whatever its state, opens the **write room** on the practice (WEB-UX replaced the
+    inline composer it opened on main): the room reads the view (`GET /library/{id}/open`) only then, shows her letter
+    (the card's prompt when it was sent, else the view's opener and questions, a lone question shown), the line saying
+    which slot the words fill (`.room-fills`), and posts `POST /entries` with `practice` on **Save** (the room's answer
+    button was "Send your answer"; beside *Send to chat* a "send" would read as the chat). A view refused (unknown, a
+    note) shows the server's reason and no box. *Speak it* stays beside *Write now* on a prompt that waits or is due.
+  - **`/today?write=<id>`** (and `/today` as Today's second path, its nav item marked) opens the room once, on the row
+    `writeTarget` names (the engine's slot order; now in `components/WriteRoom.tsx`, re-exported by `routes/today.tsx`,
+    and the room's own row choice uses it too), or on the practice alone; it leaves the address at once, and the reload
+    after a save does not open it again.
+  - **Due** rows ("due since 09:00") wait with the open ones under "Waiting for you", and the room's quiet start offers
+    them; **Send to chat** (was *Send now*) is on a card to come, due or missed, never when `/today` says `chat: false`;
+    a practice turned off keeps both (decision 4). The Library's practice page has *Write now* (`/today?write=<id>`)
+    and *Send to chat*, which it leaves out too when the day's quiet read says `chat: false` (main's page has no chat
+    flag to read; an addition, the same rule as Today's).
+  - **Tests:** main's new web tests are ported to the room's DOM with every behavioural assertion kept (the view asked
+    only on open, nothing written on open, its opener, question and fills line, the words and their practice, the
+    entry linked, `?write` used once and not reopened after a save (and the view not asked again), the slot order, no
+    box for a refused view, no Send to chat without a chat, Write now and Send to chat on a practice turned off — with
+    WEB-UX's *Speak it* beside them). Main's app.css lines live in `routes/today.css` (`.pill.due`) and
+    `components/WriteRoom.css` (`.room-fills`).
+- **WEB-UX-OPEN-PUSH (2026-11-10) — main's notifications, inside the redesigned Settings.** Main's OPEN-PUSH put a
+  *Notifications* section in the old Settings page. Merged into WEB-UX, its behaviour is unchanged (`Notifications` in
+  `web/src/routes/settings.tsx`, still exported with its `device` and `env` seams; `push.ts`, `sw.ts`, `swCore.ts` as
+  main has them, `pwa.ts`'s refused-registration fix untouched by them) and its presentation is the system's: a card
+  of its own at the head of *07 This device* (it is about this device, as pairing is), one row with the state in words
+  (*On for this device*, *Off for this device*, *Checking this device…*, *Asking the server…*, or why it cannot be
+  offered) and *Turn on notifications* / *Turn off* (`ui/Button`, small: a permission prompt and a subscription are
+  not a switch that acts at once), the blocked permission and a failed change under it (the filled-mark error line),
+  and a second row saying what a notification carries and when nothing is pushed (`push.when: no-chat` with a chat).
+  Not in *At a glance*: it would need the subscription read on every load of the page. A tap on a notification opens
+  `/today?write=<id>`, which opens the write room (WEB-UX-OPEN-FACES). `web/tests/push.test.tsx` runs unchanged
+  against the new markup (every assertion holds); `web/tests/pages.test.tsx` pins where the card stands; the shots draw
+  it blocked (headless Chromium's default) and off with the permission not asked yet (`settings-push-blocked`, `-off`).
+  Main's docs carried conflict markers from its own merge (AGENTS.md, DEPLOY.md, README.md); they are resolved here
+  as open PR #32 resolves them, with its `tests/test_no_conflict_markers.py`.
+- **WEB-UX-REVIEW (2026-11-10) — the independent review of the WEB-UX pull request, and what changed.** One blocker,
+  eight code points, four of docs and housekeeping, and nits; all taken, with these calls:
+  - **One draft, two boxes.** The entry's box and the write room on that entry share `entry:<stem>`; `drafts.ts` now
+    tells every box on a key what another box wrote or sent (`onDraft`, same tab), and a box takes it up unless it is
+    sending, so neither overwrites the other's words nor sends them twice. While the room is open on an entry its box
+    is hidden (kept mounted: a recording in it stays) with a line saying so, and what the room saves there makes the
+    page read the entry again (`shell/write.ts`, `onWritten`).
+  - **His voice is not dropped by a key.** Escape or Close while recording stops the recording and keeps it (the room
+    stays); with a recording not sent the room asks in place (*Keep writing* / *Discard the recording*); while a save
+    settles, closing waits. Typed words are kept as the draft, as before. *Speak it* starts the microphone once (the
+    room owns it, so a discard or *Write another* does not start it again), and a microphone granted after the room
+    closed is let go at once. Only one room at a time: a stray `N`, or a link, while it stands is ignored; `N` does
+    nothing on the pairing screens or while composing.
+  - **The room's reads are quiet** (`todayQuiet`, `libraryQuiet`, `entryQuiet`, `runsQuiet`, the practice view): they
+    never change the offline ribbon or the kept-copy rules of the page behind it.
+  - **Today never folds a prompt** (FRONTEND §1.1): her questions stand open on every card, by part, as main had them;
+    the test that forbade a fold is back. The entry keeps its fold (`FOLD_ENTRY_QUESTIONS`).
+  - **The entry sidebar's "Load more"** keeps a page with the first page it followed, aborts on a newer one, and says
+    a failed page with Retry, as Entries does.
+  - **Her letter in the room on a phone** rests at three lines with *Read all of her letter* to open it.
+  - **Colour.** `--her-soft` is held at AA on every ground, as the ink is; light brown and light green were a touch
+    too pale for that on the darkest grounds and are deepened (`#6e3c14`, `#1a523f`). A swatch that names its own
+    scheme (a light one on a dark page) now carries that scheme's ink. Every duration in a component's sheet is a
+    token (`--d-0`, `--d-5`, `--d-loop` and `--d-breath` are new).
+  - **Settings.** A value stepped back to what it was, or to the default while unset, is no change (a default is never
+    written into the file by accident); an edit in a row that folded away under its switch is not sent; a locked
+    switch is described by its line; a stepper with an open lower bound ("more than 0") can step to any value above
+    it. (The test that ties the page's defaults to `config.DEFAULTS` was already there.)
+  - **Smaller:** Keep in a question in place gives focus back to its button; Edit from a passage's sheet puts the caret
+    in the editor; a sheet leaves on Android's back; the run card says "session 3 of 10" beside a strip that counts
+    sessions done; the player says when a recording cannot be played, and its seek bar is 44 px on touch (the mobile
+    pass now measures sliders); the room's program list says a failed read instead of offering a program already
+    running; a note's words carried into an answer leave no copy in the next note; the Library waits for the chat
+    flag before it offers *Send to chat*.
+  - **Housekeeping.** The build brief for this pass named one operator's tooling and is gone from the repository; the
+    owner's verdicts in `design/` are paraphrased (his exact words are in the deployment's private notes).
+  - **Tests changed on purpose:** the read-only document test allows exactly the player's two buttons and the fold's
+    head, and asserts no field in her letter; Today's card test asserts no fold; the Library's turned-off test waits
+    for *Send to chat*. New tests cover each point above.
+- **X-MEMORY (raised 2026-11-09; the owner, 2026-11-11) — the journal's own model calls load the companion's
+  memory, and her memory tool is not refused in an off-the-record turn. Accepted.** Every model step (openers,
+  annotations, day reflections, week reviews, program reflections and insights, outage replies) runs
+  `hermes chat --oneshot` in her profile (`hermes/companion.py`). Hermes loads her built-in memory (`MEMORY.md`,
+  `USER.md`) into that call's prompt unless `--ignore-rules` is passed, and `--toolsets none` removes tools, not
+  memory. Since X-SCOPE lets her memory hold what was said off the record, an annotation or reflection written
+  into an entry may carry it in other words; the quote check only catches a literal quote. Two ways to close
+  this were put to the owner, and he declined both: running the journal's model calls without her memory
+  (2026-11-09: they keep it; the continuity of her voice matters more), and refusing her memory tool in an
+  off-the-record turn (2026-11-11: it is not refused, so "/x remember that…" keeps working). So the limit stands
+  as the guarantee words it (README, *Guarantees*): `/x` keeps a message out of what the journal captures, and
+  what her memory holds can come back in the journal's model calls. This also answers WEB-DESIGN's open point
+  about openers (the one-shot does load her memory). Nothing in the code changes. To revisit: either of the two
+  ways above, or a Hermes switch that drops memory without dropping her persona file, if one appears.
+
 - **PROGRAM-KINDS (the owner, 2026-11-10) — two kinds, practice and program; "situational" is no longer a kind**
   (issue #1). Decided in conversation. Recorded here with what the code on `main` does today (read at `0d46f1b`, after
   the OPEN-PROMPTS packages merged), the definition keys proposed for it, what it revisits and the order of the

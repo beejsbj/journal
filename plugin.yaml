@@ -22,6 +22,7 @@ provides_tools:
   - journal_set_location
   - journal_notebook
   - journal_program
+  - journal_search
 provides_hooks:
   - pre_gateway_dispatch
   - pre_llm_call
