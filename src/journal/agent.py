@@ -12,6 +12,9 @@ The agent only ever returns text here; code decides what to do with it. There ar
 
 Anything that looks like the agent's failure text is never returned as an answer, even with exit 0.
 
+An outage, once found, is known across processes (``outage``'s breaker): while it lasts ``ask`` starts no run and
+raises ``outage.ModelHeld`` (an ``AgentUnavailable``) until a probe is due, then probes once before the run.
+
 ``ask(cfg, …)`` is the facade every model step calls; it asks ``cfg.companion()``: by default the Hermes adapter's
 one-shot chat in the configured profile (``journal.hermes.companion``), and with ``agent.command`` any other command
 (``CommandCompanion``: an argv list; ``{query_file}``, ``{budget}`` and ``{toolsets}`` are filled in).
@@ -29,6 +32,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from . import outage
 from .config import Config
 from .ports import CompanionUnavailable
 
@@ -84,6 +88,9 @@ _STATUS = re.compile(r"\b(?:error code|http(?: status)?|status(?: code)?)[:= ]+(
 _ERROR_CLASS = re.compile(r"""["']type["']\s*:\s*["']([a-z]{2,20}(?:_[a-z]{2,20}){0,3}_error)["']"""
                           r"""|\berror code: [45]\d\d\s+-\s+([a-z]{2,20}(?:_[a-z]{2,20}){0,3}_error)\b""")
 _LABELS = ("timed out", "could not run the agent", "agent reported a failure")
+_ITEM = r"(?:[45]\d\d|[a-z]{2,20}(?:_[a-z]{2,20}){0,3}_error)"
+_MADE = re.compile(rf"(?:(?:exit -?\d{{1,3}}|killed by signal \d{{1,3}}|{'|'.join(_LABELS)}|model unreachable)"
+                   rf"(?:: {_ITEM}(?: {_ITEM})*)?|{_ITEM}(?: {_ITEM})*)")  # what ``failure_reason`` returns
 
 
 def failure_reason(message: str) -> str:
@@ -100,6 +107,9 @@ def failure_reason(message: str) -> str:
     words would put one) matches nothing. Everything else, whatever the length, is dropped, so no prose from the
     message reaches a log line."""
     low = (message or "").lower().lstrip()
+    if outage.held(low):  # ``ModelHeld``: "held: " and a reason this function made (its grammar), else "held" alone
+        rest = low[len(outage.HELD) + 1:].strip()
+        return f"{outage.HELD}: {rest}"[:DETAIL_CAP] if _MADE.fullmatch(rest) else outage.HELD
     m = re.match(r"exit (-?\d{1,3})\b", low)
     if m and m.group(1).startswith("-"):
         head = f"killed by signal {m.group(1)[1:]}"
@@ -187,8 +197,16 @@ def ask(cfg: Config, query: str, budget: int, toolsets: str | None = None, image
     takes = getattr(companion, "takes_image", None)
     if image and callable(takes) and not takes():
         return None  # nothing ran, so nothing answered: this is no evidence that the model is reachable
-    text = companion.ask(query, budget, toolsets, **({"image": image} if image else {}),
-                         **({"env": env} if env else {}))
     global _answered
+    if outage.gate(cfg, companion):  # an outage is known: held (``ModelHeld``), or a probe answered just now
+        _answered = True
+    try:
+        text = companion.ask(query, budget, toolsets, **({"image": image} if image else {}),
+                             **({"env": env} if env else {}))
+    except AgentUnavailable as e:
+        if not (str(e).startswith("timed out") and _answered):  # (a long run after an answer is no outage)
+            outage.trip(cfg, failure_reason(str(e)) or "model unreachable")
+        raise
     _answered = True
+    outage.answered(cfg)  # (an outage another process found is over)
     return text

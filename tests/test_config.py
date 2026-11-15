@@ -263,8 +263,11 @@ class AdapterTest(CleanEnv):
     def test_with_no_companion_ask_is_an_outage_and_runs_nothing(self):
         from unittest import mock
         from journal import agent
+        import tempfile
         c = self.cfg(adapter="none")
-        with mock.patch("subprocess.run", side_effect=AssertionError("ran a command")):
+        with tempfile.TemporaryDirectory() as t, \
+                mock.patch("subprocess.run", side_effect=AssertionError("ran a command")):
+            c.state_dir = Path(t)  # (the breaker records the outage there: never under a fixed /tmp path)
             with self.assertRaises(agent.AgentUnavailable) as e:
                 real_ask(c, "q", 10)
         self.assertIn("adapter is none", str(e.exception))
