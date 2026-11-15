@@ -39,23 +39,25 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   describe one self-hosted stack. Kept as they are (renaming them is a config and test migration). To close: keep
   them, or move the less common ones behind a generic command source; likewise whether the `brain:` citation kind
   gains a neutral alias (`notes:`), which needs `context.py` and `validate.py` to accept both.
-- **CHANNELS — one journal channel, or several (open, the owner's; reframed by him 2026-11-15, issue #9).** His
-  framing replaces the (a)/(b)/(c) question below: the journal already runs on several faces (the web app, the CLI,
-  MCP, the Hermes plugin), and only the Hermes plugin face is tied to one chat. That face should be platform- and
-  channel-agnostic: `/j` and `/x` wherever the companion is. One channel makes sense only for the companion
-  journaling by default (the `everything` mode). Designed with #9, which already holds this model. As written before:
-  Built: **(a) one channel at a time**, switched by
-  config (`channel.platform`, `channel.chat_id`): prompts go there, and capture, the sweep, the conversation writer,
-  the privacy pass and the catch-up read only there. The other options: **(b) one delivery channel plus capture
-  channels**: prompts still go to one chat, and he can also journal from a second platform (`/j`, `/x`, replies,
-  the conversation) at the same time. Each further chat then needs its own conversation cursor, saved privacy pass,
-  bare-`/x` windows and sweep watermark (`conversations.json`, `sweep.json` per chat: a pass saved over one chat and
-  read for another turns that chat's private rows public), and the pack, "last heard" and the quote check read every
-  chat. The engine is single-chat throughout, so (b) is the chat steps of the tick and the hook run once per channel
-  over a config narrowed to it, with per-channel state names. **(c) Several delivery channels** (each prompt to every
-  chat, folded and replied to on each) adds the most surface for the least: he answers in one place anyway.
-  Recommendation: (a) now; (b) as its own package when he wants to write from a second platform without moving the
-  prompts, with a test that two chats' passes never share a file. To close: the owner picks.
+- **CHANNELS — one journal channel, or several (open; reframed by the owner 2026-11-15, issue #9).** His framing
+  replaces the (a)/(b)/(c) question below: the journal already runs on several faces (the web app, the CLI, MCP, the
+  Hermes plugin), and only the Hermes plugin face is tied to one chat. That face should be platform- and
+  channel-agnostic, with `/j` and `/x` wherever the companion is; in his words, one channel makes sense only where the
+  companion journals by default. Issue #9 holds the model this fits: a home channel for scheduled sends (the slot
+  OPEN-PROMPTS.md names), capture chosen per channel and opted out by default, `/x` and `/j` on every channel. The two
+  `/x` and fold entries below are part of #9's platform differences. As written before: Built: **(a) one channel at a
+  time**, switched by config (`channel.platform`, `channel.chat_id`): prompts go there, and capture, the sweep, the
+  conversation writer, the privacy pass and the catch-up read only there. The other options: **(b) one delivery
+  channel plus capture channels**: prompts still go to one chat, and he can also journal from a second platform (`/j`,
+  `/x`, replies, the conversation) at the same time. Each further chat then needs its own conversation cursor, saved
+  privacy pass, bare-`/x` windows and sweep watermark (`conversations.json`, `sweep.json` per chat: a pass saved over
+  one chat and read for another turns that chat's private rows public), and the pack, "last heard" and the quote check
+  read every chat. The engine is single-chat throughout, so (b) is the chat steps of the tick and the hook run once
+  per channel over a config narrowed to it, with per-channel state names. **(c) Several delivery channels** (each
+  prompt to every chat, folded and replied to on each) adds the most surface for the least: he answers in one place
+  anyway. Recommendation: (a) now; (b) as its own package when he wants to write from a second platform without moving
+  the prompts, with a test that two chats' passes never share a file. To close: #9 is designed and built (future, not
+  scheduled).
 - **CHANNELS — `/x` in a chat that is not the journal's (open).** The journal handles `/x` only in its own chat, as it
   always did on Telegram. Elsewhere (the companion on Discord while the journal is on Telegram) nothing of that chat is
   ever captured or written, so nothing said there can reach an entry through the engine; but Hermes answers a bare `/x`
@@ -80,9 +82,10 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
 
 - **IDENTITY — the entry's questions: folded or in full (decided 2026-11-15: folded).** The entry page folds a
   practice's questions behind "The 24 questions", as the Margin × Letters mix did; Today shows them in full. The owner
-  kept it folded: his writing leads and her notes stay beside the paragraphs they answer. Nothing changes in code. Flipping it is one line: `FOLD_ENTRY_QUESTIONS` in
-  `web/src/components/Document.tsx` (`false` shows them in full; on a wide screen they then run down her column,
-  and a note of hers early in the entry moves down below them, away from the paragraph it answers).
+  kept it folded (as recommended to him: his writing leads, and her notes stay beside the paragraphs they answer).
+  Nothing changes in code. Flipping it is one line: `FOLD_ENTRY_QUESTIONS` in `web/src/components/Document.tsx`
+  (`false` shows them in full; on a wide screen they then run down her column, and a note of hers early in the entry
+  moves down below them, away from the paragraph it answers).
 
 - **SENT-AS-SENT — program phases keep no question snapshot (open; see the decided entry at the end).** A program
   edited while a run is live shows its current questions on the entry page and Today. Revisit if programs are edited
