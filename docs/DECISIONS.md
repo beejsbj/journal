@@ -34,13 +34,13 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   *OPEN-PROGRAMS built*: see "OPEN-PROGRAMS" under *Taken*, with its follow-ups for OPEN-FACES and OPEN-PUSH.
   *OPEN-PUSH built*: see "OPEN-PUSH" under *Taken*.
 
-- **PROGRAM-KINDS — two kinds, practice and program (the owner's decisions taken 2026-11-10; the keys proposed, not
-  built; issue #1).** "Situational" stops being a kind: anything with a sequence is a program, and what sets a
+- **PROGRAM-KINDS — two kinds, practice and program (the owner's decisions taken 2026-11-10, the open points
+  2026-11-15; not built; issue #1).** "Situational" stops being a kind: anything with a sequence is a program, and what sets a
   situational session apart today becomes settings any program's file can carry. The decisions, what the code does
   today (some of it is not what was assumed), the proposed keys, what this revisits and the order of the packages
   are in "PROGRAM-KINDS" at the end of *Taken*. Nothing is built: the code, the built-in files, the goldens and
-  PRACTICES.md's format are as they were. To close: the owner takes the open points listed there (the key's name, what
-  a file that says nothing gets, the entry's name, `after:`), then the packages land in the order given.
+  PRACTICES.md's format are as they were. The open points were taken on 2026-11-15 (listed there).
+  To close: the packages land in the order given.
 
 - **SCRUB-PERSONAL — the source adapters and `brain:` (open, the owner's).** The built-in context sources (tududi,
   chat-scrobbler, listenbrainz, storyteller, audiobookshelf, grimmory) are optional features, but together they
@@ -4151,27 +4151,24 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
        written fresh and neutral, each one's lineage in its `sources:` line. It needs package 1 only (one file,
        `kind: program`, `sources:`); the issue's longer candidates wait on 2 and 3 where they are timed (a prompt a
        day, a revisit after three months).
-  - **Open, for the owner.**
-    1. **The key's name:** `one_at_a_time` as proposed, `exclusive`, or another.
-    2. **What a file that says nothing gets.** Proposed: off, for all three (his words for A). That changes two
-       defaults for a program directory he already has: it would stop holding the slot, and, where its `program.md`
-       has no `insights:` line, stop compiling insights by itself. An edit of fix-life made before the release
-       carries the built-in's `insights: compile` and lacks only the new line. Nothing is lost (`/start <id>
-       insights` compiles on request) and nothing that works today is refused, but the one-program rule would lapse
-       for that program without a word. Proposed with it: for the alias's release, `journal doctor` names each
-       program directory of his with no `one_at_a_time` line, and says what to add; an edit of fix-life also reads
-       "the default has changed since you edited it" in the Library when the default it began from is on record
-       (BUILTIN-EDIT). The other choice: keep today's defaults for `kind: program` (holds, compiles) and have
-       the one-offs say `one_at_a_time: false` and `insights: none`. Then a one-file program he writes without those
-       lines is refused while fix-life is unfinished and leaves an insights file after every run, which is against A.
-    3. **`advance` for a one-file program that does not say.** Proposed: `settle`, one default for the kind (row 1
-       of this file's table); both shipped one-offs say `advance: next` themselves, and the alias keeps `next`.
-    4. **The entry's name:** by layout as proposed, or `-s01` everywhere.
-    5. **`after:`.** Nothing reads it. Drop it from the format (the alias would still take it and ignore it), or make
-       it do what PRACTICES.md says.
-    6. **The text before the first phase of a one-file program,** and its `quote:`. Parsed today and never sent.
-       Send them with phase 1, as a session file's are, or refuse them when the file is checked.
-    7. **How long the alias lives.** At least one release (decided). Reading it costs a line in the parser, so it
-       could stay for good beside the doctor note; taking it out later is a decision for this file.
-    8. **Issue #1's text.** It files the thought record under practices and does not name boundary setting or
-       conflict resolution. Not edited here.
+  - **The open points, decided (the owner, 2026-11-15; 7 and 8 left to his delegate, who took them).** The proposals
+    above stand as written, with these answers:
+    1. **The key's name:** `one_at_a_time`.
+    2. **A file that says nothing gets off, for all three** (holds the slot, expires, insights). The cost named in the
+       proposal is accepted: an edit of fix-life made before the release stops holding the slot and stops compiling
+       insights by itself until it says so. `journal doctor` names each program directory of his with no
+       `one_at_a_time` line and what to add, for the alias's release, and the Library reads "the default has changed
+       since you edited it" where BUILTIN-EDIT has the default on record.
+    3. **`advance` for a one-file program that does not say:** `settle`, one default for the kind. Both shipped
+       one-offs say `advance: next` themselves; the alias keeps `next`.
+    4. **The entry's name follows the layout,** as proposed; no file is renamed.
+    5. **`after:` is dropped from the format.** The program's `debrief:` line stays the one link from a program to
+       its debrief. A file that carries `after:` is still read and the key ignored; `practices validate` names it as
+       unused, as a note and not a problem.
+    6. **The text before the first phase of a one-file program, and its `quote:`, are sent with phase 1,** as a
+       session file's are.
+    7. **The alias stays for good** (the delegate's call): `kind: situational` is read as `kind: program` in one file
+       with the defaults listed above, and `journal doctor` keeps naming it as the old spelling. Taking it out later
+       is a decision for this file.
+    8. **Issue #1's text is corrected** (the delegate's call): the thought record is filed under programs, and
+       boundary setting and conflict resolution are named, in the order the packages above give.
