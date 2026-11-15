@@ -39,7 +39,12 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   describe one self-hosted stack. Kept as they are (renaming them is a config and test migration). To close: keep
   them, or move the less common ones behind a generic command source; likewise whether the `brain:` citation kind
   gains a neutral alias (`notes:`), which needs `context.py` and `validate.py` to accept both.
-- **CHANNELS — one journal channel, or several (open, the owner's).** Built: **(a) one channel at a time**, switched by
+- **CHANNELS — one journal channel, or several (open, the owner's; reframed by him 2026-11-15, issue #9).** His
+  framing replaces the (a)/(b)/(c) question below: the journal already runs on several faces (the web app, the CLI,
+  MCP, the Hermes plugin), and only the Hermes plugin face is tied to one chat. That face should be platform- and
+  channel-agnostic: `/j` and `/x` wherever the companion is. One channel makes sense only for the companion
+  journaling by default (the `everything` mode). Designed with #9, which already holds this model. As written before:
+  Built: **(a) one channel at a time**, switched by
   config (`channel.platform`, `channel.chat_id`): prompts go there, and capture, the sweep, the conversation writer,
   the privacy pass and the catch-up read only there. The other options: **(b) one delivery channel plus capture
   channels**: prompts still go to one chat, and he can also journal from a second platform (`/j`, `/x`, replies,
@@ -73,9 +78,9 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   have plain REST edits the deliver command could call with the token it already loads), or a gateway-side send
   through `ctx` when Hermes exposes one.
 
-- **IDENTITY — the entry's questions: folded or in full (open, the owner's).** The entry page folds a practice's
-  questions behind "The 24 questions", as the Margin × Letters mix did; Today shows them in full. The owner has not
-  decided which the entry should do. Flipping it is one line: `FOLD_ENTRY_QUESTIONS` in
+- **IDENTITY — the entry's questions: folded or in full (decided 2026-11-15: folded).** The entry page folds a
+  practice's questions behind "The 24 questions", as the Margin × Letters mix did; Today shows them in full. The owner
+  kept it folded: his writing leads and her notes stay beside the paragraphs they answer. Nothing changes in code. Flipping it is one line: `FOLD_ENTRY_QUESTIONS` in
   `web/src/components/Document.tsx` (`false` shows them in full; on a wide screen they then run down her column,
   and a note of hers early in the entry moves down below them, away from the paragraph it answers).
 
@@ -84,7 +89,8 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   mid-run.
 
 - **PRIV3 — the tool guard can be walked around by a shell, and the faces it leaves open reach the journal's
-  writes (finding 1 of the window-D seam review; not fixed here: structural, and the owner's decision).** `guard.check`
+  writes (finding 1 of the window-D seam review; not fixed here: structural; the owner, 2026-11-15: accepted, the
+  guard stays a guardrail and not a boundary; when to revisit and the mechanisms are in issue #52).** `guard.check`
   reads a terminal command as text, so anything that does not spell a protected command or path literally passes:
   `$(which journal) config set …`, `` `which journal` config set …``, `J=journal; $J config set …`, `… | xargs journal
   config`, `journal config se"t" …` / `se\t`; `"hermes" config set …`, `'hermes' -p <profile> config set …`,
