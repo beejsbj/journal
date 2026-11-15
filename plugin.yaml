@@ -135,11 +135,15 @@ config_schema:
       Hermes sessions database, read-only, every tick.
   recovery:
     type: dict
-    default: {enabled: true, max_age_hours: 48}
+    default: {enabled: true, max_age_hours: 48, breaker: true, probe_after_minutes: 5, probe_max_minutes: 30,
+              catchup_per_tick: 2, sends_per_tick: 2, sends_per_hour: 4, stale_hours: 24}
     description: >-
       After a model outage left his chat messages answered only by Hermes' failure line, send one catch-up
       reply once a model is reachable again (messages older than max_age_hours get a note in the chat
-      session instead of a reply).
+      session instead of a reply). While an outage is known (breaker), no model run starts until a probe
+      answers (after probe_after_minutes, doubling to probe_max_minutes); then held work comes back paced
+      (catchup_per_tick model calls a step, sends_per_tick and sends_per_hour messages to the chat), and a
+      message more than stale_hours late is not sent (it stays in its file).
   capture:
     type: dict
     default: {mode: everything}
