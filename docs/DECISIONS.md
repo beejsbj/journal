@@ -2683,7 +2683,7 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
 
 - **ONE-PROGRAM-RUN (2026-10-27) — one program means one unfinished run; situational sessions are exempt both ways.**
   *Revisited 2026-11-10 by PROGRAM-KINDS (at the end of this file): the exemption becomes a setting in the program's
-  file instead of its kind. Proposed, not built: until it is, this entry is the rule as it runs.*
+  file instead of its kind. Decided 2026-11-15, not built: until it is, this entry is the rule as it runs.*
   Supersedes ONE-PROGRAM's reading (its "open for him" point). The owner: one program means that while a program
   (fix-life, say) is unfinished, no other program can start; practices and situational sessions keep working.
   (1) **The rule** (`programs.blocking`, asked by `one_at_a_time`): while a program that is not situational has an
@@ -4010,8 +4010,8 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
        while fix-life is unfinished.
     4. **B — a phase that a one-off interrupted is not sent again by the engine.** He types `/start fix-life`.
        Manual, as a program is taken up everywhere else.
-    5. **`kind: situational` keeps working** as another spelling, for at least one release, so the files he has do
-       not break. "Situational" survives at most as a group label in the Library.
+    5. **`kind: situational` keeps working** as another spelling, so the files he has do not break; it stays for
+       good (open point 7, below). "Situational" survives at most as a group label in the Library.
     6. **A program can be run again later** (fix-life in two years): a finished run never stops a new one.
     7. **Later, as separate packages** (the order is below): programs on a schedule, a schedule by interval, one
        entry file per day for a check-in that comes often, a mood line in the today block, one `settle:` notion
@@ -4066,7 +4066,8 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     default `advance` is behaviour, so the alias has to carry it.
     (3) *`after:` does nothing.* `programdefs.parse_situational` stores it and no code reads it. The debrief is
     offered because fix-life's `program.md` says `debrief: post-session-debrief` (`programs.complete_session` files
-    the notebook follow-up). PRACTICES.md §1.5 says `after: fix-life` "lets the engine offer it"; it does not.
+    the notebook follow-up). PRACTICES.md §1.5 says `after: fix-life` "lets the engine offer it"; it does not. (Dropped:
+    open point 5.)
     (4) *`sources:` cannot be written in a one-file definition today* (unknown key), and in a `program.md` nothing
     reads it: it is a line for whoever reads the file. The lineage issue #1's content is to carry waits on the first
     package.
@@ -4078,8 +4079,8 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     is untouched.
     (7) *Issue #1 reads differently.* It lists a thought record under "practices to add alongside" and names
     neither boundary setting nor conflict resolution. Under decision 1 a thought record is a program. The issue's
-    text is not changed here.
-  - **Proposed (not built): the three settings as front-matter keys.** One rule for all three: a setting is off
+    text is corrected (open point 8).
+  - **Decided 2026-11-15, not built: the three settings as front-matter keys.** One rule for all three: a setting is off
     unless the file says it.
 
     | Setting | Key | Values | A file that does not say | Today |
@@ -4119,7 +4120,7 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
       now for any program that does not hold the slot: started while another is mid-session it becomes the newest
       prompt, so the other's open phase no longer takes the next message (`capture.superseded`), and under
       `capture.mode: arm` an untargeted message after it is not saved. `/start` is the way back.
-  - **Proposed: the entry's name follows the layout, and no file is renamed.** A program in one file writes
+  - **Decided 2026-11-15: the entry's name follows the layout, and no file is renamed.** A program in one file writes
     `<date>-<id>.md`; a program with session files writes `<date>-<id>-sNN.md`, with one session listed too. That is
     what each existing definition writes today, so every entry in a journal keeps its name and every definition
     keeps producing the names it produces now; `entries._ENGINE_NAME` already reads both shapes. The other choice,
@@ -4137,7 +4138,11 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     that is the alias's test.
   - **Packages, in order** (each its own branch and PR; none designed here).
     1. **PROGRAM-KINDS:** the keys, the alias, `kind: program` in one file, the built-ins respelled, the docs
-       rewritten. Gateway and tick side; the web app too if the wire value changes.
+       rewritten. With it, from the open points decided below: a one-file program's text before phase 1 and its
+       `quote:` go out with phase 1 (the shipped one-offs carry neither, so no golden changes); `after:` is dropped
+       and `practices validate` names it as unused; the `journal doctor` and Library notes for a program with no
+       `one_at_a_time` line; and the "still open" line for every run that ends. Gateway and tick side; the web app
+       too if the wire value changes.
     2. **Programs on a schedule.** Only practices can be scheduled today. Its own question: what a scheduled program
        does when its time comes while a run is unfinished.
     3. **A schedule by interval** (hourly), beside `HH:MM` and a weekday.
