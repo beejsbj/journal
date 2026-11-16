@@ -20,6 +20,9 @@ fact the journal holds:
 * **Written while there was no chat**: how many annotations and reflections were written with ``channel.platform:
   none`` (marked skipped, ``no chat``, and never sent) since the newest prompt delivered to the chat. Counts only,
   never their words: they are in the entries.
+* **Too late for the chat**: how many annotation replies and reflection sends were skipped, ``stale``, in the last
+  day: more than ``recovery.stale_hours`` late, after an outage (OUTAGES), so she can speak of them herself. Counts
+  only, as above.
 
 ``collect`` returns a plain dict; ``pack_lines`` and ``today_lines`` render it. The today block runs in the gateway
 hook, which never reads the transcript: it passes the chat part the tick cached (``today.refresh``) instead of
@@ -262,6 +265,28 @@ def without_chat(data: dict, now: datetime | None = None) -> dict:
     return out
 
 
+STALE_SHOWN = timedelta(days=1)  # how long the too-late line stays after a send was skipped as stale
+
+
+def too_late(data: dict, now: datetime) -> dict:
+    """``{"annotations", "reflections"}``: how many annotation replies and reflection sends were not sent because
+    they came too late (marked skipped, ``stale``: more than ``recovery.stale_hours`` late, after an outage), skipped
+    within ``STALE_SHOWN`` before ``now``. The skips come in the ticks after an outage ends, so the line is there for
+    the first openers and today blocks after it, then goes. Counts only: nothing of their words is read."""
+    out = {"annotations": 0, "reflections": 0}
+    marks = [("annotations", p.get("annotation_reply")) for p in _prompts(data)]
+    found = data.get("reflections") if isinstance(data, dict) else None
+    marks += [("reflections", rec.get("telegram")) for rec in (found if isinstance(found, list) else [])
+              if isinstance(rec, dict)]
+    for kind, mark in marks:
+        if not isinstance(mark, dict) or mark.get("skipped") != "stale":
+            continue
+        at = _parse(mark.get("skipped_at"))
+        if at is not None and -_FUTURE <= now - at <= STALE_SHOWN:
+            out[kind] += 1
+    return out
+
+
 # ── programs ─────────────────────────────────────────────────────────────────
 
 def movement(phases_of: str, session: int) -> str:
@@ -319,7 +344,8 @@ def collect(cfg: Config, now: datetime, chat: tuple[datetime | None, str] | None
     out: dict = {"date": today.isoformat(), "heard": None, "chat": "none", "entry": None,
                  "missed": {"total": 0, "counts": {}, "since": None, "since_title": None, "capped": False,
                             "days": pack_lookback_days(cfg), "run": []},
-                 "programs": [], "no_chat": {"annotations": 0, "reflections": 0}, "gap_days": None, "returning": False,
+                 "programs": [], "no_chat": {"annotations": 0, "reflections": 0},
+                 "stale": {"annotations": 0, "reflections": 0}, "gap_days": None, "returning": False,
                  "returning_days": pack_returning_days(cfg), "unavailable": []}
     try:
         data = ledger.snapshot(cfg.ledger_path)
@@ -361,6 +387,10 @@ def collect(cfg: Config, now: datetime, chat: tuple[datetime | None, str] | None
         out["no_chat"] = without_chat(data, now)
     except Exception:  # noqa: BLE001 - the count is lost, never the pack
         pass
+    try:
+        out["stale"] = too_late(data, now)
+    except Exception:  # noqa: BLE001 - the count is lost, never the pack
+        pass
     return out
 
 
@@ -387,6 +417,21 @@ def no_chat_text(counts: dict | None) -> str:
         return ""
     verb = "was" if sum(n.values()) == 1 else "were"
     return f"{' and '.join(parts)} {verb} written; they are in the entries, never sent to the chat"
+
+
+def stale_text(cfg: Config, counts: dict | None) -> str:
+    """``3 replies to his entries and 1 reflection weren't sent, too late; …`` (after an outage), or "" when there
+    were none (an annotation reply is her annotations sent as a reply to his entry)."""
+    counts = counts or {}
+    a, r = counts.get("annotations", 0), counts.get("reflections", 0)
+    his = cfg.names.possessive
+    parts = ([f"1 reply to {his} entry" if a == 1 else f"{a} replies to {his} entries"] if a else []) \
+        + ([f"{r} reflection{'' if r == 1 else 's'}"] if r else [])
+    if not parts:
+        return ""
+    one = a + r == 1
+    return f"{' and '.join(parts)} {'wasn' if one else 'weren'}'t sent, too late; {'it is' if one else 'they are'} " \
+        "in the entries"
 
 
 def program_text(prog: dict, today: date) -> str:
@@ -445,6 +490,8 @@ def pack_lines(cfg: Config, data: dict) -> list[str]:
         lines.append(f"- Program in progress: {program_text(prog, today)}.")
     if no_chat_text(data.get("no_chat")):
         lines.append(f"- While there was no chat: {no_chat_text(data.get('no_chat'))}.")
+    if stale_text(cfg, data.get("stale")):
+        lines.append(f"- After an outage: {stale_text(cfg, data.get('stale'))}.")
     if data["gap_days"] is not None:
         days = data["gap_days"]
         span = "less than a day" if days == 0 else ("1 day" if days == 1 else f"{days} days")
@@ -476,4 +523,6 @@ def today_lines(cfg: Config, data: dict) -> list[str]:
         out.append(f"- program: {program_text(prog, today)}")
     if no_chat_text(data.get("no_chat")):
         out.append(f"- while there was no chat: {no_chat_text(data.get('no_chat'))}")
+    if stale_text(cfg, data.get("stale")):
+        out.append(f"- after an outage: {stale_text(cfg, data.get('stale'))}")
     return out
