@@ -464,8 +464,9 @@ def _outage(cfg: Config, rid: str, kind: str, end: date, now: datetime, detail: 
 
 
 def write_one(cfg: Config, kind: str, end: date, trigger: str, now: datetime,
-              log: list[str]) -> tuple[str | None, bool]:
-    """Try once to write one analysis. Returns (alert message or None, whether the model was unreachable).
+              log: list[str]) -> tuple[str | None, bool | str]:
+    """Try once to write one analysis. Returns (alert message or None, whether the model was unreachable:
+    ``outage.HELD`` when the breaker held the ask and nothing ran).
 
     An unreachable model defers the analysis without using an attempt; a bad answer uses one."""
     from .tools import READ_TOOLSET
@@ -488,7 +489,7 @@ def write_one(cfg: Config, kind: str, end: date, trigger: str, now: datetime,
                         env=None if plain else {search.UPTO_ENV: upto})
     except agent.AgentUnavailable as e:
         if not (str(e).startswith("timed out") and agent.answered_this_run()):
-            return _outage(cfg, rid, kind, end, now, str(e), log), True
+            return _outage(cfg, rid, kind, end, now, str(e), log), outage.HELD if outage.held(str(e)) else True
         raw, timed_out = None, str(e)  # a long run, not an outage: the model answered another step in this tick
     text, followups = notebook.split_followups(raw or "")
     ok, reason, rejected = False, timed_out or "agent failed", None
@@ -634,19 +635,25 @@ def _skip_stale(cfg: Config, rec: dict, now: datetime, late: timedelta, log: lis
 
 def run(cfg: Config, now: datetime, log: list[str]) -> list[str]:
     """One pass: write what is due (one attempt each, oldest first, at most ``recovery.catchup_per_tick``; none once the
-    model is found unreachable), then send. Returns alert messages."""
+    model is found unreachable), then send. Returns alert messages. While the breaker holds, every due analysis is
+    deferred (a held ask runs nothing), so each keeps its ``deferred_since`` and stays due until it is written or the
+    outage outlasts ``outage.GIVE_UP_AFTER``: a period that leaves the always-due window (yesterday, this week) during
+    a long outage is not dropped without a word."""
     alerts = []
     if not ledger.snapshot(cfg.ledger_path).get("reflections_since"):
         with ledger.locked(cfg.ledger_path) as data:  # the first run starts the clock: no backlog of old periods
             data.setdefault("reflections_since", now.astimezone(cfg.tz).date().isoformat())
-    limit = outage.per_tick(cfg)  # (the paced catch-up: oldest first, a few a tick)
-    for n, (kind, end, trigger) in enumerate(due(cfg, ledger.snapshot(cfg.ledger_path), now.astimezone(cfg.tz))):
-        if n >= limit:
+    limit, asked = outage.per_tick(cfg), 0  # (the paced catch-up: oldest first, a few a tick)
+    for kind, end, trigger in due(cfg, ledger.snapshot(cfg.ledger_path), now.astimezone(cfg.tz)):
+        if asked >= limit:
             log.append(f"analyses: {limit} asked for this tick; the rest wait for the next (paced catch-up)")
             break
         msg, down = write_one(cfg, kind, end, trigger, now, log)
         if msg:
             alerts.append(msg)
+        if down == outage.HELD:  # nothing ran: the next is deferred too, at no cost
+            continue
+        asked += 1
         if down:  # the model is unreachable for the rest of this tick too; don't wait out another timeout
             break
     return alerts + send(cfg, now, log)

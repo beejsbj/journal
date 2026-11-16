@@ -456,6 +456,33 @@ class PacedAnalysesTest(ReflectBase):
         self.assertEqual(rec["telegram"]["skipped"], "stale")
 
 
+class HeldAnalysesTest(ReflectBase):
+    """OUTAGES review, finding 4: while the breaker holds, every due analysis is deferred (a held ask runs nothing),
+    so one that leaves the always-due window (yesterday, this week) during a long outage is not dropped silently."""
+
+    def setUp(self):
+        super().setUp()
+        self.cfg.recovery["catchup_per_tick"] = 1
+        PacedAnalysesTest.two_days(self)
+
+    def ask(self, cfg, query, budget, toolsets=None, env=None):
+        self.asked.append((query, toolsets))
+        raise outage.ModelHeld("held: exit 1: 503")
+
+    def test_every_due_analysis_is_deferred(self):
+        IST = self.cfg.tz
+        _, log = self.reflect(datetime(2026, 10, 15, 23, 50, tzinfo=IST))
+        self.assertEqual(len([l for l in log if "reflection deferred" in l]), 2)  # not the first alone
+        self.assertFalse([l for l in log if "paced catch-up" in l])  # held asks are free
+        for day in ("2026-10-14", "2026-10-15"):
+            rec = self.rec(f"{day}-reflection")
+            self.assertTrue(rec["deferred_since"])
+            self.assertNotIn("last_deferred_at", rec)  # no try: free the moment a model answers
+        later = datetime(2026, 10, 18, 12, 0, tzinfo=IST)  # three days on, the 15th is no longer "yesterday"
+        due = reflect.due(self.cfg, ledger.snapshot(self.cfg.ledger_path), later)
+        self.assertIn(("reflection", date(2026, 10, 15), "annotated"), due)
+
+
 class ConfigTest(unittest.TestCase):
     def test_the_defaults(self):
         from journal import config as jconfig
