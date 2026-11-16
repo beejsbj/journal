@@ -14,7 +14,7 @@ from test_outage import GENERIC_FAILED, UNREACHABLE
 from test_reflect import FakeBot
 from test_sweep import FakeSessions
 
-from journal import agent, ledger, recovery, telegram, tick, validate
+from journal import agent, ledger, outage, recovery, telegram, tick, validate
 
 T0 = datetime(2026, 10, 15, 16, 0, tzinfo=timezone.utc)  # 21:30 IST
 NOTICE = agent.FAILED_TURN_NOTICES[0]  # what Hermes stores for a failed turn (the ⚠️ copy only goes to Telegram)
@@ -239,11 +239,23 @@ class CatchUpTest(Base):
 
     def test_without_an_outage_sign_a_deferral_is_the_evidence(self):
         self.outage(meta=None)
-        self.answers = [agent.AgentUnavailable("exit 1"), REPLY]
+        outage.trip(self.cfg, "exit 1", T0)  # (the run found no model, and the probe none either: the breaker is open)
+        self.answers = [outage.ModelHeld("held: exit 1"), REPLY]
         self.run_at(T0 + timedelta(hours=1))
         self.assertTrue(self.recs()[0]["outage_seen"])
         self.assertEqual(self.run_at(T0 + timedelta(hours=2)),
                          ["sent the catch-up for outage-3 (2 unanswered message(s))"])
+
+    def test_a_run_that_failed_on_its_own_is_no_evidence(self):
+        # OUTAGES review: the catch-up's run failed but a probe answered (no outage is known), so the failed turns
+        # before it were not shown to be an outage either: no "I was offline" reply
+        self.outage(meta=None)
+        self.answers = [agent.AgentUnavailable("exit 1: 503"), REPLY]
+        self.run_at(T0 + timedelta(hours=1))
+        self.assertNotIn("outage_seen", self.recs()[0])
+        self.assertEqual(self.run_at(T0 + timedelta(hours=2)),
+                         ["outage-3: no catch-up (no sign of an outage: the turn failed for another reason)"])
+        self.assertEqual(self.sends(), [])
 
     def test_no_sign_and_a_model_already_working_skips_without_a_model_run(self):
         self.outage(meta=None)
