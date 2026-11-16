@@ -4272,3 +4272,21 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
        is a decision for this file.
     8. **Issue #1's text is corrected** (the delegate's call): the thought record is filed under programs, and
        boundary setting and conflict resolution are named, in the order the packages above give.
+
+- **ESCALATE-WORDING (2026-11-15) — nothing promises an escalation to `guard.escalate_to` (#42, finding 4, its first
+  half; the owner, 2026-11-15).** Three places promised that the person named in `guard.escalate_to` would be asked
+  or would look into it: the guard's refusal (`guard.refusal`: "or ask {escalate_to} to look into it"), the skill
+  (`hermes.skill_tokens`: "or offer to ask {escalate_to}" when something looks broken, "ask {escalate_to}" for
+  changing times or questions) and a slash command that failed (`commands._failed`: "{escalate_to} can look into
+  it"). Nothing carries a message to that person: the companion has no tool for it, and the journal's chat is his
+  personal chat. Each now names them as who looks after the setup and asks for nothing: the refusal and the skill
+  say "tell {user} what you saw; {escalate_to} looks after the setup", the change line "tell {user} what to change
+  ({escalate_to} looks after the setup)", and a failed command "{escalate_to} looks after the setup; `journal
+  doctor` can say why" (the doctor hint now stands in both cases). With `escalate_to` empty the person is not
+  mentioned, as before. Names come from config. `test_escalate_wording.py` checks every place, with the person set
+  and unset, against a list of promising words. **Tests changed on purpose:** `test_hermes.py`'s rendered skill and
+  `test_engine.py`'s `test_refusal_names_people_from_config` expected the old phrases and now expect the new. No golden,
+  built-in or install-scan pattern is touched.
+  - **Next, its own package (decided, not built here):** a real route, a companion tool that files a short report
+    for the operator's ops channel, refused under `/x`, at most one a day. When it lands, the wording can point to
+    it.

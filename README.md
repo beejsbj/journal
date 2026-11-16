@@ -147,7 +147,7 @@ Minimal config:
 | `guard.block_execute_code` | `false` | Refuse the `execute_code` tool entirely. |
 | `guard.restrict_hermes_cli` | `true` | Allow only `hermes chat`, `cron list/status/runs`, `status`, `version` from the terminal tool. |
 | `guard.block_system_commands` | `true` | Refuse `systemctl`, `crontab`, `loginctl`, `journalctl --vacuum`. |
-| `guard.escalate_to` | `""` | Who the companion offers to ask when something looks broken. |
+| `guard.escalate_to` | `""` | Who looks after the setup: named when something looks broken (in the guard's refusal, the skill, a command that failed). Nothing sends them a message. |
 | `prompts.reading_guidance` | "older entries in `<root>`…" | Where the companion should read before an opener or a reply. |
 | `entries.frontmatter_source` | `journal` | The `source:` value in each entry's front matter. |
 | `audio.transcribe` | `true` | Transcribe audio files and recordings sent as documents (voice notes are always transcribed by the gateway). The tick does it, a few minutes after capture. |

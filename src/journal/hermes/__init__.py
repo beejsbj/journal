@@ -91,8 +91,10 @@ def skill_tokens(names: jconfig.Names, cfg) -> dict[str, str]:
         "reading_guidance": reading or "Good places to look: older entries in the journal folder, and anything "
                                        "else your read-only tools can reach.",
         "config_location": where,
-        "ask_for_changes": f"ask {esc}" if esc else f"tell {names.user or 'the user'} what to change",
-        "escalate": f", or offer to ask {esc}" if esc else "",
+        # ``escalate_to`` is named, never sent to: nothing carries a message to them, so nothing promises one (#42)
+        "ask_for_changes": f"tell {names.user or 'the user'} what to change"
+                           + (f" ({esc} looks after the setup)" if esc else ""),
+        "escalate": f"; {esc} looks after the setup" if esc else "",
         "collapse_hours": f"{cfg.collapse_hours:g}" if cfg else "6",
         "annotate_minutes": str(cfg.annotate_after_minutes) if cfg else "20",
         "quiet_minutes": f"{jconfig.quiet_minutes(cfg):g}" if cfg else "45",

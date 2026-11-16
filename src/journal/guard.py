@@ -46,9 +46,10 @@ _SYSTEM = re.compile(r"\b(systemctl|crontab|loginctl|journalctl\s+--vacuum)\b")
 def refusal(cfg: Config) -> str:
     n = cfg.names
     esc = (cfg.guard.get("escalate_to") or "").strip()
-    ask = f", or ask {esc} to look into it" if esc else ""
+    # (nothing carries a message to ``escalate_to``: name who looks after the setup, promise no escalation; #42)
+    who = f"; {esc} looks after the setup" if esc else ""
     return (f"Blocked by the journal guard: {n.companion} doesn't change Hermes settings, cron jobs, skills, "
-            f"plugins, model routing, or the journal engine. Tell {n.user or 'the user'} what you found{ask}.")
+            f"plugins, model routing, or the journal engine. Tell {n.user or 'the user'} what you found{who}.")
 
 
 def _real(p) -> str:

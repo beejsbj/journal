@@ -234,7 +234,7 @@ class GuardTest(unittest.TestCase):
     def test_refusal_names_people_from_config(self):
         msg = guard.check(self.cfg, "cronjob_manage", {"action": "create"})
         self.assertIn("Ada doesn't change Hermes settings", msg)
-        self.assertIn("Tell Sam what you found, or ask the operator", msg)
+        self.assertIn("Tell Sam what you found; the operator looks after the setup.", msg)
 
     def test_defaults_are_gentler_and_can_be_disabled(self):
         cfg = Config(root=Path("/tmp/j"), state_dir=Path("/tmp/state"))

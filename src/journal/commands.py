@@ -106,9 +106,9 @@ def routed_program(text: str) -> str | None:
 # --- what the commands do ------------------------------------------------------------------------------------------
 
 def _failed(cfg: Config, what: str, e: Exception) -> str:
-    who = (cfg.guard.get("escalate_to") or "").strip()
-    return (f"Couldn't {what} ({type(e).__name__})." + (f" {who} can look into it." if who else
-                                                         " `journal doctor` can say why."))
+    who = (cfg.guard.get("escalate_to") or "").strip()  # named, never sent to: nothing carries a message (#42)
+    return f"Couldn't {what} ({type(e).__name__})." + (f" {who} looks after the setup;" if who else "") \
+        + " `journal doctor` can say why."
 
 
 def send_practice(cfg: Config, pid: str, spawn: Spawn) -> str:
