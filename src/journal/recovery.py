@@ -219,7 +219,7 @@ def run(cfg: Config, now: datetime, log: list[str], db: Path | None = None) -> N
     if rec.get("text"):  # written earlier; only the send failed
         _send(cfg, rec, now, log)
         return
-    if outage.waiting(rec, now) and not agent.answered_this_run():
+    if outage.waiting(rec, now, cfg) and not agent.answered_this_run():
         return  # the model was unreachable moments ago; another step would have found it back
     if not rec.get("outage_seen") and agent.answered_this_run():
         _skip(cfg, rec, now, "no sign of an outage: the turn failed for another reason", log)
@@ -232,7 +232,8 @@ def run(cfg: Config, now: datetime, log: list[str], db: Path | None = None) -> N
             r = find(d, rec["id"])
             if r is not None:
                 outage.defer(r, now, str(e))
-                r["outage_seen"] = True  # the model really was unreachable
+                if outage.known(cfg) or not outage.breaker_on(cfg):
+                    r["outage_seen"] = True  # the model really was unreachable (a probe found none either)
         log.append(f"{rec['id']}: catch-up deferred, model still unreachable ({e})")
         return
     if not rec.get("outage_seen"):  # the model answered at once and no row says it had failed

@@ -19,7 +19,10 @@ Silent when there is nothing to report; prints a line per action otherwise. The 
 so the scheduler alerts, when a prompt could not be delivered after ``SEND_ATTEMPTS`` ticks, when a
 step crashed, when another bounded retry ran out, or when the model (or speech-to-text) has been
 unreachable for ``outage.ALERT_AFTER`` (once; see ``Alert`` and ``outage``). An unreachable model defers
-annotations, reflections and transcripts without using up their attempts.
+annotations, reflections and transcripts without using up their attempts; once one model run has found it, the
+outage is known to every later step and tick (``outage``'s breaker): no model run starts until a probe, a few minutes
+on and then less and less often, finds a model again. Held work then comes back in order, a few model calls a step
+and a few chat messages a tick and an hour, and a message gone stale is recorded as skipped and not sent.
 """
 from __future__ import annotations
 
@@ -99,7 +102,7 @@ def _opener(cfg: Config, practice: Practice | str, now_local: datetime, pid: str
             log.append(f"{pid}: opener request failed with the standing data ({type(e).__name__}); asked without it")
         query = prompts.opener_request(cfg, practice, now_local, pack, practice.bank_with_ids())
     try:
-        raw = agent.ask(cfg, query, cfg.opener_budget_seconds)
+        raw = agent.ask(cfg, query, cfg.opener_budget_seconds, trip_at_once=True)
     except agent.AgentUnavailable as e:  # an opener is never deferred: the prompt goes out on time, plain
         reason = agent.failure_reason(str(e))
         if reason and log is not None:
@@ -532,10 +535,15 @@ def process_images(cfg: Config, now: datetime, log: list[str]) -> None:
     description is a nicety, not something the tick should fail over."""
     if not images.describing(cfg) or cfg.agent.get("enabled") is False:
         return
+    limit, asked = outage.per_tick(cfg), 0  # (the paced catch-up: oldest first, a few a tick)
     for p in ledger.snapshot(cfg.ledger_path)["prompts"]:
+        if asked >= limit:
+            break
         entry = Path(p.get("entry_path") or "")
         for i, c in enumerate(p.get("captures") or []):
-            if c.get("describe") != "pending" or not c.get("images") or outage.waiting(c, now):
+            if asked >= limit:
+                break
+            if c.get("describe") != "pending" or not c.get("images") or outage.waiting(c, now, cfg):
                 continue
             done = list(c.get("described") or [])
             wanted = [n for n in c["images"] if images.describable(n)]  # (HEIC is kept, but cannot be handed over)
@@ -546,6 +554,11 @@ def process_images(cfg: Config, now: datetime, log: list[str]) -> None:
                 path = cfg.root / name
                 if not path.is_file() or not _embedded(entry, name):
                     continue  # (gone, or he removed its block, or the entry cannot be read now: not handed over)
+                if asked >= limit:
+                    log.append(f"image descriptions: {limit} asked for this tick; the rest wait for the next "
+                               "(paced catch-up)")
+                    break
+                asked += 1
                 try:
                     text = agent.ask(cfg, images.describe_request(name), 120, toolsets="none", image=str(path))
                 except agent.AgentUnavailable as e:
@@ -588,11 +601,13 @@ def process_images(cfg: Config, now: datetime, log: list[str]) -> None:
 
 
 def annotate(cfg: Config, now: datetime, log: list[str]) -> None:
-    """Write the companion's annotations. A model that cannot be reached defers the entry (retried at most
-    every 30 minutes, up to 7 days, no attempt used); a bad answer from a reachable model uses an attempt."""
+    """Write the companion's annotations, oldest first, at most ``recovery.catchup_per_tick`` a tick. A model that
+    cannot be reached defers the entry (retried at most every 30 minutes, up to 7 days, no attempt used; while the
+    breaker holds, at no cost and the moment a model answers); a bad answer from a reachable model uses an attempt."""
     alerts: list[str] = []
     snap = ledger.snapshot(cfg.ledger_path)
     asked: set[Path] = set()  # a session's phase prompts share one entry: ask about it once a tick
+    limit = outage.per_tick(cfg)  # (the paced catch-up: oldest first, a few a tick)
     for p in snap["prompts"]:
         path = Path(p.get("entry_path") or "")
         if not p.get("captures") or not path.is_file() or p.get("annotate_attempts", 0) >= ANNOTATE_ATTEMPTS:
@@ -608,11 +623,14 @@ def annotate(cfg: Config, now: datetime, log: list[str]) -> None:
         first = datetime.fromisoformat(p["captures"][0]["at"])
         if now - first < timedelta(minutes=cfg.annotate_after_minutes):
             continue
-        if outage.waiting(p, now):
+        if outage.waiting(p, now, cfg):
             continue
         body = path.read_text(encoding="utf-8")
         if not entries.annotations_pending(body):
             continue
+        if len(asked) >= limit:
+            log.append(f"annotations: {limit} asked for this tick; the rest wait for the next (paced catch-up)")
+            break
         # her next chat reply aligns the annotations with a chat answer; words saved on a face have none, and the
         # chat after them is unrelated (OPEN-PROMPTS rule 9)
         reply = context.companion_reply_after(cfg, first, chat_id=p.get("chat_id"), platform=channel.platform_of(p)) \
@@ -706,17 +724,52 @@ def _skip_annotation_replies(cfg: Config, now: datetime, log: list[str]) -> None
         log.append(f"no chat: {skipped} annotation repl{'y' if skipped == 1 else 'ies'} skipped (in the entries)")
 
 
+def _newest_words(p: dict) -> datetime | None:
+    """When his newest words in a prompt's captures were written (what an annotation reply answers)."""
+    times = []
+    for c in p.get("captures") or []:
+        try:
+            times.append(datetime.fromisoformat(c["at"]))
+        except (KeyError, TypeError, ValueError):
+            continue
+    return max(times, default=None)
+
+
+def _skip_stale_reply(cfg: Config, p: dict, now: datetime, newest: datetime, log: list[str]) -> None:
+    """An annotation reply that would come more than ``recovery.stale_hours`` after his words is not sent: it is
+    marked skipped, ``stale``, and stays in the entry (after an outage, or a tick that did not run)."""
+    with ledger.locked(cfg.ledger_path) as data:
+        q = ledger.find(data, p["id"])
+        if q is None:
+            return
+        q.setdefault("annotation_reply", {}).update(skipped="stale", skipped_at=now.isoformat())
+    hours = (now - newest).total_seconds() / 3600
+    log.append(f"{p['id']}: annotation reply not sent: stale ({hours:.0f} h after {cfg.names.possessive} words; "
+               "the annotations are in the entry)")
+
+
 def reply_annotations(cfg: Config, now: datetime, log: list[str]) -> None:
     """Send each new annotation to the chat as a reply to the message it annotates (as a message of its own where the
-    platform has no replies, or the prompt was made on another platform); exactly once."""
+    platform has no replies, or the prompt was made on another platform); exactly once.
+
+    Oldest first, within the chat's pace (``outage.chat_room``: a few a tick, a few an hour; the rest wait for a later
+    tick), and never later than ``recovery.stale_hours`` after his words (``_skip_stale_reply``)."""
     if not cfg.has_channel:   # (also with replies switched off: turned on later, they must not send the backlog)
         _skip_annotation_replies(cfg, now, log)
         return
     if not cfg.telegram.get("annotation_replies", True):
         return
     chat = None
-    for p in ledger.snapshot(cfg.ledger_path)["prompts"]:
-        if not _reply_owed(p):
+    owed = [p for p in ledger.snapshot(cfg.ledger_path)["prompts"] if _reply_owed(p)]
+    owed.sort(key=lambda p: _newest_words(p) or datetime.fromisoformat(p.get("annotated_at") or now.isoformat()))
+    room, waiting = outage.chat_room(cfg, now), 0
+    for p in owed:
+        newest = _newest_words(p)
+        if newest is not None and now - newest > outage.stale_after(cfg):
+            _skip_stale_reply(cfg, p, now, newest, log)
+            continue
+        if room <= 0:
+            waiting += 1
             continue
         path = Path(p.get("entry_path") or "")
         text = entries.annotations(path.read_text(encoding="utf-8")) if path.is_file() else ""
@@ -744,12 +797,15 @@ def reply_annotations(cfg: Config, now: datetime, log: list[str]) -> None:
                 r["attempts"] = r.get("attempts", 0) + 1
                 r["error"] = (error or "")[:300]
         if mid:
+            room -= 1
             log.append(f"replied to {p['id']} with its annotations")
             what = (f"{cfg.names.companion}'s annotations on {Path(p.get('entry_path') or p['id']).stem}, sent at "
                     f"{mirror.stamp(cfg, now)} as a reply to {cfg.names.possessive} entry")
             mirror.to_chat(cfg, what, text, log, ref=("prompts", p["id"], "annotation_reply"))
         else:
             log.append(f"{p['id']}: annotation reply failed ({error})")
+    if waiting:
+        log.append(outage.pace_note(cfg, waiting, "annotation repl" + ("y" if waiting == 1 else "ies")))
 
 
 def _reflect(cfg: Config, now: datetime, log: list[str]) -> None:
@@ -869,6 +925,19 @@ def _held_off_record(cfg: Config, now: datetime, only: str, log: list[str]) -> b
     return True
 
 
+def _outage_news(cfg: Config, before: dict | None) -> list[str]:
+    """A line when the breaker opened or closed during this run (``outage``), for ``last-tick.json`` and the log."""
+    after = outage.known(cfg)
+    if after and not before:
+        return [f"model outage: no model answered ({after.get('last_error')}); model work is held until a probe "
+                "answers, and prompts go out with the plain opener"]
+    if before and not after:
+        down = outage._when(before, "down_since")
+        since = down.astimezone(cfg.tz).strftime("%-d %b %H:%M %Z") if down else "?"
+        return [f"model outage over: a model answered again (down since {since}); held work catches up, paced"]
+    return []
+
+
 def files_as_error(line: str) -> bool:
     """Whether a step's log line also goes to ``errors.jsonl``: one that says something failed, and a row the sweep
     withheld from his words (``sweep.WITHHELD``), which someone should look at."""
@@ -914,6 +983,7 @@ def run(cfg: Config, only: str | None = None, dry_run: bool = False,
                       ("mirror", lambda: mirror.flush(cfg, now, log)),
                       ("cache", lambda: today.refresh(cfg, now, log)), ("prune", lambda: prune(cfg, now)),
                       ("notebook", lambda: notebook.sweep(cfg, now))]
+        down = outage.known(cfg)  # (before and after: a line when this run found an outage, or saw one end)
         for name, step in steps:
             try:
                 step()
@@ -925,6 +995,7 @@ def run(cfg: Config, only: str | None = None, dry_run: bool = False,
                 broken += 1
                 log.append(f"error: {name}: {type(e).__name__}: {e}")
                 errors.append(f"{name}: {type(e).__name__}: {e}")
+        log.extend(_outage_news(cfg, down))
         errors += [l for l in log if files_as_error(l) and l not in errors]
         # Exit 1 (so the scheduler's failure delivery fires) for an alert or a step that crashed.
         # Retryable soft failures ("fold failed", a reply that will be retried) stay exit 0.

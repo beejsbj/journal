@@ -3999,6 +3999,92 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   what her memory holds can come back in the journal's model calls. This also answers WEB-DESIGN's open point
   about openers (the one-shot does load her memory). Nothing in the code changes. To revisit: either of the two
   ways above, or a Hermes switch that drops memory without dropping her persona file, if one appears.
+- **OUTAGES (2026-11-15) — a breaker across ticks, and a paced catch-up (#42, findings 1 and 2).** Confirmed on
+  main first. Each step already deferred its own record on an outage (`outage.py`: retried at most every 30 minutes,
+  no attempt used) and stopped at the first one in a tick, but nothing knew of the outage beyond one process
+  (`agent._answered`): every step of every tick found it again with a run of its own, each held record on its own
+  30-minute clock, so with a few entries waiting a run started on nearly every tick (seven in an hour for three
+  annotations alone; `test_outage_breaker.py`, `TickUnderOutageTest`), every opener ran the model and waited out its
+  failure, and program reflect phases and bridges asked too. When a model answered, one tick wrote every held
+  annotation and analysis and sent them all (`PacedCatchUpTest`), however late.
+  - **The breaker** (`outage.gate`, `trip`, `answered`; `recovery.breaker`, on). The state is `outage.json` in
+    `state_dir`, read and written under `ledger.locked_state`, since `journal send`, `journal program` and the tick
+    are separate processes. The seam is `agent.ask`, the one facade every model step calls, so every caller is
+    covered without changing its code: while the breaker is open it raises `outage.ModelHeld`, an
+    `AgentUnavailable`, and each caller defers as it did (an opener goes out plain at once instead of after a
+    timeout). **What opens it:** a run that timed out (except after another run answered in the same process:
+    reflect's rule, a long run and not an outage) opens it at once; a run that failed otherwise opens it only when a
+    probe run at once (`outage.confirm`) fails too. When that probe answers, the failure was the request's own (one
+    picture, a prompt too long, the vision model down while text works): nothing is held; a fault of the request's
+    (`outage.request_failed`: a 4xx other than 408 and 429, or `invalid_request_error`) comes back from `agent.ask`
+    as None, a bad answer, so the caller counts an attempt and the work ends at its attempt limit; any other failure
+    (a 5xx, a 429, an exit with no code) defers that record alone, as main did. A timeout is confirmed the same way (re-review, 2026-11-15: one request that always runs too long had
+    tripped the breaker every 35 minutes for 7 days), unless a run already answered in this process (a long run, no
+    outage). The steps that deliver to the chat (the opener, a program's reflect phase and bridge) pass
+    `trip_at_once`: any failure opens the breaker with no confirming probe, so a scheduled send goes out plain at once
+    rather than up to three minutes later; the cost is that a failure of that one request can hold other work until
+    the next probe (5 minutes). A probe that answers also closes a breaker another process opened meanwhile. **The probe:** a fixed question with no tools, no words of his and no context, on a 120 s budget
+    (`PROBE_BUDGET`, a picture's description's, the smallest of the deferred steps; a bridge's 60 s falls back to its
+    template; the run gets a minute more), run by the next
+    ask once it is due: 5 minutes after the outage was found, then 10, 20 and every 30 (`probe_after_minutes`,
+    `probe_max_minutes`; the 30 matches the records' own retry); a next probe time further off than
+    `probe_max_minutes` (the clock was set back) is due. Any answer, even an empty one, is a model that answered; then the ask that probed goes on
+    with its own run. A probe is claimed under the lock (the next probe time is moved first), so two processes never
+    probe at once. **A held ask is no try:** `outage.defer` keeps `last_deferred_at` and the first `defer_error`, so
+    the record is free the moment a model answers (no 30-minute wait after the outage ends) and the alert after 6
+    hours and the give-up after 7 days count from `deferred_since` as before. The record whose own run found the
+    outage is no different (`outage.waiting(rec, now, cfg)` reads the breaker: a try after `down_since` does not wait
+    while it is open, and a try before the last `answered_at` does not wait once it closed), so the work comes back
+    oldest first. `reflect.run` goes on past a held ask (it ran nothing and is not counted against the pace), so
+    every due analysis gets its `deferred_since` and stays due through a long outage instead of leaving the
+    always-due window (yesterday, this week) unmarked. `failure_reason` keeps a held
+    message's reason only when it has the shape of its own output (`agent._MADE`), else says `held`. `journal
+    status` shows the outage; the tick's log has a line when it begins and ends. `adapter: none` with no command
+    (`NoCompanion`) opens it too: nobody answers, and status saying so is right.
+  - **The paced catch-up.** Each model step (annotations, picture descriptions, day reflections and week reviews)
+    makes at most `recovery.catchup_per_tick` (2) model calls a tick, oldest first. This counts fresh work as well
+    as deferred work, on purpose: with the breaker only the first record of a step is ever tried during an outage,
+    so most held work carries no deferral mark, and a limit on marked records alone would let it all through in one
+    tick. A normal day rarely needs more than two of a kind in one tick; the third waits five minutes. It also keeps
+    a recovering tick from holding `tick.lock` for an hour (a scheduled prompt is skipped while it is held). The limit
+    is per step, not shared across steps (simpler to reason about; at most three steps' worth a tick). Program
+    syntheses and the outage catch-up reply were already one at a time and are unchanged.
+  - **What goes to the chat** (`outage.chat_room`): annotation replies and analyses go at most
+    `recovery.sends_per_tick` (2) a tick and `sends_per_hour` (4) an hour, counted from the ledger's `sent_at` of
+    those two and the catch-up replies (the catch-up counts toward the limits but is never held by them; no new state; a tick's steps share one `now`, so "this tick" is `sent_at ==
+    now`), oldest first within each kind; annotation replies go before analyses because their step runs first (the
+    two are not merged into one queue). **Stale:** one more than `recovery.stale_hours` (24) late (an annotation reply
+    after his newest words in the prompt; an analysis after its period's fallback time) is not sent: it is marked
+    `skipped: "stale"` with `skipped_at` and a log line, and stays in its file. The rule holds always, not only after
+    a model outage: a tick that did not run for a day sends nothing stale either. Staleness applies to the chat
+    only; the work itself is still written into the files up to the existing 7-day give-up (his record stays
+    complete). Prompts, interrupts and program phases are on his schedule and are neither counted nor held; the
+    catch-up reply (one per outage, its own 48-hour limit) is never held but is counted, being a message the engine
+    sends of its own. Privacy is unchanged: pacing and
+    staleness only hold back or drop sends that already existed; the probe reads no chat and sends nothing;
+    annotation replies and analyses are not prompt sends, so they end no `/x` window, as before.
+  - **The catch-up's evidence:** `recovery.run` counts its own failed run as a sign of an outage (`outage_seen`) only
+    when the breaker is open after it (a probe found no model either) or switched off; a run that failed while a
+    probe answered is no evidence, so a turn that failed for another reason gets no "I was offline" reply.
+  - **The independent review (2026-11-15)** found the first version opened the breaker on any failure (a request of
+    its own reopened it on every retry for up to 7 days), probed on 45 s while real steps had 60-300 s, trusted a
+    probe time set by a clock that later went back, held the reflect step after its first held ask, put the record
+    whose run found the outage last after recovery, set `outage_seen` on a held ask, and parsed `outage.json` outside
+    the tick's per-step guard. Each is changed as above (and `_outage_news` and `outage.probes` read a damaged file
+    as nothing).
+  - **Tests changed on purpose:** `test_outage.py`'s `AskTest` runs with the breaker off (it tests what one run
+    gives; `BreakerTest` covers the breaker), and its reflection written three days late is no longer sent (stale);
+    `test_config.py`'s no-companion test uses a temporary state dir (the breaker writes there; it used a fixed `/tmp`
+    path); after the review, the probe counts in `test_outage_breaker.py` include the probe that confirms an outage,
+    its recovery-order tests expect the oldest first, and `test_recovery.py`'s "a deferral is the evidence" opens the
+    breaker first, as the real ask does.
+  - **Open, for the owner:** whether file work should go stale too (an annotation written into an entry four days
+    late is kept now); whether the companion should be told of replies skipped as stale (the "no chat" skips are
+    counted for her by `standing.without_chat`; stale ones are not); the probe is a one-shot in her profile, so it
+    loads her memory (X-MEMORY) and leaves a session like every model step, at most about 50 a day in a full-day
+    outage, plus one each time a run fails while the breaker is shut; an annotation whose run fails with a provider
+    error while the probe answers is deferred and alerted as "unreachable" after 6 hours, the wording main used. Findings 3 (annotations wait from the first capture, not for quiet) and 4 (`guard.escalate_to` leads
+    nowhere) are confirmed on main and stay open in #42 for their own pull requests.
 
 - **PROGRAM-KINDS (the owner, 2026-11-10) — two kinds, practice and program; "situational" is no longer a kind**
   (issue #1). Decided in conversation. Recorded here with what the code on `main` does today (read at `0d46f1b`, after

@@ -117,7 +117,17 @@ DEFAULTS: dict[str, Any] = {
         "week": {"enabled": True, "fallback_time": "04:00"},  # after the weekly entry is annotated, else the day after
     },
     "sweep": {"enabled": True, "lookback_hours": 48},  # capture replies the gateway hook missed (busy path)
-    "recovery": {"enabled": True, "max_age_hours": 48},  # one catch-up reply after a model outage left him unanswered
+    "recovery": {                  # after a model outage
+        "enabled": True,           # one catch-up reply when the outage left his chat messages unanswered
+        "max_age_hours": 48,       # older messages get no reply, only a note in her chat session
+        "breaker": True,           # an outage, once found, holds model work (across ticks) until a probe answers
+        "probe_after_minutes": 5,  # the first probe; each failed one doubles the wait
+        "probe_max_minutes": 30,   # up to this
+        "catchup_per_tick": 2,     # model calls per step per tick (annotations, pictures, reflections), oldest first
+        "sends_per_tick": 2,       # annotation replies and analyses sent to the chat per tick
+        "sends_per_hour": 4,       # and per hour; the rest wait for a later tick
+        "stale_hours": 24,         # later than this (after his words, or an analysis's time), not sent: in the file
+    },
     "capture": {                   # what gets journaled (capture_mode): "everything" or "arm"
         "mode": "everything",      # everything: every chat thread; arm: prompt replies, /j notes, program answers
     },                             # and the conversation after them, never ordinary chat

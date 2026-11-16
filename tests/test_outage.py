@@ -30,6 +30,7 @@ class AskTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.cfg = make_cfg(Path(self.tmp.name))
+        self.cfg.recovery["breaker"] = False  # what one run gives; what the breaker makes of it is BreakerTest's
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -377,7 +378,10 @@ class ReflectOutageTest(ReflectBase):
         rec = self.rec("2026-10-14-reflection")
         self.assertEqual(rec["attempts"], 1)
         self.assertNotIn("deferred_since", rec)
-        self.assertEqual(len(self.bot.calls), 1)
+        # written into its file, but not sent: two days past its time is stale for the chat (OUTAGES)
+        self.assertEqual(self.bot.calls, [])
+        self.assertEqual(rec["telegram"]["skipped"], "stale")
+        self.assertIn("2026-10-14-reflection: not sent: stale (54 h past its time; in its file)", log)
 
     def test_a_bad_answer_still_uses_an_attempt(self):
         self.evening()

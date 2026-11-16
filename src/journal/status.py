@@ -55,6 +55,21 @@ def next_occurrences(cfg: Config, now_local: datetime) -> dict[str, str]:
     return out
 
 
+def _model_outage(cfg: Config) -> dict | None:
+    """The outage the breaker holds model work for (``outage.known``), in local time; None when there is none."""
+    st = outage.known(cfg)
+    if st is None:
+        return None
+
+    def local(key: str) -> str:
+        try:
+            return datetime.fromisoformat(st[key]).astimezone(cfg.tz).strftime("%-d %b %H:%M %Z")
+        except (KeyError, TypeError, ValueError):
+            return "?"
+    return {"since": local("down_since"), "error": st.get("last_error") or "model unreachable",
+            "probes": outage.probes(st), "next_probe": local("next_probe_at")}
+
+
 def status(cfg: Config, now: datetime | None = None, *, web: bool = False) -> dict:
     """What the journal is doing. ``web``: for ``journal serve``, leave out everything read from the chat side
     (the privacy pass, ``conversations.json``, the mirror queue, the notebook, the hook's records), which no web
@@ -112,6 +127,7 @@ def status(cfg: Config, now: datetime | None = None, *, web: bool = False) -> di
         "pending_annotations": pending_ann,
         "pending_annotation_replies": pending_reply,
         "deferred": waiting,
+        "model_outage": _model_outage(cfg),
         "undelivered": failed,
         "reflections": _reflections(cfg, data),
         "sweep": _read_json(cfg.state_dir / "sweep.json"),
@@ -267,6 +283,10 @@ def format_status(s: dict) -> str:
         lines.append("Annotation replies not yet sent: " + ", ".join(
             f"{r['id']} ({r['attempts']} tries{': ' + r['error'] if r.get('error') else ''})"
             for r in s["pending_annotation_replies"]))
+    if s.get("model_outage"):
+        o = s["model_outage"]
+        lines.append(f"Model outage known since {o['since']} ({o['error']}): model work is held; "
+                     f"{o['probes']} probe(s) so far, the next at {o['next_probe']}")
     if s.get("deferred"):
         lines.append("Deferred by an outage (model or speech-to-text): " + ", ".join(
             f"{d['id']} {d['what']} ({d['detail']})" for d in s["deferred"]))

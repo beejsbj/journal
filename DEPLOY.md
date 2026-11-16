@@ -16,6 +16,39 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## OUTAGES — a breaker across ticks and a paced catch-up (2026-11-15; tick and hook side, and serve for its status; **gateway restart required, in a window**; new optional settings `recovery.*`; one new state file)
+
+**What changes.** Once a model run finds no model (a failure is confirmed by a probe first, except in the steps that send to the chat, which trip at once), the
+outage is known to every later step and tick (`<state dir>/outage.json`): no model run starts (openers go out plain at once; annotations, descriptions,
+reflections and syntheses defer as before, without spending a try) until a probe, a short question with no tools,
+answers: 5 minutes after the outage was found, then 10, 20 and every 30. When a model is back, each step makes at most
+two model calls a tick, oldest first, and annotation replies and analyses go to the chat at most two a tick and four
+an hour; one more than 24 hours late is not sent (recorded as `skipped: "stale"`, kept in its file). Prompts,
+interrupts and program phases are not held. DECISIONS.md, OUTAGES.
+**Side and restart.** `agent.py`, `outage.py`, `reflect.py`, `recovery.py`, `programs.py`, `config.py`, `status.py`,
+`tick.py` and `plugin.yaml`.
+The gateway imports `agent`, `outage`, `reflect` and `config` at load (the import list in the table above), and
+model steps can run in processes the gateway spawns, so: move the plugin pin and the CLI to the merge sha, then
+`hermes gateway restart` in a window. The tick takes the new code at its next run. The web app's status
+(`status.status`, which serve imports) gains `model_outage`, so `journal-serve` shows it only after `uv tool install
+--force` at the merge sha and `systemctl --user restart journal-serve`; until then the web status simply lacks it.
+**Config.** None needed: the defaults are `recovery.breaker: true`, `probe_after_minutes: 5`, `probe_max_minutes: 30`,
+`catchup_per_tick: 2`, `sends_per_tick: 2`, `sends_per_hour: 4`, `stale_hours: 24` (README *Configure*).
+`recovery.breaker: false` turns the breaker off without a rollback (every step asks on its own again; an
+`outage.json` left behind is then ignored).
+**State.** `outage.json` (and `outage.lock`) appear in the state dir at the first outage. Closed, the file keeps only
+`last` (when the last outage ran). Deleting it closes the breaker. Ledger records gain `skipped: "stale"` on an
+annotation reply or an analysis's send: code before this release reads any `skipped` as "do not send", so a rollback
+sends none of them.
+**First checks.** After the restart: `journal status` has no "Model outage known" line (with a model up), and the
+next tick's `last-tick.json` has no `error:` line. With a model down (no need to cause one), `journal status` says
+"Model outage known since …" and the tick's log has `model outage: no model answered (…)` once, then no model run
+until a probe; when it ends, `model outage over: a model answered again (…)`. Receipts as usual: the vault checksum
+before and after.
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
+previous sha), then `hermes gateway restart`. `outage.json` is ignored by the old code; remove it if wanted. Nothing
+else to undo.
+
 ## WEB-UX — the web app on its design system (2026-11-10; serve side only; no gateway restart; no config or state change)
 
 **What changes.** The web app's whole look and its write surface: the round-02 design system (`design/DESIGN.md`,

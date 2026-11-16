@@ -195,7 +195,7 @@ def _trigger(cfg: Config, data: dict, kind: str, end: date, ritual_id: str | Non
     rec = find(data, record_id(kind, end.isoformat()))
     if rec and (rec.get("written_at") or rec.get("attempts", 0) >= ATTEMPTS or rec.get("skipped")):
         return None
-    if rec and outage.waiting(rec, now_local):  # an outage was found moments ago: not again yet
+    if rec and outage.waiting(rec, now_local, cfg):  # an outage was found moments ago: not again yet
         return None
     since = data.get("reflections_since")
     if since:  # yesterday's day may still be reflected on the first run; no older day, no older week
@@ -464,8 +464,9 @@ def _outage(cfg: Config, rid: str, kind: str, end: date, now: datetime, detail: 
 
 
 def write_one(cfg: Config, kind: str, end: date, trigger: str, now: datetime,
-              log: list[str]) -> tuple[str | None, bool]:
-    """Try once to write one analysis. Returns (alert message or None, whether the model was unreachable).
+              log: list[str]) -> tuple[str | None, bool | str]:
+    """Try once to write one analysis. Returns (alert message or None, whether the model was unreachable:
+    ``outage.HELD`` when the breaker held the ask and nothing ran).
 
     An unreachable model defers the analysis without using an attempt; a bad answer uses one."""
     from .tools import READ_TOOLSET
@@ -488,7 +489,7 @@ def write_one(cfg: Config, kind: str, end: date, trigger: str, now: datetime,
                         env=None if plain else {search.UPTO_ENV: upto})
     except agent.AgentUnavailable as e:
         if not (str(e).startswith("timed out") and agent.answered_this_run()):
-            return _outage(cfg, rid, kind, end, now, str(e), log), True
+            return _outage(cfg, rid, kind, end, now, str(e), log), outage.HELD if outage.held(str(e)) else True
         raw, timed_out = None, str(e)  # a long run, not an outage: the model answered another step in this tick
     text, followups = notebook.split_followups(raw or "")
     ok, reason, rejected = False, timed_out or "agent failed", None
@@ -564,9 +565,17 @@ def send(cfg: Config, now: datetime, log: list[str]) -> list[str]:
     if not cfg.has_channel:
         _skip(cfg, now, log)
         return alerts  # no chat: the analysis is in its file, and nothing is attempted (OPEN-PROMPTS rule 6)
-    for rec in ledger.snapshot(cfg.ledger_path).get("reflections") or []:
+    owed = [r for r in ledger.snapshot(cfg.ledger_path).get("reflections") or [] if _owed(r)]
+    owed.sort(key=lambda r: (r.get("local_date") or "", r.get("kind") != "reflection"))  # oldest first, the day first
+    room, waiting = outage.chat_room(cfg, now), 0
+    for rec in owed:
         tg = rec.get("telegram") or {}  # (the record's name for its send, whatever the platform)
-        if not _owed(rec):
+        late = _lateness(cfg, rec, now)
+        if late is not None and late > outage.stale_after(cfg):
+            _skip_stale(cfg, rec, now, late, log)
+            continue
+        if room <= 0:
+            waiting += 1
             continue
         path = Path(rec.get("path") or "")
         error, mid, title, body = None, None, "", ""
@@ -595,22 +604,56 @@ def send(cfg: Config, now: datetime, log: list[str]) -> list[str]:
                     alerts.append(f"{rec['id']} could not be sent to {where} after {t['attempts']} attempts: {error}")
         log.append(f"sent {rec['id']} to {where}" if mid else f"{rec['id']}: {where} send failed ({error})")
         if mid:
+            room -= 1
             mirror.to_chat(cfg, f"{title}, sent at {mirror.stamp(cfg, now)}", body, log,
                            ref=("reflections", rec["id"], "telegram"))
+    if waiting:
+        log.append(outage.pace_note(cfg, waiting, "analys" + ("is" if waiting == 1 else "es")))
     return alerts
 
 
+def _lateness(cfg: Config, rec: dict, now: datetime) -> timedelta | None:
+    """How long after its fallback time (the latest it is written on a normal night) an analysis would be sent."""
+    try:
+        end = date.fromisoformat(rec["local_date"])
+        kind = rec.get("kind") or "reflection"
+        return now - _at(cfg, end + timedelta(days=1), _fallback_time(cfg, kind))
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _skip_stale(cfg: Config, rec: dict, now: datetime, late: timedelta, log: list[str]) -> None:
+    """An analysis more than ``recovery.stale_hours`` past its fallback time is not sent (after an outage, or a tick
+    that did not run): it is marked skipped, ``stale``, and stays in its file."""
+    with ledger.locked(cfg.ledger_path) as data:
+        q = find(data, rec["id"])
+        if q is None:
+            return
+        q.setdefault("telegram", {}).update(skipped="stale", skipped_at=now.isoformat())
+    log.append(f"{rec['id']}: not sent: stale ({late.total_seconds() / 3600:.0f} h past its time; in its file)")
+
+
 def run(cfg: Config, now: datetime, log: list[str]) -> list[str]:
-    """One pass: write what is due (one attempt each; none once the model is found unreachable), then send.
-    Returns alert messages."""
+    """One pass: write what is due (one attempt each, oldest first, at most ``recovery.catchup_per_tick``; none once the
+    model is found unreachable), then send. Returns alert messages. While the breaker holds, every due analysis is
+    deferred (a held ask runs nothing), so each keeps its ``deferred_since`` and stays due until it is written or the
+    outage outlasts ``outage.GIVE_UP_AFTER``: a period that leaves the always-due window (yesterday, this week) during
+    a long outage is not dropped without a word."""
     alerts = []
     if not ledger.snapshot(cfg.ledger_path).get("reflections_since"):
         with ledger.locked(cfg.ledger_path) as data:  # the first run starts the clock: no backlog of old periods
             data.setdefault("reflections_since", now.astimezone(cfg.tz).date().isoformat())
+    limit, asked = outage.per_tick(cfg), 0  # (the paced catch-up: oldest first, a few a tick)
     for kind, end, trigger in due(cfg, ledger.snapshot(cfg.ledger_path), now.astimezone(cfg.tz)):
+        if asked >= limit:
+            log.append(f"analyses: {limit} asked for this tick; the rest wait for the next (paced catch-up)")
+            break
         msg, down = write_one(cfg, kind, end, trigger, now, log)
         if msg:
             alerts.append(msg)
+        if down == outage.HELD:  # nothing ran: the next is deferred too, at no cost
+            continue
+        asked += 1
         if down:  # the model is unreachable for the rest of this tick too; don't wait out another timeout
             break
     return alerts + send(cfg, now, log)

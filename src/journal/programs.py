@@ -470,7 +470,7 @@ def _construction(cfg: Config, prog: Program, run: dict, s: int, p: int, log: li
     session = prog.session(s)
     query = prompts.reflect_phase_request(cfg, prog, session, session.phase(p), his)
     try:
-        raw = agent.ask(cfg, query, REFLECT_BUDGET, toolsets="none")
+        raw = agent.ask(cfg, query, REFLECT_BUDGET, toolsets="none", trip_at_once=True)
     except agent.AgentUnavailable as e:
         log.append(f"{run['id']}: session {s} phase {p}: reflect text unavailable ({e}); template sent")
         return None, "skipped (no model)"
@@ -490,7 +490,8 @@ def _bridge(cfg: Config, prog: Program, run: dict, s: int, p: int, log: list[str
     if not last.strip():
         return ""
     try:
-        raw = agent.ask(cfg, prompts.bridge_request(cfg, prog, prog.session(s), last), 60, toolsets="none")
+        raw = agent.ask(cfg, prompts.bridge_request(cfg, prog, prog.session(s), last), 60, toolsets="none",
+                        trip_at_once=True)
     except agent.AgentUnavailable:
         return ""
     ok, why = validate.check_bridge(raw, last)
@@ -2077,7 +2078,7 @@ def synthesize(cfg: Config, run_id: str, now: datetime, log: list[str], *, quiet
     Returns the alerts to raise (empty when none)."""
     run = find_run(cfg, run_id)
     syn = (run or {}).get("synthesis") or {}
-    if run is None or syn.get("status") != "pending" or outage.waiting(syn, now):
+    if run is None or syn.get("status") != "pending" or outage.waiting(syn, now, cfg):
         return []
     prog = _program(cfg, run["program"])
     if not _wants_synthesis(cfg, prog):  # asked for when it was compiled, switched off since
