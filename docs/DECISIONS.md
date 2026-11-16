@@ -4311,3 +4311,24 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   - **Next, its own package (decided, not built here):** a real route, a companion tool that files a short report
     for the operator's ops channel, refused under `/x`, at most one a day. When it lands, the wording can point to
     it.
+
+- **STALE-COUNT (2026-11-15) — the companion is told how many sends were skipped as too late (the owner,
+  2026-11-15, on the question OUTAGES left open; #42).** OUTAGES skips an annotation reply or a reflection send more
+  than `recovery.stale_hours` late (`skipped: "stale"`), and nothing told her, so a reply she had "written" never
+  reached him and she could not say so. As for the "no chat" skips (OPEN-PROMPTS decision 3, `standing.without_chat`),
+  `standing.too_late` counts them for her where things stand: the pack ("- After an outage: 3 replies to his entries
+  and 1 reflection weren't sent, too late; they are in the entries.") and the today block (the same, short). Counts
+  only: no entry id, no words of his or hers is read or shown (the marks are read from the ledger). The pronoun comes
+  from config.
+  - **Which skips, for how long:** those whose `skipped_at` is within a day of now (`STALE_SHOWN`, as
+    `NO_CHAT_SHOWN`). The skips come in the ticks right after an outage ends, so the line is in the first openers and
+    the first threads' today blocks after it, then goes, and an older outage's skips are not said again. A
+    `skipped_at` more than five minutes ahead of now (a clock error, `_FUTURE`) or unreadable is not counted; a
+    count that cannot be made costs the line, never the pack.
+  - **Wording, the delegate's call:** "replies to his entries" for annotation replies (the owner's own example), and
+    "after an outage" though the stale rule also holds for a tick that did not run for a day (that is an outage of the
+    engine). The later catch-up message (the owner's decision 1 on #42: one message when the model is back, in place
+    of late replies) will change what goes stale; this count stays the record of what did not go.
+  - **Fences:** `standing.py` gains no import; serve and mcp do not import it (`test_serve_fence.py`,
+    `test_mcp_fence.py` pass unchanged). Tested in `test_standing_stale.py` and, end to end through
+    `tick.reply_annotations` and `reflect.send`, in `test_outage_breaker.py`.

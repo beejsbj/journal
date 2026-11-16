@@ -16,6 +16,23 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## STALE-COUNT — the companion is told how many sends went stale (2026-11-15; tick and hook side; **gateway restart required, in a window**; no config or state change)
+
+**What changes.** For a day after an annotation reply or a reflection send is skipped as too late after an outage
+(`skipped: "stale"`, OUTAGES), the companion's context says how many: the opener's pack ("- After an outage: 3
+replies to his entries weren't sent, too late; they are in the entries.") and the today block. Counts only.
+DECISIONS.md, STALE-COUNT.
+**Side and restart.** `standing.py` alone. The tick builds the pack (it takes the new code at its next run); the
+today block is built in the gateway's `pre_llm_call` hook, and `journal.standing` is loaded when the gateway imports
+the plugin (the import list in the table above): move the plugin pin and the CLI to the merge sha, then `hermes
+gateway restart` in a window. Until the restart the openers carry the line and the today block does not. Serve and
+MCP do not import `standing`.
+**First checks.** With no stale skip in the last day (the usual case) nothing changes: the pack's "Where things
+stand" has no "After an outage" line. `last-tick.json` has no `error:` line. After an outage that skipped sends, the
+next opener's pack (`<state dir>/packs/`) has the line with the counts.
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
+previous sha), then `hermes gateway restart`. Nothing to undo in state.
+
 ## ESCALATE-WORDING — nothing promises an escalation (2026-11-15; hook side; **gateway restart required, in a window**; no config or state change)
 
 **What changes.** The guard's refusal, the companion's skill and a failed slash command no longer say the

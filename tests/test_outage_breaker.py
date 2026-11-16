@@ -10,7 +10,7 @@ from unittest import mock
 
 from helpers import CHAT, add_prompt, make_cfg, real_ask
 
-from journal import agent, capture, context, entries, ledger, outage, reflect, telegram, tick
+from journal import agent, capture, context, entries, ledger, outage, reflect, standing, telegram, tick
 from journal.config import Config
 from test_annotation_replies import FakeBot
 from test_reflect import Base as ReflectBase
@@ -513,6 +513,14 @@ class PacedCatchUpTest(BreakerBase):
         self.assertIn(f"{self.ids[0]}: annotation reply not sent: stale (26 h after his words; the annotations are "
                       "in the entry)", log)
         self.assertFalse([l for l in log if "failed" in l])  # a drop is no error
+        # STALE-COUNT: the companion is told how many, never which words (the owner, 2026-11-15)
+        stand = standing.collect(self.cfg, self.clock)
+        self.assertEqual(stand["stale"], {"annotations": 3, "reflections": 0})
+        line = "- After an outage: 3 replies to his entries weren't sent, too late; they are in the entries."
+        self.assertIn(line, standing.pack_lines(self.cfg, stand))
+        self.assertIn(line, context.build(self.cfg, self.clock, stand=stand))
+        self.assertNotIn("words 0", "\n".join(standing.pack_lines(self.cfg, stand)
+                                               + standing.today_lines(self.cfg, stand)))
 
 
 class PacedAnalysesTest(ReflectBase):
@@ -555,6 +563,10 @@ class PacedAnalysesTest(ReflectBase):
         self.assertEqual(len(self.bot.calls), 1)
         rec = reflect.find(ledger.snapshot(self.cfg.ledger_path), "2026-10-12-reflection")
         self.assertEqual(rec["telegram"]["skipped"], "stale")
+        stand = standing.collect(self.cfg, datetime(2026, 10, 16, 0, 15, tzinfo=IST))
+        self.assertEqual(stand["stale"], {"annotations": 0, "reflections": 1})
+        self.assertIn("- after an outage: 1 reflection wasn't sent, too late; it is in the entries",
+                      standing.today_lines(self.cfg, stand))
 
 
 class HeldAnalysesTest(ReflectBase):
