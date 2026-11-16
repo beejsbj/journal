@@ -331,6 +331,38 @@ class TickUnderOutageTest(BreakerBase):
         self.assertEqual(len(self.companion.runs), 1)  # no run started, so no wait for a timeout
         self.assertEqual(log, ["2026-10-14-evening: opener: plain:agent-failed: held: exit 1: 503 overloaded_error"])
 
+    def test_the_breaker_opens_mid_tick_and_holds_the_later_steps(self):
+        later = []
+
+        def reflect_step(cfg, now, log):  # a later step of the same tick asks too
+            try:
+                agent.ask(cfg, "a reflection", 300, toolsets="none")
+            except outage.ModelHeld as e:
+                later.append(str(e))
+        quiet = ("send_due", "fold", "process_audio", "process_images", "reply_annotations", "prune")
+        with mock.patch.multiple(tick, **{n: mock.DEFAULT for n in quiet}), \
+                mock.patch.multiple("journal.tick.programs", send_due_interrupts=mock.DEFAULT, step=mock.DEFAULT), \
+                mock.patch("journal.tick.privacy.update"), mock.patch("journal.tick.sweep.run"), \
+                mock.patch("journal.tick.conversations.run"), mock.patch("journal.tick.recovery.run"), \
+                mock.patch("journal.tick.mirror.flush"), mock.patch("journal.tick.today.refresh"), \
+                mock.patch("journal.tick.notebook.sweep"), mock.patch.object(tick, "_reflect", reflect_step), \
+                mock.patch("journal.tick.datetime") as dt:
+            dt.now.return_value, dt.fromisoformat = self.at(timedelta(0)), datetime.fromisoformat
+            code, log = tick.run(self.cfg)
+            self.assertEqual(later, ["held: exit 1: 503 overloaded_error"])  # no run, and no probe: none is due
+            self.assertEqual((len(self.companion.runs), len(self.companion.probes)), (1, 1))
+            self.assertIn("model outage: no model answered (exit 1: 503 overloaded_error); model work is held until "
+                          "a probe answers, and prompts go out with the plain opener", log)
+            self.assertEqual(code, 0)  # an outage is no crash: the alert comes after 6 hours
+            self.companion.down, later[:] = False, []
+            self.new_process()
+            dt.now.return_value = self.at(timedelta(minutes=5))  # the next tick: a probe is due, and answers
+            code, log = tick.run(self.cfg)
+        self.assertEqual(later, [])
+        self.assertIn("model outage over: a model answered again (down since 14 Oct 11:30 IST); held work catches "
+                      "up, paced", log)
+        self.assertEqual(len(self.companion.probes), 2)
+
     def test_back_again_held_work_resumes_at_once(self):
         tick.annotate(self.cfg, self.at(timedelta(0)), [])
         for minutes in (5, 10):
@@ -398,6 +430,29 @@ class PacedCatchUpTest(BreakerBase):
         self.assertEqual(self.replied(self.run_tick(10)), self.ids[2:4])
         self.assertEqual(self.replied(self.run_tick(35)), [])  # the hour is full
         self.assertEqual(self.replied(self.run_tick(65)), self.ids[4:])
+
+    def test_annotation_replies_and_analyses_share_the_chat_limit(self):
+        self.companion.down = False
+        self.cfg.recovery["breaker"] = False
+        path = self.cfg.root / "2026-10-13-reflection.md"
+        path.write_text("---\nkind: reflection\n---\n\n# x\n\n**What stood out** — rain.\n")
+        with ledger.locked(self.cfg.ledger_path) as data:
+            data.setdefault("reflections", []).append(
+                {"id": "2026-10-13-reflection", "kind": "reflection", "local_date": "2026-10-13", "path": str(path),
+                 "written_at": T0.isoformat(), "trigger": "annotated"})
+
+        def tick_at(minutes):
+            log = self.run_tick(minutes)
+            reflect.send(self.cfg, self.clock, log)  # the reflect step, later in the same tick
+            return log
+        first = tick_at(0)
+        self.assertEqual(len(self.replied(first)), 2)
+        self.assertIn("chat pacing: 1 analysis wait for a later tick (2 a tick, 4 an hour)", first)  # the tick's two
+        second = tick_at(5)
+        self.assertEqual(len(self.replied(second)), 2)
+        self.assertIn("chat pacing: 1 analysis wait for a later tick (2 a tick, 4 an hour)", second)  # the hour's four
+        self.assertIn("sent 2026-10-13-reflection to Telegram", tick_at(60))  # the first two left the hour
+        self.assertEqual(len([c for c in self.bot.calls if c[0] == "sendMessage"]), 6)  # five replies, one analysis
 
     def test_a_reply_gone_stale_is_not_sent_and_says_so(self):
         self.companion.down = False
