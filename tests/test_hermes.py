@@ -361,7 +361,7 @@ class RegisterTest(HermesHome):
         text = path.read_text()
         self.assertNotIn("{{", text)
         self.assertIn("How Iris converses when Theo answers", text)
-        self.assertIn("offer to ask Max", text)
+        self.assertIn("Max looks after the setup", text)
         self.assertIn(str(self.conf), text)
         self.assertTrue((path.parent / "references" / "voice-and-consent.md").is_file())
 

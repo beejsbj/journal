@@ -4273,6 +4273,45 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     8. **Issue #1's text is corrected** (the delegate's call): the thought record is filed under programs, and
        boundary setting and conflict resolution are named, in the order the packages above give.
 
+- **ANNOTATE-QUIET (2026-11-15) — annotations wait for quiet: `annotate_after_minutes` from his newest words, not his
+  first (#42, finding 3; the owner, 2026-11-15).** `tick.annotate` waited from `captures[0]["at"]`, the first
+  capture, and an annotation once written is no longer pending, so words he added after minute 20 never got one
+  (captures at +0 and +15: annotated at +20 from the first words alone). It now waits from the newest capture of any
+  prompt filed in the entry (`tick._last_words`, over the existing `_newest_words`: by time, not list order; a
+  program session's phases share one entry, so its wait runs from the last phase's words). The alignment with her
+  chat reply (`context.companion_reply_after` from the first capture, OPEN-PROMPTS rule 9) is unchanged, and so is
+  the reply's staleness (already measured from his newest words). README *Configure* and *Architecture* and the
+  skill say "after his newest words". Tested in `test_annotation_replies.py` (`AnnotateQuietTest`).
+  - **What counts as his newest words:** captures only, the replies the hook, the sweep and a face record, plus
+    the recordings and pictures `conversations.py` files on the entry's prompt. His text lines in the chat that
+    follows (written into the entry by `conversations.py`) are not captures and do not move the wait, as before.
+  - **Not built, open for the owner: words after the annotation is written.** Once an entry is annotated, later
+    words (minute 40, the next morning) still get none. Re-opening it is a design question, not this fix: the
+    annotations would be rewritten (`entries.write_annotations` replaces the section, so her earlier notes go, and
+    the guarantee is that her words are never edited on any surface; the engine rewriting them is a new case) or a
+    second set appended; the reply already sent to the chat would be followed by a second, or not; `annotated_at`,
+    `annotate_attempts` and the notebook's follow-ups would need a rule for a second round. Waiting for quiet
+    covers the common case (he writes in bursts within minutes); a later return to the entry is left to the day
+    reflection, which reads the whole entry.
+
+- **ESCALATE-WORDING (2026-11-15) — nothing promises an escalation to `guard.escalate_to` (#42, finding 4, its first
+  half; the owner, 2026-11-15).** Three places promised that the person named in `guard.escalate_to` would be asked
+  or would look into it: the guard's refusal (`guard.refusal`: "or ask {escalate_to} to look into it"), the skill
+  (`hermes.skill_tokens`: "or offer to ask {escalate_to}" when something looks broken, "ask {escalate_to}" for
+  changing times or questions) and a slash command that failed (`commands._failed`: "{escalate_to} can look into
+  it"). Nothing carries a message to that person: the companion has no tool for it, and the journal's chat is his
+  personal chat. Each now names them as who looks after the setup and asks for nothing: the refusal says "tell
+  {user} what you found; {escalate_to} looks after the setup" and the skill "… what you saw; …", the change line "tell {user} what to change
+  ({escalate_to} looks after the setup)", and a failed command "{escalate_to} looks after the setup; `journal
+  doctor` can say why" (the doctor hint now stands in both cases). With `escalate_to` empty the person is not
+  mentioned, as before. Names come from config. `test_escalate_wording.py` checks every place, with the person set
+  and unset, against a list of promising words. **Tests changed on purpose:** `test_hermes.py`'s rendered skill and
+  `test_engine.py`'s `test_refusal_names_people_from_config` expected the old phrases and now expect the new. No golden,
+  built-in or install-scan pattern is touched.
+  - **Next, its own package (decided, not built here):** a real route, a companion tool that files a short report
+    for the operator's ops channel, refused under `/x`, at most one a day. When it lands, the wording can point to
+    it.
+
 - **STALE-COUNT (2026-11-15) — the companion is told how many sends were skipped as too late (the owner,
   2026-11-15, on the question OUTAGES left open; #42).** OUTAGES skips an annotation reply or a reflection send more
   than `recovery.stale_hours` late (`skipped: "stale"`), and nothing told her, so a reply she had "written" never
