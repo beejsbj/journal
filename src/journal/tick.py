@@ -102,7 +102,7 @@ def _opener(cfg: Config, practice: Practice | str, now_local: datetime, pid: str
             log.append(f"{pid}: opener request failed with the standing data ({type(e).__name__}); asked without it")
         query = prompts.opener_request(cfg, practice, now_local, pack, practice.bank_with_ids())
     try:
-        raw = agent.ask(cfg, query, cfg.opener_budget_seconds)
+        raw = agent.ask(cfg, query, cfg.opener_budget_seconds, trip_at_once=True)
     except agent.AgentUnavailable as e:  # an opener is never deferred: the prompt goes out on time, plain
         reason = agent.failure_reason(str(e))
         if reason and log is not None:

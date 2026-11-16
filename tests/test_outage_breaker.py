@@ -146,6 +146,52 @@ class BreakerTest(BreakerBase):
                 self.ask()
         self.assertIsNone(outage.known(self.cfg))
 
+    def test_a_timeout_with_no_answer_yet_is_confirmed_by_a_probe(self):
+        # (OUTAGES re-review, medium 1) one request that always runs too long trips nothing while a probe answers
+        self.companion.down = False
+        real = self.companion.ask
+
+        def slow(query, budget, toolsets=None, image=None, env=None):
+            if query == "slow":
+                raise agent.AgentUnavailable("timed out after 240s")
+            return real(query, budget, toolsets, image, env)
+        with mock.patch.object(self.companion, "ask", slow):
+            with self.assertRaises(agent.AgentUnavailable) as cm:
+                agent.ask(self.cfg, "slow", 180, toolsets="none")
+        self.assertNotIsInstance(cm.exception, outage.ModelHeld)
+        self.assertIsNone(outage.known(self.cfg))
+        self.assertEqual(len(self.companion.probes), 1)
+        self.new_process()
+        self.assertEqual(self.ask(), DRAFT)  # nothing is held
+
+    def test_trip_at_once_opens_it_with_no_probe(self):
+        # (OUTAGES re-review, medium 2) the opener's failure goes out plain at once: no probe waited out first
+        with self.assertRaises(agent.AgentUnavailable):
+            agent.ask(self.cfg, "q", 60, trip_at_once=True)
+        self.assertEqual(self.companion.probes, [])
+        self.assertIsNotNone(outage.known(self.cfg))
+
+    def test_a_confirming_answer_closes_a_breaker_another_process_opened(self):
+        self.companion.down = False
+        real = self.companion.ask
+
+        def other_opens(query, budget, toolsets=None, image=None, env=None):
+            if query == "bad":
+                outage.trip(self.cfg, "exit 1")  # (another process found the outage meanwhile)
+                raise agent.AgentUnavailable("exit 1: Error code: 503")
+            return real(query, budget, toolsets, image, env)
+        with mock.patch.object(self.companion, "ask", other_opens):
+            with self.assertRaises(agent.AgentUnavailable):
+                agent.ask(self.cfg, "bad", 60, toolsets="none")
+        self.assertIsNone(outage.known(self.cfg))  # the probe answered: closed, not held till the next probe
+
+    def test_a_time_with_no_zone_in_the_file_is_as_if_not_there(self):
+        path = self.cfg.state_dir / outage.STATE
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"down_since": T0.isoformat(), "next_probe_at": "2026-10-14T12:00:00"}))
+        self.companion.down = False
+        self.assertEqual(self.ask(), DRAFT)  # (a probe, not a TypeError)
+
     def test_switched_off_every_ask_runs(self):
         self.cfg.recovery["breaker"] = False
         for _ in range(3):

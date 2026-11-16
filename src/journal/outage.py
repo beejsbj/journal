@@ -48,9 +48,10 @@ KEYS = ("deferred_since", "last_deferred_at", "defer_error", "defer_alerted_at")
 
 def _when(rec: dict, key: str) -> datetime | None:
     try:
-        return datetime.fromisoformat(rec[key])
+        when = datetime.fromisoformat(rec[key])
     except (KeyError, TypeError, ValueError):
         return None
+    return when if when.tzinfo is not None else None  # (one with no zone cannot be compared: as if not there)
 
 
 def deferred(rec: dict) -> bool:
@@ -115,7 +116,7 @@ def describe(rec: dict, tz) -> str:
 
 STATE = "outage.json"
 PROBE_QUERY = "This is a connection check. Reply with the single word: ok"
-PROBE_BUDGET = 120  # seconds (the run gets a minute more): the smallest budget a real step has (a picture's description),
+PROBE_BUDGET = 120  # seconds (the run gets a minute more): a picture's description's budget, the smallest of the deferred steps (a bridge's 60 s falls back to its template),
 # since Hermes caps a provider's stale timeout to what is left of the budget, and a probe must not fail where a real
 # step would have been answered (an overloaded provider, a fallback)
 HELD = "held"

@@ -4018,10 +4018,14 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     picture, a prompt too long, the vision model down while text works): nothing is held; a fault of the request's
     (`outage.request_failed`: a 4xx other than 408 and 429, or `invalid_request_error`) comes back from `agent.ask`
     as None, a bad answer, so the caller counts an attempt and the work ends at its attempt limit; any other failure
-    (a 5xx, a 429, an exit with no code) defers that record alone, as main did. A timeout is not confirmed because a
-    probe after it would most likely wait out its own budget too, delaying a real outage's plain opener by three
-    more minutes. **The probe:** a fixed question with no tools, no words of his and no context, on a 120 s budget
-    (`PROBE_BUDGET`, the smallest real step's, a picture's description; the run gets a minute more), run by the next
+    (a 5xx, a 429, an exit with no code) defers that record alone, as main did. A timeout is confirmed the same way (re-review, 2026-11-15: one request that always runs too long had
+    tripped the breaker every 35 minutes for 7 days), unless a run already answered in this process (a long run, no
+    outage). The steps that deliver to the chat (the opener, a program's reflect phase and bridge) pass
+    `trip_at_once`: any failure opens the breaker with no confirming probe, so a scheduled send goes out plain at once
+    rather than up to three minutes later; the cost is that a failure of that one request can hold other work until
+    the next probe (5 minutes). A probe that answers also closes a breaker another process opened meanwhile. **The probe:** a fixed question with no tools, no words of his and no context, on a 120 s budget
+    (`PROBE_BUDGET`, a picture's description's, the smallest of the deferred steps; a bridge's 60 s falls back to its
+    template; the run gets a minute more), run by the next
     ask once it is due: 5 minutes after the outage was found, then 10, 20 and every 30 (`probe_after_minutes`,
     `probe_max_minutes`; the 30 matches the records' own retry); a next probe time further off than
     `probe_max_minutes` (the clock was set back) is due. Any answer, even an empty one, is a model that answered; then the ask that probed goes on

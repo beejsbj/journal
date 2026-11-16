@@ -190,10 +190,11 @@ class NoCompanion:
 
 
 def ask(cfg: Config, query: str, budget: int, toolsets: str | None = None, image: str | None = None,
-        env: dict[str, str] | None = None) -> str | None:
+        env: dict[str, str] | None = None, trip_at_once: bool = False) -> str | None:
     """The agent's text; None when it is off or answered with nothing; raises ``AgentUnavailable`` on an outage.
     ``image``: a picture to attach; ``env``: variables for the run's environment (each passed on only when given, so
-    a companion that predates it is called as before)."""
+    a companion that predates it is called as before). ``trip_at_once``: a failed run opens the breaker with no
+    confirming probe (the opener: a scheduled prompt must not wait out a probe before it goes out plain)."""
     if cfg.agent.get("enabled") is False:
         return None
     companion = cfg.companion()
@@ -209,14 +210,16 @@ def ask(cfg: Config, query: str, budget: int, toolsets: str | None = None, image
                              **({"env": env} if env else {}))
     except AgentUnavailable as e:
         reason = failure_reason(str(e)) or "model unreachable"
-        if str(e).startswith("timed out"):
-            if not _answered:  # (a long run after an answer is no outage)
-                outage.trip(cfg, reason)
+        if str(e).startswith("timed out") and _answered:
+            raise  # (a long run after an answer is no outage)
+        if trip_at_once and not probed:
+            outage.trip(cfg, reason)
             raise
         if not (probed or outage.confirm(cfg, companion)):  # the probe found no model either: an outage
             outage.trip(cfg, reason)
             raise
         _answered = True  # a model answers: this request failed on its own, and the breaker stays shut
+        outage.answered(cfg)  # (one another process opened meanwhile is over too)
         if outage.request_failed(reason):
             return None  # (a bad request: the caller counts it as an attempt, so the work ends at its limit)
         raise
