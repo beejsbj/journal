@@ -176,6 +176,65 @@ class AnnotationReplyTest(unittest.TestCase):
         self.assertTrue(self.prompt()["annotation_reply"]["message_id"])
 
 
+class AnnotateQuietTest(unittest.TestCase):
+    """Annotations wait ``annotate_after_minutes`` from his newest words in the entry, not his first (#42, finding
+    3): words he adds while still writing are annotated with the rest, not left out of a note written too soon."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.cfg = make_cfg(Path(self.tmp.name))
+        self.cfg.annotate_after_minutes = 20
+        self.t0 = datetime(2026, 10, 14, 6, 5, tzinfo=timezone.utc)
+        add_prompt(self.cfg, sent=self.t0 - timedelta(minutes=5))
+        self.info = capture.capture(self.cfg, self.cfg.chat_id, "100", "slept badly, clear head",
+                                    self.t0, "text", "4242")
+        capture.capture(self.cfg, self.cfg.chat_id, "100", "and the lake walk after", self.t0 + timedelta(minutes=15),
+                        "text", "4243")
+        self.asked = []
+        self.patches = [mock.patch.object(agent, "ask", lambda cfg, prompt, *a, **k: self.asked.append(prompt) or DRAFT),
+                        mock.patch("journal.context.companion_reply_after", lambda *a, **k: None)]
+        for p in self.patches:
+            p.start()
+
+    def tearDown(self):
+        for p in self.patches:
+            p.stop()
+        self.tmp.cleanup()
+
+    def annotate_at(self, minutes):
+        log = []
+        tick.annotate(self.cfg, self.t0 + timedelta(minutes=minutes), log)
+        return log
+
+    def test_waits_from_the_newest_words_then_annotates_them_all(self):
+        self.assertEqual(self.annotate_at(21), [])  # 21 minutes after the first words, 6 after the newest
+        self.assertEqual(self.asked, [])
+        self.assertTrue(entries.annotations_pending(Path(self.info["path"]).read_text()))
+        self.assertIn("annotated 2026-10-14-morning (+1 notebook)", self.annotate_at(36))
+        self.assertEqual(len(self.asked), 1)
+        self.assertIn("slept badly, clear head", self.asked[0])
+        self.assertIn("and the lake walk after", self.asked[0])
+
+    def test_captures_out_of_order_still_wait_from_the_newest(self):
+        with ledger.locked(self.cfg.ledger_path) as data:
+            data["prompts"][0]["captures"].reverse()  # the newest first: the wait reads every capture's time
+        self.assertEqual(self.annotate_at(21), [])
+        self.assertIn("annotated 2026-10-14-morning (+1 notebook)", self.annotate_at(36))
+
+    def test_a_program_session_waits_from_its_last_phase(self):
+        """A session's phases share one entry: the wait runs from the newest words in any of them."""
+        with ledger.locked(self.cfg.ledger_path) as data:
+            first = data["prompts"][0]
+            later = first["captures"].pop()  # the words at +15 belong to the session's second phase
+            first.update(program="trial", run="r1", session=1, session_complete=True)
+            data["prompts"].append({"id": "2026-10-14-trial-s01-p2", "kind": "trial", "program": "trial",
+                                    "run": "r1", "session": 1, "session_complete": True,
+                                    "entry_path": first["entry_path"], "captures": [later]})
+        self.assertEqual(self.annotate_at(21), [])
+        self.assertIn("annotated 2026-10-14-morning (+1 notebook)", self.annotate_at(36))
+        self.assertEqual(len(self.asked), 1)
+
+
 class TelegramPayloadTest(unittest.TestCase):
     def test_parse_error_falls_back_to_plain_text_and_keeps_reply(self):
         calls = []
