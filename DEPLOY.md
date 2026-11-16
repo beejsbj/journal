@@ -30,6 +30,22 @@ these texts.
 **Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
 previous sha), then `hermes gateway restart`.
 
+## ANNOTATE-QUIET — annotations wait from his newest words (2026-11-15; tick side, and the skill's wording; **no gateway restart needed**; no config or state change)
+
+**What changes.** An annotation is written `annotate_after_minutes` (20) after his newest captured words in the
+entry, not his first, so words he adds while still writing are annotated with the rest (#42, finding 3).
+DECISIONS.md, ANNOTATE-QUIET.
+**Side and restart.** `tick.py` (`annotate`), plus a comment in `config.py`, the skill's one line and the README.
+`journal.tick` is not loaded when the gateway imports the plugin (the import list in the table above), and
+`tick.annotate` runs only in the tick, a fresh process: the behaviour changes at the next tick after the plugin pin
+moves to the merge sha. The skill (`skills/journal-system/SKILL.md`) is rendered when the gateway loads the plugin,
+so the companion reads the new line ("after his last words") only after a gateway restart; the old line is only
+less exact, so this rides the next window rather than needing its own. Serve is untouched.
+**First checks.** After the next tick: an entry answered in two replies some minutes apart is annotated 20 minutes
+after the second, and its annotations draw on both. `last-tick.json` has no `error:` line.
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
+previous sha). Nothing to undo in state.
+
 ## OUTAGES — a breaker across ticks and a paced catch-up (2026-11-15; tick and hook side, and serve for its status; **gateway restart required, in a window**; new optional settings `recovery.*`; one new state file)
 
 **What changes.** Once a model run finds no model (a failure is confirmed by a probe first, except in the steps that send to the chat, which trip at once), the
