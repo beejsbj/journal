@@ -16,6 +16,22 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## ANNOTATE-QUIET — annotations wait from his newest words (2026-11-15; tick side, and the skill's wording; **no gateway restart needed**; no config or state change)
+
+**What changes.** An annotation is written `annotate_after_minutes` (20) after his newest captured words in the
+entry, not his first, so words he adds while still writing are annotated with the rest (#42, finding 3).
+DECISIONS.md, ANNOTATE-QUIET.
+**Side and restart.** `tick.py` (`annotate`), plus a comment in `config.py`, the skill's one line and the README.
+`journal.tick` is not loaded when the gateway imports the plugin (the import list in the table above), and
+`tick.annotate` runs only in the tick, a fresh process: the behaviour changes at the next tick after the plugin pin
+moves to the merge sha. The skill (`skills/journal-system/SKILL.md`) is rendered when the gateway loads the plugin,
+so the companion reads the new line ("after his last words") only after a gateway restart; the old line is only
+less exact, so this rides the next window rather than needing its own. Serve is untouched.
+**First checks.** After the next tick: an entry answered in two replies some minutes apart is annotated 20 minutes
+after the second, and its annotations draw on both. `last-tick.json` has no `error:` line.
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
+previous sha). Nothing to undo in state.
+
 ## OUTAGES — a breaker across ticks and a paced catch-up (2026-11-15; tick and hook side, and serve for its status; **gateway restart required, in a window**; new optional settings `recovery.*`; one new state file)
 
 **What changes.** Once a model run finds no model (a failure is confirmed by a probe first, except in the steps that send to the chat, which trip at once), the

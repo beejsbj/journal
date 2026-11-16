@@ -618,11 +618,11 @@ def annotate(cfg: Config, now: datetime, log: list[str]) -> None:
             continue  # a note saved from conversation: the day reflection covers it
         if p.get("program") and not p.get("session_complete"):
             continue  # a program session is annotated once, when it is complete (not phase by phase)
-        if _transcribing(p):  # annotate the words, not the placeholder
+        if any(_transcribing(q) for q in _entry_prompts(snap, p)):  # the words, not the placeholder (any phase's)
             continue
         first = datetime.fromisoformat(p["captures"][0]["at"])
-        if now - first < timedelta(minutes=cfg.annotate_after_minutes):
-            continue
+        if now - _last_words(snap, p) < timedelta(minutes=cfg.annotate_after_minutes):
+            continue  # he may still be writing: wait for quiet, so his later words are annotated with the rest
         if outage.waiting(p, now, cfg):
             continue
         body = path.read_text(encoding="utf-8")
@@ -691,6 +691,18 @@ def annotate(cfg: Config, now: datetime, log: list[str]) -> None:
             log.append(f"{p['id']}: annotation attempt failed")
     if alerts:
         raise Alert("; ".join(alerts))
+
+
+def _entry_prompts(snap: dict, p: dict) -> list[dict]:
+    """``p`` and every other prompt filed in its entry (a program session's phases share one)."""
+    path = p.get("entry_path")
+    return [q for q in snap["prompts"] if q is p or (path and q.get("entry_path") == path)]
+
+
+def _last_words(snap: dict, p: dict) -> datetime:
+    """When his newest words in ``p``'s entry were captured: the newest capture of any prompt filed in that entry, by
+    time, not list order (#42, finding 3)."""
+    return max(t for t in map(_newest_words, _entry_prompts(snap, p)) if t is not None)
 
 
 def _reply_target(p: dict) -> str | None:

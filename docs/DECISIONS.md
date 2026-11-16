@@ -4272,3 +4272,24 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
        is a decision for this file.
     8. **Issue #1's text is corrected** (the delegate's call): the thought record is filed under programs, and
        boundary setting and conflict resolution are named, in the order the packages above give.
+
+- **ANNOTATE-QUIET (2026-11-15) — annotations wait for quiet: `annotate_after_minutes` from his newest words, not his
+  first (#42, finding 3; the owner, 2026-11-15).** `tick.annotate` waited from `captures[0]["at"]`, the first
+  capture, and an annotation once written is no longer pending, so words he added after minute 20 never got one
+  (captures at +0 and +15: annotated at +20 from the first words alone). It now waits from the newest capture of any
+  prompt filed in the entry (`tick._last_words`, over the existing `_newest_words`: by time, not list order; a
+  program session's phases share one entry, so its wait runs from the last phase's words). The alignment with her
+  chat reply (`context.companion_reply_after` from the first capture, OPEN-PROMPTS rule 9) is unchanged, and so is
+  the reply's staleness (already measured from his newest words). README *Configure* and *Architecture* and the
+  skill say "after his newest words". Tested in `test_annotation_replies.py` (`AnnotateQuietTest`).
+  - **What counts as his newest words:** captures only, the replies the hook, the sweep and a face record, plus
+    the recordings and pictures `conversations.py` files on the entry's prompt. His text lines in the chat that
+    follows (written into the entry by `conversations.py`) are not captures and do not move the wait, as before.
+  - **Not built, open for the owner: words after the annotation is written.** Once an entry is annotated, later
+    words (minute 40, the next morning) still get none. Re-opening it is a design question, not this fix: the
+    annotations would be rewritten (`entries.write_annotations` replaces the section, so her earlier notes go, and
+    the guarantee is that her words are never edited on any surface; the engine rewriting them is a new case) or a
+    second set appended; the reply already sent to the chat would be followed by a second, or not; `annotated_at`,
+    `annotate_attempts` and the notebook's follow-ups would need a rule for a second round. Waiting for quiet
+    covers the common case (he writes in bursts within minutes); a later return to the entry is left to the day
+    reflection, which reads the whole entry.

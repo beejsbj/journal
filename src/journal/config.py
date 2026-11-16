@@ -50,7 +50,7 @@ DEFAULTS: dict[str, Any] = {
         "collapse_hours": 6.0,          # a prompt is "visible" (and folds) after this long
         "grace_hours": 2.0,             # how late a scheduled prompt may still be sent
         "opener_budget_seconds": 240,   # model time for the opener
-        "annotate_after_minutes": 20,   # wait after the first reply before annotating
+        "annotate_after_minutes": 20,   # wait after his newest words before annotating
         "day_ends_at": "04:00",         # words written before this belong to the day before (the journal day)
     },
     "channel": {                        # the journal's chat (CHANNELS): any Hermes gateway platform
