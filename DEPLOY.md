@@ -16,19 +16,22 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
-## OUTAGES — a breaker across ticks and a paced catch-up (2026-11-15; tick and hook side; **gateway restart required, in a window**; new optional settings `recovery.*`; one new state file)
+## OUTAGES — a breaker across ticks and a paced catch-up (2026-11-15; tick and hook side, and serve for its status; **gateway restart required, in a window**; new optional settings `recovery.*`; one new state file)
 
-**What changes.** Once a model run finds no model, the outage is known to every later step and tick
-(`<state dir>/outage.json`): no model run starts (openers go out plain at once; annotations, descriptions,
+**What changes.** Once a model run finds no model (a failure other than a timeout is confirmed by a probe first), the
+outage is known to every later step and tick (`<state dir>/outage.json`): no model run starts (openers go out plain at once; annotations, descriptions,
 reflections and syntheses defer as before, without spending a try) until a probe, a short question with no tools,
 answers: 5 minutes after the outage was found, then 10, 20 and every 30. When a model is back, each step makes at most
 two model calls a tick, oldest first, and annotation replies and analyses go to the chat at most two a tick and four
 an hour; one more than 24 hours late is not sent (recorded as `skipped: "stale"`, kept in its file). Prompts,
 interrupts and program phases are not held. DECISIONS.md, OUTAGES.
-**Side and restart.** `agent.py`, `outage.py`, `reflect.py`, `config.py`, `status.py`, `tick.py` and `plugin.yaml`.
+**Side and restart.** `agent.py`, `outage.py`, `reflect.py`, `recovery.py`, `programs.py`, `config.py`, `status.py`,
+`tick.py` and `plugin.yaml`.
 The gateway imports `agent`, `outage`, `reflect` and `config` at load (the import list in the table above), and
 model steps can run in processes the gateway spawns, so: move the plugin pin and the CLI to the merge sha, then
-`hermes gateway restart` in a window. The tick takes the new code at its next run.
+`hermes gateway restart` in a window. The tick takes the new code at its next run. The web app's status
+(`status.status`, which serve imports) gains `model_outage`, so `journal-serve` shows it only after `uv tool install
+--force` at the merge sha and `systemctl --user restart journal-serve`; until then the web status simply lacks it.
 **Config.** None needed: the defaults are `recovery.breaker: true`, `probe_after_minutes: 5`, `probe_max_minutes: 30`,
 `catchup_per_tick: 2`, `sends_per_tick: 2`, `sends_per_hour: 4`, `stale_hours: 24` (README *Configure*).
 `recovery.breaker: false` turns the breaker off without a rollback (every step asks on its own again; an
