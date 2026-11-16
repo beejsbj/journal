@@ -16,6 +16,20 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## ESCALATE-WORDING — nothing promises an escalation (2026-11-15; hook side; **gateway restart required, in a window**; no config or state change)
+
+**What changes.** The guard's refusal, the companion's skill and a failed slash command no longer say the
+`guard.escalate_to` person will be asked or will look into it (nothing sends them a message): they name that person as
+who looks after the setup (#42, finding 4). DECISIONS.md, ESCALATE-WORDING.
+**Side and restart.** `guard.py`, `commands.py` and `hermes/__init__.py` (the skill's tokens), all loaded when the
+gateway imports the plugin (the import list in the table above), and the skill is rendered at that load: move the
+plugin pin and the CLI to the merge sha, then `hermes gateway restart` in a window. The tick and serve do not use
+these texts.
+**First checks.** After the restart, the rendered skill (`<state dir>/skill/journal-system/SKILL.md`; by default the state dir is
+`$HERMES_HOME/plugin-data/journal`) says "looks after the setup" and no longer "offer to ask"; `grep -c "offer to ask"` on it gives 0.
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
+previous sha), then `hermes gateway restart`.
+
 ## ANNOTATE-QUIET — annotations wait from his newest words (2026-11-15; tick side, and the skill's wording; **no gateway restart needed**; no config or state change)
 
 **What changes.** An annotation is written `annotate_after_minutes` (20) after his newest captured words in the
