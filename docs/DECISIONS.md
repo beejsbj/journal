@@ -4279,8 +4279,8 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   (`hermes.skill_tokens`: "or offer to ask {escalate_to}" when something looks broken, "ask {escalate_to}" for
   changing times or questions) and a slash command that failed (`commands._failed`: "{escalate_to} can look into
   it"). Nothing carries a message to that person: the companion has no tool for it, and the journal's chat is his
-  personal chat. Each now names them as who looks after the setup and asks for nothing: the refusal and the skill
-  say "tell {user} what you saw; {escalate_to} looks after the setup", the change line "tell {user} what to change
+  personal chat. Each now names them as who looks after the setup and asks for nothing: the refusal says "tell
+  {user} what you found; {escalate_to} looks after the setup" and the skill "… what you saw; …", the change line "tell {user} what to change
   ({escalate_to} looks after the setup)", and a failed command "{escalate_to} looks after the setup; `journal
   doctor` can say why" (the doctor hint now stands in both cases). With `escalate_to` empty the person is not
   mentioned, as before. Names come from config. `test_escalate_wording.py` checks every place, with the person set
