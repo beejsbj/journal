@@ -234,6 +234,20 @@ class AnnotateQuietTest(unittest.TestCase):
         self.assertIn("annotated 2026-10-14-morning (+1 notebook)", self.annotate_at(36))
         self.assertEqual(len(self.asked), 1)
 
+    def test_a_session_waits_while_any_phase_is_still_transcribing(self):
+        """(review) the wait reads the whole entry, so the transcription check does too: a voice note in the last
+        phase still pending keeps the session's placeholder out of her note."""
+        with ledger.locked(self.cfg.ledger_path) as data:
+            first = data["prompts"][0]
+            later = first["captures"].pop()
+            later["transcript"] = "pending"
+            first.update(program="trial", run="r1", session=1, session_complete=True)
+            data["prompts"].append({"id": "2026-10-14-trial-s01-p2", "kind": "trial", "program": "trial",
+                                    "run": "r1", "session": 1, "session_complete": True,
+                                    "entry_path": first["entry_path"], "captures": [later]})
+        self.assertEqual(self.annotate_at(60), [])
+        self.assertEqual(self.asked, [])
+
 
 class TelegramPayloadTest(unittest.TestCase):
     def test_parse_error_falls_back_to_plain_text_and_keeps_reply(self):
