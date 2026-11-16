@@ -1,6 +1,7 @@
 """OUTAGES (#42, findings 1 and 2): an outage, once found, is known across ticks (the breaker): model work is held
 and probed for sparingly, prompts still go out plain on time; and when a model answers again, the held work comes
 back in order, a few a tick, and what has gone stale is not sent to the chat (it stays in its file, recorded)."""
+import json
 import tempfile
 import unittest
 from datetime import date, datetime, timedelta, timezone
@@ -84,7 +85,7 @@ class BreakerTest(BreakerBase):
         with self.assertRaises(outage.ModelHeld) as cm:
             self.ask()
         self.assertEqual(str(cm.exception), "held: exit 1: 503 overloaded_error")
-        self.assertEqual((len(self.companion.runs), len(self.companion.probes)), (1, 0))
+        self.assertEqual((len(self.companion.runs), len(self.companion.probes)), (1, 1))  # (the probe that confirmed it)
 
     def test_probes_back_off_and_one_that_answers_closes_it(self):
         with self.assertRaises(agent.AgentUnavailable):
@@ -98,13 +99,14 @@ class BreakerTest(BreakerBase):
             st = outage.known(self.cfg)
             waits.append(datetime.fromisoformat(st["next_probe_at"]) - self.clock)
         self.assertEqual(waits, [timedelta(minutes=m) for m in (10, 20, 30, 30, 30)])
-        self.assertEqual(self.companion.probes, [(outage.PROBE_BUDGET, "none")] * 5)  # cheap: no tools
+        self.assertEqual(self.companion.probes, [(outage.PROBE_BUDGET, "none")] * 6)  # cheap: no tools (the first
+        # confirmed the outage at once)
         self.assertEqual(len(self.companion.runs), 1)  # nothing else ran in those 95 minutes
         self.companion.down = False
         self.new_process()
         self.at(timedelta(minutes=125))
         self.assertEqual(self.ask(), DRAFT)  # the probe answered: the ask goes on with its own run
-        self.assertEqual((len(self.companion.runs), len(self.companion.probes)), (2, 6))
+        self.assertEqual((len(self.companion.runs), len(self.companion.probes)), (2, 7))
         self.assertIsNone(outage.known(self.cfg))
         last = ledger.read_state(self.cfg.state_dir / outage.STATE)["last"]
         self.assertEqual((last["down_since"], last["answered_at"], last["probes"]),
@@ -125,7 +127,7 @@ class BreakerTest(BreakerBase):
         self.companion.during_probe = another_process
         with self.assertRaises(outage.ModelHeld):
             self.ask()
-        self.assertEqual((seen, len(self.companion.probes)), (["held"], 1))
+        self.assertEqual((seen, len(self.companion.probes)), (["held"], 2))  # (the confirming one, then this one)
 
     def test_an_answer_elsewhere_closes_it(self):
         with self.assertRaises(agent.AgentUnavailable):
@@ -134,7 +136,7 @@ class BreakerTest(BreakerBase):
         outage.answered(self.cfg, T0 + timedelta(minutes=1))  # (another process's run answered)
         self.assertIsNone(outage.known(self.cfg))
         self.assertEqual(self.ask(), DRAFT)
-        self.assertEqual(self.companion.probes, [])
+        self.assertEqual(len(self.companion.probes), 1)  # only the one that confirmed the outage
 
     def test_a_long_run_after_an_answer_is_not_an_outage(self):
         self.companion.down = False
@@ -161,7 +163,7 @@ class BreakerTest(BreakerBase):
         nothing = mock.Mock(side_effect=AssertionError("the probe touched the chat"))
         with mock.patch.object(Config, "channel", nothing), mock.patch.object(Config, "transcript", nothing):
             self.assertEqual(self.ask(), DRAFT)
-        self.assertEqual(len(self.companion.probes), 1)
+        self.assertEqual(len(self.companion.probes), 2)
 
     def test_a_held_ask_is_no_try_of_the_record(self):
         rec = {}
@@ -202,6 +204,99 @@ class BreakerTest(BreakerBase):
         self.assertEqual(r("held: exit 1: and then she said"), "held")
 
 
+class RequestFailureTest(BreakerBase):
+    """OUTAGES review, findings 1-3: a failure of one request is no outage, a probe can be answered where a real step
+    would be, and a probe set far off by a clock jump is due."""
+
+    BAD = ("exit 1: Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', "
+           "'message': 'prompt is too long: his words'}}")
+
+    def failing(self, error, which="bad"):
+        """The companion answers, except for the query ``which``, whose run fails with ``error``."""
+        real = self.companion.ask
+
+        def ask(query, budget, toolsets=None, image=None, env=None):
+            if query == which:
+                self.companion.runs.append((query, budget, toolsets))
+                raise agent.AgentUnavailable(error)
+            return real(query, budget, toolsets, image, env)
+        return mock.patch.object(self.companion, "ask", ask)
+
+    def test_a_bad_request_opens_nothing_and_is_a_bad_answer(self):
+        self.companion.down = False
+        with self.failing(self.BAD):
+            self.assertIsNone(agent.ask(self.cfg, "bad", 60, toolsets="none"))  # (the caller counts an attempt)
+            self.assertIsNone(outage.known(self.cfg))
+            self.assertEqual(self.ask(), DRAFT)  # nothing is held
+        self.assertEqual(len(self.companion.probes), 1)  # the probe that found a model answering
+
+    def test_a_provider_error_on_one_run_while_a_probe_answers_defers_that_work_alone(self):
+        self.companion.down = False
+        with self.failing("exit 1: Error code: 503 - {'type': 'error', 'error': {'type': 'overloaded_error'}}"):
+            with self.assertRaises(agent.AgentUnavailable) as cm:
+                agent.ask(self.cfg, "bad", 60, toolsets="none")
+            self.assertNotIsInstance(cm.exception, outage.ModelHeld)
+            self.assertIsNone(outage.known(self.cfg))
+            self.assertEqual(self.ask(), DRAFT)
+
+    def test_request_failed(self):
+        f = outage.request_failed
+        self.assertTrue(f("exit 1: 400 invalid_request_error") and f("exit 1: 413") and f("invalid_request_error"))
+        self.assertFalse(f("exit 1: 429 rate_limit_error") or f("exit 1: 408") or f("exit 1: 503 overloaded_error")
+                         or f("exit 1") or f("timed out") or f("model unreachable"))
+
+    def test_an_annotation_whose_request_fails_ends_at_its_attempts_and_holds_nothing(self):
+        for n, kind in enumerate(("morning", "evening")):
+            add_prompt(self.cfg, kind=kind, sent=T0 - timedelta(hours=3 - n), message_id=str(100 + n))
+            capture.capture(self.cfg, CHAT, str(100 + n), f"words {n}", T0 - timedelta(hours=3 - n, minutes=-5),
+                            "text", str(4242 + n))
+        self.companion.down = False
+        real = self.companion.ask
+
+        def ask(query, budget, toolsets=None, image=None, env=None):  # the morning entry's request always fails
+            if query != outage.PROBE_QUERY and "words 0" in query:
+                self.companion.runs.append((query, budget, toolsets))
+                raise agent.AgentUnavailable(self.BAD)
+            return real(query, budget, toolsets, image, env)
+        with mock.patch.object(self.companion, "ask", ask):
+            for minutes in range(0, 30, 5):
+                self.new_process()
+                tick.annotate(self.cfg, self.at(timedelta(minutes=minutes)), [])
+        data = ledger.snapshot(self.cfg.ledger_path)
+        morning, evening = (ledger.find(data, f"2026-10-14-{k}") for k in ("morning", "evening"))
+        self.assertEqual(morning["annotate_attempts"], tick.ANNOTATE_ATTEMPTS)  # ended, not retried for 7 days
+        self.assertFalse(morning.get("annotated_at"))
+        self.assertTrue(evening["annotated_at"])  # the other entry was never held
+        self.assertIsNone(outage.known(self.cfg))
+
+    def test_a_probe_gets_the_budget_of_the_smallest_real_step(self):
+        # Hermes caps a provider's stale timeout to the budget left: a 45 s probe died where a picture's description
+        # (120 s, the smallest real budget) would have been answered, so only a probe kept the breaker open
+        self.assertGreaterEqual(outage.PROBE_BUDGET, 120)
+
+    def test_a_probe_set_far_off_by_a_clock_jump_is_due(self):
+        self.at(timedelta(days=7))  # the clock jumped a week ahead, and a run found no model
+        with self.assertRaises(agent.AgentUnavailable):
+            self.ask()
+        self.companion.down = False
+        self.new_process()
+        self.at(timedelta(minutes=1))  # set right again: the probe "due in a week" is due now
+        self.assertEqual(self.ask(), DRAFT)
+        self.assertIsNone(outage.known(self.cfg))
+
+    def test_a_damaged_outage_file_stops_no_ask_and_no_tick(self):
+        path = self.cfg.state_dir / outage.STATE
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"down_since": "not a time", "probes": "x", "next_probe_at": 5}))
+        with self.assertRaises(outage.ModelHeld):  # (not a ValueError: the opener still goes out plain)
+            self.ask()
+        self.companion.down = False
+        self.at(timedelta(minutes=40))
+        self.assertEqual(self.ask(), DRAFT)
+        self.assertEqual(tick._outage_news(self.cfg, {"down_since": "not a time"}),
+                         ["model outage over: a model answered again (down since ?); held work catches up, paced"])
+
+
 class TickUnderOutageTest(BreakerBase):
     """Finding 1 on main: each tick started model runs of its own while every model was down."""
 
@@ -217,9 +312,9 @@ class TickUnderOutageTest(BreakerBase):
             self.new_process()
             tick.annotate(self.cfg, self.at(timedelta(minutes=minutes)), [])
         # main: a run on nearly every tick (each entry has its own 30-minute clock); now: the run that found the
-        # outage, then probes at +5, +15 and +35 minutes
+        # outage and the probe that confirmed it, then probes at +5, +15 and +35 minutes
         self.assertEqual(len(self.companion.runs), 1)
-        self.assertEqual(len(self.companion.probes), 3)
+        self.assertEqual(len(self.companion.probes), 4)
         data = ledger.snapshot(self.cfg.ledger_path)
         self.assertTrue(all(p.get("annotate_attempts", 0) == 0 for p in data["prompts"]))  # no attempt used
 
@@ -245,9 +340,10 @@ class TickUnderOutageTest(BreakerBase):
         self.new_process()
         log = []
         tick.annotate(self.cfg, self.at(timedelta(minutes=15)), log)  # a probe is due: it answers
-        # the entry the first run deferred waits out its 30 minutes; the two only held ask at once
+        # oldest first: the entry whose own run found the outage does not wait out its 30 minutes (the outage it
+        # found is over), and the two only held come after it (two a tick)
         self.assertEqual([l for l in log if l.startswith("annotated")],
-                         ["annotated 2026-10-14-evening", "annotated 2026-10-14-midweek"])
+                         ["annotated 2026-10-14-morning", "annotated 2026-10-14-evening"])
 
 
 class PacedCatchUpTest(BreakerBase):
@@ -297,11 +393,11 @@ class PacedCatchUpTest(BreakerBase):
         self.run_tick(0)  # down: one run finds it
         self.companion.down = False
         log = self.run_tick(5)  # the probe answers
-        self.assertEqual(len(self.companion.probes), 1)
-        self.assertEqual(self.replied(log), self.ids[1:3])  # (the first entry waits out its 30 minutes)
-        self.assertEqual(self.replied(self.run_tick(10)), self.ids[3:5])
+        self.assertEqual(len(self.companion.probes), 2)  # (the one that confirmed the outage, and this one)
+        self.assertEqual(self.replied(log), self.ids[:2])  # oldest first: the first entry's outage is over too
+        self.assertEqual(self.replied(self.run_tick(10)), self.ids[2:4])
         self.assertEqual(self.replied(self.run_tick(35)), [])  # the hour is full
-        self.assertEqual(self.replied(self.run_tick(65)), self.ids[:1])
+        self.assertEqual(self.replied(self.run_tick(65)), self.ids[4:])
 
     def test_a_reply_gone_stale_is_not_sent_and_says_so(self):
         self.companion.down = False

@@ -10,16 +10,21 @@ model (which counts as an attempt as before), clears the deferral.
 
 **The breaker** (``recovery.breaker``, on by default) is what the engine knows of an outage across processes: a tick
 is a fresh process, so without it every step of every tick found the outage again with a model run of its own. The
-first model run that finds no model (``agent.ask``: any ``AgentUnavailable`` but a timeout after another run answered
-in the same process, which is a long run and not an outage) opens it, in ``outage.json`` under ``state_dir`` (read and
-written under ``ledger.locked_state``). While it is open, ``agent.ask`` starts nothing: it raises ``ModelHeld`` (an
+first model run that finds no model opens it (``agent.ask``), in ``outage.json`` under ``state_dir`` (read and written
+under ``ledger.locked_state``): a run that timed out, unless another run answered in the same process (a long run, not
+an outage), and a run that failed otherwise once a probe run at once (``confirm``) fails too. When that probe answers,
+the failure was the request's own (one picture, a prompt too long): nothing is held, and a fault of the request's
+(``request_failed``) counts as an attempt of the record's. While it is open, ``agent.ask`` starts nothing: it raises ``ModelHeld`` (an
 ``AgentUnavailable``, so every caller defers as before and an opener goes out plain at once, never after a
 timeout). Once ``recovery.probe_after_minutes`` (5) have passed, the next ask first runs one probe: a fixed question
 with no tools, no words of his and a short budget (``PROBE_BUDGET``). A probe that fails waits twice as long for the
-next (5, 10, 20, then every ``recovery.probe_max_minutes``, 30); one that answers, or any model run that answers,
+next (5, 10, 20, then every ``recovery.probe_max_minutes``, 30; a probe set further off than that, after the clock
+was set back, is due); one that answers, or any model run that answers,
 closes the breaker, and the ask that probed goes on with its own run. A probe is claimed under the lock before it
 runs, so two processes never probe at once. A held ask is no try of the record's: ``defer`` keeps its
-``last_deferred_at`` (so the record is free the moment a model answers) and its first ``defer_error``.
+``last_deferred_at`` (so the record is free the moment a model answers) and its first ``defer_error``; and the record
+whose own run found the outage is no different (``waiting`` reads the breaker: held at no cost while it is open, free
+once it closed), so the work comes back oldest first.
 
 **The catch-up is paced** (``catchup``): each model step (annotations, picture descriptions, reflections) runs at most
 ``recovery.catchup_per_tick`` (2) model calls a tick, in order, so work held through an outage comes back a few
@@ -28,6 +33,7 @@ items at a time and no tick holds the lock for an hour. What goes to the chat is
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta, timezone
 
 from . import ledger
@@ -51,10 +57,23 @@ def deferred(rec: dict) -> bool:
     return _when(rec, "deferred_since") is not None
 
 
-def waiting(rec: dict, now: datetime) -> bool:
-    """Deferred and tried too recently to try again."""
+def waiting(rec: dict, now: datetime, cfg: Config | None = None) -> bool:
+    """Deferred and tried too recently to try again. With ``cfg`` and the breaker on, a try that found the outage the
+    breaker holds for is no reason to wait (its ask is held at no cost, and the first ask after the outage probes),
+    and neither is a try before the last outage closed: the record keeps its place, oldest first."""
     last = _when(rec, "last_deferred_at")
-    return last is not None and now - last < RETRY_EVERY
+    if last is None or now - last >= RETRY_EVERY:
+        return False
+    if cfg is None or not breaker_on(cfg):
+        return True
+    st = ledger.read_state(_path(cfg))
+    down, back = _when(st, "down_since"), _when(st.get("last") or {}, "answered_at")
+    try:
+        if down is not None:
+            return last < down  # (a try before this outage began waits as before)
+        return back is None or back <= last
+    except TypeError:  # (a time without its zone, written by hand)
+        return True
 
 
 def expired(rec: dict, now: datetime) -> bool:
@@ -96,7 +115,9 @@ def describe(rec: dict, tz) -> str:
 
 STATE = "outage.json"
 PROBE_QUERY = "This is a connection check. Reply with the single word: ok"
-PROBE_BUDGET = 45  # seconds (the run gets a minute more): a probe is cheap or it is a failure
+PROBE_BUDGET = 120  # seconds (the run gets a minute more): the smallest budget a real step has (a picture's description),
+# since Hermes caps a provider's stale timeout to what is left of the budget, and a probe must not fail where a real
+# step would have been answered (an overloaded provider, a fallback)
 HELD = "held"
 
 
@@ -137,6 +158,14 @@ def probe_wait(cfg: Config, failed_probes: int) -> timedelta:
     return timedelta(minutes=min(first * 2 ** min(failed_probes, 16), most))
 
 
+def probes(st: dict) -> int:
+    """Probes failed in the outage ``st`` holds (0 when the file says something else: it never stops an ask)."""
+    try:
+        return max(0, int(st.get("probes") or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
 def known(cfg: Config) -> dict | None:
     """The outage the breaker holds for (``down_since``, ``last_error``, ``probes``, ``next_probe_at``), or None (also
     whenever the breaker is switched off: then nothing is held, whatever the file says)."""
@@ -160,9 +189,9 @@ def gate(cfg: Config, companion, now: datetime | None = None) -> bool:
         if not st.get("down_since"):
             return False  # closed meanwhile by another process
         due = _when(st, "next_probe_at")
-        wait = due is not None and now < due
+        wait = due is not None and now < due <= now + probe_wait(cfg, 16)  # (one further off: the clock jumped back)
         if not wait:  # claimed: a run elsewhere sees the next probe already scheduled and is held meanwhile
-            st["next_probe_at"] = (now + probe_wait(cfg, int(st.get("probes") or 0) + 1)).isoformat()
+            st["next_probe_at"] = (now + probe_wait(cfg, probes(st) + 1)).isoformat()
             st["probing_at"] = now.isoformat()
         failed = _held(cfg, st)
     if wait:
@@ -174,7 +203,7 @@ def gate(cfg: Config, companion, now: datetime | None = None) -> bool:
         with ledger.locked_state(_path(cfg)) as st:
             st.pop("probing_at", None)
             if st.get("down_since"):
-                st["probes"] = int(st.get("probes") or 0) + 1
+                st["probes"] = probes(st) + 1
                 st["last_probe_at"] = now.isoformat()
                 st["last_error"] = failure_reason(str(e)) or st.get("last_error") or "model unreachable"
                 st["next_probe_at"] = (_now_or(now) + probe_wait(cfg, st["probes"])).isoformat()
@@ -182,6 +211,27 @@ def gate(cfg: Config, companion, now: datetime | None = None) -> bool:
         raise failed from e
     answered(cfg, now)
     return True
+
+
+def confirm(cfg: Config, companion) -> bool:
+    """A run just failed with the breaker shut (``agent.ask``): whether a model answers the probe now. True: the
+    request failed on its own and nothing is held; False: the probe failed too, and the caller opens the breaker. With
+    the breaker off, no probe and False (as before it: the run's failure is the outage)."""
+    if not breaker_on(cfg):
+        return False
+    try:
+        companion.ask(PROBE_QUERY, PROBE_BUDGET, "none")
+    except CompanionUnavailable:
+        return False
+    return True
+
+
+def request_failed(reason: str) -> bool:
+    """Whether a failed run's reason (``agent.failure_reason``) puts the fault in the request itself, not the provider:
+    an HTTP 4xx other than 408 (timeout) and 429 (rate limit), or ``invalid_request_error``. Asked only after a probe
+    answered; such a request would fail the same way next time, so it counts as an attempt."""
+    codes = re.findall(r"\b([45]\d\d)\b", reason or "")
+    return any(c.startswith("4") and c not in ("408", "429") for c in codes) or "invalid_request_error" in (reason or "")
 
 
 def _now_or(now: datetime) -> datetime:
@@ -209,7 +259,7 @@ def answered(cfg: Config, now: datetime | None = None) -> None:
     with ledger.locked_state(_path(cfg)) as st:
         if not st.get("down_since"):
             return
-        last = {"down_since": st["down_since"], "answered_at": now.isoformat(), "probes": int(st.get("probes") or 0),
+        last = {"down_since": st["down_since"], "answered_at": now.isoformat(), "probes": probes(st),
                 "last_error": st.get("last_error") or ""}
         st.clear()
         st["last"] = last

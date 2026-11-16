@@ -2077,7 +2077,7 @@ def synthesize(cfg: Config, run_id: str, now: datetime, log: list[str], *, quiet
     Returns the alerts to raise (empty when none)."""
     run = find_run(cfg, run_id)
     syn = (run or {}).get("synthesis") or {}
-    if run is None or syn.get("status") != "pending" or outage.waiting(syn, now):
+    if run is None or syn.get("status") != "pending" or outage.waiting(syn, now, cfg):
         return []
     prog = _program(cfg, run["program"])
     if not _wants_synthesis(cfg, prog):  # asked for when it was compiled, switched off since

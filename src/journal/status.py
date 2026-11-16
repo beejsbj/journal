@@ -67,7 +67,7 @@ def _model_outage(cfg: Config) -> dict | None:
         except (KeyError, TypeError, ValueError):
             return "?"
     return {"since": local("down_since"), "error": st.get("last_error") or "model unreachable",
-            "probes": int(st.get("probes") or 0), "next_probe": local("next_probe_at")}
+            "probes": outage.probes(st), "next_probe": local("next_probe_at")}
 
 
 def status(cfg: Config, now: datetime | None = None, *, web: bool = False) -> dict:

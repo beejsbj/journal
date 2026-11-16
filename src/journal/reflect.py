@@ -195,7 +195,7 @@ def _trigger(cfg: Config, data: dict, kind: str, end: date, ritual_id: str | Non
     rec = find(data, record_id(kind, end.isoformat()))
     if rec and (rec.get("written_at") or rec.get("attempts", 0) >= ATTEMPTS or rec.get("skipped")):
         return None
-    if rec and outage.waiting(rec, now_local):  # an outage was found moments ago: not again yet
+    if rec and outage.waiting(rec, now_local, cfg):  # an outage was found moments ago: not again yet
         return None
     since = data.get("reflections_since")
     if since:  # yesterday's day may still be reflected on the first run; no older day, no older week

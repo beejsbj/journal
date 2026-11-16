@@ -543,7 +543,7 @@ def process_images(cfg: Config, now: datetime, log: list[str]) -> None:
         for i, c in enumerate(p.get("captures") or []):
             if asked >= limit:
                 break
-            if c.get("describe") != "pending" or not c.get("images") or outage.waiting(c, now):
+            if c.get("describe") != "pending" or not c.get("images") or outage.waiting(c, now, cfg):
                 continue
             done = list(c.get("described") or [])
             wanted = [n for n in c["images"] if images.describable(n)]  # (HEIC is kept, but cannot be handed over)
@@ -623,7 +623,7 @@ def annotate(cfg: Config, now: datetime, log: list[str]) -> None:
         first = datetime.fromisoformat(p["captures"][0]["at"])
         if now - first < timedelta(minutes=cfg.annotate_after_minutes):
             continue
-        if outage.waiting(p, now):
+        if outage.waiting(p, now, cfg):
             continue
         body = path.read_text(encoding="utf-8")
         if not entries.annotations_pending(body):
@@ -932,7 +932,8 @@ def _outage_news(cfg: Config, before: dict | None) -> list[str]:
         return [f"model outage: no model answered ({after.get('last_error')}); model work is held until a probe "
                 "answers, and prompts go out with the plain opener"]
     if before and not after:
-        since = datetime.fromisoformat(before["down_since"]).astimezone(cfg.tz).strftime("%-d %b %H:%M %Z")
+        down = outage._when(before, "down_since")
+        since = down.astimezone(cfg.tz).strftime("%-d %b %H:%M %Z") if down else "?"
         return [f"model outage over: a model answered again (down since {since}); held work catches up, paced"]
     return []
 

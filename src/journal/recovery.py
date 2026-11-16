@@ -219,7 +219,7 @@ def run(cfg: Config, now: datetime, log: list[str], db: Path | None = None) -> N
     if rec.get("text"):  # written earlier; only the send failed
         _send(cfg, rec, now, log)
         return
-    if outage.waiting(rec, now) and not agent.answered_this_run():
+    if outage.waiting(rec, now, cfg) and not agent.answered_this_run():
         return  # the model was unreachable moments ago; another step would have found it back
     if not rec.get("outage_seen") and agent.answered_this_run():
         _skip(cfg, rec, now, "no sign of an outage: the turn failed for another reason", log)

@@ -13,7 +13,10 @@ The agent only ever returns text here; code decides what to do with it. There ar
 Anything that looks like the agent's failure text is never returned as an answer, even with exit 0.
 
 An outage, once found, is known across processes (``outage``'s breaker): while it lasts ``ask`` starts no run and
-raises ``outage.ModelHeld`` (an ``AgentUnavailable``) until a probe is due, then probes once before the run.
+raises ``outage.ModelHeld`` (an ``AgentUnavailable``) until a probe is due, then probes once before the run. A run
+that fails (other than by timing out) opens the breaker only when a probe run at once fails too: when the probe
+answers, the request failed on its own (one picture, one prompt too long), nothing else is held, and a failure the
+request caused (``outage.request_failed``: a 4xx other than 408 and 429) comes back as None, a bad answer.
 
 ``ask(cfg, …)`` is the facade every model step calls; it asks ``cfg.companion()``: by default the Hermes adapter's
 one-shot chat in the configured profile (``journal.hermes.companion``), and with ``agent.command`` any other command
@@ -198,14 +201,24 @@ def ask(cfg: Config, query: str, budget: int, toolsets: str | None = None, image
     if image and callable(takes) and not takes():
         return None  # nothing ran, so nothing answered: this is no evidence that the model is reachable
     global _answered
-    if outage.gate(cfg, companion):  # an outage is known: held (``ModelHeld``), or a probe answered just now
+    probed = outage.gate(cfg, companion)  # an outage is known: held (``ModelHeld``), or a probe answered just now
+    if probed:
         _answered = True
     try:
         text = companion.ask(query, budget, toolsets, **({"image": image} if image else {}),
                              **({"env": env} if env else {}))
     except AgentUnavailable as e:
-        if not (str(e).startswith("timed out") and _answered):  # (a long run after an answer is no outage)
-            outage.trip(cfg, failure_reason(str(e)) or "model unreachable")
+        reason = failure_reason(str(e)) or "model unreachable"
+        if str(e).startswith("timed out"):
+            if not _answered:  # (a long run after an answer is no outage)
+                outage.trip(cfg, reason)
+            raise
+        if not (probed or outage.confirm(cfg, companion)):  # the probe found no model either: an outage
+            outage.trip(cfg, reason)
+            raise
+        _answered = True  # a model answers: this request failed on its own, and the breaker stays shut
+        if outage.request_failed(reason):
+            return None  # (a bad request: the caller counts it as an attempt, so the work ends at its limit)
         raise
     _answered = True
     outage.answered(cfg)  # (an outage another process found is over)
