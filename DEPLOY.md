@@ -18,7 +18,7 @@ The gateway restarts in **windows**, at least an hour from a ritual (the built-i
 
 ## OUTAGES — a breaker across ticks and a paced catch-up (2026-11-15; tick and hook side, and serve for its status; **gateway restart required, in a window**; new optional settings `recovery.*`; one new state file)
 
-**What changes.** Once a model run finds no model (a failure other than a timeout is confirmed by a probe first), the
+**What changes.** Once a model run finds no model (a failure is confirmed by a probe first, except in the steps that send to the chat, which trip at once), the
 outage is known to every later step and tick (`<state dir>/outage.json`): no model run starts (openers go out plain at once; annotations, descriptions,
 reflections and syntheses defer as before, without spending a try) until a probe, a short question with no tools,
 answers: 5 minutes after the outage was found, then 10, 20 and every 30. When a model is back, each step makes at most
