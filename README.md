@@ -355,6 +355,104 @@ Your own programs go in `practices_dir` (`<name>/program.md` with `sessions/`, o
 
 ## Architecture
 
+**The shape.** Four faces over one engine. The engine reaches the outside world only through three ports, and keeps
+everything in two places: the entry files and the state directory. Every reader of the chat goes through the privacy pass.
+
+```mermaid
+flowchart LR
+    you(("You"))
+
+    subgraph faces["Faces"]
+        chat["Chat<br/>Telegram or another platform"]
+        pwa["Web app (PWA)"]
+        mcpc["MCP client"]
+        cron["cron / timer<br/>every 5 minutes"]
+    end
+
+    subgraph adapters["Thin adapters"]
+        plugin["Hermes plugin<br/>hermes/hooks.py, tools, commands"]
+        serve["journal serve<br/>serve/"]
+        mcp["journal mcp<br/>mcp/"]
+        cli["journal CLI<br/>cli.py"]
+    end
+
+    subgraph engine["Engine (src/journal, stdlib)"]
+        inbound["inbound.receive<br/>capture.py"]
+        actions["actions.py<br/>answer, note, add"]
+        tick["tick.run<br/>send, sweep, conversations, programs,<br/>fold, annotate, reply, reflect, recover"]
+        slots["slots.py<br/>which slot words belong to"]
+        privacy{{"privacy.py<br/>one pass, fails closed"}}
+        validate["validate.py<br/>citations and quotes checked"]
+    end
+
+    subgraph ports["Ports (ports.py)"]
+        channel["Channel<br/>send, edit"]
+        transcript["Transcript<br/>chat rows, read-only; the mirror"]
+        companion["Companion<br/>agent.ask"]
+    end
+
+    subgraph state["Files"]
+        entries[("Entries<br/>root/*.md")]
+        statedir[("State<br/>ledger.json, sent.jsonl, ...")]
+    end
+
+    you --> chat & pwa & mcpc
+    chat --> plugin --> inbound
+    pwa --> serve --> actions
+    mcpc --> mcp --> actions
+    cron --> cli --> tick
+    serve -. "spawns journal send / program" .-> cli
+
+    inbound --> entries
+    actions --> slots
+    actions --> entries
+    tick --> slots
+    tick --> companion --> validate
+    tick --> channel --> chat
+    tick --> privacy --> transcript
+    tick --> entries & statedir
+    inbound --> statedir
+```
+
+The dotted line is the one way serve reaches the chat: it spawns `journal send` (or `journal program`) and never sends
+itself; MCP sends nothing at all (`journal_start` returns the practice to answer). Serve and MCP read entries and state
+and import nothing that reads the chat (`tests/test_serve_fence.py`,
+`tests/test_mcp_fence.py`); Hermes is imported only under `hermes/` (`tests/test_purity.py`).
+
+**One prompt, end to end.** Code owns the timing, the sending and the capture; the model only writes words, and every
+model step has a plain fallback.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant T as journal tick
+    participant M as Companion (model)
+    participant C as Chat
+    participant H as Gateway hook
+    participant F as Entries + ledger
+
+    T->>T: schedule.slots_due: is a practice due?
+    T->>M: context.build pack, agent.ask for an opener
+    M-->>T: opener + citations
+    T->>T: validate.check (uncited or unfound: plain opener)
+    T->>F: answered on a face meanwhile? then send nothing
+    T->>C: Channel.send (header, opener, question bank)
+    T->>F: ledger record + sent.jsonl, mirror into her session
+    C->>H: his reply
+    H->>F: inbound.receive → capture: saved verbatim, before any model runs
+    Note over T,F: later ticks
+    T->>F: sweep catches what the hook missed, conversations writes the chat by thread
+    T->>C: fold the prompt (answered ✓ / missed)
+    T->>M: annotate once he has gone quiet
+    T->>F: annotations into the file
+    T->>C: annotations as a reply to his message
+    T->>F: day reflection / week review when due
+```
+
+On a face the same practice needs no send: words written in the web app, `journal write` or MCP's `journal_save` go
+through `actions.answer` into the slot `slots.resolve` names, recorded with `opened_via` and no `message_id`, so the
+tick sees the slot as answered and nothing that reads the chat ever sees it. The module map:
+
 ```
 plugin.yaml, __init__.py      the repository root is the Hermes plugin (wrapper → src/journal/hermes)
 pyproject.toml                the same code as a package with a `journal` console script
