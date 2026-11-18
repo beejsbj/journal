@@ -27,19 +27,21 @@ A *program* is a set of ordered sessions run phase by phase (`/next`, `/skip`, `
 
 ## Design
 
-Four ideas carry the design. Each is held by code, not asked of a model, and pinned by tests (*Guarantees*, below,
-names them).
+Four ideas carry the design. Each is held by code, not asked of a model, and pinned by tests: *Guarantees*, below,
+names them for each promise, and each idea here names its own.
 
 **1. Code owns what must not fail; the model only writes words.** Timing, sending, dating, capture and folding are
-plain code. The model drafts openers, annotations and reflections, and everything it writes is checked before it is
-used. Every model step has a floor: when the model is unreachable or its answer fails the check, the journal does
-something plain and correct, never something invented.
+plain code. The model drafts openers, annotations and reflections. What speaks about him is checked against the
+record before it is used: an opener's claims about him must cite a source, and a quote of his words in an opener, a
+reflection, a catch-up or a program's text must be found in his own words (annotations are checked for shape only).
+Every model step has a floor: when the model is unreachable or its answer fails the check, the journal does something
+plain and correct, never something invented.
 
 ```mermaid
 flowchart LR
     due["A practice is due<br/>schedule.py"]:::code --> pack["A dated, sourced<br/>context pack"]:::code
     pack --> draft["The companion<br/>drafts an opener"]:::model
-    draft --> check{"Every claim cited?<br/>Every quote really his?<br/>validate.py"}:::code
+    draft --> check{"Claims about him cited?<br/>Every quote really his?<br/>validate.py"}:::code
     check -- yes --> send["Sent on time,<br/>recorded in the ledger"]:::code
     check -- "no, or no model" --> plain["The plain opener"]:::code --> send
 
@@ -50,16 +52,19 @@ flowchart LR
 | Model step | Its floor |
 | --- | --- |
 | Opener | the plain opener; a prompt is never deferred for a model |
-| Annotation, transcript | deferred while no model answers, retried for up to 7 days; none after three bad answers |
+| Annotation, transcript, picture description | deferred while no model answers, retried for up to 7 days; none after a few bad answers |
 | Day reflection, week review | not written unless every quote is found in his own words |
 | Catch-up after an outage | not sent unless it quotes only his messages |
+| A program's construction, bridge or synthesis | not used unless every quote is his |
 
 An outage is found once and known everywhere (a breaker and a probe); held work comes back oldest first, a few
-messages an hour, and anything too stale to make sense is recorded and not sent.
+messages an hour, and anything too stale to make sense is recorded and not sent. Pinned by `test_outage.py`,
+`test_outage_breaker.py`, `test_openers.py`, `test_reflect.py` and `test_continuity.py`.
 
 **2. Two voices, kept apart.** His words come in from any face and are appended verbatim; the engine never rewrites a
 block of his. Her words are labelled as hers and never editable, on any surface. What the engine adds to a turn (her
-notebook, a context pack, the today block) is fenced, and taken off before anything reads his message as his words.
+notebook, a context pack, the today block) is fenced, and taken off before anything reads his message as his words;
+where it cannot be told apart, the whole message is left out rather than cut.
 
 ```mermaid
 flowchart LR
@@ -80,26 +85,27 @@ flowchart LR
 
     subgraph entry["One Markdown entry"]
         direction TB
-        e1["## Prompt: her opener"]:::hers
-        e2["## Sam: his words"]:::his
-        e3["## Conversation: both, by thread"]:::code
-        e4["## Ada's annotations · notes"]:::hers
+        e1["## Prompt<br/>her opener"]:::hers
+        e2["## Sam<br/>his words, under his name"]:::his
+        e3["## Conversation<br/>both voices, by thread"]:::code
+        e4["## Ada's annotations<br/>## Ada's notes"]:::hers
     end
 
     classDef his fill:#e2f4e6,stroke:#2f8a4a,color:#0c2b16
     classDef hers fill:#efe6fa,stroke:#7a4cc2,color:#26103f
     classDef code fill:#e3ecfb,stroke:#3567c8,color:#0d1f40
-    style his fill:none,stroke:#999,color:#555
-    style hers fill:none,stroke:#999,color:#555
-    style entry fill:none,stroke:#999,color:#555
+    style his fill:none,stroke:#999
+    style hers fill:none,stroke:#999
+    style entry fill:none,stroke:#999
 ```
 
 Quotes are held to the same line: a reflection may put in quotation marks only words found in one paragraph of his,
 never hers, and nothing written after the period it covers.
 
-**3. Off the record holds everywhere, and fails closed.** `/x` keeps a message out of the journal on every face. Every
-way his words come in refuses it at the write; every reader of the chat asks one privacy pass, and when that pass
-cannot run, everything counts as private.
+**3. Off the record holds across the journal, and fails closed.** `/x` keeps a message out of the journal on every
+face. Every way his words come in refuses it at the write; every reader of the chat asks one privacy pass, and when
+that pass cannot run, everything counts as private. The line is the journal's: `/x` does not reach the companion's
+other tools, such as her own memory (*Guarantees* says where it runs).
 
 ```mermaid
 flowchart LR
@@ -127,14 +133,16 @@ flowchart LR
 
     classDef his fill:#e2f4e6,stroke:#2f8a4a,color:#0c2b16
     classDef code fill:#e3ecfb,stroke:#3567c8,color:#0d1f40
-    style writes fill:none,stroke:#999,color:#555
-    style readers fill:none,stroke:#999,color:#555
+    style writes fill:none,stroke:#999
+    style readers fill:none,stroke:#999
 ```
 
 **4. One engine, many faces, fenced.** The chat, the web app, the `journal` command and MCP are thin faces over one
-engine and one set of files, and any one of them is enough. The engine reaches the outside only through ports, so
-Hermes lives in one adapter. The web app and MCP sit behind a fence: they cannot open the chat or call a model, and the
-web app sends only by spawning `journal send`, so the engine alone owns sending and capture.
+engine and one set of files: you can journal through any one of them, and `journal tick` does the scheduled work
+(prompts, annotations, reflections). The engine reaches the outside only through ports, so Hermes is imported in one
+adapter, `hermes/` (and by `audio.py` for its speech-to-text, the one allowed exception). The web app and MCP sit behind
+a fence: none of their modules imports the chat or a model, no route calls one, and the web app sends only by spawning
+`journal send`, so the engine alone owns sending and capture.
 
 ```mermaid
 flowchart LR
@@ -157,29 +165,31 @@ flowchart LR
         files[("Entries (Markdown)<br/>and state (JSON)")]:::code
     end
 
-    subgraph adapter["hermes/: the one adapter"]
+    subgraph adapter["Adapters: hermes/, telegram.py"]
         direction TB
-        p1["Channel: send, edit"]:::port
+        hook["Gateway hooks<br/>capture before any model"]:::port
+        p1["Channel: send, edit<br/>Telegram, or Hermes' senders"]:::port
         p2["Transcript: the chat, read-only"]:::port
         p3["Companion: the model"]:::port
     end
 
     you --> chat & web & mcp
-    chat --> engine
+    chat --> hook --> engine
     cron --> engine
     web --> files
     mcp --> files
     web -. "spawns journal send" .-> engine
     engine --> files
     engine --> p1 & p2 & p3
+    p1 --> chat
 
     classDef face fill:#f2f2f2,stroke:#777,color:#1a1a1a
     classDef code fill:#e3ecfb,stroke:#3567c8,color:#0d1f40
     classDef port fill:#fff5d6,stroke:#b58a00,color:#3a2c00
-    style fence fill:none,stroke-dasharray: 6 4,stroke:#c0392b,color:#c0392b
-    style faces fill:none,stroke:#999,color:#555
-    style core fill:none,stroke:#999,color:#555
-    style adapter fill:none,stroke:#999,color:#555
+    style fence fill:none,stroke-dasharray: 6 4,stroke:#c0392b
+    style faces fill:none,stroke:#999
+    style core fill:none,stroke:#999
+    style adapter fill:none,stroke:#999
 ```
 
 The fences are tests, not conventions: `test_purity.py` (Hermes imported only under `hermes/`, the chat database opened
@@ -527,6 +537,7 @@ sequenceDiagram
     participant C as Chat
     participant H as Gateway hook
     participant F as Entries + ledger
+    participant S as Her chat session
 
     T->>T: schedule.slots_due: is a practice due?
     T->>M: context.build pack, agent.ask for an opener
@@ -534,7 +545,8 @@ sequenceDiagram
     T->>T: validate.check (uncited or unfound: plain opener)
     T->>F: answered on a face meanwhile? then send nothing
     T->>C: Channel.send (header, opener, question bank)
-    T->>F: ledger record + sent.jsonl, mirror into her session
+    T->>F: ledger record + sent.jsonl
+    T->>S: mirror: what was sent, into her session
     C->>H: his reply
     H->>F: inbound.receive → capture: saved verbatim, before any model runs
     Note over T,F: later ticks
