@@ -37,7 +37,8 @@ The kinds (thresholds under ``ops.*``):
 - ``send_failing``: the newest scheduled prompts were not delivered after all their attempts (a chat or bot token
   that stopped working). Only with a chat (``channel.platform`` other than ``none``).
 - ``fold_given_up``: a prompt's fold was given up for good within ``fold_hours`` (72). The one field read is the
-  ledger's ``fold_gave_up_at``, which ``tick.fold`` writes when it stops trying.
+  ledger's ``fold_gave_up`` record (``at``, ``reason``, ``attempts``, ``error``), which ``tick.fold`` writes when
+  it stops trying.
 - ``step_failing``: a step of the tick crashed in ``step_ticks`` (6) scheduled ticks in a row.
 - ``tick_stale``: no scheduled tick has finished for ``tick_stale_hours`` (1). A tick cannot see its own absence, so
   only ``journal ops check`` (run by a scheduler other than the tick's) can open it; every tick closes it.
@@ -116,7 +117,7 @@ HINTS = {
     "breaker_open": "`journal status` (model outage line), the companion's own logs.",
     "model_floor": "`journal status` (recent errors), `journal doctor`.",
     "send_failing": "`journal doctor` (channel and token rows), `journal status` (undelivered).",
-    "fold_given_up": "`journal status`; the ledger's `fold_error` on the prompt records.",
+    "fold_given_up": "`journal status`; the ledger's `fold_gave_up` on the prompt records.",
     "step_failing": "`journal status` (last run, recent errors).",
     "tick_stale": "the scheduler that runs `journal tick`, and `journal status` (last run).",
 }
@@ -124,7 +125,8 @@ LABELS = (  # fact key, label, how it renders
     ("since", "Since", "time"), ("probes_failed", "Probes failed", "int"),
     ("plain_openers", "Openers sent plain", "int"), ("annotations_failed", "Annotations given up", "int"),
     ("last_success", "Last model success", "time"), ("undelivered", "Prompts undelivered", "int"),
-    ("folds", "Folds given up", "int"), ("newest", "Newest", "time"), ("steps", "Steps", "steps"),
+    ("folds", "Folds given up", "int"), ("newest", "Newest", "time"), ("reason", "Given up because", "reason"),
+    ("steps", "Steps", "steps"),
     ("ticks", "Ticks in a row", "int"), ("exception", "Exception class", "names"), ("error", "Error class", "class"),
 )
 
@@ -416,15 +418,24 @@ def _send_failing(cfg: Config, data: dict, now: datetime, send_attempts: int):
     return {"since": _iso(run[-1][0]), "undelivered": len(run), "error": error_class(run[0][1].get("send_error"))}
 
 
+_GAVE_UP_REASONS = ("permanent", "attempts")  # ``tick.fold``'s words for why it stopped
+
+
 def _fold_given_up(cfg: Config, data: dict, now: datetime):
     window = timedelta(hours=_number(cfg, "fold_hours"))
-    gave = [(at, p) for p in data.get("prompts") or [] if isinstance(p, dict)
-            and (at := _at(p.get("fold_gave_up_at"))) is not None and now - at < window]
+    gave = []
+    for p in data.get("prompts") or []:
+        g = p.get("fold_gave_up") if isinstance(p, dict) else None
+        if isinstance(g, dict) and (at := _at(g.get("at"))) is not None and now - at < window:
+            gave.append((at, g))
     if not gave:
         return None
     at, newest = max(gave, key=lambda x: x[0])
-    return {"since": _iso(min(a for a, _ in gave)), "folds": len(gave), "newest": _iso(at),
-            "error": error_class(newest.get("fold_error"))}
+    facts = {"since": _iso(min(a for a, _ in gave)), "folds": len(gave), "newest": _iso(at),
+             "error": error_class(newest.get("error"))}
+    if newest.get("reason") in _GAVE_UP_REASONS:
+        facts["reason"] = newest["reason"]
+    return facts
 
 
 def _step_failing(cfg: Config, st: dict):
@@ -559,6 +570,8 @@ def _value(how: str, value, now: datetime) -> str | None:
         return ", ".join(v if v in STEP_NAMES else "other" for v in value or []) or None
     if how == "names":
         return ", ".join(v for v in value or [] if _NAME.fullmatch(str(v))) or None
+    if how == "reason":
+        return {"permanent": "refused for good", "attempts": "out of attempts"}.get(str(value))
     if how == "class":
         text = str(value or "")
         return text if _class_ok(text) else "unclassified"

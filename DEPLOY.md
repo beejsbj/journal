@@ -23,8 +23,8 @@ kind (`breaker_open`, `model_floor`, `send_failing`, `fold_given_up`, `step_fail
 `<state dir>/ops.json`; with `ops.repo` set each incident becomes one GitHub issue filed with the `gh` CLI (label
 `journal-ops`), commented on at most every `ops.update_hours` (6), closed when it clears, and reopened if it comes
 back within 6 h. Fixed templates only: kinds, UTC dates and durations (never a time of day), counts, error classes.
-Delivery runs after the tick releases `tick.lock` (45 s a pass, 20 s a `gh` call), so a slow GitHub delays no send. `tick.fold` now also writes `fold_gave_up_at` on a prompt whose fold it
-gives up. New: `journal ops` (incidents open) and `journal ops check [--dry-run]`; `journal status` and `journal
+Delivery runs after the tick releases `tick.lock` (45 s a pass, 20 s a `gh` call), so a slow GitHub delays no
+send. A fold given up is read from FOLD-RETRY's `fold_gave_up` record (`at`, `reason`, `error`). New: `journal ops` (incidents open) and `journal ops check [--dry-run]`; `journal status` and `journal
 doctor` gain an ops line. README *When the journal breaks*; DECISIONS.md, OPS-NOTICE.
 **Side and restart.** `ops.py` is imported by `tick.py` and `status.py`, neither of which the gateway loads at import
 (the import list in the table above); `ops.assess`/`ops.deliver_due` are called only by `tick.run` and `journal ops check`, both fresh
@@ -51,10 +51,68 @@ and plain openers since the last model success count toward `model_floor` (that 
 failure is deployed first, nothing is filed. A notice that cannot be delivered shows as `ops: notice open for <kind>
 failed (<class>)` in the tick's lines and `errors.jsonl`, and in `journal ops` as `last try: <class>`.
 **Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
-previous sha). Nothing to undo: `ops.json` and the `fold_gave_up_at` fields are ignored by older code (delete
-`ops.json` if wanted). Close any issue the notice left open by hand (`gh issue list --label journal-ops`). Removing
+previous sha). Nothing to undo: `ops.json` is ignored by older code (delete it if wanted). Close any issue the notice left open by hand (`gh issue list --label journal-ops`). Removing
 `ops.repo` from the config stops all delivery without a rollback. Changing `ops.repo` later never touches the old
 repository's issues: open incidents are filed again in the new one (close the old ones by hand).
+
+## FOLD-RETRY — a failed fold retries over a day, and a fold given up says so (2026-11-22; tick side; no gateway restart; no config change)
+
+**What changes.** A fold whose edit fails is tried again with a doubling wait (5, 10, 20 … 640 minutes: nine tries
+over about 21 hours) instead of on the next five ticks; one the platform refuses for good (a message gone or past its
+edit window: a Telegram `Bad Request` about the message) is given up at once. After a failure that may pass (a token
+that could not be had, the network, a chat that refuses the bot: `Forbidden`, `chat not found`) the other folds due
+that tick wait for the next one; once an edit goes through, the folds waiting out a backoff are due on the next tick.
+The prompt record gains `fold_retry_at` while it waits and `fold_gave_up` (`at`, `reason`: `permanent` | `attempts`,
+`attempts`, `error`) when it is given up, with `fold_gave_up_captures` beside an `attempts` give-up (a later reply
+earns it one more try); a fold that goes through clears them all. A token helper that exits non-zero says its exit
+status in the "bot token unavailable" error. DECISIONS.md, FOLD-RETRY.
+**Side and restart.** `tick.py`, plus a `permanent` flag on `ports.ChannelError` and `telegram.TelegramError`, and the
+exit status in `telegram.resolve_secret`'s failure text. The fold runs only in the tick, a fresh process, so it takes
+the new code at its next run once the plugin pin and the CLI move to the merge sha. The gateway imports `ports` (and
+loads `telegram` when it sends), but nothing it runs reads the new flag, and its old copy of `resolve_secret` differs
+only in the wording of a failure: no restart; the next restart in any window picks it up. Serve reads a secret
+through `resolve_secret` (`serve.token_command`): after `uv tool install --force` and its restart, a failing helper's
+message there gains the exit status too, nothing else. MCP does not fold.
+**First checks.** `last-tick.json` has no `error:` line. A fold failure in `errors.jsonl` now ends "trying again in N
+min" (or "given up (…)"), and the next failure line for the same prompt comes after that wait, not on the next tick.
+`journal doctor` as usual. Nothing to see while folds succeed.
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
+previous sha). Nothing to undo in state: the older code ignores `fold_retry_at`, `fold_gave_up` and
+`fold_gave_up_captures`; a record waiting on a retry is tried on its next tick and closed once its `fold_attempts`
+reaches six; one given up is already closed.
+
+## HERMES-TOOLSETS — model steps run again on a Hermes that refuses unknown toolsets (2026-11-22; tick and hook side; **gateway restart required, in a window**; no config or state change; **urgent**)
+
+**What changes.** A Hermes whose gateway runs every one-shot refuses a `-t` pick naming a toolset it does not know
+(`invalid_params`) and runs no model. The engine asked for "no tools" with `-t none`, so every model step with no
+tools (annotations, picture descriptions, the catch-up, program reflect phases and bridges, the outage probe) failed;
+the probe failing too kept the breaker open, so every opener went out plain and annotations were held. The Hermes
+adapter now passes `-t no_mcp` for "no tools" (no toolsets on that Hermes; an older Hermes, which warned of unknown
+names, also ran it with none). A request the agent refuses before any model runs no longer opens or holds the
+breaker: that call falls back for its own record (an opener goes plain, the record defers on its own 30-minute clock
+and keeps its attempts) and writes one line of its own in `errors.jsonl` (`model request refused (exit 1:
+invalid_params, <field>): …`). A refused probe closes an open breaker without claiming a model answered. DECISIONS.md,
+HERMES-TOOLSETS.
+**Side and restart.** `hermes/companion.py`, `agent.py`, `outage.py`, `recovery.py`. Model steps run in the tick and
+in the `journal send` / `journal program` processes, all fresh processes: **the fix takes effect at the next tick
+after the plugin pin and the CLI move to the merge sha**, so move the pin as soon as it merges, without waiting for a
+window. The gateway imports `agent` and `outage` at load (the import list in the table above), so `hermes gateway
+restart` follows in the next window to bring its loaded copies in line; nothing in the gateway asks a model meanwhile.
+Serve is untouched.
+**First checks.** After the next tick (5 minutes):
+- `<state dir>/outage.json` holds no `down_since` (only `last`, with `answered_at`): the open breaker's next probe
+  answered and closed it. `journal status` shows no model outage, and `last-tick.json` has "model outage over".
+- `errors.jsonl` gains no new `invalid_params` or `model request refused` line.
+- Held annotations come back paced, oldest first, two a tick: their entries gain annotations over the next ticks (by
+  ledger, `annotated_at` set; no need to open an entry), and `journal status` lists fewer waiting. Replies more than a
+  day late are recorded `skipped: "stale"`, not sent (OUTAGES); the annotations themselves are written.
+- The next scheduled opener is not `plain:agent-failed` (its `errors.jsonl` / `last-tick.json` line, or the ledger's
+  `opener` field).
+Annotations deferred more than 7 days are given up (OUTAGES), so the earliest held ones are lost if this lands later
+than 7 days after the first failure.
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
+previous sha), then `hermes gateway restart`. Rolling back on the same Hermes brings the outage back. Nothing to undo
+in state.
 
 ## STALE-COUNT — the companion is told how many sends went stale (2026-11-15; tick and hook side; **gateway restart required, in a window**; no config or state change)
 

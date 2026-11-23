@@ -291,20 +291,26 @@ class SendAndFoldTest(OpsBase):
         self.run_ops()
         self.assertIsNone(self.incident("send_failing"))
 
-    def test_a_fold_given_up_writes_one_field_and_the_notice_reads_it(self):
+    def test_a_fold_given_up_is_read_from_its_record(self):
         sent = datetime.now(timezone.utc) - timedelta(hours=7)
         add_prompt(self.cfg, sent=sent, message_id="5")
 
-        def boom(*a, **k):
-            raise telegram.TelegramError(RAW_FOLD_ERROR)
+        def boom(*a, **k):  # a permanent refusal: the fold gives up at once
+            raise telegram.TelegramError(f"editMessageText: {RAW_FOLD_ERROR}")
         with mock.patch.object(telegram, "edit_html", boom):
-            for _ in range(tick.FOLD_ATTEMPTS):
-                tick.fold(self.cfg, datetime.now(timezone.utc), [])
+            tick.fold(self.cfg, datetime.now(timezone.utc), [])
         p = ledger.find(ledger.snapshot(self.cfg.ledger_path), "2026-10-14-morning")
-        gave = datetime.fromisoformat(p["fold_gave_up_at"])
+        self.assertEqual(p["fold_gave_up"]["reason"], "permanent")
+        gave = datetime.fromisoformat(p["fold_gave_up"]["at"])
         self.run_ops(gave + timedelta(minutes=5))
         inc = self.incident("fold_given_up")
-        self.assertEqual((inc["facts"]["folds"], inc["facts"]["error"]), (1, "message not found"))
+        self.assertEqual((inc["facts"]["folds"], inc["facts"]["error"], inc["facts"]["reason"]),
+                         (1, "message not found", "permanent"))
+        self.assertIn("| Given up because | refused for good |", self.gh.calls[-1][1])
+        with ledger.locked(self.cfg.ledger_path) as data:  # a reason outside tick.fold's two words is left out
+            ledger.find(data, "2026-10-14-morning")["fold_gave_up"]["reason"] = WORDS
+        self.assertNotIn("reason", ops._fold_given_up(self.cfg, ledger.snapshot(self.cfg.ledger_path),
+                                                      gave + timedelta(minutes=6)))
         self.run_ops(gave + timedelta(hours=73))
         self.assertIsNone(self.incident("fold_given_up"))  # the window passed with no other
         self.assertEqual(self.gh.verbs()[-1], "issue close")

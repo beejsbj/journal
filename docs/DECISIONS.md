@@ -4333,6 +4333,115 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     `test_mcp_fence.py` pass unchanged). Tested in `test_standing_stale.py` and, end to end through
     `tick.reply_annotations` and `reflect.send`, in `test_outage_breaker.py`.
 
+- **FOLD-RETRY (2026-11-22) — a failed fold heals on its own over a day; one that never can is given up at once, and
+  says so in `fold_gave_up`.** A fold that failed was tried on each of the next ticks, `FOLD_ATTEMPTS` (6) in all, so
+  about half an hour: a token helper or network outage longer than that left the message unfolded for good, and a
+  message that could never be edited (gone, past its edit window) spent the same six tries. Seen on a live install: a
+  token helper that printed nothing on two ticks five minutes apart (the third folded), and a connection reset. And a
+  fold that went through after failing kept its `fold_error` and `fold_attempts`, so the record read as a failure.
+  - **The stretch:** the wait doubles from five minutes (`FOLD_RETRY_MINUTES` = 5, 10, 20 … 640), so nine tries
+    (`FOLD_ATTEMPTS`) over about 21 hours from the first failure. A night's outage of the token helper or the network
+    heals by the morning, the error log gets at most nine lines a prompt rather than one a tick, and after a day the
+    fold is cosmetic (the next prompts have gone out). A retry is due a minute early (`FOLD_SLACK`), so a tick that
+    starts a few seconds soon does not slip five minutes. The record keeps `fold_attempts`, the last `fold_error` and
+    `fold_retry_at` (when it is next due); nothing else about the fold changed: what is folded, `needs_edit` (still
+    "the next due tick folds it"; a reply that lands mid-edit keeps it), and the edits made outside the ledger lock
+    with one locked write after each.
+  - **Never what cannot succeed:** `ports.ChannelError.permanent` (false by default; another channel says so only if it
+    knows). `TelegramError` is permanent for what the Bot API refuses about the message itself, a `Bad Request` (a
+    message to edit not found, one that can't be edited, `MESSAGE_ID_INVALID`) or a bare HTTP 400. Not for a refusal
+    of the whole chat: `Forbidden` (the bot blocked or kicked, the user deactivated, a bare 403) and the `Bad Request`
+    texts about the chat (`chat not found`, a group upgraded, rights the bot lacks, `CHAT_…`, `PEER_ID_INVALID`).
+    Those fail every message alike and pass when the chat is open to the bot again, so they are retried and hold the
+    others back like any failure that may pass; classed permanent, one blocked bot gave up every due fold in one
+    tick, beyond recovery once unblocked (and, with the ops notice, one notice a fold for one event). Nor for a token
+    that could not be had, a network error, a 5xx, `Too Many Requests`, or `Unauthorized` (a token the operator can
+    fix inside the day). The delegate's call: any other 400 for an edit is the same request failing the same way, so
+    it is not retried.
+  - **The give-up field, for the operator notice (`feat/ops-notice`): `fold_gave_up`** on the prompt record,
+    `{"at": <ISO time>, "reason": "permanent" | "attempts", "attempts": <n>, "error": <the channel's error text>}`.
+    Set when a fold is given up; the record is then closed as before (`collapsed_at`, `needs_edit` false) and the
+    message stays as sent. A `permanent` give-up is never tried again (a later reply that sets `needs_edit` does not
+    reopen it). An `attempts` give-up gets one more try each time a reply of his is captured to the prompt after it
+    (`fold_gave_up_captures`, the count of his replies at the give-up, beside the field so its shape stays four keys):
+    the reply is when a fold matters again, and the outage that spent the nine tries may be long over. That try
+    failing gives the fold up again (`fold_gave_up` rewritten: a new `at`, `attempts` one more, the new error) and
+    records the new count, so it cannot loop: at most one try a reply. It going through clears every fold field.
+    (Changed from the first cut, where any give-up blocked for good, on review.) Only a new send of the same prompt
+    (`send_prompt`'s re-send) clears it with the other fold fields (`tick.FOLD_STATE`), since that is a new message. The error text names no secret (`ChannelError`). A
+    given-up fold is no `Alert` (the tick still exits 0): it is cosmetic, and the operator's signal is the notice
+    that PR builds on this field. The give-up's log line says "fold failed … given up", so it is in `errors.jsonl` too.
+  - **No storm:** one try a prompt a due tick; and after a failure that may pass, the other folds due that tick wait
+    for the next one, untried and with no attempt spent, since a missing token or a dead network fails them all the
+    same (each try of a token helper can take 30 + 60 seconds under `tick.lock`). A permanent refusal holds nobody.
+    The oldest due fold goes first; the others get their turn while it waits. **When the channel comes back:** an
+    edit that goes through makes every fold waiting out a backoff due on the next tick (`fold_retry_at` set to now),
+    so one that failed in the night is not left until its 320- or 640-minute wait ends; still one try each a tick,
+    and a fold that failed in that same tick keeps its own wait.
+  - **A fold that goes through** clears `fold_attempts`, `fold_error` and `fold_retry_at`. Records mid-retry from
+    before carry on from their count on the new schedule; records closed by the old give-up stay closed.
+  - **Not touched:** the token command and any deployment's config. What the code says about "token_command printed
+    no TELEGRAM_BOT_TOKEN (two attempts)": `telegram.resolve_secret` ran the command twice (30 s, then 60 s timeout),
+    both finished in time, and neither stdout held a `TELEGRAM_BOT_TOKEN=` line nor exactly one line without `=`. The
+    exit status and stderr are not read, so a helper that failed (an exit status with its reason on stderr, such as
+    the secret store unreachable) reads the same as one whose output changed shape. Each tick is a fresh process and
+    the token is cached per process only, so every tick that sends or edits runs the helper. Taken on review: a
+    helper that exits non-zero now says so, "token_command exited with status N and printed no TELEGRAM_BOT_TOKEN
+    (two attempts)" (the last run's status), which tells the two apart. Never its stdout or stderr, which may hold the
+    secret. Unchanged: one bare stdout line is taken as the token whatever the exit status.
+  - Tested in `test_fold_retry.py` (a missing token healing on a later tick, a refusal given up at once and never
+    tried again, the nine tries and their doubling waits inside a day, one try a tick across three failing prompts,
+    a refusal not holding the others, a re-send clearing the fold's account, which texts are permanent; and after
+    review: a blocked bot giving up none of three folds and holding all but one, an `attempts` give-up getting one
+    try a reply and a `permanent` one none, a fold that goes through making the waiting ones due, `message is not
+    modified` counting as folded, the helper's exit status and nothing it printed).
+    **Test changed on purpose:** `test_engine.py`'s `FoldRetryTest` folded at one fixed time `FOLD_ATTEMPTS` times;
+    it now steps to each retry's due time.
+
+- **HERMES-TOOLSETS (2026-11-22) — "no tools" is `-t no_mcp`, and a refused request holds nothing.** Hermes moved
+  every one-shot into its gateway, whose `gateway/session_policy.py` `_resolve_toolsets` refuses a pick naming an
+  unknown toolset (`invalid_params`, "unknown or invalid toolset name") before any model runs; the CLI before it
+  warned ("Unknown toolsets: none") and ran with none. The engine says "no tools" with `toolsets="none"` (annotations,
+  picture descriptions, the catch-up, program reflect phases, bridges and syntheses, and the outage probe), so from
+  the upgrade every such step failed with exit 1. The probe asked the same way, so OUTAGES' confirming probe failed
+  too and opened the breaker, and every later probe failed again: everything was held (openers plain, annotations
+  deferred) with no model down. OUTAGES' "a fault of the request's comes back as None" did not apply: the refusal is
+  no HTTP 4xx and no `invalid_request_error`, so `failure_reason` read only `exit 1`, and in any case the rule asks a
+  probe first, which shared the fault.
+  - **The name.** Checked in Hermes' source and in process (a temporary `HERMES_HOME` with this repo as its one plugin,
+    lazy installs off): `none` is refused; an empty pick and `no_mcp` (the sentinel `saved_toolset_resolver` accepts)
+    both resolve to no toolsets; `journal_read` resolves to `journal_search` alone. `no_mcp` is used: the older
+    Hermes did not know it and ran with no tools, as with `none`, while an empty pick there meant the profile's
+    default tools. The engine keeps "none" as its own word (a custom `agent.command` still receives it); the Hermes
+    adapter maps it (`hermes/companion.py` `NO_TOOLS`, `hermes_toolsets`). Pinned by
+    `tests/test_hermes_argv_contract.py`: every `toolsets=` value in `src/journal` maps to a name in a mirror of
+    Hermes' rule (kept in sync by hand, like `test_install_scan.py`), a fake `hermes` that refuses as the gateway
+    does, and an opt-in `LiveHermesTest` (`JOURNAL_HERMES_AGENT=<checkout>`) that asks the real `_resolve_toolsets` in
+    a child process. The core still imports no Hermes (`test_purity.py`).
+  - **A refused request** (`outage.RequestRefused`, an `AgentUnavailable`): `failure_reason` reads `invalid_params`
+    only right after Hermes' own copy ("couldn't start the model connection:") and the refused field's name; the
+    detail after it, which echoes what was sent, is never read. `agent.ask` then runs no probe, never trips the
+    breaker (`trip_at_once` included), writes one `errors.jsonl` line (`mode: "model"`, "model request refused
+    (exit 1: invalid_params, toolsets): …"), and raises: the caller falls back as for an unavailable model, for that
+    record alone. **Chosen over a bad answer (None)**, which OUTAGES gives an HTTP 4xx: a refusal is the engine's
+    or the agent's setup, the same for every request until a deploy fixes it, so counting attempts would drop his
+    annotations within the hour, while deferring keeps them for the 7-day give-up and they are written once the fix
+    is in. The cost: while a refusal lasts, each deferring step retries its first record every 30 minutes (a
+    refused run is cheap: no model) and adds a line each time; the alerting that would notice it is the
+    ops-notice package's. `recovery.run` does not count a refused run as a sign of an outage.
+  - **A refused probe** says nothing of the model. In `gate` (the breaker open) it closes the breaker without saying
+    a model answered (`outage.release`: `last.released_at`, not `answered_at`, so records tried before it keep their
+    own 30-minute clock) and the ask runs; in `confirm` (a run failed with the breaker shut) it opens nothing and the
+    run's record defers alone. Without this, any future refusal of the probe's own request would hold every model
+    step for the whole outage window again. The cost: while the probe is refused, a real outage is found again run
+    by run (the behaviour before the breaker), not held.
+  - **Not done here:** alerting on refusals or a long-open breaker (the ops-notice package). The upgrade's other
+    effects on the plugin were not audited; a temporary-home probe saw the plugin's load overrun Hermes' default
+    10-second `plugins.load_timeout_seconds` on a cold start (its registrations then ignored); a deployment's logs show
+    the same now and then since before the upgrade. In a process where that happens `journal_read` is unknown, so a
+    reflection's pick is refused: it now defers alone with its `errors.jsonl` line instead of opening the breaker.
+    The load time itself is left open (raised here, not decided).
+
 - **OPS-NOTICE (2026-11-22) — the journal tells its operator when it breaks, in code, through GitHub issues (the
   owner: maintenance mode with nobody watching; the channel, GitHub issues, his choice; #42, "a real escalation
   route").** From 2026-11-17 every model call failed for five days (a Hermes upgrade refused a parameter): the breaker
@@ -4366,10 +4475,10 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     run by another scheduler (a systemd user timer or crontab; DEPLOY.md), opens `tick_stale`, and the next tick
     closes it. Not built: a check inside `journal serve` (a long-lived process that could watch `tick_at`), since
     serve sends nothing of its own today.
-  - **The one coupling to the fold** is a new ledger field, `fold_gave_up_at`, written by `tick.fold` where it stops
-    trying (the `fold_attempts` limit today). `fix/fold-retry`, which lengthens the retries, keeps writing that field
-    where it gives up; the notice reads nothing else of the fold. Records that gave up before this have no such field
-    and are not reported.
+  - **The one coupling to the fold** is FOLD-RETRY's ledger record `fold_gave_up` (`at`, `reason`: `permanent` |
+    `attempts`, `attempts`, `error`), written by `tick.fold` where it stops trying. The notice reads `fold_gave_up.at`
+    for the window, the error through `error_class`, and the reason only when it is one of those two words; nothing
+    else of the fold. Records that gave up before FOLD-RETRY have no such record and are not reported.
   - **Delivery.** `gh` as a subprocess (the core stays stdlib): `gh label create --force` once per repo and label,
     `gh issue create --label`, `gh issue comment`, `gh issue close --comment`; the issue number is read from the URL
     `gh` prints. `ops.command`, an argv of the operator's (`{action}` `{kind}` `{title}` `{issue}`, body on stdin),

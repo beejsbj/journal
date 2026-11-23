@@ -472,14 +472,17 @@ class FoldRetryTest(unittest.TestCase):
 
             def boom(*a, **k):
                 raise telegram.TelegramError("timeout")
+            now = datetime.now(timezone.utc)
             with mock.patch.object(telegram, "edit_html", boom):
-                for _ in range(tick.FOLD_ATTEMPTS - 1):
-                    tick.fold(cfg, datetime.now(timezone.utc), [])
+                for wait in tick.FOLD_RETRY_MINUTES:  # each try once it is due again (test_fold_retry has the rest)
+                    tick.fold(cfg, now, [])
                     p = ledger.find(ledger.snapshot(cfg.ledger_path), "2026-10-14-morning")
                     self.assertIsNone(p.get("collapsed_at"))
-                tick.fold(cfg, datetime.now(timezone.utc), [])
+                    now += timedelta(minutes=wait)
+                tick.fold(cfg, now, [])
                 p = ledger.find(ledger.snapshot(cfg.ledger_path), "2026-10-14-morning")
                 self.assertIsNotNone(p.get("collapsed_at"))
+                self.assertEqual(p["fold_gave_up"]["reason"], "attempts")
 
 
 class WovenQuestionsTest(unittest.TestCase):
