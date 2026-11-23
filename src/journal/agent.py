@@ -25,10 +25,14 @@ one-shot chat in the configured profile (``journal.hermes.companion``), and with
 (``CommandCompanion``: an argv list; ``{query_file}``, ``{budget}`` and ``{toolsets}`` are filled in).
 ``agent.enabled: false`` turns model steps off entirely.
 
-Every run carries ``JOURNAL_MODEL_STEP=1`` in its environment: the journal's own hook in that process
+Every run carries ``JOURNAL_MODEL_STEP=1`` in its environment and the same fact as the first line of its query
+(``step_mark``: ``[journal model step]``, with the search bound when the step has one): the journal's own hook
 (``hermes.hooks.on_llm_call``) then adds nothing to the turn, so a model step sees only the query the engine wrote
 (the context pack an opener is given already holds what it should; the notebook and the today block are for her chat).
-A step may add variables of its own (``env``): the reflection's carries ``search.UPTO_ENV``, its period's last day.
+A step may add variables of its own (``env``): the reflection's carries ``search.UPTO_ENV``, its period's last day,
+which the mark carries too. The query carries it because the environment does not always arrive: a Hermes that runs
+every one-shot inside its gateway keeps the client's environment to an allowlist of its own and never sets it in
+the process the hooks and tools run in (HERMES-ONESHOT-ENV, DECISIONS.md).
 """
 from __future__ import annotations
 
@@ -40,9 +44,12 @@ from pathlib import Path
 from . import outage
 from .config import Config
 from .ports import CompanionUnavailable
+from .search import UPTO_ENV
 
 DETAIL_CAP = 200
 MODEL_STEP_ENV = "JOURNAL_MODEL_STEP"  # set in every run's environment: the engine's own model step, not a turn of his
+STEP_MARK = "[journal model step]"  # the first line of every run's query: the same fact, for a process with no env
+_STEP_LINE = re.compile(r"\[journal model step(?:; search up to (\d{4}-\d\d-\d\d))?\]")
 _answered = False  # a model answered in this process (one tick): it is reachable again
 
 
@@ -56,6 +63,29 @@ AgentUnavailable = CompanionUnavailable  # the engine's name for it (one class)
 FAILURE_MARKS = ("⚠", "⏱")
 FAILURE_PHRASES = ("(`hermes logs`)", "`hermes doctor` on the host", "use /retry", "provider said:",
                    "couldn't finish this reply")
+
+
+def step_mark(env: dict[str, str] | None = None) -> str:
+    """The line that opens every run's query: ``[journal model step]``, or with the step's search bound
+    (``UPTO_ENV``, a YYYY-MM-DD) ``[journal model step; search up to 2026-10-14]``."""
+    upto = (env or {}).get(UPTO_ENV) or ""
+    return f"[journal model step; search up to {upto}]" if re.fullmatch(r"\d{4}-\d\d-\d\d", upto) else STEP_MARK
+
+
+def read_step_mark(text) -> tuple[bool, str | None]:
+    """Whether ``text`` (a turn's user message: a string, or a list of content parts) carries ``step_mark``'s line,
+    and the search bound it names. Any line of it counts (an agent may put something before the query, such as a
+    picture's description), but only a whole line: ``(False, None)`` otherwise."""
+    if isinstance(text, (list, tuple)):
+        text = "\n".join(p if isinstance(p, str) else str(p.get("text") or "") if isinstance(p, dict) else ""
+                         for p in text)
+    if not isinstance(text, str) or "[journal model step" not in text:
+        return False, None
+    for line in text.splitlines():
+        m = _STEP_LINE.fullmatch(line.strip())
+        if m:
+            return True, m.group(1)
+    return False, None
 
 
 def is_failure_text(text: str | None) -> bool:
@@ -168,7 +198,7 @@ class CommandCompanion:
             return None
         cfg.state_dir.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile("w", suffix=".md", dir=cfg.state_dir, delete=False) as fh:
-            fh.write(query)
+            fh.write(f"{step_mark(env)}\n\n{query}")
             qpath = Path(fh.name)
         try:
             argv = self.argv(qpath, budget, toolsets, image) if image else self.argv(qpath, budget, toolsets)

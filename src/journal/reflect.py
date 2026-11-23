@@ -14,7 +14,7 @@ The model (a one-shot) is given the period's entry files (the user's words, anno
 plus, for a week, that week's day reflections, and what came before (``continuity``): the opening and the closing
 question of her last few analyses (``EARLIER``), what he wrote back to each in the chat, and the open notebook threads
 the engine filed from a journal file (``notebook.on_record``; never one she added in chat, and the journal's hook adds
-nothing to an engine one-shot: ``agent.MODEL_STEP_ENV``). Its one tool is ``journal_search`` (``tools.READ_TOOLSET``),
+nothing to an engine one-shot: ``agent.step_mark``, ``hermes.steps``). Its one tool is ``journal_search`` (``tools.READ_TOOLSET``),
 over his words in every entry; no chat transcript or context pack is given to it. ``FOLLOW-UP:`` lines go to the
 notebook, as with annotations.
 
@@ -28,7 +28,7 @@ once; a reflection that never passes is never written. The reason logged, kept i
 (which mark, where, how long), never the reflection's words; the start of a quote that was not his is kept in the
 ledger alone (``rejected_quote``). Paraphrase is not checked. A reflection written after its period (the morning
 fallback, an outage's retry) is held to that period: the search finds nothing dated after its last day
-(``search.UPTO_ENV`` in the one-shot's environment), and no later entry, reply or notebook thread is read or
+(``search.UPTO_ENV``: in the one-shot's environment, and in its query's first line, ``agent.step_mark``), and no later entry, reply or notebook thread is read or
 quotable.
 
 A model that cannot be reached at all is different: that is an outage, which defers the reflection without using an

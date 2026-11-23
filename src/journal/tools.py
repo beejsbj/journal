@@ -263,13 +263,14 @@ def _program(cfg: Config, params: dict, **_) -> str:
     return json.dumps({"success": False, "error": f"unknown action {action!r}: use status or propose"})
 
 
-def _search(cfg: Config, params: dict, **_) -> str:
+def _search(cfg: Config, params: dict, search_upto: str | None = None, **_) -> str:
     """A read of his words in the journal's files (``search``): allowed in an off-record turn, as the notebook's list
-    is. In a reflection's one-shot the engine has set ``search.UPTO_ENV`` to the period's last day, and nothing dated
-    after it is found, whatever the call asks for."""
+    is. In a reflection's one-shot nothing dated after the period's last day is found, whatever the call asks for:
+    the adapter passes that day (``search_upto``, read from the run's query, ``agent.step_mark``), and where the
+    run is its own process the engine has set ``search.UPTO_ENV`` too."""
     try:
         found = search.search(cfg, params.get("query") or "", params.get("date_from"), params.get("date_to"),
-                              params.get("limit"), upto=os.environ.get(search.UPTO_ENV) or None)
+                              params.get("limit"), upto=search_upto or os.environ.get(search.UPTO_ENV) or None)
     except search.SearchError as e:
         return json.dumps({"success": False, "error": str(e)})
     return json.dumps({"success": True, **found}, ensure_ascii=False)
