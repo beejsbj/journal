@@ -4523,3 +4523,10 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     classification belongs to `fix/hermes-toolsets`). Possible later kinds: speech-to-text deferred past its alert, a
     reflection given up, the sweep's watermark not moving, the mirror queue growing, a `journal serve` that stopped
     (seen from the tick).
+
+**OPS-NOTICE, on re-review (2026-11-23).** A reopen half sent (the issue reopened, its comment refused) closes like
+a delivered incident when its condition clears, so it never leaves an issue open with the record saying closed. A
+pass that runs out of time before a call starts (`OutOfTime`) counts no try and logs no failure: the notice goes on
+the next pass. An `ops.command` route names its command (`command:<hash of the argv>`), so another command's issue
+numbers are never used, and a number is read from a command's reply only after `open`. DEPLOY's first checks look
+for a failed notice in `errors.jsonl` and `journal ops`, not `last-tick.json`, which is written before delivery.

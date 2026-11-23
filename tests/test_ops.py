@@ -606,6 +606,62 @@ class FlapTest(OpsBase):
         self.assertEqual(self.incident("breaker_open")["issue"], 43)
 
 
+class ReviewEdgesTest(OpsBase):
+    def test_a_half_sent_reopen_is_closed_when_it_clears(self):
+        outage.trip(self.cfg, RAW_MODEL_ERROR, NOW - timedelta(hours=3))
+        self.run_ops()
+        outage.answered(self.cfg, NOW + timedelta(hours=1))
+        self.run_ops(NOW + timedelta(hours=1, minutes=5))
+        outage.trip(self.cfg, RAW_MODEL_ERROR, NOW + timedelta(hours=2))
+        # the reopen goes through, its comment does not
+        self.gh.during = lambda argv: setattr(self.gh, "fail", "HTTP 502" if argv[1:3] == ["issue", "comment"] else None)
+        self.run_ops(NOW + timedelta(hours=4, minutes=5))
+        self.assertEqual(self.gh.verbs()[-2:], ["issue reopen", "issue comment"])
+        self.assertEqual(self.incident("breaker_open")["pending"], "reopen")
+        self.gh.during, self.gh.fail = None, None
+        outage.answered(self.cfg, NOW + timedelta(hours=4, minutes=10))
+        self.run_ops(NOW + timedelta(hours=4, minutes=15))
+        self.assertEqual(self.gh.verbs()[-1], "issue close")  # the reopened #42 is not left open
+        self.assertEqual(self.gh.calls[-1][0][3], "42")
+        self.assertIsNone(self.incident("breaker_open"))
+        self.assert_private()
+
+    def test_running_out_of_time_mid_notice_is_not_a_failed_try(self):
+        outage.trip(self.cfg, RAW_MODEL_ERROR, NOW - timedelta(hours=3))
+        with mock.patch.object(ops._Budget, "call", side_effect=[20.0, ops.OutOfTime()]):
+            log = self.run_ops()
+        self.assertIn("ops: delivery out of time; the rest is sent on the next pass", log)
+        self.assertFalse([line for line in log if "failed" in line])
+        inc = self.incident("breaker_open")
+        self.assertEqual((inc["pending"], inc.get("tries", 0)), ("open", 0))
+        self.assertNotIn("next_try_at", inc)
+        self.run_ops(NOW + timedelta(minutes=5))  # the next pass sends it, with no backoff
+        self.assertEqual(self.incident("breaker_open")["issue"], 42)
+
+    def test_a_command_route_names_its_command_and_only_a_create_names_a_number(self):
+        replies = {"open": "https://example.invalid/issues/7\n", "update": "posted to #2\n"}
+        calls = []
+
+        def run(argv, input=None, timeout=None, **kw):
+            calls.append(list(argv))
+            return subprocess.CompletedProcess(argv, 0, replies.get(argv[1], ""), "")
+
+        self.cfg.ops = {"command": ["/opt/notify", "{action}", "{kind}", "{issue}"], "update_hours": 1}
+        with mock.patch("journal.ops.subprocess.run", run):
+            outage.trip(self.cfg, RAW_MODEL_ERROR, NOW - timedelta(hours=3))
+            self.run_ops()
+            inc = self.incident("breaker_open")
+            self.assertEqual(inc["issue"], 7)
+            self.assertTrue(inc["route"].startswith("command:"))
+            self.run_ops(NOW + timedelta(hours=2))  # an update; its reply names another number
+            self.assertEqual(calls[-1][1], "update")
+            self.assertEqual(self.incident("breaker_open")["issue"], 7)
+            self.cfg.ops = {"command": ["/opt/other", "{action}", "{kind}", "{issue}"], "update_hours": 1}
+            self.run_ops(NOW + timedelta(hours=4))  # another command: #7 means nothing to it, so it files again
+            self.assertEqual(calls[-1][:2], ["/opt/other", "open"])
+            self.assertFalse([c for c in calls if c[0] == "/opt/other" and c[1] != "open"])
+
+
 def _quiet_tick():
     """Every tick step stubbed: the tick runs only its frame and the ops notice."""
     import contextlib

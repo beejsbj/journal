@@ -45,8 +45,9 @@ user's crontab, with the same `--config`/`--hermes-home` as the serve unit); the
 **First checks.** `journal doctor`: the `ops notice` row is `ok` (`issues in <owner>/<repo> (label journal-ops) via
 <gh>; 0 incident(s) open`); `fail … (not found)` means `ops.gh` is wrong. `journal ops check --dry-run` prints
 `[dry-run] nothing to file` on a healthy journal, or the notices it would open, as they would be filed: read one
-before letting it go. After the next tick, `<state dir>/ops.json` exists with `tick_at`, and `last-tick.json` has no
-`ops: … failed` line. **Expect a notice at once** if the model is still failing when this lands: annotations given up
+before letting it go. After the next tick, `<state dir>/ops.json` exists with `tick_at`. Delivery runs after
+`last-tick.json` is written, so a failed notice never shows there: look in `errors.jsonl` and `journal ops` (`last
+try: <class>`). A dry run does not test `gh`'s sign-in, so run `gh auth status` as the tick's user before relying on it. **Expect a notice at once** if the model is still failing when this lands: annotations given up
 and plain openers since the last model success count toward `model_floor` (that is the point); if the fix for that
 failure is deployed first, nothing is filed. A notice that cannot be delivered shows as `ops: notice open for <kind>
 failed (<class>)` in the tick's lines and `errors.jsonl`, and in `journal ops` as `last try: <class>`.

@@ -55,6 +55,7 @@ from __future__ import annotations
 
 import contextlib
 import fcntl
+import hashlib
 import json
 import os
 import re
@@ -518,8 +519,10 @@ def reconcile(cfg: Config, st: dict, found: dict, now: datetime) -> None:
         if facts is None:
             if inc is None or inc.get("resolved_at"):
                 continue
-            if inc.get("delivered"):
-                inc.update(resolved_at=_iso(now), pending="resolve", tries=0)
+            if inc.get("delivered") or (inc.get("pending") == "reopen" and inc.get("issue")):
+                # (a reopen half sent, the issue reopened but not commented on, closes too: closing a closed issue
+                # changes nothing, and leaving it would orphan an open one)
+                inc.update(resolved_at=_iso(now), pending="resolve", tries=0, delivered=True)
                 inc.pop("next_try_at", None)
             else:
                 inc["resolved_at"] = _iso(now)
@@ -623,6 +626,13 @@ class Undelivered(RuntimeError):
     """A notice did not go out; its text is an error class (``error_class``), safe for a log line."""
 
 
+class OutOfTime(Undelivered):
+    """The pass's budget ran out before a call could start: not a failed try (the notice goes on the next pass)."""
+
+    def __init__(self):
+        super().__init__("timeout")
+
+
 class _Budget:
     """The delivery pass's deadline (``PASS_SECONDS``), and each call's share of it (``CALL_SECONDS`` at most)."""
 
@@ -635,7 +645,7 @@ class _Budget:
     def call(self) -> float:
         left = self.left()
         if left < MIN_CALL_SECONDS:
-            raise Undelivered("timeout")
+            raise OutOfTime()
         return min(CALL_SECONDS, left)
 
 
@@ -662,6 +672,8 @@ def route(cfg: Config) -> str:
     """Where notices go now: ``github:<owner/name>``, ``command`` or ``off``. An incident keeps the route it was filed
     on, and its issue number means something only there."""
     how = delivery(cfg)
+    if how == "command":  # (which command: another one's issue numbers mean nothing to this one)
+        return "command:" + hashlib.sha256(json.dumps(command(cfg)).encode()).hexdigest()[:12]
     return f"github:{repo(cfg)}" if how == "github" else how
 
 
@@ -703,8 +715,10 @@ def deliver(cfg: Config, st: dict, kind: str, inc: dict, action: str, now: datet
         values = {"action": action, "kind": kind, "title": title(kind), "issue": str(inc.get("issue") or "")}
         fill = re.compile(r"\{(action|kind|title|issue)\}")  # (any other brace stays as written)
         out = _call([fill.sub(lambda m: values[m.group(1)], part) for part in cmd], text, budget)
+        if action != "open":
+            return inc.get("issue")  # (only a create names a number; a reply to another action never changes it)
         m = re.search(r"(?:/issues/|#)(\d+)", out) or re.fullmatch(r"\s*(\d+)\s*", out)
-        return int(m.group(1)) if m else inc.get("issue")
+        return int(m.group(1)) if m else None
     gh, where = gh_path(cfg), ["--repo", repo(cfg)]
     if action == "open":
         _gh_label(cfg, st, budget)
@@ -715,8 +729,9 @@ def deliver(cfg: Config, st: dict, kind: str, inc: dict, action: str, now: datet
         try:
             out = _call([gh, "issue", "create", *where, "--title", title(kind), "--label", label(cfg),
                          "--body-file", "-"], text, budget)
-        except Undelivered:
-            st["label_ready"] = None  # (the label may be what failed: made again on the next try)
+        except Undelivered as e:
+            if not isinstance(e, OutOfTime):
+                st["label_ready"] = None  # (the label may be what failed: made again on the next try)
             raise
         m = re.search(r"/issues/(\d+)", out)
         return int(m.group(1)) if m else None
@@ -858,6 +873,9 @@ def _deliver_due(cfg: Config, now: datetime, log: list[str]) -> None:
             try:
                 issue = deliver(cfg, label_state, kind, inc, action, now, budget)
                 error = None
+            except OutOfTime:
+                log.append("ops: delivery out of time; the rest is sent on the next pass")
+                return  # (no try counted: nothing was refused, the pass just ran out)
             except Undelivered as e:
                 issue, error = None, str(e)
             with ledger.locked_state(path) as st:
