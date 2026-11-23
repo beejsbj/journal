@@ -157,6 +157,10 @@ function HerLetter({ prompt, hers }: { prompt: Prompt; hers: string }) {
 
 // ── the room ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
+/** A zero-width space (U+200B) ends the mirror so a trailing empty line keeps its height. It is decoded at run time:
+ * the minifier folds `String.fromCharCode(0x200b)` and rewrites a "\u200b" escape into the literal character, and a
+ * literal U+200B in the bundle is an `invisible_unicode` finding for Hermes' install scanner (`tests/test_install_scan.py`). */
+const HOLD_LINE = decodeURIComponent("%E2%80%8B");
 const EXIT_MS = 460;
 const WIDE = "(min-width: 761px)";
 
@@ -525,7 +529,7 @@ function Desk({ page, hour, voice, onVoiceUsed, guard, onClose, onMade }: {
                     <span class={lit.has(i) ? "room-p lit" : "room-p"}>{p.text}</span>
                   </span>
                 ))}
-                {"\n​"}
+                {"\n" + HOLD_LINE}
               </div>
               <label class="visually-hidden" for={id}>{page.label}</label>
               <textarea

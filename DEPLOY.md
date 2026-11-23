@@ -49,6 +49,20 @@ than 7 days after the first failure.
 previous sha), then `hermes gateway restart`. Rolling back on the same Hermes brings the outage back. Nothing to undo
 in state.
 
+## ZERO-WIDTH — the write room's built bundle carries no literal invisible character (2026-11-22; serve side only; no gateway restart; no config or state change)
+
+**What changes.** The write room's mirror ends with a zero-width space so that a trailing empty line keeps its height.
+It was a literal U+200B in the source and in the built bundle, which Hermes' install scanner reports as HIGH
+`invisible_unicode`. It is now built from its code point (`web/src/components/WriteRoom.tsx`), so the bundle holds no
+literal; the line keeps its height as before. `tests/test_install_scan.py` fails if a file under `serve/static/` carries
+an invisible character. #36.
+**Side and restart.** Serve side only (the committed web build). `uv tool install --force` at the merge sha, then
+`systemctl --user restart journal-serve`; the installed PWA takes the update through its "Update available" prompt. No
+gateway restart.
+**First checks.** The install scan no longer lists `invisible_unicode` for the bundle. In the write room, type a
+paragraph, press Enter at the end: the new empty line keeps its height.
+**Rollback.** Reinstall the previous sha and restart `journal-serve`. Nothing to undo in state.
+
 ## STALE-COUNT — the companion is told how many sends went stale (2026-11-15; tick and hook side; **gateway restart required, in a window**; no config or state change)
 
 **What changes.** For a day after an annotation reply or a reflection send is skipped as too late after an outage
