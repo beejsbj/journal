@@ -396,10 +396,33 @@ class NearTest(FileCase):
             self.assertNotIn("76.283", url)
         # nothing the host keeps holds the position: not the config, not the history
         line = (cfg.state_dir / "location-history.jsonl").read_text(encoding="utf-8").splitlines()[-1]
-        self.assertEqual(json.loads(line)["query"], "device position")
-        for text in (line, self.file.read_text(encoding="utf-8")):
+        record = json.loads(line)
+        self.assertEqual(record["query"], "device position")
+        # the history line's `at` is a clock reading with microseconds ("...:39.983327"), which can contain "9.98" by
+        # chance (#6): look at what the line records about the place, not at when it was written
+        recorded = json.dumps({k: v for k, v in record.items() if k != "at"})
+        for text in (recorded, self.file.read_text(encoding="utf-8")):
             self.assertNotIn("9.98", text)
             self.assertNotIn("76.28", text)
+
+    def test_the_history_stamp_cannot_fail_the_position_check_whatever_the_clock_reads(self):
+        # #6: the history line's `at` carries microseconds; at "...:39.983327" it contains "9.98". The check on the
+        # line must hold with the clock pinned to exactly that reading.
+        from datetime import datetime, timezone
+        stamp = datetime(2026, 10, 27, 14, 2, 39, 983327, tzinfo=timezone.utc)
+
+        class Pinned(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return stamp if tz is None else stamp.astimezone(tz)
+
+        fetch, _ = answers(NOMINATIM, OPEN_METEO)
+        with mock.patch("journal.location.datetime", Pinned):
+            cfg, _done = self.apply(9.981234, 76.283456, fetch)
+        record = json.loads((cfg.state_dir / "location-history.jsonl").read_text(encoding="utf-8").splitlines()[-1])
+        self.assertIn("9.98", record["at"])            # the collision is real: a raw substring check would fail here
+        self.assertNotIn("9.98", json.dumps({k: v for k, v in record.items() if k != "at"}))
+        self.assertNotIn("76.28", json.dumps(record))
 
     def test_the_credit_goes_with_the_place_osm_named_and_a_typed_place_clears_it(self):
         from journal import location

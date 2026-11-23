@@ -4379,3 +4379,47 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     a refusal not holding the others, a re-send clearing the fold's account, which texts are permanent).
     **Test changed on purpose:** `test_engine.py`'s `FoldRetryTest` folded at one fixed time `FOLD_ATTEMPTS` times;
     it now steps to each retry's due time.
+
+- **HERMES-TOOLSETS (2026-11-22) — "no tools" is `-t no_mcp`, and a refused request holds nothing.** Hermes moved
+  every one-shot into its gateway, whose `gateway/session_policy.py` `_resolve_toolsets` refuses a pick naming an
+  unknown toolset (`invalid_params`, "unknown or invalid toolset name") before any model runs; the CLI before it
+  warned ("Unknown toolsets: none") and ran with none. The engine says "no tools" with `toolsets="none"` (annotations,
+  picture descriptions, the catch-up, program reflect phases, bridges and syntheses, and the outage probe), so from
+  the upgrade every such step failed with exit 1. The probe asked the same way, so OUTAGES' confirming probe failed
+  too and opened the breaker, and every later probe failed again: everything was held (openers plain, annotations
+  deferred) with no model down. OUTAGES' "a fault of the request's comes back as None" did not apply: the refusal is
+  no HTTP 4xx and no `invalid_request_error`, so `failure_reason` read only `exit 1`, and in any case the rule asks a
+  probe first, which shared the fault.
+  - **The name.** Checked in Hermes' source and in process (a temporary `HERMES_HOME` with this repo as its one plugin,
+    lazy installs off): `none` is refused; an empty pick and `no_mcp` (the sentinel `saved_toolset_resolver` accepts)
+    both resolve to no toolsets; `journal_read` resolves to `journal_search` alone. `no_mcp` is used: the older
+    Hermes did not know it and ran with no tools, as with `none`, while an empty pick there meant the profile's
+    default tools. The engine keeps "none" as its own word (a custom `agent.command` still receives it); the Hermes
+    adapter maps it (`hermes/companion.py` `NO_TOOLS`, `hermes_toolsets`). Pinned by
+    `tests/test_hermes_argv_contract.py`: every `toolsets=` value in `src/journal` maps to a name in a mirror of
+    Hermes' rule (kept in sync by hand, like `test_install_scan.py`), a fake `hermes` that refuses as the gateway
+    does, and an opt-in `LiveHermesTest` (`JOURNAL_HERMES_AGENT=<checkout>`) that asks the real `_resolve_toolsets` in
+    a child process. The core still imports no Hermes (`test_purity.py`).
+  - **A refused request** (`outage.RequestRefused`, an `AgentUnavailable`): `failure_reason` reads `invalid_params`
+    only right after Hermes' own copy ("couldn't start the model connection:") and the refused field's name; the
+    detail after it, which echoes what was sent, is never read. `agent.ask` then runs no probe, never trips the
+    breaker (`trip_at_once` included), writes one `errors.jsonl` line (`mode: "model"`, "model request refused
+    (exit 1: invalid_params, toolsets): …"), and raises: the caller falls back as for an unavailable model, for that
+    record alone. **Chosen over a bad answer (None)**, which OUTAGES gives an HTTP 4xx: a refusal is the engine's
+    or the agent's setup, the same for every request until a deploy fixes it, so counting attempts would drop his
+    annotations within the hour, while deferring keeps them for the 7-day give-up and they are written once the fix
+    is in. The cost: while a refusal lasts, each deferring step retries its first record every 30 minutes (a
+    refused run is cheap: no model) and adds a line each time; the alerting that would notice it is the
+    ops-notice package's. `recovery.run` does not count a refused run as a sign of an outage.
+  - **A refused probe** says nothing of the model. In `gate` (the breaker open) it closes the breaker without saying
+    a model answered (`outage.release`: `last.released_at`, not `answered_at`, so records tried before it keep their
+    own 30-minute clock) and the ask runs; in `confirm` (a run failed with the breaker shut) it opens nothing and the
+    run's record defers alone. Without this, any future refusal of the probe's own request would hold every model
+    step for the whole outage window again. The cost: while the probe is refused, a real outage is found again run
+    by run (the behaviour before the breaker), not held.
+  - **Not done here:** alerting on refusals or a long-open breaker (the ops-notice package). The upgrade's other
+    effects on the plugin were not audited; a temporary-home probe saw the plugin's load overrun Hermes' default
+    10-second `plugins.load_timeout_seconds` on a cold start (its registrations then ignored); a deployment's logs show
+    the same now and then since before the upgrade. In a process where that happens `journal_read` is unknown, so a
+    reflection's pick is refused: it now defers alone with its `errors.jsonl` line instead of opening the breaker.
+    The load time itself is left open (raised here, not decided).

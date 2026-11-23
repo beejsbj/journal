@@ -127,6 +127,37 @@ class ModelHeld(CompanionUnavailable):
     ``held: <reason>``, the reason being ``agent.failure_reason`` of the run that found the outage (a whitelist)."""
 
 
+class RequestRefused(CompanionUnavailable):
+    """The agent refused the request before any model ran (Hermes' ``invalid_params``: a launch parameter it does not
+    accept, such as an unknown toolset name). The request is wrong, not the model: it never opens or holds the
+    breaker. A caller treats it as it treats an unavailable model for that one record (an opener goes out plain, a
+    record defers alone and is tried again on its own clock), so the work is still there once a fix is deployed.
+    Its text is the failed run's own message, as before."""
+
+
+REFUSED = "invalid_params"  # Hermes' wire code for a refused launch parameter (``gateway.session_policy._refuse``)
+
+
+def refused(reason) -> bool:
+    """Whether a failed run's reason (``agent.failure_reason``) is a refusal of the request (``REFUSED``)."""
+    return REFUSED in str(reason or "").replace(":", " ").split()
+
+
+def note_refused(cfg: Config, what: str, reason: str, field: str = "") -> None:
+    """One line in ``errors.jsonl`` for a refused request, apart from outages: ``what`` (a step, or the probe), the
+    whitelisted ``reason`` and the refused parameter's name (Hermes' field name, e.g. ``toolsets``). Any process may
+    write it (a tick, ``journal send``, ``journal program``); a plain append, as the tick's own lines."""
+    import json
+    line = (f"model request refused ({reason}{f', {field}' if field else ''}): {what}; the agent did not accept "
+            "the request, so no model ran; not an outage: nothing is held, and this call falls back")
+    try:
+        cfg.state_dir.mkdir(parents=True, exist_ok=True)
+        with open(cfg.state_dir / "errors.jsonl", "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"at": _now().isoformat(), "mode": "model", "error": line}, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+
+
 def held(detail) -> bool:
     return str(detail or "").startswith(HELD + ":")
 
@@ -200,7 +231,11 @@ def gate(cfg: Config, companion, now: datetime | None = None) -> bool:
     try:
         companion.ask(PROBE_QUERY, PROBE_BUDGET, "none")
     except CompanionUnavailable as e:
-        from .agent import failure_reason
+        from .agent import failure_reason, refused_field
+        if refused(failure_reason(str(e))):  # the probe's own request was refused: no evidence of an outage at all
+            note_refused(cfg, "the outage probe", failure_reason(str(e)), refused_field(str(e)))
+            release(cfg, now)  # (holding on would hold every model step for as long as the refusal lasts)
+            return False
         with ledger.locked_state(_path(cfg)) as st:
             st.pop("probing_at", None)
             if st.get("down_since"):
@@ -214,15 +249,21 @@ def gate(cfg: Config, companion, now: datetime | None = None) -> bool:
     return True
 
 
-def confirm(cfg: Config, companion) -> bool:
+def confirm(cfg: Config, companion) -> bool | None:
     """A run just failed with the breaker shut (``agent.ask``): whether a model answers the probe now. True: the
-    request failed on its own and nothing is held; False: the probe failed too, and the caller opens the breaker. With
-    the breaker off, no probe and False (as before it: the run's failure is the outage)."""
+    request failed on its own and nothing is held; False: the probe failed too, and the caller opens the breaker; None:
+    the probe's own request was refused (``RequestRefused``), which says nothing of the model either way, so nothing
+    is opened and the run's record defers alone. With the breaker off, no probe and False (as before it: the run's
+    failure is the outage)."""
     if not breaker_on(cfg):
         return False
     try:
         companion.ask(PROBE_QUERY, PROBE_BUDGET, "none")
-    except CompanionUnavailable:
+    except CompanionUnavailable as e:
+        from .agent import failure_reason, refused_field
+        if refused(failure_reason(str(e))):
+            note_refused(cfg, "the outage probe", failure_reason(str(e)), refused_field(str(e)))
+            return None
         return False
     return True
 
@@ -254,13 +295,24 @@ def trip(cfg: Config, reason: str, now: datetime | None = None) -> None:
 def answered(cfg: Config, now: datetime | None = None) -> None:
     """A model answered: close the breaker if it is open, keeping when the outage ran (``last``). Reads only, unless
     it was open."""
+    _close(cfg, now, "answered_at")
+
+
+def release(cfg: Config, now: datetime | None = None) -> None:
+    """The probe's own request was refused: close the breaker without saying a model answered (``last`` has
+    ``released_at``, not ``answered_at``). Work is then tried on its own again, record by record, as before the
+    breaker: a real outage is found again by the next run that fails, and its record defers alone."""
+    _close(cfg, now, "released_at")
+
+
+def _close(cfg: Config, now: datetime | None, key: str) -> None:
     if not ledger.read_state(_path(cfg)).get("down_since"):
         return
     now = now or _now()
     with ledger.locked_state(_path(cfg)) as st:
         if not st.get("down_since"):
             return
-        last = {"down_since": st["down_since"], "answered_at": now.isoformat(), "probes": probes(st),
+        last = {"down_since": st["down_since"], key: now.isoformat(), "probes": probes(st),
                 "last_error": st.get("last_error") or ""}
         st.clear()
         st["last"] = last
