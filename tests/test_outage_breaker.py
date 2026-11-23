@@ -343,6 +343,95 @@ class RequestFailureTest(BreakerBase):
                          ["model outage over: a model answered again (down since ?); held work catches up, paced"])
 
 
+class RefusedRequestTest(BreakerBase):
+    """HERMES-TOOLSETS: a request the agent refuses before any model runs (Hermes' ``invalid_params``) says nothing of
+    the model. It never opens or holds the breaker, runs no probe, falls back for its own record alone and has a line
+    of its own in ``errors.jsonl``; a refused probe holds nothing either."""
+
+    REFUSED = ("exit 1: Hermes couldn't start the model connection: invalid_params (toolsets: unknown or invalid "
+               "toolset name: 'his words'). Your message was not sent. Run `hermes doctor` to check the setup.")
+
+    def refusing(self, probe=False, runs=True):
+        real = self.companion.ask
+
+        def ask(query, budget, toolsets=None, image=None, env=None):
+            is_probe = query == outage.PROBE_QUERY
+            if (probe and is_probe) or (runs and not is_probe):
+                (self.companion.probes.append((budget, toolsets)) if is_probe
+                 else self.companion.runs.append((query, budget, toolsets)))
+                raise agent.AgentUnavailable(self.REFUSED)
+            return real(query, budget, toolsets, image, env)
+        return mock.patch.object(self.companion, "ask", ask)
+
+    def errors(self):
+        path = self.cfg.state_dir / "errors.jsonl"
+        return [json.loads(l) for l in path.read_text().splitlines()] if path.is_file() else []
+
+    def test_the_reason_is_whitelisted(self):
+        self.assertEqual(agent.failure_reason(self.REFUSED), "exit 1: invalid_params")
+        self.assertEqual(agent.refused_field(self.REFUSED), "toolsets")
+        self.assertTrue(outage.refused("exit 1: invalid_params") and outage.refused("held: exit 1: invalid_params"))
+        self.assertFalse(outage.refused("exit 1") or outage.refused("exit 1: 400 invalid_request_error"))
+        self.assertEqual(agent.failure_reason("exit 1: he wrote invalid_params in prose"), "exit 1")  # (only after
+        # Hermes' own copy)
+
+    def test_a_refused_run_holds_nothing_and_says_so(self):
+        self.companion.down = False
+        with self.refusing():
+            for once in (False, True):  # (an opener's ``trip_at_once`` too)
+                with self.assertRaises(outage.RequestRefused) as cm:
+                    agent.ask(self.cfg, "q", 60, toolsets="none", trip_at_once=once)
+                self.assertIsInstance(cm.exception, agent.AgentUnavailable)  # (callers fall back as before)
+                self.assertNotIsInstance(cm.exception, outage.ModelHeld)
+        self.assertIsNone(outage.known(self.cfg))
+        self.assertEqual(self.companion.probes, [])  # no probe: the refusal is the request's, whatever the model
+        self.assertEqual(self.ask(), DRAFT)  # nothing is held
+        errors = self.errors()
+        self.assertEqual([e["mode"] for e in errors], ["model", "model"])
+        self.assertTrue(errors[0]["error"].startswith(
+            "model request refused (exit 1: invalid_params, toolsets): a model step; "), errors[0])
+        self.assertNotIn("his words", json.dumps(errors))  # (the detail Hermes echoes is never read)
+
+    def test_a_refused_probe_releases_an_open_breaker(self):
+        with self.assertRaises(agent.AgentUnavailable):
+            self.ask()  # a real outage opened it
+        self.assertTrue(outage.known(self.cfg))
+        self.companion.down = False
+        self.new_process()
+        self.at(timedelta(minutes=5))
+        with self.refusing(probe=True, runs=False):
+            self.assertEqual(self.ask(), DRAFT)  # the probe was refused: no evidence, so the ask runs on its own
+        self.assertIsNone(outage.known(self.cfg))
+        last = ledger.read_state(self.cfg.state_dir / outage.STATE)["last"]
+        self.assertEqual(last["released_at"], (T0 + timedelta(minutes=5)).isoformat())
+        self.assertNotIn("answered_at", last)
+        self.assertIn("the outage probe", self.errors()[-1]["error"])
+
+    def test_a_refused_probe_after_a_failed_run_opens_nothing(self):
+        self.companion.down = False
+        with self.refusing(probe=True, runs=False), \
+                mock.patch.object(self.companion, "down", True):  # the run fails; the probe is refused
+            with self.assertRaises(agent.AgentUnavailable) as cm:
+                self.ask()
+        self.assertNotIsInstance(cm.exception, (outage.ModelHeld, outage.RequestRefused))  # (this record defers)
+        self.assertIsNone(outage.known(self.cfg))
+
+    def test_an_annotation_whose_request_is_refused_waits_and_is_written_after_the_fix(self):
+        add_prompt(self.cfg, kind="morning", sent=T0 - timedelta(hours=3), message_id="100")
+        capture.capture(self.cfg, CHAT, "100", "words", T0 - timedelta(hours=2, minutes=55), "text", "4242")
+        self.companion.down = False
+        with self.refusing():
+            tick.annotate(self.cfg, self.at(timedelta(0)), [])
+        rec = ledger.find(ledger.snapshot(self.cfg.ledger_path), "2026-10-14-morning")
+        self.assertFalse(rec.get("annotate_attempts"))  # no attempt spent: the fix deploys, the work is still there
+        self.assertTrue(rec.get("deferred_since"))
+        self.assertIsNone(outage.known(self.cfg))
+        self.new_process()
+        tick.annotate(self.cfg, self.at(outage.RETRY_EVERY), [])  # the fix is in: its own clock, then written
+        rec = ledger.find(ledger.snapshot(self.cfg.ledger_path), "2026-10-14-morning")
+        self.assertTrue(rec.get("annotated_at"))
+
+
 class TickUnderOutageTest(BreakerBase):
     """Finding 1 on main: each tick started model runs of its own while every model was down."""
 
