@@ -28,7 +28,17 @@ from .ports import Caps, ChannelError, Keyboard
 
 
 class TelegramError(ChannelError):
-    pass
+    @property
+    def permanent(self) -> bool:
+        """The Bot API refused the request itself (``Bad Request``, ``Forbidden``: a message to edit not found, one that
+        can't be edited, a chat the bot can no longer write to): the same request fails the same way every time. A
+        token that could not be had, a network error, a 5xx, ``Too Many Requests`` and ``Unauthorized`` (a token the
+        operator can fix) are not."""
+        return bool(_REFUSED.search(str(self)))
+
+
+# what ``_call`` raises for a 400 or 403: "<method>: Bad Request: …" from the API's description, "HTTP 400" without one
+_REFUSED = re.compile(r"^\w+: (?:Bad Request|Forbidden)\b|^\w+: HTTP 40[03]$")
 
 
 _TOKEN: str | None = None

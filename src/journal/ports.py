@@ -112,7 +112,11 @@ class ChatUnreadable(OSError):
 
 
 class ChannelError(RuntimeError):
-    """A message could not be sent into (or edited in) the chat; the text says why, never a secret."""
+    """A message could not be sent into (or edited in) the chat; the text says why, never a secret. ``permanent``:
+    the platform refused this request for good (the message is gone, past its edit window, the request is one it will
+    never take), so trying it again cannot help; otherwise the failure may pass (the network, a token helper, a 5xx,
+    a rate limit) and a caller may retry."""
+    permanent = False
 
 
 @dataclass(frozen=True)
