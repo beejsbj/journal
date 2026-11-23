@@ -16,7 +16,9 @@ An outage, once found, is known across processes (``outage``'s breaker): while i
 raises ``outage.ModelHeld`` (an ``AgentUnavailable``) until a probe is due, then probes once before the run. A run
 that fails (other than by timing out) opens the breaker only when a probe run at once fails too: when the probe
 answers, the request failed on its own (one picture, one prompt too long), nothing else is held, and a failure the
-request caused (``outage.request_failed``: a 4xx other than 408 and 429) comes back as None, a bad answer.
+request caused (``outage.request_failed``: a 4xx other than 408 and 429) comes back as None, a bad answer. A request
+the agent refused before any model ran (Hermes' ``invalid_params``) raises ``outage.RequestRefused``: no probe, never
+the breaker, one line in ``errors.jsonl``; the caller falls back as for an unavailable model, for that record alone.
 
 ``ask(cfg, …)`` is the facade every model step calls; it asks ``cfg.companion()``: by default the Hermes adapter's
 one-shot chat in the configured profile (``journal.hermes.companion``), and with ``agent.command`` any other command
@@ -90,8 +92,12 @@ def _detail(out: subprocess.CompletedProcess) -> str:
 _STATUS = re.compile(r"\b(?:error code|http(?: status)?|status(?: code)?)[:= ]+([45]\d\d)\b")
 _ERROR_CLASS = re.compile(r"""["']type["']\s*:\s*["']([a-z]{2,20}(?:_[a-z]{2,20}){0,3}_error)["']"""
                           r"""|\berror code: [45]\d\d\s+-\s+([a-z]{2,20}(?:_[a-z]{2,20}){0,3}_error)\b""")
+# Hermes' own refusal of a launch parameter (``agent_init_failed``: "Hermes couldn't start the model connection:
+# invalid_params (toolsets: unknown or invalid toolset name: …)"): its wire code, and the field it names, read only
+# right after that copy. The detail after the field (which echoes what was sent) is never read.
+_REFUSAL = re.compile(r"couldn.t start the model connection: (invalid_params)\b(?: \(([a-z_]{2,40}):)?")
 _LABELS = ("timed out", "could not run the agent", "agent reported a failure")
-_ITEM = r"(?:[45]\d\d|[a-z]{2,20}(?:_[a-z]{2,20}){0,3}_error)"
+_ITEM = r"(?:[45]\d\d|[a-z]{2,20}(?:_[a-z]{2,20}){0,3}_error|invalid_params)"
 _MADE = re.compile(rf"(?:(?:exit -?\d{{1,3}}|killed by signal \d{{1,3}}|{'|'.join(_LABELS)}|model unreachable)"
                    rf"(?:: {_ITEM}(?: {_ITEM})*)?|{_ITEM}(?: {_ITEM})*)")  # what ``failure_reason`` returns
 
@@ -119,8 +125,15 @@ def failure_reason(message: str) -> str:
     else:
         head = f"exit {m.group(1)}" if m else next((label for label in _LABELS if low.startswith(label)), "")
     classes = [a or b for a, b in _ERROR_CLASS.findall(low)]
-    found = list(dict.fromkeys([*_STATUS.findall(low), *classes]))
+    refusal = [m.group(1)] if (m := _REFUSAL.search(low)) else []
+    found = list(dict.fromkeys([*_STATUS.findall(low), *classes, *refusal]))
     return (": ".join(x for x in (head, " ".join(found)) if x))[:DETAIL_CAP]
+
+
+def refused_field(message: str) -> str:
+    """The launch parameter a refused request named (Hermes' field name, e.g. ``toolsets``), or "": for the log."""
+    m = _REFUSAL.search((message or "").lower())
+    return (m.group(2) or "") if m else ""
 
 
 def answered_this_run() -> bool:
@@ -210,12 +223,18 @@ def ask(cfg: Config, query: str, budget: int, toolsets: str | None = None, image
                              **({"env": env} if env else {}))
     except AgentUnavailable as e:
         reason = failure_reason(str(e)) or "model unreachable"
+        if outage.refused(reason):  # the agent refused the request itself: no model ran, so this says nothing of one
+            outage.note_refused(cfg, "a model step", reason, refused_field(str(e)))
+            raise outage.RequestRefused(str(e)) from e  # (never trips or holds the breaker, ``trip_at_once`` or not)
         if str(e).startswith("timed out") and _answered:
             raise  # (a long run after an answer is no outage)
         if trip_at_once and not probed:
             outage.trip(cfg, reason)
             raise
-        if not (probed or outage.confirm(cfg, companion)):  # the probe found no model either: an outage
+        seen = probed or outage.confirm(cfg, companion)
+        if seen is None:
+            raise  # the probe was refused too: no evidence of an outage, so nothing is held and this record waits alone
+        if not seen:  # the probe found no model either: an outage
             outage.trip(cfg, reason)
             raise
         _answered = True  # a model answers: this request failed on its own, and the breaker stays shut
