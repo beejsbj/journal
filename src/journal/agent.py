@@ -106,11 +106,20 @@ def __getattr__(name: str):
     raise AttributeError(name)
 
 
+_ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-_]")  # colour, cursor, title
+
+
 def _detail(out: subprocess.CompletedProcess) -> str:
-    """One line saying why a run failed: Hermes' failure copy on stdout, else the last stderr line."""
+    """One line saying why a run failed: Hermes' failure copy on stdout (its first paragraph, as one line: a terminal's
+    copy may be wrapped), else the last stderr line; terminal colour and control codes dropped either way."""
     for stream in (out.stdout, out.stderr):
-        lines = [l.strip() for l in (stream or "").splitlines()
-                 if l.strip() and not l.strip().startswith("session_id:")]
+        text = _ANSI.sub("", stream or "")
+        if stream is out.stdout:
+            paras = [" ".join(l.strip() for l in para.splitlines() if l.strip())
+                     for para in re.split(r"\n\s*\n", text)]
+            lines = [p for p in paras if p and not p.startswith("session_id:")]
+        else:
+            lines = [l.strip() for l in text.splitlines() if l.strip() and not l.strip().startswith("session_id:")]
         if lines:
             return f"exit {out.returncode}: {lines[0] if stream is out.stdout else lines[-1]}"[:DETAIL_CAP]
     return f"exit {out.returncode}"
@@ -145,7 +154,7 @@ def failure_reason(message: str) -> str:
     right after ``Error code: NNN -``. A number or ``*_error`` word loose in prose (which is where an echo of his
     words would put one) matches nothing. Everything else, whatever the length, is dropped, so no prose from the
     message reaches a log line."""
-    low = (message or "").lower().lstrip()
+    low = _ANSI.sub("", message or "").lower().lstrip()
     if outage.held(low):  # ``ModelHeld``: "held: " and a reason this function made (its grammar), else "held" alone
         rest = low[len(outage.HELD) + 1:].strip()
         return f"{outage.HELD}: {rest}"[:DETAIL_CAP] if _MADE.fullmatch(rest) else outage.HELD
@@ -162,7 +171,7 @@ def failure_reason(message: str) -> str:
 
 def refused_field(message: str) -> str:
     """The launch parameter a refused request named (Hermes' field name, e.g. ``toolsets``), or "": for the log."""
-    m = _REFUSAL.search((message or "").lower())
+    m = _REFUSAL.search(_ANSI.sub("", message or "").lower())
     return (m.group(2) or "") if m else ""
 
 

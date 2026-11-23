@@ -30,7 +30,7 @@ from helpers import ROOT, make_cfg, real_ask
 from journal import agent, outage, tools
 from journal.config import Config
 from journal.hermes import tools as hermes_tools
-from journal.hermes.companion import NO_TOOLS, HermesCompanion, hermes_toolsets
+from journal.hermes.companion import NO_TOOLS, HermesCompanion, hermes_toolsets, toolset_hazards
 
 SRC = ROOT / "src" / "journal"
 PLUGIN_TOOLSETS = {hermes_tools.TOOLSET, tools.READ_TOOLSET}  # what the journal plugin registers (``ctx.register_tool``)
@@ -122,15 +122,82 @@ class ArgvContractTest(unittest.TestCase):
         self.assertEqual(hermes_toolsets(" journal_read "), "journal_read")
 
 
+class HazardTest(unittest.TestCase):
+    """M1 (review of #62): ``-t no_mcp`` is no toolsets only while the profile has no xAI credentials and the default
+    context engine; ``journal doctor`` says when either holds. Values are never read out, only their presence."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name) / "hermes"
+        self.home = self.root / "profiles" / "companion"
+        self.home.mkdir(parents=True)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def hazards(self, **env):
+        return toolset_hazards(self.home, env)
+
+    def test_a_plain_profile_has_none(self):
+        (self.home / "config.yaml").write_text("context:\n  engine: compressor\nmodel: x\n")
+        (self.home / ".env").write_text("OPENROUTER_API_KEY=k\nXAI_API_KEY=\n")
+        (self.home / "auth.json").write_text(json.dumps({"providers": {"nous": {"x": 1}}}))
+        self.assertEqual(self.hazards(), [])
+        self.assertEqual(toolset_hazards(None), [])
+
+    def test_each_condition(self):
+        (self.home / "config.yaml").write_text("context:\n  engine: Some-Engine\n")
+        self.assertEqual(len(self.hazards()), 1)
+        self.assertIn("context.engine is 'some-engine'", self.hazards()[0])
+        (self.home / "config.yaml").write_text("{}\n")
+        for where in ("env", "dotenv", "auth", "root-auth", "pool"):
+            with self.subTest(where):
+                for f in (self.home / ".env", self.home / "auth.json", self.root / "auth.json"):
+                    f.unlink(missing_ok=True)
+                env = {}
+                if where == "env":
+                    env = {"XAI_API_KEY": "secret-value"}
+                elif where == "dotenv":
+                    (self.home / ".env").write_text("export XAI_API_KEY='secret-value'\n")
+                elif where == "auth":
+                    (self.home / "auth.json").write_text(json.dumps({"providers": {"xai-oauth": {"tokens": {}}}}))
+                elif where == "root-auth":
+                    (self.root / "auth.json").write_text(json.dumps({"providers": {"xai-oauth": {"tokens": {}}}}))
+                else:
+                    (self.home / "auth.json").write_text(json.dumps({"credential_pool": {"xai-oauth": [{"a": 1}]}}))
+                found = self.hazards(**env)
+                self.assertEqual(len(found), 1)
+                self.assertIn("x_search", found[0])
+                self.assertNotIn("secret-value", found[0])
+
+    def test_doctor_says_it(self):
+        from journal import status
+        cfg = make_cfg(Path(self.tmp.name) / "j")
+        cfg.hermes_home = self.home
+        cfg.hermes = {"command": sys.executable}
+        (self.home / "config.yaml").write_text("context:\n  engine: some-engine\n")
+        with mock.patch.object(Config, "companion", lambda c: HermesCompanion(c)), \
+                mock.patch.object(Config, "hermes_env", lambda c: {}):
+            rows = [r for r in status.doctor(cfg, token=False) if r[0] == "one-shot tools"]
+            self.assertEqual([r[1] for r in rows], ["warn"])
+            (self.home / "config.yaml").write_text("{}\n")
+            rows = [r for r in status.doctor(cfg, token=False) if r[0] == "one-shot tools"]
+        self.assertEqual([r[1] for r in rows], ["ok"])
+
+
 FAKE_HERMES = textwrap.dedent('''\
-    import sys
+    import os, sys, textwrap
     ACCEPTED = set(sys.argv[1].split(","))
     REFUSAL = sys.argv[2]
     args = sys.argv[3:]
     if "-t" in args:
         for name in [n.strip() for n in args[args.index("-t") + 1].split(",") if n.strip()]:
             if name not in ACCEPTED:
-                print(REFUSAL.format(name=name))
+                text = REFUSAL.format(name=name)
+                if os.environ.get("FAKE_STYLE") == "tty":  # a terminal's copy: colour codes, wrapped at 80 columns
+                    text = text.replace("invalid_params", "\\x1b[1minvalid_params\\x1b[22m")
+                    text = "\\n".join("\\x1b[31m" + l + "\\x1b[0m" for l in textwrap.wrap(text, 80))
+                print(text)
                 sys.exit(1)
     print("ok")
     print("session_id: 20261117_000000_abcdef")
@@ -163,6 +230,7 @@ class FakeHermesTest(unittest.TestCase):
         self.real.stop()
         self.companion.stop()
         self.env.stop()
+        os.environ.pop("FAKE_STYLE", None)
         agent._answered = False
         self.tmp.cleanup()
 
@@ -197,35 +265,53 @@ class FakeHermesTest(unittest.TestCase):
         self.assertTrue(all(e.startswith("model request refused (exit 1: invalid_params, toolsets): ") for e in errors))
         self.assertFalse(any("no_mcp" in e or "unknown or invalid" in e for e in errors))  # (Hermes' detail: not read)
 
+    def test_a_refusal_in_colour_and_wrapped_is_still_one(self):
+        """L2 (review of #62): Hermes' copy as a terminal prints it, with colour codes and wrapped at 80 columns, so
+        the wire code sits on another line than the copy before it. Still a refusal, and still no detail read."""
+        os.environ.update(FAKE_ACCEPTED="journal_read", FAKE_STYLE="tty")
+        with self.assertRaises(outage.RequestRefused):
+            agent.ask(self.cfg, "q", 60, toolsets="none", trip_at_once=True)
+        self.assertIsNone(outage.known(self.cfg))
+        errors = self.errors()
+        self.assertEqual(len(errors), 1)
+        self.assertTrue(errors[0].startswith("model request refused (exit 1: invalid_params, toolsets): "), errors)
+        self.assertNotIn("\x1b", errors[0])
+        self.assertFalse("no_mcp" in errors[0] or "unknown or invalid" in errors[0])
+
 
 @unittest.skipUnless(os.environ.get("JOURNAL_HERMES_AGENT"), "set JOURNAL_HERMES_AGENT to a Hermes checkout to check")
 class LiveHermesTest(unittest.TestCase):
     """Opt-in: what the real ``_resolve_toolsets`` makes of the engine's picks, in a child process with a temporary
-    ``HERMES_HOME`` holding this repo as its one plugin (``HERMES_DISABLE_LAZY_INSTALLS=1``)."""
+    ``HERMES_HOME`` holding this repo as its one plugin (``HERMES_DISABLE_LAZY_INSTALLS=1``).
+
+    It reads the toolset NAMES a pick enables, not only their tools: a toolset with no static tools (Hermes'
+    ``context_engine``, whose tools the engine supplies at run time) flattens to nothing, so "no tools" read from the
+    tools alone would pass with a context engine's tools in the run (M1, review of #62)."""
 
     PROBE = textwrap.dedent('''\
-        import copy, json, sys
+        import copy, json, os, sys
         from hermes_cli.config import load_config
         from hermes_cli.plugins import discover_plugins
         discover_plugins()
         from gateway.session_policy import _resolve_toolsets
         from toolsets import resolve_toolset
         base, out = load_config(), {}
+        if sys.argv[2] == "hazards":  # the two conditions ``journal doctor`` warns of
+            base["context"] = {"engine": "some-engine"}
+            os.environ["XAI_API_KEY"] = "placeholder-not-a-key"
         for pick in json.loads(sys.argv[1]):
             try:
                 enabled = _resolve_toolsets({"toolsets": pick}, copy.deepcopy(base), "tool", False)
-                out[",".join(pick)] = sorted({t for n in enabled for t in resolve_toolset(n)})
+                out[",".join(pick)] = {"toolsets": sorted(enabled),
+                                       "tools": sorted({t for n in enabled for t in resolve_toolset(n)})}
             except Exception as e:
                 out[",".join(pick)] = "refused: " + type(e).__name__ + " " + str(e)
         print(json.dumps(out))
     ''')
 
-    def test_the_engines_picks_against_hermes(self):
+    def resolve(self, picks_: list, mode: str = "plain") -> dict:
         checkout = Path(os.environ["JOURNAL_HERMES_AGENT"])
         python = checkout / "venv" / "bin" / "python"
-        cfg = make_cfg(Path(tempfile.mkdtemp()))
-        cfg.hermes = {"command": "hermes"}
-        argvs = {v: picks(HermesCompanion(cfg).argv(Path("/q"), 1, v)) for v in engine_toolsets()}
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp) / "home"
             (home / "plugins").mkdir(parents=True)
@@ -233,15 +319,32 @@ class LiveHermesTest(unittest.TestCase):
             (home / "config.yaml").write_text("plugins:\n  load_timeout_seconds: 0\n  enabled: [journal]\n"
                                               "  entries:\n    journal:\n      settings:\n"
                                               f"        config_file: {tmp}/none.json\n")
-            env = {**os.environ, "HERMES_HOME": str(home), "HERMES_DISABLE_LAZY_INSTALLS": "1",
-                   "JOURNAL_STATE_DIR": f"{tmp}/state", "PYTHONPATH": str(checkout)}
-            out = subprocess.run([str(python), "-c", self.PROBE, json.dumps(list(argvs.values()) + [["none"]])],
+            env = {k: v for k, v in os.environ.items() if k != "XAI_API_KEY"}
+            env.update(HERMES_HOME=str(home), HERMES_DISABLE_LAZY_INSTALLS="1", JOURNAL_STATE_DIR=f"{tmp}/state",
+                       PYTHONPATH=str(checkout))
+            out = subprocess.run([str(python), "-c", self.PROBE, json.dumps(picks_), mode],
                                  capture_output=True, text=True, timeout=300, cwd=tmp, env=env)
         self.assertEqual(out.returncode, 0, out.stderr[-2000:])
-        got = json.loads(out.stdout.strip().splitlines()[-1])
-        self.assertEqual(got[NO_TOOLS], [])  # no tools at all
-        self.assertEqual(got[tools.READ_TOOLSET], sorted(tools.READ_ONLY))  # the read tools and nothing else
+        return json.loads(out.stdout.strip().splitlines()[-1])
+
+    def engine_picks(self) -> list:
+        cfg = make_cfg(Path(tempfile.mkdtemp()))
+        cfg.hermes = {"command": "hermes"}
+        return [picks(HermesCompanion(cfg).argv(Path("/q"), 1, v)) for v in sorted(engine_toolsets())]
+
+    def test_the_engines_picks_against_hermes(self):
+        got = self.resolve(self.engine_picks() + [["none"]])
+        self.assertEqual(got[NO_TOOLS], {"toolsets": [], "tools": []})  # no toolsets at all, so no tools
+        self.assertEqual(got[tools.READ_TOOLSET], {"toolsets": [tools.READ_TOOLSET], "tools": sorted(tools.READ_ONLY)})
         self.assertTrue(str(got["none"]).startswith("refused"), got["none"])  # (why this file exists)
+
+    def test_what_journal_doctor_warns_of(self):
+        """A profile with xAI credentials adds ``x_search`` to "no tools", and a context engine other than the
+        default adds ``context_engine`` to every pick, the reflection's too (``journal doctor``:
+        ``hermes.companion.toolset_hazards``)."""
+        got = self.resolve(self.engine_picks(), "hazards")
+        self.assertEqual(got[NO_TOOLS]["toolsets"], ["context_engine", "x_search"])
+        self.assertEqual(got[tools.READ_TOOLSET]["toolsets"], ["context_engine", tools.READ_TOOLSET])
 
 
 if __name__ == "__main__":

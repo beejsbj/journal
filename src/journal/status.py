@@ -404,6 +404,11 @@ def doctor(cfg: Config, deep: bool = False, token: bool = True, web: bool = Fals
         found = shutil.which(exe) is not None or Path(exe).is_file()
         rows.append(("agent", "ok" if found else "fail",
                      f"{exe} {' '.join(cfg.profile_args())}".strip() if found else f"{exe} not found"))
+        if found:
+            try:
+                rows += getattr(cfg.companion(), "doctor_rows", lambda: [])()
+            except Exception as e:  # (a check of its own: doctor goes on)
+                rows.append(("one-shot tools", "warn", f"could not check: {type(e).__name__}"))
     agent_on = cfg.agent.get("enabled") is not False
     for which, kind in (("day", "reflection"), ("week", "week")):
         spec = cfg.reflections.get(which) or {}

@@ -1027,6 +1027,9 @@ def _outage_news(cfg: Config, before: dict | None) -> list[str]:
     if before and not after:
         down = outage._when(before, "down_since")
         since = down.astimezone(cfg.tz).strftime("%-d %b %H:%M %Z") if down else "?"
+        if outage.released(cfg):  # a refused probe released it: no model was heard from (HERMES-TOOLSETS)
+            return [f"model outage released (down since {since}): the probe's own request was refused, so no model "
+                    "was heard from; held work is tried again record by record, and a run that fails is found again"]
         return [f"model outage over: a model answered again (down since {since}); held work catches up, paced"]
     return []
 
