@@ -63,7 +63,7 @@ the transcript placeholder live there, `actions.refuse`), which takes its slot f
   `sent.jsonl`, `send-times.json`, `conversations.json` (cursor and the saved privacy pass), `sweep.json` (the sweep's
   row-id watermark), `hook-state.json`, `mirror-queue.json`, `notebook.json`, `notebook-archive.jsonl`,
   `today-cache.json`, `packs/`, `runs/`, `practices/`, `audio-stash/`, `serve-auth.json`, `serve-pairings.json`,
-  `serve-push.json` (VAPID keys and subscriptions, 0600), `push-sent.json` (slots pushed),
+  `serve-push.json` (VAPID keys and subscriptions, 0600), `push-sent.json` (slots pushed), `ops.json` (the operator's incidents, `ops.py`),
   `last-tick.json`, `errors.jsonl`. Each name is a constant or literal in the module that owns it
   (`grep -rnE '"[a-z-]+\.jsonl?"' src/journal` finds them). Shared JSON state is read, changed and written under `ledger.locked` /
   `ledger.locked_state`, with a `<name>.lock` beside the file; `tick.lock` serialises ticks; `sent.jsonl`,

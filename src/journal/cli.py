@@ -81,6 +81,13 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("--json", action="store_true")
     d.add_argument("--deep", action="store_true",
                    help="Also run each enabled context source once and count how the newest 50 chat rows read")
+    ob = subs.add_parser("ops", help="The operator's notice: open incidents, or one pass now (`ops check`)")
+    obs = ob.add_subparsers(dest="ops_command", metavar="<ops command>")
+    obst = obs.add_parser("status", help="How notices are delivered and the incidents open (the default)")
+    obst.add_argument("--json", action="store_true")
+    obc = obs.add_parser("check", help="Judge every incident now and deliver what is due; the one pass that can see "
+                                       "a tick that stopped (run it from a scheduler other than the tick's)")
+    obc.add_argument("--dry-run", action="store_true", help="Print what would be filed; write and send nothing")
     add_practices_parser(subs)
     add_serve_parser(subs)
     add_program_parser(subs)
@@ -939,6 +946,16 @@ def run(args, cfg_loader=None, hermes_checks=None) -> int:
         from .status import format_status, status
         s = status(cfg)
         print(json.dumps(s, indent=2, ensure_ascii=False) if args.json else format_status(s))
+        return 0
+    if cmd == "ops":
+        from . import ops
+        if getattr(args, "ops_command", None) == "check":
+            lines = ops.check(cfg, dry_run=args.dry_run)
+            print("\n".join(lines) or "ops: nothing changed")
+            return 1 if any("failed" in line for line in lines) else 0
+        s = ops.summary(cfg)
+        print(json.dumps(s, indent=2, ensure_ascii=False) if getattr(args, "json", False)
+              else ops.format_summary(s) or f"Ops incidents: none (delivery: {s['delivery']})")
         return 0
     if cmd == "today":
         from . import today

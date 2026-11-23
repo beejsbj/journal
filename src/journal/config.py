@@ -168,6 +168,18 @@ DEFAULTS: dict[str, Any] = {
         "when": "no-chat",         # no-chat: only with channel.platform none; always: delivered slots are pushed too
         "subject": None,           # the VAPID contact (mailto: or https:) push services see; None = the project's URL
     },
+    "ops": {                       # the operator's notice when the journal breaks (ops.py): GitHub issues via gh
+        "repo": "",                # owner/name the issues go to; "" (and no command) = incidents kept, nothing sent
+        "label": "journal-ops",    # the label every notice carries (created once, if missing)
+        "gh": None,                # the gh executable; None = found on PATH
+        "command": None,           # an argv of the operator's instead of gh: {action} {kind} {title} {issue}, body on stdin
+        "breaker_hours": 2,        # the outage breaker open this long
+        "floor_run": 3,            # model steps in a row that fell to their floor (breaker shut)
+        "fold_hours": 72,          # a fold given up within this window
+        "step_ticks": 6,           # a tick step that crashed this many scheduled ticks in a row
+        "tick_stale_hours": 1,     # no scheduled tick for this long (judged by `journal ops check` only)
+        "update_hours": 6,         # a comment at most this often while an incident lasts
+    },
     "programs": {                  # ordered sessions of phases (programs.py)
         "settle_minutes": 2,       # a phase answer advances the run after this much quiet (/next: at once)
         "reflect": True,           # ask the model for a reflect phase's construction (template when it can't)
@@ -397,6 +409,7 @@ class Config:
     pack: dict = field(default_factory=lambda: copy.deepcopy(DEFAULTS["pack"]))
     serve: dict = field(default_factory=lambda: copy.deepcopy(DEFAULTS["serve"]))
     push: dict = field(default_factory=lambda: copy.deepcopy(DEFAULTS["push"]))
+    ops: dict = field(default_factory=lambda: copy.deepcopy(DEFAULTS["ops"]))
     programs: dict = field(default_factory=lambda: copy.deepcopy(DEFAULTS["programs"]))
     practices_dir: Path | None = None  # None only until from_dict resolves it; see ``practices_path``
     hermes_home: Path | None = None
@@ -638,6 +651,7 @@ def from_dict(data: Mapping, *, hermes_home: Path | None = None, config_file: Pa
             pack=pack_cfg,
             serve=serve_cfg,
             push=push_cfg,
+            ops=dict(merged.get("ops") or {}) if isinstance(merged.get("ops"), Mapping) else {},
             programs=dict(merged.get("programs") or {}) if isinstance(merged.get("programs"), Mapping) else {},
             hermes_home=Path(hermes_home) if hermes_home is not None else None,
             adapter=adapter,

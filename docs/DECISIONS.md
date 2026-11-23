@@ -4441,3 +4441,92 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     the same now and then since before the upgrade. In a process where that happens `journal_read` is unknown, so a
     reflection's pick is refused: it now defers alone with its `errors.jsonl` line instead of opening the breaker.
     The load time itself is left open (raised here, not decided).
+
+- **OPS-NOTICE (2026-11-22) — the journal tells its operator when it breaks, in code, through GitHub issues (the
+  owner: maintenance mode with nobody watching; the channel, GitHub issues, his choice; #42, "a real escalation
+  route").** From 2026-11-17 every model call failed for five days (a Hermes upgrade refused a parameter): the breaker
+  stayed open, every opener went out plain, and nothing told anyone. The tick's own alerts reach nobody: an exit 1
+  goes to the cron's failure delivery, which defaults to the journal's chat (broken when sends fail, and his personal
+  chat in any case), and `errors.jsonl` is read only by someone already looking. Built on what exists, not beside it:
+  the breaker's `outage.json`, the ledger's records, the tick's step loop and `errors.jsonl`.
+  - **Incidents** (`ops.py`, state `ops.json` under `ledger.locked_state`, one pass at a time under `ops-run.lock`,
+    which is not `tick.lock`, so a hung tick cannot stop `journal ops check`). One per kind; opened when its condition
+    holds, filed once, a comment at most every `ops.update_hours` (6) while it lasts, closed when the condition
+    clears. One that clears before it was filed files nothing; one that comes back before its close went out is the
+    same incident. Judged after every scheduled tick (not a manual send, not a dry run) and by `journal ops check`.
+    Incidents are judged and kept with delivery off too (no `ops.repo`, no `ops.command`), so `journal status` shows
+    them and setting up delivery later files what is open.
+  - **Kinds.** `breaker_open`: open longer than `ops.breaker_hours` (2). `model_floor`: with the breaker shut,
+    `ops.floor_run` (3) model steps in a row fell to their floor since the last model success (an opener sent plain on
+    `plain:agent-failed` or a rejected answer; an annotation given up at its attempt limit; `plain:practice`,
+    `plain:send-retry` and a face's `plain:<face>` are not floors). A success is a model opener, an `annotated_at` or
+    a reflection's `written_at`; the breaker closing (`outage.json` `last.answered_at`) also starts the count again,
+    so the floors an outage caused are not counted twice. While the breaker is open the incident is held as it is.
+    Count-based, not "no success in N hours": a quiet week with no entries is no failure. This is what catches a
+    request the provider refuses, which after the parallel `fix/hermes-toolsets` falls to its floor without opening
+    the breaker. `send_failing` (with a chat only): the newest scheduled prompts, by `scheduled`, are a run of
+    records undelivered after `SEND_ATTEMPTS` with no delivery after them, the newest within 7 days. Added because
+    the tick's own alert for it goes to the chat that is failing. `fold_given_up`: a fold given up within
+    `ops.fold_hours` (72); it clears when the window passes with no other. `step_failing`: a tick step crashed in
+    `ops.step_ticks` (6) scheduled ticks in a row (the tick hands the pass each crashed step's name and exception
+    class). `tick_stale`: no scheduled tick for `ops.tick_stale_hours` (1), judged only by `journal ops check`.
+  - **A stale tick cannot be seen from inside the tick**: a tick that does not run judges nothing. The pass records
+    `tick_at` in `ops.json` (not `last-tick.json`, which a manual `journal send` also writes); `journal ops check`,
+    run by another scheduler (a systemd user timer or crontab; DEPLOY.md), opens `tick_stale`, and the next tick
+    closes it. Not built: a check inside `journal serve` (a long-lived process that could watch `tick_at`), since
+    serve sends nothing of its own today.
+  - **The one coupling to the fold** is FOLD-RETRY's ledger record `fold_gave_up` (`at`, `reason`: `permanent` |
+    `attempts`, `attempts`, `error`), written by `tick.fold` where it stops trying. The notice reads `fold_gave_up.at`
+    for the window, the error through `error_class`, and the reason only when it is one of those two words; nothing
+    else of the fold. Records that gave up before FOLD-RETRY have no such record and are not reported.
+  - **Delivery.** `gh` as a subprocess (the core stays stdlib): `gh label create --force` once per repo and label,
+    `gh issue create --label`, `gh issue comment`, `gh issue close --comment`; the issue number is read from the URL
+    `gh` prints. `ops.command`, an argv of the operator's (`{action}` `{kind}` `{title}` `{issue}`, body on stdin),
+    replaces `gh` for any other route (the ops channel the operator already reads, say). A failed call (exit status,
+    timeout, `gh` missing) is never raised: it is a log line with "failed", which the tick files in `errors.jsonl`,
+    and the notice is tried again 30 minutes later, then less often (at most `update_hours`). An issue closed or
+    deleted by hand is not reopened or replaced (a comment on a closed issue still lands; one on a deleted issue fails
+    and is retried) — kept simple on purpose.
+  - **Privacy, the hard line: the repository may be public.** Titles and bodies are fixed templates per kind. The
+    values in them are a kind, UTC dates and durations (re-formatted from parsed times, so no text passes), integers, step names
+    from the tick's own list (anything else is `other`), exception class names matching an identifier, and an error
+    class from `ops.error_class`, which assembles its answer from a fixed vocabulary and digits (`exit 1 http 400
+    invalid_params (toolsets)`, `timeout`, `chat not found`, `unclassified`) and never copies the error's text. No
+    slot id, practice name (his own practices may be personal), entry text, words of either voice, chat content, path,
+    host or name. `test_ops.py` feeds raw errors and records carrying personal-looking text through every kind and
+    asserts none of it reaches any argv or stdin.
+  - **Review fixes (2026-11-23, an independent privacy-first review).** *No time of day in any notice* (the
+    orchestrator's call): a time tied to his schedule (a model step at a prompt's time) gives away his UTC offset, so
+    a notice carries UTC dates and durations only (`2026-11-19 UTC, 26 h ago`, `open 26 h`; whole hours, whole days
+    from 48 h), and `test_ops.py` asserts no argv or stdin holds an `H:MM`. `journal status` on the host keeps its
+    times. A residual: a duration beside GitHub's own public timestamps places a start to the hour, not the minute.
+    *Delivery is out of `tick.lock`*: the tick runs `ops.assess` (note the tick, judge, reconcile: local) under the
+    lock and `ops.deliver_due` after releasing it, within 45 s a pass and 20 s a call; what is left over waits for the
+    next pass without counting as a failure; its failure lines are appended to `errors.jsonl` there. *An open is
+    idempotent*: the body ends with `<!-- journal-ops kind=<kind> opened=<date> -->` (fixed words, a kind and a date);
+    an open tried before (`open_tried`, set before the call) first lists open issues with the label and adopts one
+    carrying the marker. Not covered: an open that went through unrecorded and whose condition clears before the
+    retry leaves that issue open (closed by hand). *An incident keeps its route* (`github:<owner/name>` or `command`):
+    after `ops.repo` changes, an old number is never commented on, reopened or closed in the new place; an incident
+    still open is filed again there, a cleared one is dropped with a log line; `deliver` refuses a mismatch too.
+    *Flapping*: an incident back within `REOPEN_WITHIN` (6 h) of its close, on the same route, reopens the issue it
+    had (`gh issue reopen` and a comment; `{action}` `reopen` for `ops.command`) rather than filing a new one; chosen
+    over holding a close for 30 minutes, which still files anew on a cycle of hours (the breaker's 2-hour threshold
+    makes cycles that long). *Error classes* read phrases, exit codes and status numbers from the error's structural
+    prefix only (up to the first quote mark or line break; a status only after `http`, `error code:`, `status`,
+    `exit N:` or at the start), `held` only as a prefix (`outage.HELD`), and a provider class from its structured
+    `"type"` field; a rendered class is checked again word by word against the vocabulary (else `unclassified`).
+    A pass that finds the ops run lock held still notes the tick's crashed steps; a failed create forgets that the
+    label was made.
+  - **Not done here:** the companion's own report tool (ESCALATE-WORDING's "Next") is a different route (her
+    judgment, under `/x`); this one is the engine's, with no model. Nothing in `agent.py` changed (the breaker's
+    classification belongs to `fix/hermes-toolsets`). Possible later kinds: speech-to-text deferred past its alert, a
+    reflection given up, the sweep's watermark not moving, the mirror queue growing, a `journal serve` that stopped
+    (seen from the tick).
+
+**OPS-NOTICE, on re-review (2026-11-23).** A reopen half sent (the issue reopened, its comment refused) closes like
+a delivered incident when its condition clears, so it never leaves an issue open with the record saying closed. A
+pass that runs out of time before a call starts (`OutOfTime`) counts no try and logs no failure: the notice goes on
+the next pass. An `ops.command` route names its command (`command:<hash of the argv>`), so another command's issue
+numbers are never used, and a number is read from a command's reply only after `open`. DEPLOY's first checks look
+for a failed notice in `errors.jsonl` and `journal ops`, not `last-tick.json`, which is written before delivery.

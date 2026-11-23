@@ -44,6 +44,11 @@
   },
   "entries": {"frontmatter_source": "ada-journal"},
   "audio": {"ffprobe": "/usr/bin/ffprobe"},
+  "ops": {
+    "repo": "example-owner/journal-ops",
+    "label": "journal-ops",
+    "gh": "/usr/bin/gh"
+  },
   "serve": {
     "port": 8790,
     "host": "journal.example.com",
