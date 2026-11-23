@@ -16,6 +16,20 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## ZERO-WIDTH — the write room's built bundle carries no literal invisible character (2026-11-22; serve side only; no gateway restart; no config or state change)
+
+**What changes.** The write room's mirror ends with a zero-width space so that a trailing empty line keeps its height.
+It was a literal U+200B in the source and in the built bundle, which Hermes' install scanner reports as HIGH
+`invisible_unicode`. It is now built from its code point (`web/src/components/WriteRoom.tsx`), so the bundle holds no
+literal; the line keeps its height as before. `tests/test_install_scan.py` fails if a file under `serve/static/` carries
+an invisible character. #36.
+**Side and restart.** Serve side only (the committed web build). `uv tool install --force` at the merge sha, then
+`systemctl --user restart journal-serve`; the installed PWA takes the update through its "Update available" prompt. No
+gateway restart.
+**First checks.** The install scan no longer lists `invisible_unicode` for the bundle. In the write room, type a
+paragraph, press Enter at the end: the new empty line keeps its height.
+**Rollback.** Reinstall the previous sha and restart `journal-serve`. Nothing to undo in state.
+
 ## STALE-COUNT — the companion is told how many sends went stale (2026-11-15; tick and hook side; **gateway restart required, in a window**; no config or state change)
 
 **What changes.** For a day after an annotation reply or a reflection send is skipped as too late after an outage

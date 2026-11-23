@@ -214,6 +214,17 @@ class InstallScanTest(unittest.TestCase):
         self.assertTrue(hits(integrity_of_7_4_1), "the mining pattern is case-insensitive")
         self.assertEqual(hits("curl -sS $B/manifest.webmanifest | jq -c '{start_url,scope}'"), set())
 
+    def test_the_built_web_app_carries_no_invisible_character(self):
+        """Hermes reports a literal zero-width character as HIGH `invisible_unicode` on every deploy (#36). A minifier can
+        turn an escape back into the literal, so this reads the build, not the source."""
+        invisible = re.compile("[\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff]")
+        static = ROOT / "src" / "journal" / "serve" / "static"
+        files = [p for p in static.rglob("*") if p.is_file() and p.suffix in SCANNABLE_EXTENSIONS | {".webmanifest", ".svg"}]
+        self.assertTrue(any(p.suffix == ".js" for p in files), "the built bundle should be among the files read")
+        found = [f"{p.relative_to(ROOT)}: U+{ord(m.group()):04X} at {m.start()}"
+                 for p in files for m in invisible.finditer(p.read_text(encoding="utf-8"))]
+        self.assertEqual(found, [], "a literal invisible character in the built web app: write it as an escape or build it from its code point")
+
 
 if __name__ == "__main__":
     unittest.main()
