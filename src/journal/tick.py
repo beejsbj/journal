@@ -52,7 +52,9 @@ SEND_ATTEMPTS = 3
 FOLD_RETRY_MINUTES = (5, 10, 20, 40, 80, 160, 320, 640)  # the wait after the 1st … 8th failure
 FOLD_ATTEMPTS = len(FOLD_RETRY_MINUTES) + 1
 FOLD_SLACK = timedelta(minutes=1)  # a retry is due a little early, so a tick that starts a few seconds soon still tries
-FOLD_STATE = ("fold_attempts", "fold_error", "fold_retry_at", "fold_gave_up")  # a fold's account; a new message clears it
+# a fold's account; a new message clears it (``fold_gave_up_captures``: his replies counted when a fold was given up
+# after its attempts, so a later one earns it one more try)
+FOLD_STATE = ("fold_attempts", "fold_error", "fold_retry_at", "fold_gave_up", "fold_gave_up_captures")
 EARLIER_OPENERS = 5  # the openers of earlier sends of one prompt a record keeps (so a quote of a folded one matches)
 REPLY_ATTEMPTS = 6
 KEEP_DAYS = 120
@@ -392,21 +394,31 @@ def fold(cfg: Config, now: datetime, log: list[str]) -> None:
     after the first failure that may pass (``ChannelError.permanent`` false: the token, the network) no other message
     is edited this tick, since they would fail the same way. A fold that can never succeed (a permanent refusal) or
     has failed ``FOLD_ATTEMPTS`` times is given up: the record is closed as if folded, the message stays as sent, and
-    ``fold_gave_up`` says so (``at``, ``reason``: ``permanent`` | ``attempts``, ``attempts``, ``error``); it is never
-    tried again unless the prompt is sent again. A fold that succeeds clears the retry fields."""
+    ``fold_gave_up`` says so (``at``, ``reason``: ``permanent`` | ``attempts``, ``attempts``, ``error``). A permanent
+    give-up is never tried again unless the prompt is sent again. One after its attempts gets one more try each time
+    a reply of his is captured to the prompt after it (``fold_gave_up_captures`` counts them; the try failing gives it
+    up again, so it cannot loop). A fold that succeeds clears the retry fields, and since the channel works again,
+    makes the folds waiting out a backoff due on the next tick (still one try each a tick)."""
     todo = []
     for p in ledger.snapshot(cfg.ledger_path)["prompts"]:
-        if not p.get("message_id") or p.get("fold_gave_up"):
+        if not p.get("message_id"):
             continue
+        again = False  # a fold given up after its attempts, owed one more try by a later reply
+        if p.get("fold_gave_up"):
+            again = _fold_owed_again(p)
+            if not again:
+                continue
         expired = not p.get("collapsed_at") and now - datetime.fromisoformat(p["sent_at"]) >= capture.window(cfg, p)
         if p.get("phase_open") and not expired:
             continue  # a program phase still taking answers folds when the run moves on (or when it expires)
         if p.get("fold_retry_at") and now + FOLD_SLACK < datetime.fromisoformat(p["fold_retry_at"]):
             continue  # a failed fold waits its turn
-        if expired or p.get("needs_edit"):
+        if expired or p.get("needs_edit") or again:
             todo.append(p)
     chat = cfg.channel() if todo else None
     held = False  # a failure that may pass: the messages after it wait for the next tick, untried, attempts unspent
+    through = False  # an edit went through: the channel works, so folds waiting out a backoff need not wait
+    failed = set()  # ... except one that failed this very tick
     for p in todo:  # network calls happen outside the ledger lock
         answered = bool(p.get("captures"))
         status = "answered ✓" if answered else "missed — reply anytime"
@@ -427,10 +439,14 @@ def fold(cfg: Config, now: datetime, log: list[str]) -> None:
             if error is not None:
                 attempts = q["fold_attempts"] = q.get("fold_attempts", 0) + 1
                 q["fold_error"] = str(error)
-                if error.permanent or attempts >= FOLD_ATTEMPTS:
+                if error.permanent or attempts >= FOLD_ATTEMPTS or q.get("fold_gave_up"):
                     q.pop("fold_retry_at", None)
                     gave_up = q["fold_gave_up"] = {"at": now.isoformat(), "attempts": attempts, "error": str(error),
                                                    "reason": "permanent" if error.permanent else "attempts"}
+                    if error.permanent:
+                        q.pop("fold_gave_up_captures", None)
+                    else:  # his replies so far; the next one earns one more try (``_fold_owed_again``)
+                        q["fold_gave_up_captures"] = len(p.get("captures") or [])
                 else:
                     wait = FOLD_RETRY_MINUTES[attempts - 1]
                     q["fold_retry_at"] = (now + timedelta(minutes=wait)).isoformat()
@@ -442,15 +458,42 @@ def fold(cfg: Config, now: datetime, log: list[str]) -> None:
                 if gave_up or len(q.get("captures", [])) == len(p.get("captures", [])):
                     q["needs_edit"] = False  # a reply that landed mid-edit keeps its flag (a fold given up is done)
         if error is None:
+            through = through or editable
             log.append(f"folded {p['id']} ({status})" if editable else
                        f"closed {p['id']} ({status}; {channel.platform_of(p)} cannot edit it here, so it stays as sent)")
             continue
         held = held or not error.permanent
+        failed.add(p["id"])
         if gave_up:
             why = "refused for good" if error.permanent else f"{gave_up['attempts']} attempts"
             log.append(f"{p['id']}: fold failed ({error}); given up ({why}): closed, the message stays as sent")
         else:
             log.append(f"{p['id']}: fold failed ({error}); trying again in {wait} min")
+    if through:
+        _folds_due_again(cfg, now, log, failed)
+
+
+def _fold_owed_again(p: dict) -> bool:
+    """Whether a fold given up after its attempts is owed one more try: a reply of his was captured to the prompt
+    since (a permanent refusal never is; a record given up before the count was kept is not)."""
+    gave = p.get("fold_gave_up") or {}
+    seen = p.get("fold_gave_up_captures")
+    return gave.get("reason") == "attempts" and isinstance(seen, int) and len(p.get("captures") or []) > seen
+
+
+def _folds_due_again(cfg: Config, now: datetime, log: list[str], failed: set) -> None:
+    """After an edit went through, the folds waiting out a backoff after a failure that may pass (the token, the
+    network) are due on the next tick rather than at the end of their wait: whatever failed them has passed. Not one
+    that failed this tick (``failed``): its own failure is newer than the success."""
+    moved = []
+    with ledger.locked(cfg.ledger_path) as data:
+        for q in data.get("prompts") or []:
+            due = q.get("fold_retry_at")
+            if due and q.get("id") not in failed and not q.get("fold_gave_up") and datetime.fromisoformat(due) > now:
+                q["fold_retry_at"] = now.isoformat()
+                moved.append(q["id"])
+    if moved:
+        log.append(f"an edit went through: {len(moved)} fold(s) waiting to retry are due on the next tick")
 
 
 def _fold_edit(cfg: Config, chat, p: dict, status: str, log: list[str]) -> None:
