@@ -169,6 +169,9 @@ Minimal config:
 | `recovery.catchup_per_tick` | `2` | Model calls each step (annotations, picture descriptions, day reflections and week reviews) makes in one tick, oldest first: work held through an outage comes back a few at a time. |
 | `recovery.sends_per_tick`, `recovery.sends_per_hour` | `2`, `4` | Annotation replies and analyses sent to the chat in one tick and in one hour, oldest first; the rest wait for a later tick. Prompts, program phases and interrupts are on your schedule and never wait for this; the one catch-up reply after an outage counts toward them but never waits. |
 | `recovery.stale_hours` | `24` | An annotation reply this long after your words, or an analysis this long after its fallback time, is not sent: it stays in its file and is recorded as skipped (`stale`). For a day after, her context (the pack and the today block) counts them: "3 replies to his entries weren't sent, too late"; counts only. |
+| `ops.repo`, `ops.label` | `""`, `journal-ops` | The operator's notice when the journal breaks (*When the journal breaks*): the GitHub repository (`owner/name`) issues go to, filed with the `gh` CLI under this label (created once if missing). Empty, with no `ops.command`: nothing is sent, and the incidents are still kept and shown by `journal status` and `journal ops`. The repository may be public: a notice carries kinds, times in UTC, counts and error classes only. |
+| `ops.gh`, `ops.command` | on `PATH`, none | The `gh` executable; or an argv of your own used instead of `gh` (`["/usr/local/bin/notify", "{action}", "{kind}", "{title}"]`, with `{action}` `open`/`update`/`resolve`, `{kind}`, `{title}`, `{issue}`; the body on stdin). |
+| `ops.breaker_hours`, `ops.floor_run`, `ops.fold_hours`, `ops.step_ticks`, `ops.tick_stale_hours`, `ops.update_hours` | `2`, `3`, `72`, `6`, `1`, `6` | When an incident opens: the outage breaker open this long; this many model steps in a row fallen to their floor with the breaker shut; a fold given up within this window; a tick step crashed in this many scheduled ticks in a row; no scheduled tick for this long (judged by `journal ops check` only). While it lasts, a comment at most every `update_hours`. |
 | `today.enabled`, `today.max_chars` | `true`, `1200` | The *today block* (see *Today block*): once per conversation thread the companion's turn gets a short block about the day. `max_chars` is a hard cap; whole lines are cut from the bottom to fit. |
 | `today.sources` | all six | Which lines the block may carry: `practices`, `programs` (where the program run you last touched stands), `entries`, `reflection`, `tasks`, `weather`. |
 | `today.cache_minutes` | `30` | How often the tick refreshes `today-cache.json` (tasks due from `sources.tududi`, the weather from `sources.weather`); the hook never calls a source itself. |
@@ -189,6 +192,30 @@ Minimal config:
 | `programs.keyboard` | `true` | Send `/next` `/skip` `/back` `/break` as reply-keyboard buttons with each phase; `false` leaves typed commands only (the fallback if a client or gateway mishandles the buttons). |
 | `state_dir` | `<HERMES_HOME>/plugin-data/journal`, standalone `~/.local/state/journal` | Ledger, notebook, packs, program runs (`runs/`), the hook's between-callback state (`hook-state.json`). `$JOURNAL_STATE_DIR` overrides. |
 | `practices_dir` | `<state_dir>/practices` | Your own practice files and your edits of the built-in ones (see *Practices*). Outside the journal on purpose: the journal holds entries only. `$JOURNAL_PRACTICES_DIR` overrides (and is then not writable from a config layer). Use an absolute path (doctor warns on a relative one, as for `root` and `state_dir`: cron, the gateway and a shell each start in a different directory). |
+
+### When the journal breaks
+
+The journal tells its operator, deterministically and with no model, when it stops working (`ops.py`). After every
+scheduled tick it judges what the engine already records and keeps one **incident** per kind in `ops.json` in the
+state dir:
+
+| Kind | Opens when |
+| --- | --- |
+| `breaker_open` | the model outage breaker has been open longer than `ops.breaker_hours` |
+| `model_floor` | with the breaker shut, `ops.floor_run` model steps in a row fell to their floor since the last model success: openers sent plain because the model failed or its answer was rejected, annotations given up (a request the provider refuses looks like this) |
+| `send_failing` | the newest scheduled prompts were not delivered after all their attempts (with a chat only) |
+| `fold_given_up` | a prompt's fold was given up for good within `ops.fold_hours` |
+| `step_failing` | a step of the tick crashed in `ops.step_ticks` scheduled ticks in a row |
+| `tick_stale` | no scheduled tick has finished for `ops.tick_stale_hours`: only `journal ops check` can see this, run by a scheduler other than the tick's (a systemd timer, cron) |
+
+With `ops.repo` set, an incident becomes one GitHub issue (`gh issue create` with the label), a comment at most every
+`ops.update_hours` while it lasts, and is closed when the condition clears; one that clears before it was filed files
+nothing. A notice that cannot be delivered is a log line (in `errors.jsonl`) and is tried again later; it never
+fails the tick. Titles and bodies come from fixed templates: the kind, times in UTC, counts, step names and an error
+class from a fixed vocabulary (`exit 1 http 400 invalid_params (toolsets)`, `timeout`, `chat not found`). No words
+of yours or the companion's, no chat, no slot id, practice name, path, host or name ever goes into one, so the
+repository may be public. It works with `channel.platform: none`: the notice is not the journal's chat. `journal
+status` and `journal ops` show the incidents open; `journal ops check --dry-run` prints what would be filed.
 
 ### No chat
 
@@ -377,6 +404,7 @@ src/journal/
   ports.py       the two ports the engine reads the companion through: Transcript (chat rows as Row) and Companion
   agent.py       ask(): the companion's text, or AgentUnavailable (an outage); CommandCompanion for agent.command
   outage.py      model / speech-to-text outages: defer, back off, alert once; the breaker; the paced catch-up
+  ops.py         the operator's notice: incidents judged from state, filed as GitHub issues (gh) from fixed templates
   validate.py    grounding: claims need citations, journal/Telegram quotes must exist
   compose.py     prompt and annotation-reply messages (HTML)
   channel.py     the journal's chat: its platform and chat, whose messages are his (`ours`), a record's chat (`same_chat`)

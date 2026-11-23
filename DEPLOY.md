@@ -16,6 +16,43 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## OPS-NOTICE — the journal tells the operator when it breaks (2026-11-22; tick side; **no gateway restart needed**; new config `ops.*`, new state `ops.json`)
+
+**What changes.** After every scheduled tick, `ops.py` judges what the engine records and keeps one incident per
+kind (`breaker_open`, `model_floor`, `send_failing`, `fold_given_up`, `step_failing`, `tick_stale`) in
+`<state dir>/ops.json`; with `ops.repo` set each incident becomes one GitHub issue filed with the `gh` CLI (label
+`journal-ops`), commented on at most every `ops.update_hours` (6) and closed when it clears. Fixed templates only:
+kinds, UTC times, counts, error classes. `tick.fold` now also writes `fold_gave_up_at` on a prompt whose fold it
+gives up. New: `journal ops` (incidents open) and `journal ops check [--dry-run]`; `journal status` and `journal
+doctor` gain an ops line. README *When the journal breaks*; DECISIONS.md, OPS-NOTICE.
+**Side and restart.** `ops.py` is imported by `tick.py` and `status.py`, neither of which the gateway loads at import
+(the import list in the table above); `ops.run` is called only by `tick.run` and `journal ops check`, both fresh
+processes. `config.py` (the gateway's copy) only gains a default and a field nothing in the gateway reads; a gateway
+that later imports `journal.tick` through a function-level import reads `cfg.ops` with a fallback and never runs a
+pass. So the tick takes it at its next run after the plugin pin moves. `plugin.yaml` gains an `ops` entry in the
+settings schema: it shows in Hermes' settings form after the next gateway restart, which can ride the next window;
+set `ops` in the JSON config file meanwhile (an old loader ignores the key). Serve and MCP are untouched beyond
+`status` (the web's `/status` carries the `ops` summary: kinds, times, issue numbers).
+**Config to set** (in the config file; `deploy/example-overlay.json` shows the shape): `"ops": {"repo":
+"<owner>/<repo>", "gh": "<absolute path of gh>"}`. The tick runs from Hermes' cron, whose `PATH` may not hold `gh`:
+give the absolute path. `gh` must be signed in for the user the tick runs as (`gh auth status` as that user; a
+`GH_TOKEN` in the cron's environment also works), with a token that may create issues and labels on that repository
+(fine-grained: *Issues* read and write). The repository may be public; nothing personal goes into a notice. To see a
+stopped tick, run `journal ops check` hourly from a scheduler other than Hermes' cron (a systemd user timer or the
+user's crontab, with the same `--config`/`--hermes-home` as the serve unit); the tick cannot see its own absence.
+**First checks.** `journal doctor`: the `ops notice` row is `ok` (`issues in <owner>/<repo> (label journal-ops) via
+<gh>; 0 incident(s) open`); `fail … (not found)` means `ops.gh` is wrong. `journal ops check --dry-run` prints
+`[dry-run] nothing to file` on a healthy journal, or the notices it would open, as they would be filed: read one
+before letting it go. After the next tick, `<state dir>/ops.json` exists with `tick_at`, and `last-tick.json` has no
+`ops: … failed` line. **Expect a notice at once** if the model is still failing when this lands: annotations given up
+and plain openers since the last model success count toward `model_floor` (that is the point); if the fix for that
+failure is deployed first, nothing is filed. A notice that cannot be delivered shows as `ops: notice open for <kind>
+failed (<class>)` in the tick's lines and `errors.jsonl`, and in `journal ops` as `last try: <class>`.
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
+previous sha). Nothing to undo: `ops.json` and the `fold_gave_up_at` fields are ignored by older code (delete
+`ops.json` if wanted). Close any issue the notice left open by hand (`gh issue list --label journal-ops`). Removing
+`ops.repo` from the config stops all delivery without a rollback.
+
 ## STALE-COUNT — the companion is told how many sends went stale (2026-11-15; tick and hook side; **gateway restart required, in a window**; no config or state change)
 
 **What changes.** For a day after an annotation reply or a reflection send is skipped as too late after an outage
