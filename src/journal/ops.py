@@ -11,9 +11,19 @@ command of the operator's (``ops.command``).
 **Incidents.** One per kind at a time (``KINDS``): opened when its condition holds, a notice filed once (``open``),
 a comment at most every ``ops.update_hours`` (6) while it lasts (``update``), and closed when the condition clears
 (``resolve``). An incident that clears before its notice went out is dropped with nothing filed; one that comes back
-before its close went out is the same incident. A notice that cannot be delivered is logged (a line with "failed",
-which the tick files in ``errors.jsonl``) and tried again later, every 30 minutes and then less often; it never
-breaks the tick. With no ``ops.repo`` and no ``ops.command`` nothing is delivered, and the incidents are still kept
+before its close went out is the same incident, and one that comes back within ``REOPEN_WITHIN`` (6 h) of its close
+reopens the issue it had (``reopen``) rather than filing a new one, so a flapping condition keeps one issue. A notice
+that cannot be delivered is logged (a line with "failed", which the tick files in ``errors.jsonl``) and tried again
+later, every 30 minutes and then less often; it never breaks the tick.
+
+**Two halves.** ``assess`` (note the tick, judge, move the incidents on) is local and fast, and the tick runs it under
+``tick.lock``; ``deliver_due`` (the ``gh`` calls) runs after the tick has released that lock, with a deadline for the
+whole pass (``PASS_SECONDS``) and for each call (``CALL_SECONDS``), so a slow or hung ``gh`` never holds up the next
+tick or a send. An issue is filed with a fixed marker in its body (``marker``); an open that is tried again first
+looks for an open issue carrying it and adopts that one, so a create that went through but was never recorded (a
+timeout, a pass that died) is not filed twice. Every incident remembers where it was filed (``route``: the repo, or
+the operator's command); after ``ops.repo`` changes, an old issue number is never commented on or closed in the new
+place: the incident is filed again there, or, when it has cleared, dropped with a log line. With no ``ops.repo`` and no ``ops.command`` nothing is delivered, and the incidents are still kept
 and shown by ``journal status`` (the operator can look; nothing is lost when delivery is set up later).
 
 The kinds (thresholds under ``ops.*``):
@@ -33,9 +43,10 @@ The kinds (thresholds under ``ops.*``):
   only ``journal ops check`` (run by a scheduler other than the tick's) can open it; every tick closes it.
 
 **Privacy: the target repository may be public.** Every title and body comes from the fixed templates below; the
-only values in them are a kind, times in UTC, counts, step names from the tick's own list, exception class names and
+only values in them are a kind, UTC dates (never a time of day: a time tied to his schedule would give away his UTC
+offset) and durations in whole hours or days, counts, step names from the tick's own list, exception class names and
 an error class from ``error_class``, which builds its answer from a fixed vocabulary and digits and never copies text
-from the error. No entry text, no words of his or the companion's, nothing from the chat, no slot id, practice name,
+from the error (and is checked against that vocabulary again when it is rendered). No entry text, no words of his or the companion's, nothing from the chat, no slot id, practice name,
 path, host or person's name reaches a notice. ``test_ops.py`` feeds personal-looking text through every kind and
 checks the argv and stdin of each call.
 """
@@ -48,6 +59,7 @@ import os
 import re
 import shutil
 import subprocess
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -60,8 +72,11 @@ KINDS = ("breaker_open", "model_floor", "send_failing", "fold_given_up", "step_f
 DEFAULTS = {"breaker_hours": 2, "floor_run": 3, "fold_hours": 72, "step_ticks": 6, "tick_stale_hours": 1,
             "update_hours": 6}
 RETRY_FIRST = timedelta(minutes=30)
-PER_PASS = 4          # notices delivered in one pass at most (each a subprocess with a timeout)
-TIMEOUT = 60          # seconds a gh call or the operator's command may take
+PER_PASS = 4          # notices delivered in one pass at most
+PASS_SECONDS = 45     # the whole delivery pass: what is left over waits for the next pass
+CALL_SECONDS = 20     # one gh call or one run of the operator's command
+MIN_CALL_SECONDS = 3  # a call is not started with less time than this left
+REOPEN_WITHIN = timedelta(hours=6)  # an incident back this soon after its close reopens the issue it had
 SEND_RECENT = timedelta(days=7)  # an undelivered prompt older than this no longer says the chat is down
 CLOSED_KEPT = 20
 LABEL_COLOR = "B60205"
@@ -80,14 +95,14 @@ TITLES = {
     "tick_stale": "journal ops: the tick has stopped running",
 }
 SAYS = {
-    "breaker_open": "No model has answered since the time below; model work is held, and prompts go out with the "
+    "breaker_open": "No model has answered since the date below; model work is held, and prompts go out with the "
                     "plain opener.",
     "model_floor": "Model steps fail without the breaker opening: openers go out plain and annotations are given "
                    "up. A request the provider refuses (a changed parameter) looks like this.",
     "send_failing": "Scheduled prompts were not delivered to the chat after all their attempts.",
     "fold_given_up": "Prompt messages could not be folded and the fold was given up for good.",
     "step_failing": "A step of the tick crashed in every tick of the run counted below.",
-    "tick_stale": "No scheduled tick has finished since the time below: the scheduler, or the tick, has stopped.",
+    "tick_stale": "No scheduled tick has finished since the date below: the scheduler, or the tick, has stopped.",
 }
 CLEARED = {
     "breaker_open": "a model answered again and the breaker closed",
@@ -110,8 +125,7 @@ LABELS = (  # fact key, label, how it renders
     ("plain_openers", "Openers sent plain", "int"), ("annotations_failed", "Annotations given up", "int"),
     ("last_success", "Last model success", "time"), ("undelivered", "Prompts undelivered", "int"),
     ("folds", "Folds given up", "int"), ("newest", "Newest", "time"), ("steps", "Steps", "steps"),
-    ("ticks", "Ticks in a row", "int"), ("exception", "Exception class", "names"),
-    ("last_tick", "Last tick", "time"), ("minutes", "Minutes since", "int"), ("error", "Error class", "class"),
+    ("ticks", "Ticks in a row", "int"), ("exception", "Exception class", "names"), ("error", "Error class", "class"),
 )
 
 # ── error classes: a fixed vocabulary, never a copy of the error ────────────
@@ -119,38 +133,71 @@ LABELS = (  # fact key, label, how it renders
 _PROVIDER_CLASSES = ("invalid_request_error", "invalid_params", "rate_limit_error", "authentication_error",
                      "permission_error", "not_found_error", "overloaded_error", "api_error", "timeout_error",
                      "context_length_exceeded", "server_error")
-_PHRASES = (  # (what the error says, what a notice may say)
+_PHRASES = (  # (what the error says, what a notice may say), looked for in the error's structural prefix only
     ("timed out", "timeout"), ("timeout", "timeout"), ("could not run", "agent did not start"),
     ("message to edit not found", "message not found"), ("message can't be edited", "not editable"),
     ("message is not modified", "not modified"), ("can't parse entities", "parse error"),
     ("chat not found", "chat not found"), ("bot was blocked", "bot blocked"), ("unauthorized", "unauthorized"),
     ("forbidden", "forbidden"), ("too many requests", "rate limited"), ("connection", "connection error"),
-    ("name resolution", "dns error"), ("held", "held by the breaker"),
+    ("name resolution", "dns error"),
 )
-_HTTP = re.compile(r"\b(400|401|403|404|408|409|413|422|429|500|502|503|504|529)\b")
-_CLASS_SHAPE = re.compile(r"[a-z0-9 _(),.:-]{1,120}")
+_HELD_SAYS = "held by the breaker"
+_HTTP_CODES = "400|401|403|404|408|409|413|422|429|500|502|503|504|529"
+# a status number only where the error's own grammar puts one: at the start, or after "http", "error code:",
+# "status" or "exit N:" (a number loose in prose, where an echo of his words would put one, is no status)
+_HTTP = re.compile(rf"(?:^|\bhttp |\berror code:? |\bstatus:? |\bexit -?\d{{1,3}}:? )({_HTTP_CODES})\b")
+_TYPE_FIELD = re.compile(r'"type"\s*:\s*"([a-z_]{3,40})"')  # a provider's structured class, wherever it sits
+_TOOLSETS = re.compile(r'"message"\s*:\s*"[a-z ]{0,40}\btoolsets?\b')  # "unknown parameter toolsets …"
+_QUOTES = "\"'`\u201c\u201d\u2018\u2019\n\r"
+_PREFIX_CAP = 200
 _NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,40}")
+# every word an error class may carry (``error_class``'s vocabulary), checked again when a class is rendered
+_CLASS_WORDS = frozenset(
+    w for phrase in (*(said for _, said in _PHRASES), *_PROVIDER_CLASSES, _HELD_SAYS, "exit", "http",
+                     "killed by signal", "(toolsets)", "unclassified", "unknown")
+    for w in phrase.split())
+
+
+def _structural(low: str) -> str:
+    """The part of an error its own grammar wrote: up to the first quote mark or line break (what an error quotes,
+    a message, a prompt, his words, comes after one), at most ``_PREFIX_CAP`` characters."""
+    cut = min((i for i in (low.find(q) for q in _QUOTES) if i >= 0), default=len(low))
+    return low[:min(cut, _PREFIX_CAP)]
 
 
 def error_class(text) -> str:
     """A short class for an error, built only from a fixed vocabulary and digits: ``exit 1 http 400 invalid_params
     (toolsets)``, ``timeout``, ``message not found``; ``unclassified`` when nothing is recognised. Nothing of the
-    error's own text is copied, so a raw error that quotes his words, a prompt or a path gives at most these words."""
-    low = str(text or "").lower()
+    error's own text is copied, so a raw error that quotes his words, a prompt or a path gives at most these words.
+    Phrases, exit codes and status numbers are read from the error's structural prefix only (``_structural``), so a
+    quoted word ("timed out" in something he wrote) does not change the class; a provider's class is read from its
+    structured ``"type"`` field too."""
+    low = str(text or "").lower().lstrip()
+    head = _structural(low)
     parts: list[str] = []
-    m = re.search(r"\bkilled by signal (\d{1,2})\b", low)
+    m = re.search(r"\bkilled by signal (\d{1,2})\b", head)
     if m:
         parts.append(f"killed by signal {int(m.group(1))}")
-    m = re.search(r"\bexit (-?\d{1,3})\b", low)
+    m = re.search(r"\bexit (-?\d{1,3})\b", head)
     if m and not parts:
         parts.append(f"exit {int(m.group(1))}")
-    parts += [f"http {c}" for c in dict.fromkeys(_HTTP.findall(low))][:2]
-    parts += [c for c in _PROVIDER_CLASSES if c in low][:2]
-    parts += [said for phrase, said in _PHRASES if phrase in low]
-    if "toolset" in low:
+    parts += [f"http {c}" for c in dict.fromkeys(_HTTP.findall(head))][:2]
+    typed = set(_TYPE_FIELD.findall(low))
+    parts += [c for c in _PROVIDER_CLASSES if c in head or c in typed][:2]
+    parts += [said for phrase, said in _PHRASES if phrase in head]
+    if re.match(rf"{re.escape(outage.HELD)}\b", head):  # ``outage.ModelHeld``: "held: <reason>", as a prefix only
+        parts.append(_HELD_SAYS)
+    if "toolset" in head or _TOOLSETS.search(low):
         parts.append("(toolsets)")
     out = " ".join(dict.fromkeys(parts))
     return out[:120] if out else "unclassified"
+
+
+def _class_ok(text: str) -> bool:
+    """Whether a stored error class is made only of ``error_class``'s words and digits (render-time check)."""
+    words = text.split()
+    return bool(words) and len(text) <= 120 and all(w in _CLASS_WORDS or re.fullmatch(r"-?\d{1,3}", w)
+                                                    for w in words)
 
 
 # ── settings ────────────────────────────────────────────────────────────────
@@ -229,8 +276,30 @@ def _iso(when: datetime) -> str:
 
 
 def _utc(value) -> str:
+    """A time in UTC with its time of day: for ``journal status`` on the host only, never for a notice."""
     when = _at(value)
     return when.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC") if when else "unknown"
+
+
+def _date(value) -> str:
+    """A UTC date, the only form of a time a notice carries (a time of day tied to his schedule would give away his
+    UTC offset)."""
+    when = _at(value)
+    return when.astimezone(timezone.utc).strftime("%Y-%m-%d") if when else "unknown"
+
+
+def _span(delta: timedelta) -> str:
+    """A duration in whole hours, or whole days from two days on: ``under 1 h``, ``26 h``, ``3 d``."""
+    hours = int(max(delta.total_seconds(), 0) // 3600)
+    if hours < 1:
+        return "under 1 h"
+    return f"{hours} h" if hours < 48 else f"{hours // 24} d"
+
+
+def _date_ago(value, now: datetime) -> str:
+    """``2026-11-19 UTC, 26 h ago``: a date and a duration, no time of day."""
+    when = _at(value)
+    return f"{_date(value)} UTC, {_span(now - when)} ago" if when else "unknown"
 
 
 # ── what the engine records, judged ─────────────────────────────────────────
@@ -376,7 +445,7 @@ def _tick_stale(cfg: Config, st: dict, now: datetime):
         last = _at((ledger.read_state(cfg.state_dir / "last-tick.json") or {}).get("at"))
     if last is None or now - last < timedelta(hours=_number(cfg, "tick_stale_hours")):
         return None  # (a journal that never ticked has nothing to say yet)
-    return {"since": _iso(last), "last_tick": _iso(last), "minutes": int((now - last).total_seconds() // 60)}
+    return {"since": _iso(last)}  # (rendered "Since": the last scheduled tick)
 
 
 def _int(value) -> int:
@@ -410,9 +479,21 @@ def judge(cfg: Config, now: datetime, st: dict, *, from_tick: bool) -> dict:
 def _close(st: dict, kind: str, inc: dict, now: datetime) -> None:
     st.setdefault("closed", []).append({"kind": kind, "opened_at": inc.get("opened_at"),
                                         "resolved_at": inc.get("resolved_at") or _iso(now),
-                                        "issue": inc.get("issue")})
+                                        "issue": inc.get("issue"), "route": inc.get("route")})
     st["closed"] = st["closed"][-CLOSED_KEPT:]
     st.get("incidents", {}).pop(kind, None)
+
+
+def _recent_close(st: dict, kind: str, now: datetime, where: str) -> dict | None:
+    """The last issue of ``kind`` closed within ``REOPEN_WITHIN``, filed where notices go now (``route``)."""
+    for c in reversed(st.get("closed") or []):
+        if not isinstance(c, dict) or c.get("kind") != kind:
+            continue
+        at = _at(c.get("resolved_at"))
+        if c.get("issue") and c.get("route") == where and at is not None and now - at < REOPEN_WITHIN:
+            return c
+        return None  # (only the newest close of the kind counts)
+    return None
 
 
 def reconcile(cfg: Config, st: dict, found: dict, now: datetime) -> None:
@@ -431,11 +512,15 @@ def reconcile(cfg: Config, st: dict, found: dict, now: datetime) -> None:
                 inc.pop("next_try_at", None)
             else:
                 inc["resolved_at"] = _iso(now)
-                _close(st, kind, inc, now)  # never filed: nothing to close
+                _close(st, kind, inc, now)  # never filed (or never reopened): nothing to close
             continue
         if inc is None:
-            incs[kind] = {"opened_at": _iso(now), "facts": facts, "seen_at": _iso(now), "pending": "open",
-                          "tries": 0, "delivered": False, "issue": None}
+            new = {"opened_at": _iso(now), "facts": facts, "seen_at": _iso(now), "pending": "open",
+                   "tries": 0, "delivered": False, "issue": None}
+            back = _recent_close(st, kind, now, route(cfg))
+            if back:  # flapping: the issue it had is reopened, not a new one filed
+                new.update(pending="reopen", issue=back["issue"], route=back["route"])
+            incs[kind] = new
             continue
         inc.update(facts=facts, seen_at=_iso(now))
         if inc.get("resolved_at"):  # back before its close went out: the same incident goes on
@@ -465,47 +550,58 @@ def note_tick(st: dict, now: datetime, crashed: dict[str, str]) -> None:
 
 # ── the notice: fixed templates ─────────────────────────────────────────────
 
-def _value(how: str, value) -> str | None:
+def _value(how: str, value, now: datetime) -> str | None:
     if how == "int":
         return str(_int(value)) if isinstance(value, (int, str)) else None
     if how == "time":
-        return _utc(value) if value else "none recorded"
+        return _date_ago(value, now) if value else "none recorded"
     if how == "steps":
         return ", ".join(v if v in STEP_NAMES else "other" for v in value or []) or None
     if how == "names":
         return ", ".join(v for v in value or [] if _NAME.fullmatch(str(v))) or None
     if how == "class":
         text = str(value or "")
-        return text if _CLASS_SHAPE.fullmatch(text) else "unclassified"
+        return text if _class_ok(text) else "unclassified"
     return None
 
 
-def _table(kind: str, facts: dict) -> str:
+def _table(kind: str, facts: dict, now: datetime) -> str:
     rows = [f"| Kind | `{kind}` |"]
     for key, name, how in LABELS:
         if key in (facts or {}):
-            shown = _value(how, facts[key])
+            shown = _value(how, facts[key], now)
             if shown is not None:
                 rows.append(f"| {name} | {shown} |")
     return "| | |\n| --- | --- |\n" + "\n".join(rows)
 
 
-FOOTER = ("<sub>Filed by the journal's ops notice from fixed templates: kinds, times, counts and error classes "
-          "only.</sub>")
+FOOTER = ("<sub>Filed by the journal's ops notice from fixed templates: kinds, dates, durations, counts and error "
+          "classes only.</sub>")
 
 
 def title(kind: str) -> str:
     return TITLES[kind]
 
 
+def marker(kind: str, inc: dict) -> str:
+    """The fixed line an issue is filed with, by which a retried open finds an issue it already made."""
+    return f"<!-- journal-ops kind={kind} opened={_date(inc.get('opened_at'))} -->"
+
+
 def body(kind: str, action: str, inc: dict, now: datetime) -> str:
     facts = inc.get("facts") or {}
+    opened = _at(inc.get("opened_at"))
     if action == "resolve":
-        opened = _at(inc.get("opened_at"))
-        hours = f"; it was open for {int((now - opened).total_seconds() // 3600)} h" if opened else ""
-        return f"Resolved at {_utc(_iso(now))}: {CLEARED[kind]}{hours}.\n\n{FOOTER}"
-    head = SAYS[kind] if action == "open" else f"Still open at {_utc(_iso(now))}."
-    return f"{head}\n\n{_table(kind, facts)}\n\nWhere to look on the host: {HINTS[kind]}\n\n{FOOTER}"
+        hours = f"; it was open for {_span(now - opened)}" if opened else ""
+        return f"Resolved: {CLEARED[kind]}{hours}.\n\n{FOOTER}"
+    if action == "open":
+        head = SAYS[kind]
+    elif action == "reopen":
+        head = f"Back within {_span(REOPEN_WITHIN)} of its close, so this issue is reopened. {SAYS[kind]}"
+    else:
+        head = f"Still open, {_span(now - opened)} after it was opened." if opened else "Still open."
+    text = f"{head}\n\n{_table(kind, facts, now)}\n\nWhere to look on the host: {HINTS[kind]}\n\n{FOOTER}"
+    return f"{text}\n\n{marker(kind, inc)}" if action == "open" else text
 
 
 # ── delivery ────────────────────────────────────────────────────────────────
@@ -514,13 +610,30 @@ class Undelivered(RuntimeError):
     """A notice did not go out; its text is an error class (``error_class``), safe for a log line."""
 
 
+class _Budget:
+    """The delivery pass's deadline (``PASS_SECONDS``), and each call's share of it (``CALL_SECONDS`` at most)."""
+
+    def __init__(self, seconds: float = PASS_SECONDS):
+        self.end = time.monotonic() + seconds
+
+    def left(self) -> float:
+        return self.end - time.monotonic()
+
+    def call(self) -> float:
+        left = self.left()
+        if left < MIN_CALL_SECONDS:
+            raise Undelivered("timeout")
+        return min(CALL_SECONDS, left)
+
+
 def _env() -> dict:
     return {**os.environ, "GH_PROMPT_DISABLED": "1", "GH_NO_UPDATE_NOTIFIER": "1", "NO_COLOR": "1"}
 
 
-def _call(argv: list[str], stdin: str = "") -> str:
+def _call(argv: list[str], stdin: str = "", budget: _Budget | None = None) -> str:
+    timeout = (budget or _Budget()).call()
     try:
-        out = subprocess.run(argv, input=stdin, capture_output=True, text=True, timeout=TIMEOUT, env=_env())
+        out = subprocess.run(argv, input=stdin, capture_output=True, text=True, timeout=timeout, env=_env())
     except FileNotFoundError:
         raise Undelivered("not found") from None
     except subprocess.TimeoutExpired:
@@ -532,40 +645,77 @@ def _call(argv: list[str], stdin: str = "") -> str:
     return out.stdout or ""
 
 
-def _gh_label(cfg: Config, st: dict) -> None:
+def route(cfg: Config) -> str:
+    """Where notices go now: ``github:<owner/name>``, ``command`` or ``off``. An incident keeps the route it was filed
+    on, and its issue number means something only there."""
+    how = delivery(cfg)
+    return f"github:{repo(cfg)}" if how == "github" else how
+
+
+def _gh_label(cfg: Config, st: dict, budget: _Budget) -> None:
     """Make sure the label exists (once per repo and label; ``--force`` leaves an existing one as it is)."""
     key = f"{repo(cfg)} {label(cfg)}"
     if st.get("label_ready") == key:
         return
     _call([gh_path(cfg), "label", "create", label(cfg), "--repo", repo(cfg), "--color", LABEL_COLOR,
-           "--description", "Notices from the journal engine", "--force"])
+           "--description", "Notices from the journal engine", "--force"], budget=budget)
     st["label_ready"] = key
 
 
-def deliver(cfg: Config, st: dict, kind: str, inc: dict, action: str, now: datetime) -> int | None:
+def _adopt(cfg: Config, kind: str, inc: dict, budget: _Budget) -> int | None:
+    """An open issue with the label that carries this incident's marker (a create that went through unrecorded)."""
+    out = _call([gh_path(cfg), "issue", "list", "--repo", repo(cfg), "--label", label(cfg), "--state", "open",
+                 "--limit", "100", "--json", "number,body"], budget=budget)
+    try:
+        issues = json.loads(out or "[]")
+    except ValueError:
+        raise Undelivered("unclassified") from None
+    want = marker(kind, inc)
+    for issue in issues if isinstance(issues, list) else []:
+        if isinstance(issue, dict) and want in str(issue.get("body") or "") and isinstance(issue.get("number"), int):
+            return issue["number"]
+    return None
+
+
+def deliver(cfg: Config, st: dict, kind: str, inc: dict, action: str, now: datetime,
+            budget: _Budget | None = None) -> int | None:
     """Send one notice. Returns the issue number after ``open`` (None when it is not known); raises
-    ``Undelivered``."""
+    ``Undelivered``. An issue filed on another route (``route``) is never commented on, reopened or closed here."""
+    budget = budget or _Budget()
     text = body(kind, action, inc, now)
+    if action != "open" and inc.get("route") != route(cfg):
+        raise Undelivered("unclassified")  # (``_deliver_due`` never asks for this; a guard, not a path)
     cmd = command(cfg)
     if cmd:
         values = {"action": action, "kind": kind, "title": title(kind), "issue": str(inc.get("issue") or "")}
         fill = re.compile(r"\{(action|kind|title|issue)\}")  # (any other brace stays as written)
-        out = _call([fill.sub(lambda m: values[m.group(1)], part) for part in cmd], text)
+        out = _call([fill.sub(lambda m: values[m.group(1)], part) for part in cmd], text, budget)
         m = re.search(r"(?:/issues/|#)(\d+)", out) or re.fullmatch(r"\s*(\d+)\s*", out)
-        return int(m.group(1)) if m else None
+        return int(m.group(1)) if m else inc.get("issue")
     gh, where = gh_path(cfg), ["--repo", repo(cfg)]
     if action == "open":
-        _gh_label(cfg, st)
-        out = _call([gh, "issue", "create", *where, "--title", title(kind), "--label", label(cfg),
-                     "--body-file", "-"], text)
+        _gh_label(cfg, st, budget)
+        if inc.get("open_tried"):  # tried before: it may have gone through with nothing recorded
+            found = _adopt(cfg, kind, inc, budget)
+            if found:
+                return found
+        try:
+            out = _call([gh, "issue", "create", *where, "--title", title(kind), "--label", label(cfg),
+                         "--body-file", "-"], text, budget)
+        except Undelivered:
+            st["label_ready"] = None  # (the label may be what failed: made again on the next try)
+            raise
         m = re.search(r"/issues/(\d+)", out)
         return int(m.group(1)) if m else None
     if not inc.get("issue"):
         return None  # filed with no number known: nothing to comment on or close
-    if action == "update":
-        _call([gh, "issue", "comment", str(inc["issue"]), *where, "--body-file", "-"], text)
+    if action == "reopen":
+        _call([gh, "issue", "reopen", str(inc["issue"]), *where], budget=budget)
+        _call([gh, "issue", "comment", str(inc["issue"]), *where, "--body-file", "-"], text, budget)
+    elif action == "update":
+        _call([gh, "issue", "comment", str(inc["issue"]), *where, "--body-file", "-"], text, budget)
     else:
-        _call([gh, "issue", "close", str(inc["issue"]), *where, "--comment", text])
+        _call([gh, "issue", "close", str(inc["issue"]), *where, "--comment", text], budget=budget)
     return inc.get("issue")
 
 
@@ -602,20 +752,39 @@ def _run_lock(cfg: Config):
             fcntl.flock(fh, fcntl.LOCK_UN)
 
 
-def run(cfg: Config, now: datetime, log: list[str], *, crashed: dict[str, str] | None = None,
-        from_tick: bool = True) -> None:
-    """One pass: judge every kind, move the incidents on, deliver what is due. Never raises: a failure is a log line
-    with "failed" (the tick files it in ``errors.jsonl``) and is tried again on a later pass."""
+def assess(cfg: Config, now: datetime, log: list[str], *, crashed: dict[str, str] | None = None,
+           from_tick: bool = True) -> None:
+    """The local half of a pass: note the tick, judge every kind, move the incidents on. Fast, and nothing leaves
+    the host, so the tick runs it under ``tick.lock``. Never raises."""
     try:
-        _run(cfg, now, log, crashed, from_tick)
+        _assess(cfg, now, log, crashed, from_tick)
     except Exception as e:  # noqa: BLE001 - the ops notice must never break the tick
         log.append(f"ops: pass failed ({type(e).__name__})")
 
 
-def _run(cfg: Config, now: datetime, log: list[str], crashed, from_tick: bool) -> None:
+def deliver_due(cfg: Config, now: datetime, log: list[str]) -> None:
+    """The delivery half: send what is due, within ``PASS_SECONDS``. The tick runs it after releasing ``tick.lock``.
+    Never raises: a failure is a log line with "failed" and is tried again on a later pass."""
+    try:
+        _deliver_due(cfg, now, log)
+    except Exception as e:  # noqa: BLE001
+        log.append(f"ops: delivery failed ({type(e).__name__})")
+
+
+def run(cfg: Config, now: datetime, log: list[str], *, crashed: dict[str, str] | None = None,
+        from_tick: bool = True) -> None:
+    """One whole pass, both halves (``journal ops check``; the tick runs them apart)."""
+    assess(cfg, now, log, crashed=crashed, from_tick=from_tick)
+    deliver_due(cfg, now, log)
+
+
+def _assess(cfg: Config, now: datetime, log: list[str], crashed, from_tick: bool) -> None:
     path = cfg.state_dir / STATE
     with _run_lock(cfg) as mine:
-        if not mine:
+        if not mine:  # another pass is judging or delivering: it judges; this tick's run of crashes still counts
+            if from_tick:
+                with ledger.locked_state(path) as st:
+                    note_tick(st, now, crashed or {})
             return
         found = judge(cfg, now, ledger.read_state(path), from_tick=from_tick)
         with ledger.locked_state(path) as st:
@@ -626,21 +795,63 @@ def _run(cfg: Config, now: datetime, log: list[str], crashed, from_tick: bool) -
             had = set(st.get("incidents") or {})
             reconcile(cfg, st, found, now)
             log.extend(f"ops: incident {kind} opened" for kind in st.get("incidents") or {} if kind not in had)
-            todo = _due(st, now) if delivery(cfg) != "off" else []
-        for kind, action in todo:
+
+
+def _moved(st: dict, kind: str, action: str, now: datetime, log: list[str]) -> None:
+    """``ops.repo`` (or the route) changed since this incident was filed: its old number is never used in the new
+    place. A cleared one is dropped; one still open is filed again where notices go now."""
+    cur = (st.get("incidents") or {}).get(kind)
+    if cur is None or cur.get("pending") != action:
+        return
+    if action == "resolve":
+        _close(st, kind, cur, now)
+        log.append(f"ops: incident {kind} cleared; its issue was filed on another route (ops.repo changed), so no "
+                   "close is sent")
+        return
+    for k in ("next_try_at", "error", "open_tried"):
+        cur.pop(k, None)
+    cur.update(pending="open", delivered=False, issue=None, route=None, tries=0)
+    log.append(f"ops: incident {kind} filed again: its issue was on another route (ops.repo changed)")
+
+
+def _deliver_due(cfg: Config, now: datetime, log: list[str]) -> None:
+    if delivery(cfg) == "off":
+        return
+    path = cfg.state_dir / STATE
+    with _run_lock(cfg) as mine:
+        if not mine:
+            return  # the pass running now delivers
+        budget = _Budget()
+        here = route(cfg)
+        todo = _due(ledger.read_state(path), now)
+        while todo:
+            kind, action = todo.pop(0)
+            if budget.left() < MIN_CALL_SECONDS:
+                log.append("ops: delivery out of time; the rest is sent on the next pass")
+                return
             with ledger.locked_state(path) as st:
-                inc = dict((st.get("incidents") or {}).get(kind) or {})
+                stored = (st.get("incidents") or {}).get(kind)
+                inc = dict(stored or {})
+                if not stored or inc.get("pending") != action:
+                    continue
+                if action != "open" and inc.get("route") != here:
+                    _moved(st, kind, action, now, log)
+                    if (st.get("incidents") or {}).get(kind, {}).get("pending") == "open":
+                        todo.insert(0, (kind, "open"))
+                    continue
+                if action == "open":
+                    stored["open_tried"] = True  # (before the call: a create that goes through unrecorded is found)
                 label_state = {"label_ready": st.get("label_ready")}
-            if inc.get("pending") != action:
-                continue
             try:
-                issue = deliver(cfg, label_state, kind, inc, action, now)
+                issue = deliver(cfg, label_state, kind, inc, action, now, budget)
                 error = None
             except Undelivered as e:
                 issue, error = None, str(e)
             with ledger.locked_state(path) as st:
                 if label_state.get("label_ready"):
                     st["label_ready"] = label_state["label_ready"]
+                else:
+                    st.pop("label_ready", None)
                 cur = (st.get("incidents") or {}).get(kind)
                 if cur is None or cur.get("pending") != action:
                     continue
@@ -650,11 +861,11 @@ def _run(cfg: Config, now: datetime, log: list[str], crashed, from_tick: bool) -
                     cur["next_try_at"] = _iso(now + _retry_wait(cfg, cur["tries"]))
                     log.append(f"ops: notice {action} for {kind} failed ({error}); tried again later")
                     continue
-                cur.pop("error", None)
-                cur.pop("next_try_at", None)
+                for k in ("error", "next_try_at", "open_tried"):
+                    cur.pop(k, None)
                 cur.update(pending=None, tries=0, notified_at=_iso(now))
-                if action == "open":
-                    cur.update(delivered=True, issue=issue)
+                if action in ("open", "reopen"):
+                    cur.update(delivered=True, issue=issue, route=here)
                 if action == "resolve":
                     _close(st, kind, cur, now)
                 where = f" (#{issue})" if issue else ""
@@ -670,7 +881,7 @@ def check(cfg: Config, now: datetime | None = None, *, dry_run: bool = False) ->
         run(cfg, now, log, from_tick=False)
         return log
     st = json.loads(json.dumps(ledger.read_state(cfg.state_dir / STATE)))
-    reconcile(cfg, st, judge(cfg, now, st, from_tick=False), now)
+    reconcile(cfg, st, judge(cfg, now, st, from_tick=False), now)  # (a dry run: nothing written, nothing sent)
     for kind, action in _due(st, now):
         inc = st["incidents"][kind]
         log.append(f"[dry-run] {action} {kind}: {title(kind)}\n{body(kind, action, inc, now)}")
@@ -687,7 +898,8 @@ def summary(cfg: Config) -> dict:
         inc = (st.get("incidents") or {}).get(kind)
         if not inc:
             continue
-        state = {"open": "not filed yet", "update": "update owed", "resolve": "close owed"}.get(
+        state = {"open": "not filed yet", "update": "update owed", "resolve": "close owed",
+                 "reopen": "reopen owed"}.get(
             inc.get("pending") or "", "filed")
         rows.append({"kind": kind, "since": (inc.get("facts") or {}).get("since") or inc.get("opened_at"),
                      "opened_at": inc.get("opened_at"), "issue": inc.get("issue"), "state": state,

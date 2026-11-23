@@ -4379,13 +4379,36 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     deleted by hand is not reopened or replaced (a comment on a closed issue still lands; one on a deleted issue fails
     and is retried) — kept simple on purpose.
   - **Privacy, the hard line: the repository may be public.** Titles and bodies are fixed templates per kind. The
-    values in them are a kind, UTC times (re-formatted from parsed times, so no text passes), integers, step names
+    values in them are a kind, UTC dates and durations (re-formatted from parsed times, so no text passes), integers, step names
     from the tick's own list (anything else is `other`), exception class names matching an identifier, and an error
     class from `ops.error_class`, which assembles its answer from a fixed vocabulary and digits (`exit 1 http 400
     invalid_params (toolsets)`, `timeout`, `chat not found`, `unclassified`) and never copies the error's text. No
     slot id, practice name (his own practices may be personal), entry text, words of either voice, chat content, path,
     host or name. `test_ops.py` feeds raw errors and records carrying personal-looking text through every kind and
     asserts none of it reaches any argv or stdin.
+  - **Review fixes (2026-11-23, an independent privacy-first review).** *No time of day in any notice* (the
+    orchestrator's call): a time tied to his schedule (a model step at a prompt's time) gives away his UTC offset, so
+    a notice carries UTC dates and durations only (`2026-11-19 UTC, 26 h ago`, `open 26 h`; whole hours, whole days
+    from 48 h), and `test_ops.py` asserts no argv or stdin holds an `H:MM`. `journal status` on the host keeps its
+    times. A residual: a duration beside GitHub's own public timestamps places a start to the hour, not the minute.
+    *Delivery is out of `tick.lock`*: the tick runs `ops.assess` (note the tick, judge, reconcile: local) under the
+    lock and `ops.deliver_due` after releasing it, within 45 s a pass and 20 s a call; what is left over waits for the
+    next pass without counting as a failure; its failure lines are appended to `errors.jsonl` there. *An open is
+    idempotent*: the body ends with `<!-- journal-ops kind=<kind> opened=<date> -->` (fixed words, a kind and a date);
+    an open tried before (`open_tried`, set before the call) first lists open issues with the label and adopts one
+    carrying the marker. Not covered: an open that went through unrecorded and whose condition clears before the
+    retry leaves that issue open (closed by hand). *An incident keeps its route* (`github:<owner/name>` or `command`):
+    after `ops.repo` changes, an old number is never commented on, reopened or closed in the new place; an incident
+    still open is filed again there, a cleared one is dropped with a log line; `deliver` refuses a mismatch too.
+    *Flapping*: an incident back within `REOPEN_WITHIN` (6 h) of its close, on the same route, reopens the issue it
+    had (`gh issue reopen` and a comment; `{action}` `reopen` for `ops.command`) rather than filing a new one; chosen
+    over holding a close for 30 minutes, which still files anew on a cycle of hours (the breaker's 2-hour threshold
+    makes cycles that long). *Error classes* read phrases, exit codes and status numbers from the error's structural
+    prefix only (up to the first quote mark or line break; a status only after `http`, `error code:`, `status`,
+    `exit N:` or at the start), `held` only as a prefix (`outage.HELD`), and a provider class from its structured
+    `"type"` field; a rendered class is checked again word by word against the vocabulary (else `unclassified`).
+    A pass that finds the ops run lock held still notes the tick's crashed steps; a failed create forgets that the
+    label was made.
   - **Not done here:** the companion's own report tool (ESCALATE-WORDING's "Next") is a different route (her
     judgment, under `/x`); this one is the engine's, with no model. Nothing in `agent.py` changed (the breaker's
     classification belongs to `fix/hermes-toolsets`). Possible later kinds: speech-to-text deferred past its alert, a

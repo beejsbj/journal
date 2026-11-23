@@ -1,6 +1,8 @@
 """The operator's notice (``ops.py``): incidents judged from what the engine records, delivered as GitHub issues
 through a mocked ``gh`` (never a real one), and nothing personal in any notice."""
+import fcntl
 import json
+import re
 import socket
 import subprocess
 import tempfile
@@ -16,6 +18,8 @@ from journal import config as jconfig
 
 NOW = datetime(2026, 11, 20, 12, 0, tzinfo=timezone.utc)
 REPO = "example-owner/example-ops"
+OTHER = "example-owner/elsewhere"
+HHMM = re.compile(r"\b\d{1,2}:\d{2}\b")  # a time of day: never in a notice (it would give away his UTC offset)
 
 # Text that must never reach a notice: words of his and hers, a personal practice name, slot ids, a path, a host.
 WORDS = "I told Marisol about the grief I carry for my brother"
@@ -36,16 +40,28 @@ class Gh:
 
     def __init__(self, fail: str | None = None):
         self.calls: list[tuple[list[str], str]] = []
+        self.timeouts: list[float] = []
         self.fail = fail
         self.next_issue = 41
+        self.open_issues: list[dict] = []  # what ``gh issue list`` answers
+        self.hang_create = False  # the create goes through on GitHub, and gh times out before it says so
+        self.during = None  # called inside each call (a test looks at the world while gh runs)
 
-    def __call__(self, argv, input=None, **kw):
+    def __call__(self, argv, input=None, timeout=None, **kw):
         self.calls.append((list(argv), input or ""))
+        self.timeouts.append(timeout)
+        if self.during:
+            self.during(argv)
         if self.fail:
             return subprocess.CompletedProcess(argv, 1, "", self.fail)
         if argv[1:3] == ["issue", "create"]:
             self.next_issue += 1
+            self.open_issues.append({"number": self.next_issue, "body": input or ""})
+            if self.hang_create:
+                raise subprocess.TimeoutExpired(argv, timeout)
             return subprocess.CompletedProcess(argv, 0, f"https://github.com/{REPO}/issues/{self.next_issue}\n", "")
+        if argv[1:3] == ["issue", "list"]:
+            return subprocess.CompletedProcess(argv, 0, json.dumps(self.open_issues), "")
         return subprocess.CompletedProcess(argv, 0, "", "")
 
     def verbs(self) -> list[str]:
@@ -76,12 +92,16 @@ class OpsBase(unittest.TestCase):
         return (self.state().get("incidents") or {}).get(kind)
 
     def assert_private(self):
-        """No call's argv or stdin carries anything personal (the whole point of the fixed templates)."""
+        """No call's argv or stdin carries anything personal (the whole point of the fixed templates), nor a time of
+        day."""
         self.assertTrue(self.gh.calls)
         for argv, stdin in self.gh.calls:
             text = "\n".join(argv) + "\n" + stdin
             for s in personal_strings(self.cfg):
                 self.assertNotIn(s, text, (argv, stdin))
+            self.assertIsNone(HHMM.search(text), (argv, stdin))
+        for t in self.gh.timeouts:
+            self.assertLessEqual(t, ops.CALL_SECONDS)
 
     def prompt(self, n, *, source="iris", sent=None, **extra):
         sent = sent or NOW - timedelta(hours=10 - n)
@@ -105,6 +125,40 @@ class ErrorClassTest(unittest.TestCase):
             for s in ("Marisol", "grief", "/home", CHAT, PRACTICE):
                 self.assertNotIn(s, ops.error_class(raw))
 
+    def test_only_the_errors_own_prefix_is_read(self):
+        quoted = "Bad Request: chat not found while sending 'the connection timed out at 429, I held on, forbidden'"
+        self.assertEqual(ops.error_class(quoted), "chat not found")
+        self.assertEqual(ops.error_class(f"sendMessage: “timeout 500 {WORDS}”"), "unclassified")
+        self.assertEqual(ops.error_class("I ran 400 m and held my breath"), "unclassified")  # loose number, not a prefix
+        self.assertEqual(ops.error_class("held: exit 1: 429 rate_limit_error"),
+                         "exit 1 http 429 rate_limit_error held by the breaker")
+        self.assertEqual(ops.error_class("upheld: nothing"), "unclassified")
+        self.assertEqual(ops.error_class("exit 1 HTTP 401: Bad credentials"), "exit 1 http 401")
+
+    def test_a_stored_class_outside_the_vocabulary_renders_unclassified(self):
+        inc = {"opened_at": NOW.isoformat(), "facts": {"since": NOW.isoformat(), "error": "exit 1 marisol"}}
+        self.assertIn("| Error class | unclassified |", ops.body("breaker_open", "open", inc, NOW))
+        inc["facts"]["error"] = "exit 1 http 400 invalid_params (toolsets)"
+        self.assertIn("| Error class | exit 1 http 400 invalid_params (toolsets) |",
+                      ops.body("breaker_open", "open", inc, NOW))
+
+    def test_no_notice_carries_a_time_of_day(self):
+        facts = {"since": (NOW - timedelta(hours=26, minutes=17)).isoformat(), "probes_failed": 3,
+                 "plain_openers": 2, "annotations_failed": 1,
+                 "last_success": (NOW - timedelta(days=3, minutes=41)).isoformat(), "undelivered": 2, "folds": 1,
+                 "newest": (NOW - timedelta(minutes=13)).isoformat(), "steps": ["fold"], "ticks": 6,
+                 "exception": ["KeyError"], "error": "timeout"}
+        inc = {"opened_at": (NOW - timedelta(hours=26, minutes=17)).isoformat(), "facts": facts}
+        for kind in ops.KINDS:
+            for action in ("open", "update", "reopen", "resolve"):
+                text = ops.title(kind) + "\n" + ops.body(kind, action, inc, NOW)
+                self.assertIsNone(HHMM.search(text), (kind, action, text))
+        text = ops.body("model_floor", "open", inc, NOW)
+        self.assertIn("| Since | 2026-11-19 UTC, 26 h ago |", text)
+        self.assertIn("| Last model success | 2026-11-17 UTC, 3 d ago |", text)
+        self.assertIn("Still open, 26 h after it was opened.", ops.body("model_floor", "update", inc, NOW))
+        self.assertIn("it was open for 26 h", ops.body("model_floor", "resolve", inc, NOW))
+
 
 class BreakerTest(OpsBase):
     def trip(self, at):
@@ -121,7 +175,8 @@ class BreakerTest(OpsBase):
         self.assertEqual(argv[:5], ["/usr/bin/gh", "issue", "create", "--repo", REPO])
         self.assertIn("journal-ops", argv)
         self.assertIn("exit 1 http 400 invalid_params (toolsets)", body)
-        self.assertIn(_utc(NOW - timedelta(hours=1)), body)
+        self.assertIn(f"| Since | {_date(NOW - timedelta(hours=1))} UTC, 2 h ago |", body)
+        self.assertIn(ops.marker("breaker_open", self.incident("breaker_open")), body)
         inc = self.incident("breaker_open")
         self.assertEqual((inc["issue"], inc["pending"], inc["delivered"]), (42, None, True))
         # idempotent: later ticks inside update_hours say nothing more, and no second issue is made
@@ -180,7 +235,7 @@ class ModelFloorTest(OpsBase):
         body = self.gh.calls[-1][1]
         self.assertIn("| Openers sent plain | 3 |", body)
         self.assertIn("exit 1 http 400 invalid_params (toolsets)", body)
-        self.assertIn(f"| Last model success | {_utc(NOW - timedelta(hours=9))} |", body)
+        self.assertIn(f"| Last model success | {_date(NOW - timedelta(hours=9))} UTC, 9 h ago |", body)
         self.prompt(6, source="iris")
         self.run_ops(NOW + timedelta(minutes=5))
         self.assertEqual(self.gh.verbs()[-1], "issue close")
@@ -276,10 +331,12 @@ class StepsAndStaleTickTest(OpsBase):
                          "[dry-run] open tick_stale: journal ops: the tick has stopped running")
         self.assertEqual(self.gh.calls, [])  # a dry run sends nothing
         ops.check(self.cfg, NOW)
-        self.assertEqual(self.incident("tick_stale")["facts"]["minutes"], 120)
+        self.assertEqual(self.incident("tick_stale")["facts"]["since"], (NOW - timedelta(hours=2)).isoformat())
+        self.assertIn("| Since | 2026-11-20 UTC, 2 h ago |", self.gh.calls[-1][1])
         self.run_ops(NOW + timedelta(minutes=5))  # a tick again: closed
         self.assertIsNone(self.incident("tick_stale"))
         self.assertEqual(self.gh.verbs(), ["label create", "issue create", "issue close"])
+        self.assert_private()
 
     def test_a_hung_tick_does_not_stop_the_check(self):
         self.run_ops(NOW - timedelta(hours=3))
@@ -352,10 +409,210 @@ class DeliveryTest(OpsBase):
             code, log = tick.run(self.cfg)
             self.assertEqual(code, 1)
             self.assertEqual(self.state()["steps"]["fold"]["ticks"], 1)
-            with mock.patch("journal.ops._run", side_effect=OSError("disk")):
+            with mock.patch("journal.ops._assess", side_effect=OSError("disk")):
                 code, log = tick.run(self.cfg)
             self.assertIn("ops: pass failed (OSError)", log)
             self.assertEqual(code, 1)  # (the fold's crash; the ops pass changes no exit code)
+
+
+class StepNamesTest(OpsBase):
+    def test_hostile_step_and_class_names_never_reach_a_notice(self):
+        for i in range(6):
+            self.run_ops(NOW + timedelta(minutes=5 * i), crashed={WORDS: "not a class!", PRACTICE: WORDS})
+        inc = self.incident("step_failing")
+        self.assertEqual((inc["facts"]["steps"], inc["facts"]["ticks"]), (["other"], 6))
+        body = self.gh.calls[-1][1]
+        self.assertIn("| Steps | other |", body)
+        self.assertIn("| Exception class | Exception |", body)
+        self.assert_private()
+
+    def test_a_pass_that_finds_the_run_lock_held_still_counts_the_tick(self):
+        self.cfg.state_dir.mkdir(parents=True, exist_ok=True)
+        with open(self.cfg.state_dir / ops.RUN_LOCK, "a+") as fh:
+            fcntl.flock(fh, fcntl.LOCK_EX)  # a `journal ops check` running now
+            for i in range(3):
+                self.run_ops(NOW + timedelta(minutes=5 * i), crashed={"annotate": "KeyError"})
+        st = self.state()
+        self.assertEqual(st["steps"]["annotate"]["ticks"], 3)
+        self.assertEqual(st["tick_at"], (NOW + timedelta(minutes=10)).isoformat())
+        self.assertEqual(self.gh.calls, [])  # (the pass holding the lock judges and delivers)
+
+
+class DeliveryOutsideTheTickTest(OpsBase):
+    def test_the_tick_delivers_after_releasing_its_lock(self):
+        free = []
+
+        def look(argv):
+            with open(self.cfg.state_dir / "tick.lock", "a+") as fh:
+                try:
+                    fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    fcntl.flock(fh, fcntl.LOCK_UN)
+                    free.append(True)
+                except BlockingIOError:
+                    free.append(False)
+        self.gh.during = look
+        outage.trip(self.cfg, RAW_MODEL_ERROR, datetime.now(timezone.utc) - timedelta(hours=3))
+        with _quiet_tick():
+            code, log = tick.run(self.cfg)
+        self.assertEqual(self.gh.verbs(), ["label create", "issue create"])
+        self.assertEqual(free, [True, True])  # gh ran with tick.lock free: the next tick and a send are not held
+        self.assertIn("ops: notice open for breaker_open (#42)", log)
+
+    def test_a_failed_delivery_after_the_lock_still_lands_in_errors_jsonl(self):
+        self.gh.fail = "HTTP 502: Bad gateway"
+        outage.trip(self.cfg, RAW_MODEL_ERROR, datetime.now(timezone.utc) - timedelta(hours=3))
+        with _quiet_tick():
+            tick.run(self.cfg)
+        errors = (self.cfg.state_dir / "errors.jsonl").read_text().splitlines()
+        self.assertIn("ops: notice open for breaker_open failed (exit 1 http 502); tried again later",
+                      [json.loads(l)["error"] for l in errors])
+
+    def test_a_slow_gh_is_cut_off_by_the_pass_deadline(self):
+        clock = [1000.0]
+
+        def slow(argv):
+            clock[0] += 15  # every gh call takes 15 s
+        self.gh.during = slow
+        for n in (1, 2, 3):
+            self.prompt(n, source="plain:agent-failed")
+        outage.trip(self.cfg, RAW_MODEL_ERROR, NOW - timedelta(hours=3))  # breaker_open
+        self.cfg.platform = "telegram"
+        with mock.patch("journal.ops.time.monotonic", lambda: clock[0]):
+            log = []
+            ops.assess(self.cfg, NOW, log, crashed={"fold": "KeyError"})
+            for kind in ("model_floor", "send_failing", "fold_given_up", "step_failing"):  # four more due
+                with ledger.locked_state(self.cfg.state_dir / ops.STATE) as st:
+                    st["incidents"][kind] = {"opened_at": NOW.isoformat(), "facts": {}, "pending": "open",
+                                             "tries": 0, "delivered": False, "issue": None}
+            ops.deliver_due(self.cfg, NOW, log)
+        self.assertLessEqual(clock[0] - 1000.0, ops.PASS_SECONDS + ops.CALL_SECONDS)
+        self.assertTrue(all(t <= ops.CALL_SECONDS for t in self.gh.timeouts))
+        self.assertIn("ops: delivery out of time; the rest is sent on the next pass", log)
+        pending = [k for k, v in self.state()["incidents"].items() if v.get("pending") == "open"]
+        self.assertTrue(pending)  # left for the next pass, not counted as a failure
+        self.assertTrue(all(not self.incident(k).get("tries") for k in pending))
+
+
+class IdempotentOpenTest(OpsBase):
+    def test_a_create_that_went_through_unrecorded_is_adopted_not_filed_again(self):
+        self.gh.hang_create = True
+        outage.trip(self.cfg, RAW_MODEL_ERROR, NOW - timedelta(hours=3))
+        log = self.run_ops()
+        self.assertIn("ops: notice open for breaker_open failed (timeout); tried again later", log)
+        self.assertEqual(len(self.gh.open_issues), 1)  # it is on GitHub all the same
+        self.gh.hang_create = False
+        self.run_ops(NOW + timedelta(minutes=31))
+        self.assertEqual(self.gh.verbs().count("issue create"), 1)
+        self.assertEqual(self.gh.verbs()[-1], "issue list")
+        self.assertIn("--label", self.gh.calls[-1][0])
+        inc = self.incident("breaker_open")
+        self.assertEqual((inc["issue"], inc["delivered"], inc["pending"]), (42, True, None))
+        self.assertIn("<!-- journal-ops kind=breaker_open opened=2026-11-20 -->", self.gh.open_issues[0]["body"])
+        self.assert_private()
+
+    def test_no_marker_match_files_it(self):
+        self.gh.fail = "HTTP 502: Bad gateway"
+        outage.trip(self.cfg, RAW_MODEL_ERROR, NOW - timedelta(hours=3))
+        self.run_ops()
+        self.gh.fail = None
+        self.gh.open_issues = [{"number": 7, "body": "<!-- journal-ops kind=model_floor opened=2026-11-20 -->"}]
+        self.run_ops(NOW + timedelta(minutes=31))
+        self.assertEqual(self.gh.verbs()[-2:], ["issue list", "issue create"])
+        self.assertEqual(self.incident("breaker_open")["issue"], 42)
+
+    def test_a_failed_create_makes_the_label_again_next_time(self):
+        outage.trip(self.cfg, RAW_MODEL_ERROR, NOW - timedelta(hours=3))
+        self.gh.fail = "HTTP 404: Not Found"
+        with mock.patch.object(ops, "_gh_label", lambda cfg, st, budget: st.update(label_ready="x")):
+            self.run_ops()
+        self.assertIsNone(self.state().get("label_ready"))
+        self.gh.fail = None
+        self.run_ops(NOW + timedelta(minutes=31))
+        self.assertEqual(self.gh.verbs()[-3:], ["label create", "issue list", "issue create"])
+
+
+class RouteTest(OpsBase):
+    def filed(self):
+        outage.trip(self.cfg, RAW_MODEL_ERROR, NOW - timedelta(hours=3))
+        self.run_ops()
+        inc = self.incident("breaker_open")
+        self.assertEqual((inc["issue"], inc["route"]), (42, f"github:{REPO}"))
+        self.cfg.ops = {"repo": OTHER, "gh": "/usr/bin/gh"}
+
+    def assert_never_touched_42_elsewhere(self):
+        for argv, _ in self.gh.calls:
+            if OTHER in argv:
+                self.assertNotIn("42", argv[3:4], argv)
+
+    def test_an_update_after_the_repo_changed_files_again_in_the_new_repo(self):
+        self.filed()
+        log = self.run_ops(NOW + timedelta(hours=7))
+        self.assertIn("ops: incident breaker_open filed again: its issue was on another route (ops.repo changed)", log)
+        argv, _ = self.gh.calls[-1]
+        self.assertEqual(argv[1:5], ["issue", "create", "--repo", OTHER])
+        inc = self.incident("breaker_open")
+        self.assertEqual((inc["issue"], inc["route"]), (43, f"github:{OTHER}"))
+        self.assertNotIn("issue comment", self.gh.verbs())
+        self.assert_never_touched_42_elsewhere()
+
+    def test_a_close_after_the_repo_changed_is_dropped_never_sent_elsewhere(self):
+        self.filed()
+        outage.answered(self.cfg, NOW + timedelta(hours=1))
+        log = self.run_ops(NOW + timedelta(hours=1, minutes=5))
+        self.assertIn("ops: incident breaker_open cleared; its issue was filed on another route (ops.repo changed), "
+                      "so no close is sent", log)
+        self.assertNotIn("issue close", self.gh.verbs())
+        self.assertIsNone(self.incident("breaker_open"))
+        self.assert_never_touched_42_elsewhere()
+        # and deliver() itself refuses, whatever asks it
+        inc = {"issue": 42, "route": f"github:{REPO}", "opened_at": NOW.isoformat(), "facts": {}}
+        with self.assertRaises(ops.Undelivered):
+            ops.deliver(self.cfg, {}, "breaker_open", inc, "resolve", NOW)
+        self.assertFalse(any(a[1:3] == ["issue", "close"] for a, _ in self.gh.calls))
+
+
+class FlapTest(OpsBase):
+    def test_back_within_hours_of_its_close_reopens_the_same_issue(self):
+        outage.trip(self.cfg, RAW_MODEL_ERROR, NOW - timedelta(hours=3))
+        self.run_ops()
+        outage.answered(self.cfg, NOW + timedelta(hours=1))
+        self.run_ops(NOW + timedelta(hours=1, minutes=5))
+        self.assertEqual(self.gh.verbs()[-1], "issue close")
+        outage.trip(self.cfg, RAW_MODEL_ERROR, NOW + timedelta(hours=2))
+        log = self.run_ops(NOW + timedelta(hours=4, minutes=5))
+        self.assertEqual(self.gh.verbs()[-2:], ["issue reopen", "issue comment"])
+        self.assertEqual(self.gh.calls[-2][0][3], "42")
+        self.assertIn("so this issue is reopened", self.gh.calls[-1][1])
+        self.assertIn("ops: notice reopen for breaker_open (#42)", log)
+        self.assertEqual(self.gh.verbs().count("issue create"), 1)
+        inc = self.incident("breaker_open")
+        self.assertEqual((inc["issue"], inc["delivered"]), (42, True))
+        self.assert_private()
+
+    def test_back_long_after_its_close_files_a_new_issue(self):
+        outage.trip(self.cfg, RAW_MODEL_ERROR, NOW - timedelta(hours=3))
+        self.run_ops()
+        outage.answered(self.cfg, NOW + timedelta(hours=1))
+        self.run_ops(NOW + timedelta(hours=1, minutes=5))
+        outage.trip(self.cfg, RAW_MODEL_ERROR, NOW + timedelta(hours=8))
+        self.run_ops(NOW + timedelta(hours=10, minutes=5))
+        self.assertEqual(self.gh.verbs()[-1], "issue create")
+        self.assertEqual(self.incident("breaker_open")["issue"], 43)
+
+
+def _quiet_tick():
+    """Every tick step stubbed: the tick runs only its frame and the ops notice."""
+    import contextlib
+    stack = contextlib.ExitStack()
+    quiet = ("send_due", "fold", "process_audio", "process_images", "annotate", "reply_annotations", "prune",
+             "_reflect")
+    stack.enter_context(mock.patch.multiple(tick, **{n: mock.DEFAULT for n in quiet}))
+    stack.enter_context(mock.patch.multiple("journal.tick.programs", send_due_interrupts=mock.DEFAULT,
+                                            step=mock.DEFAULT))
+    for target in ("privacy.update", "sweep.run", "conversations.run", "recovery.run", "mirror.flush",
+                   "today.refresh", "notebook.sweep"):
+        stack.enter_context(mock.patch(f"journal.tick.{target}"))
+    return stack
 
 
 class ConfigTest(unittest.TestCase):
@@ -369,8 +626,8 @@ class ConfigTest(unittest.TestCase):
             self.assertEqual(ops.delivery(jconfig.from_dict({"root": t})), "off")
 
 
-def _utc(when: datetime) -> str:
-    return when.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+def _date(when: datetime) -> str:
+    return when.astimezone(timezone.utc).strftime("%Y-%m-%d")
 
 
 if __name__ == "__main__":

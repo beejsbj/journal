@@ -21,18 +21,20 @@ The gateway restarts in **windows**, at least an hour from a ritual (the built-i
 **What changes.** After every scheduled tick, `ops.py` judges what the engine records and keeps one incident per
 kind (`breaker_open`, `model_floor`, `send_failing`, `fold_given_up`, `step_failing`, `tick_stale`) in
 `<state dir>/ops.json`; with `ops.repo` set each incident becomes one GitHub issue filed with the `gh` CLI (label
-`journal-ops`), commented on at most every `ops.update_hours` (6) and closed when it clears. Fixed templates only:
-kinds, UTC times, counts, error classes. `tick.fold` now also writes `fold_gave_up_at` on a prompt whose fold it
+`journal-ops`), commented on at most every `ops.update_hours` (6), closed when it clears, and reopened if it comes
+back within 6 h. Fixed templates only: kinds, UTC dates and durations (never a time of day), counts, error classes.
+Delivery runs after the tick releases `tick.lock` (45 s a pass, 20 s a `gh` call), so a slow GitHub delays no send. `tick.fold` now also writes `fold_gave_up_at` on a prompt whose fold it
 gives up. New: `journal ops` (incidents open) and `journal ops check [--dry-run]`; `journal status` and `journal
 doctor` gain an ops line. README *When the journal breaks*; DECISIONS.md, OPS-NOTICE.
 **Side and restart.** `ops.py` is imported by `tick.py` and `status.py`, neither of which the gateway loads at import
-(the import list in the table above); `ops.run` is called only by `tick.run` and `journal ops check`, both fresh
+(the import list in the table above); `ops.assess`/`ops.deliver_due` are called only by `tick.run` and `journal ops check`, both fresh
 processes. `config.py` (the gateway's copy) only gains a default and a field nothing in the gateway reads; a gateway
 that later imports `journal.tick` through a function-level import reads `cfg.ops` with a fallback and never runs a
 pass. So the tick takes it at its next run after the plugin pin moves. `plugin.yaml` gains an `ops` entry in the
 settings schema: it shows in Hermes' settings form after the next gateway restart, which can ride the next window;
 set `ops` in the JSON config file meanwhile (an old loader ignores the key). Serve and MCP are untouched beyond
-`status` (the web's `/status` carries the `ops` summary: kinds, times, issue numbers).
+`status` (the web's `/status` carries the `ops` summary: kinds, times, issue numbers). The token also needs to list
+issues (*Issues* read): an open that is tried again first looks for its own marker among the open issues.
 **Config to set** (in the config file; `deploy/example-overlay.json` shows the shape): `"ops": {"repo":
 "<owner>/<repo>", "gh": "<absolute path of gh>"}`. The tick runs from Hermes' cron, whose `PATH` may not hold `gh`:
 give the absolute path. `gh` must be signed in for the user the tick runs as (`gh auth status` as that user; a
@@ -51,7 +53,8 @@ failed (<class>)` in the tick's lines and `errors.jsonl`, and in `journal ops` a
 **Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
 previous sha). Nothing to undo: `ops.json` and the `fold_gave_up_at` fields are ignored by older code (delete
 `ops.json` if wanted). Close any issue the notice left open by hand (`gh issue list --label journal-ops`). Removing
-`ops.repo` from the config stops all delivery without a rollback.
+`ops.repo` from the config stops all delivery without a rollback. Changing `ops.repo` later never touches the old
+repository's issues: open incidents are filed again in the new one (close the old ones by hand).
 
 ## STALE-COUNT — the companion is told how many sends went stale (2026-11-15; tick and hook side; **gateway restart required, in a window**; no config or state change)
 

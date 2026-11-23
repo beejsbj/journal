@@ -16,7 +16,8 @@
    delivered prompt is also appended to ``sent.jsonl``, the engine's private memory of what it sent.
 6. Tell the operator when the journal breaks (``ops``): incidents judged from what the steps recorded (the outage
    breaker, model steps falling to their floor, undelivered prompts, folds given up, a step that keeps crashing),
-   filed as GitHub issues or through the operator's command, from fixed templates only. Never fails the tick.
+   under the lock; filed as GitHub issues or through the operator's command, from fixed templates only, after the
+   lock is released (``ops.deliver_due``), so a slow ``gh`` never holds up a tick or a send. Never fails the tick.
 
 Silent when there is nothing to report; prints a line per action otherwise. The run exits non-zero,
 so the scheduler alerts, when a prompt could not be delivered after ``SEND_ATTEMPTS`` ticks, when a
@@ -904,6 +905,18 @@ def _record_run(cfg: Config, now: datetime, mode: str, log: list[str], errors: l
         pass
 
 
+def _record_errors(cfg: Config, now: datetime, mode: str, errors: list[str]) -> None:
+    """Lines filed in ``errors.jsonl`` after the run was recorded (the ops notice's delivery, outside the lock)."""
+    if not errors:
+        return
+    try:
+        with open(cfg.state_dir / "errors.jsonl", "a", encoding="utf-8") as fh:
+            for e in errors:
+                fh.write(json.dumps({"at": now.isoformat(), "mode": mode, "error": e}, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+
+
 def run_backfill(cfg: Config, since, write: bool) -> tuple[int, list[str]]:
     """``journal backfill-conversations``: the conversation writer over past messages (a dry run unless
     ``write``), waiting for a running tick so the two never write the same entry at once. A dry run only
@@ -1014,12 +1027,18 @@ def run(cfg: Config, only: str | None = None, dry_run: bool = False,
                 log.append(f"error: {name}: {type(e).__name__}: {e}")
                 errors.append(f"{name}: {type(e).__name__}: {e}")
         log.extend(_outage_news(cfg, down))
-        if not dry_run and not only:  # the operator's notice (ops.py): never raises; a failure is a "failed" line
-            ops.run(cfg, now, log, crashed=crashed)
+        notify = not dry_run and not only
+        if notify:  # the operator's notice (ops.py), its local half: never raises; a failure is a "failed" line
+            ops.assess(cfg, now, log, crashed=crashed)
         errors += [l for l in log if files_as_error(l) and l not in errors]
         # Exit 1 (so the scheduler's failure delivery fires) for an alert or a step that crashed.
         # Retryable soft failures ("fold failed", a reply that will be retried) stay exit 0.
         code = 1 if alerts or broken else 0
         if not dry_run:
             _record_run(cfg, now, f"send {only}" if only else "tick", log, errors, code)
-        return code, log
+    if notify:  # its delivery, with tick.lock released: a slow or hung gh holds up no tick and no send
+        sent: list[str] = []
+        ops.deliver_due(cfg, now, sent)
+        log += sent
+        _record_errors(cfg, now, "tick", [l for l in sent if files_as_error(l)])
+    return code, log
