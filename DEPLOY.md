@@ -16,6 +16,32 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## FOLD-RETRY — a failed fold retries over a day, and a fold given up says so (2026-11-22; tick side; no gateway restart; no config change)
+
+**What changes.** A fold whose edit fails is tried again with a doubling wait (5, 10, 20 … 640 minutes: nine tries
+over about 21 hours) instead of on the next five ticks; one the platform refuses for good (a message gone or past its
+edit window: a Telegram `Bad Request` about the message) is given up at once. After a failure that may pass (a token
+that could not be had, the network, a chat that refuses the bot: `Forbidden`, `chat not found`) the other folds due
+that tick wait for the next one; once an edit goes through, the folds waiting out a backoff are due on the next tick.
+The prompt record gains `fold_retry_at` while it waits and `fold_gave_up` (`at`, `reason`: `permanent` | `attempts`,
+`attempts`, `error`) when it is given up, with `fold_gave_up_captures` beside an `attempts` give-up (a later reply
+earns it one more try); a fold that goes through clears them all. A token helper that exits non-zero says its exit
+status in the "bot token unavailable" error. DECISIONS.md, FOLD-RETRY.
+**Side and restart.** `tick.py`, plus a `permanent` flag on `ports.ChannelError` and `telegram.TelegramError`, and the
+exit status in `telegram.resolve_secret`'s failure text. The fold runs only in the tick, a fresh process, so it takes
+the new code at its next run once the plugin pin and the CLI move to the merge sha. The gateway imports `ports` (and
+loads `telegram` when it sends), but nothing it runs reads the new flag, and its old copy of `resolve_secret` differs
+only in the wording of a failure: no restart; the next restart in any window picks it up. Serve reads a secret
+through `resolve_secret` (`serve.token_command`): after `uv tool install --force` and its restart, a failing helper's
+message there gains the exit status too, nothing else. MCP does not fold.
+**First checks.** `last-tick.json` has no `error:` line. A fold failure in `errors.jsonl` now ends "trying again in N
+min" (or "given up (…)"), and the next failure line for the same prompt comes after that wait, not on the next tick.
+`journal doctor` as usual. Nothing to see while folds succeed.
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
+previous sha). Nothing to undo in state: the older code ignores `fold_retry_at`, `fold_gave_up` and
+`fold_gave_up_captures`; a record waiting on a retry is tried on its next tick and closed once its `fold_attempts`
+reaches six; one given up is already closed.
+
 ## HERMES-TOOLSETS — model steps run again on a Hermes that refuses unknown toolsets (2026-11-22; tick and hook side; **gateway restart required, in a window**; no config or state change; **urgent**)
 
 **What changes.** A Hermes whose gateway runs every one-shot refuses a `-t` pick naming a toolset it does not know
