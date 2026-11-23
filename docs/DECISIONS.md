@@ -4332,3 +4332,50 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   - **Fences:** `standing.py` gains no import; serve and mcp do not import it (`test_serve_fence.py`,
     `test_mcp_fence.py` pass unchanged). Tested in `test_standing_stale.py` and, end to end through
     `tick.reply_annotations` and `reflect.send`, in `test_outage_breaker.py`.
+
+- **FOLD-RETRY (2026-11-22) — a failed fold heals on its own over a day; one that never can is given up at once, and
+  says so in `fold_gave_up`.** A fold that failed was tried on each of the next ticks, `FOLD_ATTEMPTS` (6) in all, so
+  about half an hour: a token helper or network outage longer than that left the message unfolded for good, and a
+  message that could never be edited (gone, past its edit window) spent the same six tries. Seen on a live install: a
+  token helper that printed nothing on two ticks five minutes apart (the third folded), and a connection reset. And a
+  fold that went through after failing kept its `fold_error` and `fold_attempts`, so the record read as a failure.
+  - **The stretch:** the wait doubles from five minutes (`FOLD_RETRY_MINUTES` = 5, 10, 20 … 640), so nine tries
+    (`FOLD_ATTEMPTS`) over about 21 hours from the first failure. A night's outage of the token helper or the network
+    heals by the morning, the error log gets at most nine lines a prompt rather than one a tick, and after a day the
+    fold is cosmetic (the next prompts have gone out). A retry is due a minute early (`FOLD_SLACK`), so a tick that
+    starts a few seconds soon does not slip five minutes. The record keeps `fold_attempts`, the last `fold_error` and
+    `fold_retry_at` (when it is next due); nothing else about the fold changed: what is folded, `needs_edit` (still
+    "the next due tick folds it"; a reply that lands mid-edit keeps it), and the edits made outside the ledger lock
+    with one locked write after each.
+  - **Never what cannot succeed:** `ports.ChannelError.permanent` (false by default; another channel says so only if it
+    knows). `TelegramError` is permanent for what the Bot API refuses for the request itself, `Bad Request` and
+    `Forbidden` (a message to edit not found, one that can't be edited, a chat the bot can no longer write to) or a
+    bare HTTP 400/403. Not for a token that could not be had, a network error, a 5xx, `Too Many Requests`, or
+    `Unauthorized` (a token the operator can fix inside the day). The delegate's call: a 400 for an edit is the same
+    request failing the same way, so no 400 is retried.
+  - **The give-up field, for the operator notice (`feat/ops-notice`): `fold_gave_up`** on the prompt record,
+    `{"at": <ISO time>, "reason": "permanent" | "attempts", "attempts": <n>, "error": <the channel's error text>}`.
+    Set once, when a fold is given up for good; the record is then closed as before (`collapsed_at`, `needs_edit`
+    false), the message stays as sent, and the fold is never tried again (a later reply that sets `needs_edit` does
+    not reopen it). Only a new send of the same prompt (`send_prompt`'s re-send) clears it with the other fold
+    fields (`tick.FOLD_STATE`), since that is a new message. The error text names no secret (`ChannelError`). A
+    given-up fold is no `Alert` (the tick still exits 0): it is cosmetic, and the operator's signal is the notice
+    that PR builds on this field. The give-up's log line says "fold failed … given up", so it is in `errors.jsonl` too.
+  - **No storm:** one try a prompt a due tick; and after a failure that may pass, the other folds due that tick wait
+    for the next one, untried and with no attempt spent, since a missing token or a dead network fails them all the
+    same (each try of a token helper can take 30 + 60 seconds under `tick.lock`). A permanent refusal holds nobody.
+    The oldest due fold goes first; the others get their turn while it waits.
+  - **A fold that goes through** clears `fold_attempts`, `fold_error` and `fold_retry_at`. Records mid-retry from
+    before carry on from their count on the new schedule; records closed by the old give-up stay closed.
+  - **Not touched:** the token command and any deployment's config. What the code says about "token_command printed
+    no TELEGRAM_BOT_TOKEN (two attempts)": `telegram.resolve_secret` ran the command twice (30 s, then 60 s timeout),
+    both finished in time, and neither stdout held a `TELEGRAM_BOT_TOKEN=` line nor exactly one line without `=`. The
+    exit status and stderr are not read, so a helper that failed (an exit status with its reason on stderr, such as
+    the secret store unreachable) reads the same as one whose output changed shape. Each tick is a fresh process and
+    the token is cached per process only, so every tick that sends or edits runs the helper. Open: saying the exit
+    status (not stderr, which may hold a secret) in that message would tell the two apart.
+  - Tested in `test_fold_retry.py` (a missing token healing on a later tick, a refusal given up at once and never
+    tried again, the nine tries and their doubling waits inside a day, one try a tick across three failing prompts,
+    a refusal not holding the others, a re-send clearing the fold's account, which texts are permanent).
+    **Test changed on purpose:** `test_engine.py`'s `FoldRetryTest` folded at one fixed time `FOLD_ATTEMPTS` times;
+    it now steps to each retry's due time.
