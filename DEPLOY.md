@@ -16,6 +16,39 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## HERMES-TOOLSETS — model steps run again on a Hermes that refuses unknown toolsets (2026-11-22; tick and hook side; **gateway restart required, in a window**; no config or state change; **urgent**)
+
+**What changes.** A Hermes whose gateway runs every one-shot refuses a `-t` pick naming a toolset it does not know
+(`invalid_params`) and runs no model. The engine asked for "no tools" with `-t none`, so every model step with no
+tools (annotations, picture descriptions, the catch-up, program reflect phases and bridges, the outage probe) failed;
+the probe failing too kept the breaker open, so every opener went out plain and annotations were held. The Hermes
+adapter now passes `-t no_mcp` for "no tools" (no toolsets on that Hermes; an older Hermes, which warned of unknown
+names, also ran it with none). A request the agent refuses before any model runs no longer opens or holds the
+breaker: that call falls back for its own record (an opener goes plain, the record defers on its own 30-minute clock
+and keeps its attempts) and writes one line of its own in `errors.jsonl` (`model request refused (exit 1:
+invalid_params, <field>): …`). A refused probe closes an open breaker without claiming a model answered. DECISIONS.md,
+HERMES-TOOLSETS.
+**Side and restart.** `hermes/companion.py`, `agent.py`, `outage.py`, `recovery.py`. Model steps run in the tick and
+in the `journal send` / `journal program` processes, all fresh processes: **the fix takes effect at the next tick
+after the plugin pin and the CLI move to the merge sha**, so move the pin as soon as it merges, without waiting for a
+window. The gateway imports `agent` and `outage` at load (the import list in the table above), so `hermes gateway
+restart` follows in the next window to bring its loaded copies in line; nothing in the gateway asks a model meanwhile.
+Serve is untouched.
+**First checks.** After the next tick (5 minutes):
+- `<state dir>/outage.json` holds no `down_since` (only `last`, with `answered_at`): the open breaker's next probe
+  answered and closed it. `journal status` shows no model outage, and `last-tick.json` has "model outage over".
+- `errors.jsonl` gains no new `invalid_params` or `model request refused` line.
+- Held annotations come back paced, oldest first, two a tick: their entries gain annotations over the next ticks (by
+  ledger, `annotated_at` set; no need to open an entry), and `journal status` lists fewer waiting. Replies more than a
+  day late are recorded `skipped: "stale"`, not sent (OUTAGES); the annotations themselves are written.
+- The next scheduled opener is not `plain:agent-failed` (its `errors.jsonl` / `last-tick.json` line, or the ledger's
+  `opener` field).
+Annotations deferred more than 7 days are given up (OUTAGES), so the earliest held ones are lost if this lands later
+than 7 days after the first failure.
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
+previous sha), then `hermes gateway restart`. Rolling back on the same Hermes brings the outage back. Nothing to undo
+in state.
+
 ## ZERO-WIDTH — the write room's built bundle carries no literal invisible character (2026-11-22; serve side only; no gateway restart; no config or state change)
 
 **What changes.** The write room's mirror ends with a zero-width space so that a trailing empty line keeps its height.
