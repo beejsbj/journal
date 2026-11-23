@@ -4441,3 +4441,53 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     the same now and then since before the upgrade. In a process where that happens `journal_read` is unknown, so a
     reflection's pick is refused: it now defers alone with its `errors.jsonl` line instead of opening the breaker.
     The load time itself is left open (raised here, not decided).
+- **HERMES-ONESHOT-ENV (2026-11-23) — a one-shot says it is one in its query, and the hook fails closed (review of
+  #62).** Since Hermes runs every one-shot inside its gateway, the run's environment stops at the client: the gateway
+  keeps a client's environment per session, filtered to an allowlist (`agent/session_client_env.py`: four behaviour
+  names, toolchain names, and `terminal.client_env_passthrough`), binds it in a context variable for that session's
+  turns, and never writes it to `os.environ`. `JOURNAL_MODEL_STEP` and `JOURNAL_SEARCH_UPTO` are on no list, and the
+  hook and the tool read `os.environ`, so in the gateway every model step got her notebook block (CONTINUITY's "a
+  one-shot sees only the query the engine wrote", and OUTAGES' "the probe carries no words of his", both broken), and
+  a reflection's `journal_search` had no bound: one written late could quote later entries, fail `validate.unfound`
+  (which the tick bounds, so nothing wrong was written), use up its attempts and be given up.
+  - **Confirmed** in Hermes' source and in a child process on it (lazy installs off, a temporary `HERMES_HOME`): the
+    client's `collect_client_env` and the gateway's `accept_client_env` both drop the two names; inside
+    `client_env_scope` `os.environ` lacks them; with a `client_env_passthrough` listing them they reach only the
+    session's map (`bound_client_env`), never `os.environ`. `finite_turn_required()` is True inside the one-shot's
+    admission (`gateway/session_finite.py`). Traced from source, not seen live: the gateway runs the turn's
+    `pre_llm_call` hook and its tool calls inside that admission, and the hook's `user_message` is the query file's
+    text.
+  - **The mark** (`agent.step_mark`, read by `agent.read_step_mark`): every run's query starts with `[journal model
+    step]`, or `[journal model step; search up to YYYY-MM-DD]` for a step with a bound (the reflection). Written by
+    `CommandCompanion`, so a custom `agent.command` that wraps Hermes carries it too; any whole line of the message
+    counts (an agent may put a picture's description first). **Chosen over** the passthrough setting: that needs a
+    profile change on every install and code that reads Hermes' session map, and it does nothing on the older Hermes;
+    the mark needs no setting and works on both. The environment is still set (the older Hermes, where a one-shot is
+    its own process, and any agent that reads it). The cost: the model reads one more line, which names nothing of his.
+  - **How a one-shot is told from her chat** (`hermes/steps.note`): a step when its message carries the mark,
+    `JOURNAL_MODEL_STEP=1` is in the process's environment, Hermes says the turn is finite (any `hermes chat -q`,
+    `--oneshot` or `-z`, whoever ran it: no one-shot is a conversation of hers), or the message cannot be read at all
+    (not a string or a list of parts). Then the hook adds nothing (`inbound.begin_turn` still runs first). Her chat
+    is a person's message on a gateway platform or an interactive session: never finite, no mark. The costs: another
+    tool's one-shot in the same profile no longer gets her notebook either, and a message of his that is exactly the
+    mark's line gets no context that turn (the safe side).
+  - **The bound reaches the tool by the turn's ids.** The hook keeps the mark's bound under the turn id and the session
+    id (in the process's memory, 64 at most: Hermes runs a turn's hook and its tool calls in one process); the
+    adapter's `journal_search` handler passes it to `tools.call` (`search_upto`), which falls back to
+    `JOURNAL_SEARCH_UPTO` in `os.environ` (the older Hermes). **Fails closed:** in a finite turn whose mark the hook
+    never kept (it failed, or the ids did not match), the search refuses ("could not read this run's search bound")
+    and the reflection writes from the entries it was given.
+  - **M1: "no tools" is no tools only on a plain profile.** `-t no_mcp` resolves to no toolsets unless the profile has
+    xAI credentials (Hermes adds `x_search` to a pick with no profile toolset in it, `tools_config._composite_toolsets`)
+    or a context engine other than `compressor` (Hermes adds `context_engine` to every pick, the reflection's
+    `journal_read` too; it has no static tools, so a check of the flattened tools could not see it). The engine has no
+    way to ask for less, so `journal doctor` warns of either (`one-shot tools`, `hermes.companion.toolset_hazards`:
+    the profile's `config.yaml`, `.env` and `auth.json` files, presence only), and `LiveHermesTest` now compares the
+    toolset names and shows both conditions against the checkout. Accepting either is the operator's call; neither
+    holds on a profile set up as README describes.
+  - **L1:** when a refused probe released the breaker (`last.released_at`), the tick's line is "model outage released
+    … no model was heard from", not "a model answered again" (`outage.released`). **L2:** `_detail` drops terminal
+    colour and control codes and reads stdout's first paragraph as one line, so a refusal printed in colour or
+    wrapped at 80 columns is still a refusal (the fake `hermes` in `test_hermes_argv_contract.py` prints one).
+  - **Not done here:** a live run through a restarted gateway (that is the deploy's first check); the notebook block in
+    her interactive CLI sessions is unchanged (still added: not finite, no mark).
