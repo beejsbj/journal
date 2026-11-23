@@ -12,8 +12,8 @@ A *program* is a set of ordered sessions run phase by phase (`/next`, `/skip`, `
 
 - The **`journal` command** (`uv tool install`): sends what is due (`journal tick`, every five minutes from cron or a timer), and inspects and maintains everything (`status`, `doctor`, `practices`, `program`, `today`, `send`, `migrate-config`).
 - The **[Hermes Agent](https://github.com/NousResearch/hermes-agent) plugin** (the primary integration: Hermes provides the Telegram gateway, the scheduler and the model): captures replies through the gateway hook, registers the commands and the companion's tools (`journal_add_note`, `journal_set_location`, `journal_notebook`, `journal_program`, and `journal_search` over your own words in the journal) and keeps the companion out of its own settings.
-- **`journal serve`** (see *Web app*): a private web app and API over the same files: a responsive PWA you can install on a phone's home screen or open in a desktop browser. It never calls a model and never restarts anything.
-- **`journal mcp`** (see *MCP*): the journal's tools for any MCP client (Claude Desktop, Claude Code, others) over stdio: read today and your entries, save words you give it, send a practice. An optional extra; same rules as the web app.
+- **`journal serve`** (see *Web app*): a private web app and API over the same files: a responsive PWA you can install on a phone's home screen or open in a desktop browser. It calls no model in its own process and never restarts anything.
+- **`journal mcp`** (see *MCP*): the journal's tools for any MCP client (Claude Desktop, Claude Code, others) over stdio: read today and your entries, save words you give it, open a practice for you to answer (it posts nothing and sends nothing). An optional extra; same rules as the web app.
 
 **Where things live.** All of it is configuration (see *Configure*), none of it code.
 
@@ -27,22 +27,23 @@ A *program* is a set of ordered sessions run phase by phase (`/next`, `/skip`, `
 
 ## Design
 
-Four ideas carry the design. Each is held by code, not asked of a model, and pinned by tests: *Guarantees*, below,
+Five ideas carry the design. Each is held by code, not asked of a model, and pinned by tests: *Guarantees*, below,
 names them for each promise, and each idea here names its own.
 
 **1. Code owns what must not fail; the model only writes words.** Timing, sending, dating, capture and folding are
 plain code. The model drafts openers, annotations and reflections. What speaks about him is checked against the
-record before it is used: an opener's claims about him must cite a source, and a quote of his words in an opener, a
-reflection, a catch-up or a program's text must be found in his own words (annotations are checked for shape only).
-Every model step has a floor: when the model is unreachable or its answer fails the check, the journal does something
-plain and correct, never something invented.
+record where a check exists: an opener that makes a claim about him in a recognised phrasing must carry a verified
+citation, and the quotes it cites must be his; a quote of his words in a reflection, a catch-up or a program's text
+must be found in his own words. Annotations are checked for shape only. Every model step has a floor: when the model
+is unreachable or its answer fails its check, the journal does something plain and correct, never something
+unchecked where a check exists: openers and quotes are checked, annotations for shape only.
 
 ```mermaid
 flowchart LR
     due["A practice is due<br/>schedule.py"]:::code --> pack["A dated, sourced<br/>context pack"]:::code
     pack --> draft["The companion<br/>drafts an opener"]:::model
-    draft --> check{"Claims about him cited?<br/>Every quote really his?<br/>validate.py"}:::code
-    check -- yes --> send["Sent on time,<br/>recorded in the ledger"]:::code
+    draft --> check{"Claim about him cited?<br/>Cited quotes really his?<br/>validate.py"}:::code
+    check -- yes --> send["Sent, never deferred<br/>for the model;<br/>recorded in the ledger"]:::code
     check -- "no, or no model" --> plain["The plain opener"]:::code --> send
 
     classDef code fill:#e3ecfb,stroke:#3567c8,color:#0d1f40
@@ -51,8 +52,9 @@ flowchart LR
 
 | Model step | Its floor |
 | --- | --- |
-| Opener | the plain opener; a prompt is never deferred for a model |
-| Annotation, transcript, picture description | deferred while no model answers, retried for up to 7 days; none after a few bad answers |
+| Opener | the plain opener; a prompt is never deferred for a model (a model that hangs delays it by at most `windows.opener_budget_seconds`, 240 by default) |
+| Annotation, picture description | deferred while no model answers, retried for up to 7 days; none after a few bad answers |
+| Audio transcript | no model involved: it depends on the speech-to-text backend, and is deferred the same way while that fails |
 | Day reflection, week review | not written unless every quote is found in his own words |
 | Catch-up after an outage | not sent unless it quotes only his messages |
 | A program's construction, bridge or synthesis | not used unless every quote is his |
@@ -64,7 +66,9 @@ messages an hour, and anything too stale to make sense is recorded and not sent.
 **2. Two voices, kept apart.** His words come in from any face and are appended verbatim; the engine never rewrites a
 block of his. Her words are labelled as hers and never editable, on any surface. What the engine adds to a turn (her
 notebook, a context pack, the today block) is fenced, and taken off before anything reads his message as his words;
-where it cannot be told apart, the whole message is left out rather than cut.
+a message that still carries such a mark afterwards is left out whole, never cut. The one case that cannot be told
+apart, a message of his that itself ends like a picture's turn, is cut at that point (*Guarantees* says exactly
+where).
 
 ```mermaid
 flowchart LR
@@ -99,13 +103,19 @@ flowchart LR
     style entry fill:none,stroke:#999
 ```
 
+Pinned by `test_conversations.py` (`AppendOnlyTest`: the conversation writer leaves his blocks byte for byte),
+`test_own_words.py` (what a turn adds is taken off, and a message still carrying a mark is left out) and
+`test_serve_blocks.py` (an edit splices one block of his; hers are refused).
+
 Quotes are held to the same line: a reflection may put in quotation marks only words found in one paragraph of his,
 never hers, and nothing written after the period it covers.
 
 **3. Off the record holds across the journal, and fails closed.** `/x` keeps a message out of the journal on every
 face. Every way his words come in refuses it at the write; every reader of the chat asks one privacy pass, and when
 that pass cannot run, everything counts as private. The line is the journal's: `/x` does not reach the companion's
-other tools, such as her own memory (*Guarantees* says where it runs).
+other tools, such as her own memory (*Guarantees* says where it runs). Pinned by `test_privacy_coverage.py` (a pass
+counts only the rows it read), `test_privacy_seams.py` (the seams a review found, each failing before its fix) and
+`test_serve_writes.py` (the web app refuses `/x` at the write).
 
 ```mermaid
 flowchart LR
@@ -139,10 +149,12 @@ flowchart LR
 
 **4. One engine, many faces, fenced.** The chat, the web app, the `journal` command and MCP are thin faces over one
 engine and one set of files: you can journal through any one of them, and `journal tick` does the scheduled work
-(prompts, annotations, reflections). The engine reaches the outside only through ports, so Hermes is imported in one
+(prompts, annotations, reflections). The engine reaches the chat, the model and the channel only through ports (it
+also reads its own sources, in `sources.py`, and speech-to-text, in `audio.py`), so Hermes is imported in one
 adapter, `hermes/` (and by `audio.py` for its speech-to-text, the one allowed exception). The web app and MCP sit behind
-a fence: none of their modules imports the chat or a model, no route calls one, and the web app sends only by spawning
-`journal send`, so the engine alone owns sending and capture.
+a fence: no module of either imports the chat or a model. The web app sends nothing itself: it spawns `journal send`
+and `journal program` (`settle`, `refresh-summary`, `start`), which do the engine's work in their own process, so the
+engine alone owns sending and capture. MCP spawns nothing.
 
 ```mermaid
 flowchart LR
@@ -151,8 +163,9 @@ flowchart LR
     subgraph faces["Faces"]
         direction TB
         chat["Chat<br/>Telegram or any Hermes platform"]:::face
-        cron["journal tick<br/>every five minutes"]:::face
-        subgraph fence["Fenced: no chat, no model"]
+        cli["journal command<br/>write, send, open, status"]:::face
+        cron["journal tick<br/>every five minutes<br/>(cron or a timer)"]:::face
+        subgraph fence["Fenced: no chat or model import"]
             direction TB
             web["Web app<br/>journal serve"]:::face
             mcp["MCP<br/>journal mcp"]:::face
@@ -169,16 +182,17 @@ flowchart LR
         direction TB
         hook["Gateway hooks<br/>capture before any model"]:::port
         p1["Channel: send, edit<br/>Telegram, or Hermes' senders"]:::port
-        p2["Transcript: the chat, read-only"]:::port
+        p2["Transcript: the chat, read-only<br/>plus one framed mirror write"]:::port
         p3["Companion: the model"]:::port
     end
 
-    you --> chat & web & mcp
+    you --> chat & web & mcp & cli
     chat --> hook --> engine
+    cli --> engine
     cron --> engine
     web --> files
     mcp --> files
-    web -. "spawns journal send" .-> engine
+    web -. "spawns journal send,<br/>journal program" .-> engine
     engine --> files
     engine --> p1 & p2 & p3
     p1 --> chat
@@ -191,6 +205,16 @@ flowchart LR
     style core fill:none,stroke:#999
     style adapter fill:none,stroke:#999
 ```
+
+**5. Many writers, one record.** The gateway hook, the sweep, the faces and the tick all write the same entries and
+state, at overlapping moments, so the record is kept consistent in code. Shared state is read, changed and written
+under a lock (`ledger.locked`); `slots.py` is the one reader of what a slot's state means, so every face agrees which
+slot his words belong to; the `%% journal … %%` lines are keys that stop a double write. And just before a scheduled
+send the tick reads the record again under the lock: if he answered on a face meanwhile, nothing goes
+(`_answered_meanwhile`, `tick.py`), and a send that loses the race attaches to the face's record and never
+overwrites it. Pinned by `test_locks.py` (a hook capture, a tick round and web writes at once: no deadlock, every
+write there once), `test_open_slots.py` (a slot's state and where words go) and `test_open_core.py` (a send that finds
+the slot answered meanwhile).
 
 The fences are tests, not conventions: `test_purity.py` (Hermes imported only under `hermes/`, the chat database opened
 only by its adapter), `test_serve_fence.py` and `test_mcp_fence.py` (what serve and MCP may import), and
