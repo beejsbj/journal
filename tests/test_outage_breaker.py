@@ -406,6 +406,11 @@ class RefusedRequestTest(BreakerBase):
         self.assertEqual(last["released_at"], (T0 + timedelta(minutes=5)).isoformat())
         self.assertNotIn("answered_at", last)
         self.assertIn("the outage probe", self.errors()[-1]["error"])
+        # (L1, review of #62: the tick's line says it was released, not that a model answered)
+        self.assertEqual(tick._outage_news(self.cfg, {"down_since": T0.isoformat()}),
+                         ["model outage released (down since 14 Oct 11:30 IST): the probe's own request was refused, "
+                          "so no model was heard from; held work is tried again record by record, and a run that "
+                          "fails is found again"])
 
     def test_a_refused_probe_after_a_failed_run_opens_nothing(self):
         self.companion.down = False

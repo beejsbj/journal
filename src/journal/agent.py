@@ -25,10 +25,14 @@ one-shot chat in the configured profile (``journal.hermes.companion``), and with
 (``CommandCompanion``: an argv list; ``{query_file}``, ``{budget}`` and ``{toolsets}`` are filled in).
 ``agent.enabled: false`` turns model steps off entirely.
 
-Every run carries ``JOURNAL_MODEL_STEP=1`` in its environment: the journal's own hook in that process
+Every run carries ``JOURNAL_MODEL_STEP=1`` in its environment and the same fact as the first line of its query
+(``step_mark``: ``[journal model step]``, with the search bound when the step has one): the journal's own hook
 (``hermes.hooks.on_llm_call``) then adds nothing to the turn, so a model step sees only the query the engine wrote
 (the context pack an opener is given already holds what it should; the notebook and the today block are for her chat).
-A step may add variables of its own (``env``): the reflection's carries ``search.UPTO_ENV``, its period's last day.
+A step may add variables of its own (``env``): the reflection's carries ``search.UPTO_ENV``, its period's last day,
+which the mark carries too. The query carries it because the environment does not always arrive: a Hermes that runs
+every one-shot inside its gateway keeps the client's environment to an allowlist of its own and never sets it in
+the process the hooks and tools run in (HERMES-ONESHOT-ENV, DECISIONS.md).
 """
 from __future__ import annotations
 
@@ -40,9 +44,12 @@ from pathlib import Path
 from . import outage
 from .config import Config
 from .ports import CompanionUnavailable
+from .search import UPTO_ENV
 
 DETAIL_CAP = 200
 MODEL_STEP_ENV = "JOURNAL_MODEL_STEP"  # set in every run's environment: the engine's own model step, not a turn of his
+STEP_MARK = "[journal model step]"  # the first line of every run's query: the same fact, for a process with no env
+_STEP_LINE = re.compile(r"\[journal model step(?:; search up to (\d{4}-\d\d-\d\d))?\]")
 _answered = False  # a model answered in this process (one tick): it is reachable again
 
 
@@ -56,6 +63,29 @@ AgentUnavailable = CompanionUnavailable  # the engine's name for it (one class)
 FAILURE_MARKS = ("⚠", "⏱")
 FAILURE_PHRASES = ("(`hermes logs`)", "`hermes doctor` on the host", "use /retry", "provider said:",
                    "couldn't finish this reply")
+
+
+def step_mark(env: dict[str, str] | None = None) -> str:
+    """The line that opens every run's query: ``[journal model step]``, or with the step's search bound
+    (``UPTO_ENV``, a YYYY-MM-DD) ``[journal model step; search up to 2026-10-14]``."""
+    upto = (env or {}).get(UPTO_ENV) or ""
+    return f"[journal model step; search up to {upto}]" if re.fullmatch(r"\d{4}-\d\d-\d\d", upto) else STEP_MARK
+
+
+def read_step_mark(text) -> tuple[bool, str | None]:
+    """Whether ``text`` (a turn's user message: a string, or a list of content parts) carries ``step_mark``'s line,
+    and the search bound it names. Any line of it counts (an agent may put something before the query, such as a
+    picture's description), but only a whole line: ``(False, None)`` otherwise."""
+    if isinstance(text, (list, tuple)):
+        text = "\n".join(p if isinstance(p, str) else str(p.get("text") or "") if isinstance(p, dict) else ""
+                         for p in text)
+    if not isinstance(text, str) or "[journal model step" not in text:
+        return False, None
+    for line in text.splitlines():
+        m = _STEP_LINE.fullmatch(line.strip())
+        if m:
+            return True, m.group(1)
+    return False, None
 
 
 def is_failure_text(text: str | None) -> bool:
@@ -76,11 +106,20 @@ def __getattr__(name: str):
     raise AttributeError(name)
 
 
+_ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-_]")  # colour, cursor, title
+
+
 def _detail(out: subprocess.CompletedProcess) -> str:
-    """One line saying why a run failed: Hermes' failure copy on stdout, else the last stderr line."""
+    """One line saying why a run failed: Hermes' failure copy on stdout (its first paragraph, as one line: a terminal's
+    copy may be wrapped), else the last stderr line; terminal colour and control codes dropped either way."""
     for stream in (out.stdout, out.stderr):
-        lines = [l.strip() for l in (stream or "").splitlines()
-                 if l.strip() and not l.strip().startswith("session_id:")]
+        text = _ANSI.sub("", stream or "")
+        if stream is out.stdout:
+            paras = [" ".join(l.strip() for l in para.splitlines() if l.strip())
+                     for para in re.split(r"\n\s*\n", text)]
+            lines = [p for p in paras if p and not p.startswith("session_id:")]
+        else:
+            lines = [l.strip() for l in text.splitlines() if l.strip() and not l.strip().startswith("session_id:")]
         if lines:
             return f"exit {out.returncode}: {lines[0] if stream is out.stdout else lines[-1]}"[:DETAIL_CAP]
     return f"exit {out.returncode}"
@@ -115,7 +154,7 @@ def failure_reason(message: str) -> str:
     right after ``Error code: NNN -``. A number or ``*_error`` word loose in prose (which is where an echo of his
     words would put one) matches nothing. Everything else, whatever the length, is dropped, so no prose from the
     message reaches a log line."""
-    low = (message or "").lower().lstrip()
+    low = _ANSI.sub("", message or "").lower().lstrip()
     if outage.held(low):  # ``ModelHeld``: "held: " and a reason this function made (its grammar), else "held" alone
         rest = low[len(outage.HELD) + 1:].strip()
         return f"{outage.HELD}: {rest}"[:DETAIL_CAP] if _MADE.fullmatch(rest) else outage.HELD
@@ -132,7 +171,7 @@ def failure_reason(message: str) -> str:
 
 def refused_field(message: str) -> str:
     """The launch parameter a refused request named (Hermes' field name, e.g. ``toolsets``), or "": for the log."""
-    m = _REFUSAL.search((message or "").lower())
+    m = _REFUSAL.search(_ANSI.sub("", message or "").lower())
     return (m.group(2) or "") if m else ""
 
 
@@ -168,7 +207,7 @@ class CommandCompanion:
             return None
         cfg.state_dir.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile("w", suffix=".md", dir=cfg.state_dir, delete=False) as fh:
-            fh.write(query)
+            fh.write(f"{step_mark(env)}\n\n{query}")
             qpath = Path(fh.name)
         try:
             argv = self.argv(qpath, budget, toolsets, image) if image else self.argv(qpath, budget, toolsets)
@@ -184,7 +223,8 @@ class CommandCompanion:
             raise AgentUnavailable(_detail(out))
         text = re.sub(r"\n*session_id:\s*\S+\s*$", "", out.stdout.strip())
         text = "\n".join(l for l in text.splitlines()
-                         if not l.startswith(("  Command helper:", "Warning: Unknown toolsets")))
+                         if not l.startswith(("  Command helper:", "Warning: Unknown toolsets"))
+                         and not _STEP_LINE.fullmatch(l.strip()))  # (the mark, echoed back: never in an answer)
         text = text.strip()
         if is_failure_text(text):  # a failure the agent printed with exit 0: never an answer
             raise AgentUnavailable(f"agent reported a failure: {text.splitlines()[0]}"[:DETAIL_CAP])

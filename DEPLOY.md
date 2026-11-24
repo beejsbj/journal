@@ -16,6 +16,41 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## HERMES-ONESHOT-ENV — the engine's one-shots are known in the gateway (2026-11-23; tick and hook side; **gateway restart required, with the pin move**; no config or state change; **urgent**: before the late day reflections run)
+
+**What changes.** On a Hermes whose gateway runs every one-shot, a run's environment never reaches the process its
+hooks and tools run in (the gateway keeps a client's environment per session, filtered to its own allowlist, and
+never sets it in `os.environ`). So `JOURNAL_MODEL_STEP=1` and `JOURNAL_SEARCH_UPTO` were lost there: the
+`pre_llm_call` hook added the companion's notebook to every model step (openers, annotations, reflections, picture
+descriptions, the outage probe), and a reflection's `journal_search` had no date bound, so a reflection written late
+could quote later entries, fail its quote check, use up its attempts and be given up. Now every run's query starts
+with a line saying the same (`[journal model step]`, or `[journal model step; search up to <date>]`); the hook reads
+it, also treats any finite one-shot (Hermes' own fact) and any turn whose message it cannot read as a step, and hands
+the bound to `journal_search` by the turn's ids. In a one-shot whose query the hook never read, `journal_search`
+refuses rather than search unbounded. Nothing in the profile needs setting. Also: `journal doctor` has a `one-shot
+tools` row, a warning when the profile has xAI credentials (Hermes adds `x_search` to `-t no_mcp`) or a context
+engine other than `compressor` (Hermes adds `context_engine` to every pick); the tick's log says "model outage
+released" (not "over") when a refused probe released the breaker; a refusal printed in colour or wrapped is still
+read as one. DECISIONS.md, HERMES-ONESHOT-ENV.
+**Side and restart.** `agent.py` (the mark; run by the tick and `journal send`/`program`, fresh processes) and
+`hermes/hooks.py`, `hermes/steps.py`, `hermes/tools.py`, `tools.py` (run inside the gateway, which runs the
+one-shots), plus `outage.py`, `tick.py`, `status.py`, `hermes/companion.py`. **The fix needs both halves**: until the
+gateway restarts, its loaded hook ignores the mark, so the notebook still goes in and the search is still unbounded.
+Move the plugin pin and the CLI to the merge sha and run `hermes gateway restart` in the same step. If HERMES-TOOLSETS
+is not deployed yet, deploy this sha in its place (it includes it), with the restart, so the backlog of day
+reflections it releases is written with the bound. If the restart cannot happen within the next hour or so, turn the
+day reflections off first (`reflections.day.enabled: false`) and back on after the restart: a day reflection that
+fails its quote check three times is given up, and one deferred more than 7 days is dropped. Nothing wrong is written
+meanwhile (the quote check is bounded by the tick, not the tool). Serve is untouched.
+**First checks.**
+- `journal doctor`: the `one-shot tools` row is `ok`, or says which of the two conditions holds (then decide whether
+  to accept it; DECISIONS.md, HERMES-ONESHOT-ENV).
+- After the next tick that writes a reflection: the reflection's ledger record has no `rejected_quote` naming a date
+  after its period, the reflection is written, and `errors.jsonl` has no "could not read this run's search bound".
+- The gateway's log has no `journal` hook exception after the restart.
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
+previous sha), then `hermes gateway restart`. Nothing to undo in state.
+
 ## OPS-NOTICE — the journal tells the operator when it breaks (2026-11-22; tick side; **no gateway restart needed**; new config `ops.*`, new state `ops.json`)
 
 **What changes.** After every scheduled tick, `ops.py` judges what the engine records and keeps one incident per

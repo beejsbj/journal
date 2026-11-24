@@ -305,6 +305,12 @@ def release(cfg: Config, now: datetime | None = None) -> None:
     _close(cfg, now, "released_at")
 
 
+def released(cfg: Config) -> bool:
+    """Whether the last outage the breaker held for ended by ``release`` (a refused probe), not by a model's answer."""
+    last = ledger.read_state(_path(cfg)).get("last") or {}
+    return isinstance(last, dict) and bool(last.get("released_at")) and not last.get("answered_at")
+
+
 def _close(cfg: Config, now: datetime | None, key: str) -> None:
     if not ledger.read_state(_path(cfg)).get("down_since"):
         return

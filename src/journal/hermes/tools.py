@@ -11,13 +11,15 @@ keep search out of her chat, switch ``journal_read`` off for that platform in ``
 the toolset itself and keeps it. ``agent.disabled_toolsets`` would take it from the reflection as well.
 
 Hermes passes the handler the session (and, when it has one, the turn) as keyword arguments; a handler never raises.
+A read tool also gets the search bound the turn's query carried (``steps.search_upto``: a reflection's period end);
+in a one-shot whose query the hook never read, it refuses rather than search unbounded.
 """
 from __future__ import annotations
 
 import json
 
 from .. import tools
-from . import runtime
+from . import runtime, steps
 
 TOOLSET = "journal"
 
@@ -29,8 +31,15 @@ def _handler(name: str):
         except Exception as e:
             return json.dumps({"success": False, "error": f"{type(e).__name__}: {e}"})
         turn = tools.ToolTurn(kw.get("session_id"), kw.get("turn_id"))
+        extra = {}
+        if name in tools.READ_ONLY:  # (``journal_search``: a reflection's one-shot is bounded by its period's end)
+            known, upto = steps.search_upto(kw.get("session_id"), kw.get("turn_id"))
+            if not known and steps.finite_turn() is True:
+                return json.dumps({"success": False, "error": "the journal could not read this run's search bound, "
+                                   "so nothing was searched; write from the entries you were given"})
+            extra["search_upto"] = upto
         return tools.call(cfg, name, params, turn, reload=runtime.load_config,
-                          settings_writer=runtime.settings_writer())
+                          settings_writer=runtime.settings_writer(), **extra)
     handler.__name__ = name
     return handler
 
