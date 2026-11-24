@@ -4588,3 +4588,8 @@ line of his that copies the mark never leaves a bound on her later searches. An 
 that echoes it has the line dropped. Left as known: `journal_search` refuses in a finite turn the engine did not start
 (a kanban card, his own `hermes chat -q`); an engine one-shot that starts a gateway itself would pass its variables
 to it (not this host's setup: the gateway runs as a service).
+- **INVISIBLE-PY (2026-11-24) — the invisible-character guard covers the Python source.** #63 guarded the built web
+  app; three literal U+FEFF in `library.py`, `programdefs.py` and `tests/test_library.py` still tripped Hermes'
+  scanner (it reads `.py`, tests included). Rule: a Python file writes such a character as an escape (`"\ufeff"`), and
+  `tests/test_install_scan.py` fails on a literal in any `.py` under `src/journal/` or `tests/`. Not covered: the
+  docs and fixtures, where the scanner treats the finding the same way but nothing holds one today.
