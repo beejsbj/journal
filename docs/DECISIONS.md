@@ -4588,3 +4588,28 @@ line of his that copies the mark never leaves a bound on her later searches. An 
 that echoes it has the line dropped. Left as known: `journal_search` refuses in a finite turn the engine did not start
 (a kanban card, his own `hermes chat -q`); an engine one-shot that starts a gateway itself would pass its variables
 to it (not this host's setup: the gateway runs as a service).
+
+- **PRIV4 (2026-11-24) — an old compaction copy and a queued bare `/x` (#4, #5).** Two holes the BACKLOG-PRIVACY
+  entries above left open; both fixes only make rows private, never the reverse.
+  - **A copy whose original the view did not read re-takes the pass from the original's time (#4).** A compaction
+    copy is private when its original is, and an original older than the view's recompute was answered only by its
+    saved id, which ages out at `KEEP_DAYS` (400). A copy of a private row older than that, with no mark of its own
+    (a message steered in inside a bare-`/x` window, her reply there), read as public to the outage catch-up, the
+    pack, the quote verifier and annotation alignment. Option (a) of the issue is taken: when a take holds a copy
+    whose original it did not read and no saved answer names private, `view` reads the originals' times and takes
+    the pass again from `RECOMPUTE` before the oldest, keeping the first take's answers (a re-take only adds), until
+    every copy's original was read. The hook's records it needs are kept for good since BACKLOG-PRIVACY. Option (b)
+    (keep saved private ids for good) was not taken: it grows with every private row and is still only a floor.
+    Cost: a view that holds such a copy reads back to its original (usually days, for a long-lived session's
+    carried tail) on each uncached call, the gateway's included, until the copy is older than the view; a copy whose
+    original is saved private costs nothing more. An original deleted between the two reads closes that view
+    (everything private) until the next read.
+  - **A bare `/x` stored as a row also opens its window at its own time (#5).** The pass opened a busy-path bare
+    `/x`'s window at the stored-order clock (the latest time seen), so a message he sent after the `/x` but stored
+    before it was read before any window existed and was public. The pass now gathers the own times of those rows
+    before the walk and adds them to the hook's starts (`_busy_starts`), as the issue proposed; the walk still opens
+    one where it reaches the row, as before. For a row stored in order the two are the same moment, so nothing
+    changes there. Whether Hermes can store the two in that order was not checked on a live gateway (the issue's
+    open question): the fix holds either way and costs nothing when it cannot.
+  - Not done here: #10 (a captionless photo that ends a window takes her next public reply off the record) and #11
+    (compacting and dropping the `/x` records) trade privacy for something else and wait for the owner.

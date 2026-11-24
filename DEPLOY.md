@@ -16,6 +16,25 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## PRIV4 — an old compaction copy and a queued bare `/x` (2026-11-24; tick and hook side; **gateway restart required**; no config or state change)
+
+**What changes.** `privacy.py` only. A compaction copy whose original is older than the privacy view's recompute is
+answered by recomputing from the original's time, not only by a saved answer that ages out after 400 days (#4); a
+bare `/x` stored as a row (the busy path) opens its window at its own time as well as where the stored order reaches
+it (#5). Both only make rows private. DECISIONS.md, PRIV4.
+**Side and restart.** `privacy.py` is loaded by the gateway at import (`journal.hermes` imports it: checked with the
+import check above), and the tick and serve's spawned sends run it as fresh processes. Move the plugin pin and the CLI
+to the merge sha and run `hermes gateway restart` in a window; until the restart the gateway's hook end state and tool
+guard keep the old pass, which is the less private one. Serve does not import it (fence); no serve restart.
+**First checks.**
+- `journal doctor`: no new failure.
+- The next tick's log (`last-tick.json`) has no "privacy pass could not run", and `conversations.json`
+  `privacy.at` moves to that tick's time (the pass was saved).
+- The tick after that one, the conversation writer still writes public chat (an entry gains the newest public
+  exchange, if there was one), so the pass is not stuck closed.
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
+previous sha), then `hermes gateway restart`. Nothing to undo in state.
+
 ## HERMES-ONESHOT-ENV — the engine's one-shots are known in the gateway (2026-11-23; tick and hook side; **gateway restart required, with the pin move**; no config or state change; **urgent**: before the late day reflections run)
 
 **What changes.** On a Hermes whose gateway runs every one-shot, a run's environment never reaches the process its

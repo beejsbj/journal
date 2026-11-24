@@ -19,7 +19,9 @@ For each row the pass decides whether it is private:
   ``[start, end)``: a message exactly at the end is public. A bare ``/x`` inside an open window keeps it; ``/j``
   is never private (an explicit note). A cron delivery does not end a window. A message queued while she was
   busy is stored after rows with later times and carries the time he sent it: that time is activity of the
-  window, and the row is private when it falls inside a window, the open one or one already closed.
+  window, and the row is private when it falls inside a window, the open one or one already closed. A bare ``/x``
+  stored as a row opens its window at its own time (known before the walk, as the hook's are) and again where the
+  walk reaches it, so a message he sent after it is inside the window whichever of the two was stored first.
 * **A tainted turn**: once a private row of his is taken in (a message, or a captionless photo inside a window),
   her rows are private until his next message after her turn ended (a text reply, a failed turn, an
   interruption): a public message steered into the same turn does not clear it, since her answer covers both.
@@ -44,6 +46,9 @@ view already began that far back. Only the hook's end state (the last ``RECOMPUT
 ``view`` itself; the sweep, the writer and the others ask ``covering``. A compaction copy of a row (the transcript
 finds it in the same session, with a new time, or in a rotation's child session: ``Row.copy``) is private when its
 original is; a copy of her reply with no original private is still private inside an open window or tainted turn.
+A view that holds a copy whose original it did not read, and that no saved answer names private, re-takes the pass
+from ``RECOMPUTE`` before the original's time (saved answers age out, and are a floor, never proof that a row is
+public); the first take's answers are kept, so a re-take only adds.
 
 The pass reads the chat as ``ports.Row``s from ``cfg.transcript()``; what a row is (his words, a notice, a frame,
 the end of her turn) the transcript decided, what is private is decided here and only here.
@@ -190,7 +195,9 @@ def compute(cfg: Config, rows: list[Row], hook_starts: list[datetime], sends: li
     inside an off-the-record window or turn)."""
     from . import conversations
     v = View(quiet=conversations.quiet(cfg), sends=sorted(sends))
-    pending = sorted(hook_starts)
+    # a bare /x stored as a row opens its window at its own time too: one queued behind a message he sent after it
+    # is stored later, and that message is his private words (#5); the walk still opens one at the stored-order clock
+    pending = sorted([*hook_starts, *_busy_starts(cfg, rows)])
     seen = None  # the latest time handled: a queued row can carry an older one
     late = _late(rows)  # the own times of his queued rows, stored after rows with later times
 
@@ -287,7 +294,7 @@ def compute(cfg: Config, rows: list[Row], hook_starts: list[datetime], sends: li
         rest = capture.opt_out(cfg, said) if said is not None else None
         explicit = said is not None and capture.strip_command(said) is not None  # /j: never private
         if rest is not None and not rest.strip() and row.kind == "his":
-            start(now_t)  # a bare /x that came in on the busy path
+            start(now_t)  # a bare /x that came in on the busy path (its own time is in ``pending``: _busy_starts)
             hidden = True
         else:
             # in a window by its own time: a queued message he sent before the /x stays public, and one he sent
@@ -305,6 +312,20 @@ def compute(cfg: Config, rows: list[Row], hook_starts: list[datetime], sends: li
     if v.window:
         v.windows.append((v.window["since"], None))
     return v
+
+
+def _busy_bare(cfg: Config, row: Row) -> bool:
+    """A bare /x that came in on the busy path: a stored row of his words that is the opt-out command alone."""
+    if row.copy or row.role == "assistant" or row.kind != "his" or row.meta.get("notice"):
+        return False
+    rest = capture.opt_out(cfg, row.text)
+    return rest is not None and not rest.strip()
+
+
+def _busy_starts(cfg: Config, rows: list[Row]) -> list[datetime]:
+    """The own times of the bare /x rows (``_busy_bare``): a start known before the walk, as the hook's are, so a
+    message he sent after the /x is inside its window whatever order the two were stored in."""
+    return [row.at for row in rows if _busy_bare(cfg, row)]
 
 
 def _late(rows: list[Row]) -> list[datetime]:
@@ -363,11 +384,30 @@ def view(cfg: Config, now: datetime | None = None, since: datetime | None = None
         if hit and time.time() - hit[0] < CACHE_SECONDS:
             return hit[1]
         starts, off_ids = _inputs(cfg, state)
-        found = chat.rows(since=start) if chat.source is not None and chat.available() else []
-        v = compute(cfg, found, [h for h in starts if h >= start], send_times(cfg), off_ids)
-        read = {r.id: r.at for r in found}
+        sends = send_times(cfg)
+        saved = {}
         for rid, t in (frozen.get("private") or {}).items():
-            rid, t = int(rid), datetime.fromisoformat(t)
+            saved[int(rid)] = datetime.fromisoformat(t)
+        readable = chat.source is not None and chat.available()
+        floor: View | None = None
+        while True:
+            found = chat.rows(since=start) if readable else []
+            v = compute(cfg, found, [h for h in starts if h >= start], sends, off_ids)
+            read = {r.id: r.at for r in found}
+            if floor is not None:  # an earlier take's answers stay: a re-take only adds (more private, never less)
+                for rid, t in floor.private.items():
+                    v.private.setdefault(rid, t)
+                v.windows.extend(w for w in floor.windows if w not in v.windows)
+            # a compaction copy whose original this take did not read (it is older than ``start``) is answered by the
+            # original, and a saved answer is only a floor that ages out (#4): re-take from the original's time
+            missing = {o for o in v.copies.values() if o not in read and o not in saved}
+            if not missing:
+                break
+            older = [r.at for r in chat.rows(after_id=min(missing) - 1, upto_id=max(missing)) if r.id in missing]
+            if len(older) < len(missing):  # an original gone between two reads: its copies can't be answered
+                raise LookupError("a compaction copy's original could not be read")
+            floor, start = v, min(start, *older) - RECOMPUTE
+        for rid, t in saved.items():
             if rid in read and read[rid] != t:
                 continue  # another row under this id (a replaced database): the saved answer was not about it
             v.private.setdefault(rid, t)
