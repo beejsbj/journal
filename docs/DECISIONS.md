@@ -4491,3 +4491,10 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     wrapped at 80 columns is still a refusal (the fake `hermes` in `test_hermes_argv_contract.py` prints one).
   - **Not done here:** a live run through a restarted gateway (that is the deploy's first check); the notebook block in
     her interactive CLI sessions is unchanged (still added: not finite, no mark).
+
+**HERMES-ONESHOT-ENV, on review (2026-11-23).** A search bound is kept only where Hermes does not say the turn is a
+chat turn, and every turn without a mark drops what was kept for its ids (a plugin tool gets only the session id), so a
+line of his that copies the mark never leaves a bound on her later searches. An answer never carries the mark: a model
+that echoes it has the line dropped. Left as known: `journal_search` refuses in a finite turn the engine did not start
+(a kanban card, his own `hermes chat -q`); an engine one-shot that starts a gateway itself would pass its variables
+to it (not this host's setup: the gateway runs as a service).

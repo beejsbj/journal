@@ -22,8 +22,10 @@ never finite and carries no mark (a line of his that copies the mark exactly is 
 turn, the safe side).
 
 The search bound goes from the hook to the tool by the turn's ids (``note`` keeps it, ``search_upto`` reads it), in
-this process's memory: Hermes runs a turn's ``pre_llm_call`` hook and its tool calls in the same process, and gives
-both the session id and the turn id. A one-shot's mark with no bound is kept as "no bound". In a finite turn whose
+this process's memory: Hermes runs a turn's ``pre_llm_call`` hook and its tool calls in the same process; the hook gets
+the session id and the turn id, a plugin tool only the session id (so the bound is found by session there). A bound is
+kept only where Hermes does not say the turn is a chat turn (``finite_turn() is not False``), and any turn without a
+mark drops what was kept for its ids: a line of his that copies the mark never leaves a bound on her later searches. A one-shot's mark with no bound is kept as "no bound". In a finite turn whose
 mark the hook never saw (a hook that failed, ids that do not match), ``journal_search`` refuses rather than search
 with no bound: a reflection written late must not read what came after its period (``hermes/tools.py``).
 """
@@ -62,11 +64,14 @@ def note(user_message, session_id=None, turn_id=None) -> bool:
         marked, upto = agent.read_step_mark(user_message)
     except Exception:
         marked, upto = False, None
-    if marked:
+    finite = finite_turn()
+    if marked and finite is not False:
         _keep(session_id, turn_id, upto)
+    else:  # her chat, or a turn with no mark: nothing kept for its ids, so no bound carries into a later turn
+        _drop(session_id, turn_id)
     if marked or os.environ.get(agent.MODEL_STEP_ENV) == "1" or not readable(user_message):
         return True
-    return finite_turn() is True
+    return finite is True
 
 
 def search_upto(session_id=None, turn_id=None) -> tuple[bool, str | None]:
@@ -81,6 +86,12 @@ def search_upto(session_id=None, turn_id=None) -> tuple[bool, str | None]:
 
 def _keys(session_id, turn_id) -> list[str]:
     return [k for k in (f"turn:{turn_id}" if turn_id else "", f"session:{session_id}" if session_id else "") if k]
+
+
+def _drop(session_id, turn_id) -> None:
+    with _lock:
+        for key in _keys(session_id, turn_id):
+            _bounds.pop(key, None)
 
 
 def _keep(session_id, turn_id, upto: str | None) -> None:

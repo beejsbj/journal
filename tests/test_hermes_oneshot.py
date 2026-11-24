@@ -10,6 +10,7 @@ gateway would see.
 """
 import json
 import os
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -165,6 +166,23 @@ class SearchBoundTest(unittest.TestCase):
             out = self.search("s-chat", "t-chat")
         self.assertEqual(len(out["results"]), 3)
 
+    def test_a_mark_in_her_chat_leaves_no_bound_on_later_searches(self):
+        with mock.patch.object(steps, "finite_turn", return_value=False):
+            hooks.on_llm_call(user_message=agent.step_mark({search.UPTO_ENV: "2026-01-01"}), platform="telegram",
+                              session_id="tg", turn_id="t1")
+            self.assertEqual(steps.search_upto("tg"), (False, None))
+            out = self.search("tg", "")
+        self.assertEqual(len(out["results"]), 3)
+
+    def test_an_unmarked_turn_drops_a_bound_kept_for_its_session(self):
+        hooks.on_llm_call(user_message=agent.step_mark({search.UPTO_ENV: "2026-10-02"}) + "\n\nq", platform="cli",
+                          session_id="s-mixed", turn_id="t1")
+        self.assertEqual(steps.search_upto("s-mixed"), (True, "2026-10-02"))
+        with mock.patch.object(steps, "finite_turn", return_value=False):
+            hooks.on_llm_call(user_message="an ordinary message", platform="telegram", session_id="s-mixed",
+                              turn_id="t2")
+        self.assertEqual(steps.search_upto("s-mixed"), (False, None))
+
     def test_the_old_environment_still_bounds_it(self):
         with mock.patch.dict(os.environ, {search.UPTO_ENV: "2026-10-02"}), \
                 mock.patch.object(steps, "finite_turn", return_value=None):
@@ -180,3 +198,12 @@ class SearchBoundTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EchoTest(unittest.TestCase):
+    def test_an_echoed_mark_never_reaches_an_answer(self):
+        out = subprocess.CompletedProcess([], 0, agent.step_mark({search.UPTO_ENV: "2026-10-02"})
+                                          + "\nA line of hers.\n[journal model step]\n\nsession_id: abc\n", "")
+        with tempfile.TemporaryDirectory() as t, mock.patch("journal.agent.subprocess.run", return_value=out):
+            cfg = make_cfg(Path(t), agent={"command": ["/bin/true", "{query_file}"]})
+            self.assertEqual(agent.CommandCompanion(cfg).ask("q", 30), "A line of hers.")

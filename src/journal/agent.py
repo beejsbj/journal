@@ -223,7 +223,8 @@ class CommandCompanion:
             raise AgentUnavailable(_detail(out))
         text = re.sub(r"\n*session_id:\s*\S+\s*$", "", out.stdout.strip())
         text = "\n".join(l for l in text.splitlines()
-                         if not l.startswith(("  Command helper:", "Warning: Unknown toolsets")))
+                         if not l.startswith(("  Command helper:", "Warning: Unknown toolsets"))
+                         and not _STEP_LINE.fullmatch(l.strip()))  # (the mark, echoed back: never in an answer)
         text = text.strip()
         if is_failure_text(text):  # a failure the agent printed with exit 0: never an answer
             raise AgentUnavailable(f"agent reported a failure: {text.splitlines()[0]}"[:DETAIL_CAP])
