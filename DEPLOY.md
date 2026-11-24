@@ -16,6 +16,12 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## DECISIONS-INDEX — an index at the top of docs/DECISIONS.md (2026-11-24; docs and tooling only; **nothing to deploy**)
+
+`docs/DECISIONS.md` gains a generated index (every decision's key, one line, status, link) and an anchor on each entry;
+`tools/gen_decisions_index.py --check` runs in CI beside `gen_builtins.py --check`. No code the install runs changes: no
+restart, no config, no state. Rollback: none needed.
+
 ## HERMES-ONESHOT-ENV — the engine's one-shots are known in the gateway (2026-11-23; tick and hook side; **gateway restart required, with the pin move**; no config or state change; **urgent**: before the late day reflections run)
 
 **What changes.** On a Hermes whose gateway runs every one-shot, a run's environment never reaches the process its
