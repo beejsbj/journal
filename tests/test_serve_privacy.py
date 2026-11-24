@@ -1,5 +1,8 @@
 """Every route of ``journal serve`` with ``sqlite3.connect`` made to fail (API.md §3): none may open the chat
-transcript, so each answers as it normally does, and the patched function is never even called. The journal has a
+transcript, so each answers as it normally does, and the patched function is never even called. The same walks run
+with every way to a model fenced (``helpers.no_model``: ``agent.ask``, ``Config.companion``'s companion, the companion
+classes), so "the web app calls no model" (README *Guarantees*) is held by behaviour too, not only by the import fence
+(``test_serve_fence``), which cannot see a model reached through a module serve loads. The journal has a
 conversation-bearing entry, a reflection, a program session entry and a user practice (``serve_helpers``). A route
 added to ``api.ROUTES`` without a sample here fails the test, so the walk stays complete."""
 import json
@@ -9,6 +12,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from unittest import mock
 
+from helpers import no_model
 from serve_helpers import HERS, IST, NOW, ServeCase
 
 from journal import conversations, ledger, privacy
@@ -118,7 +122,8 @@ class PrivacyTest(ServeCase):
         def refuse_view(*a, **k):
             calls.append(a)
             raise AssertionError("journal serve asked the privacy pass")
-        with mock.patch.object(sqlite3, "connect", refuse), mock.patch.object(privacy, "view", refuse_view):
+        with mock.patch.object(sqlite3, "connect", refuse), mock.patch.object(privacy, "view", refuse_view), \
+                no_model() as asked:
             for pattern, samples in SAMPLES.items():
                 for path, want in samples:
                     with self.subTest(path):
@@ -132,6 +137,7 @@ class PrivacyTest(ServeCase):
             self.assertEqual(self.request("POST", "/api/v1/logout", headers={"Origin": self.origin})[0], 204)
             self.assertEqual(self.request("GET", "/", token=False)[0], 200)
         self.assertEqual(calls, [])
+        self.assertEqual(asked, [])
 
     def test_write_nows_view_of_a_prompt_the_chat_has_opens_no_database(self):
         """``GET /library/{id}/open`` on a delivered, unanswered prompt shows it as sent (``capture.stored_opener``):
@@ -145,9 +151,11 @@ class PrivacyTest(ServeCase):
 
         def refuse(*a, **k):
             raise AssertionError("journal serve opened a SQLite database or asked the privacy pass")
-        with mock.patch.object(sqlite3, "connect", refuse), mock.patch.object(privacy, "view", refuse):
+        with mock.patch.object(sqlite3, "connect", refuse), mock.patch.object(privacy, "view", refuse), \
+                no_model() as asked:
             code, _h, body = self.request("GET", "/api/v1/library/morning/open")
         self.assertEqual(code, 200, body[:300])
+        self.assertEqual(asked, [])
         got = json.loads(body)
         self.assertEqual((got["slot"]["delivered"], got["prompt"]["opener"]), (True, "Morning. The rain again."))
 
@@ -173,13 +181,14 @@ class PrivacyTest(ServeCase):
             raise AssertionError("journal serve reached for the chat transcript on a write")
         with mock.patch.object(sqlite3, "connect", refuse), mock.patch.object(privacy, "view", refuse), \
                 mock.patch("journal.location.geocode", return_value=hit), \
-                mock.patch("journal.location.reverse_geocode", return_value=hit):
+                mock.patch("journal.location.reverse_geocode", return_value=hit), no_model() as asked:
             for (method, _pattern), samples in WRITE_SAMPLES.items():
                 for body, path, want in samples:
                     with self.subTest(method=method, path=path, body=body):
                         code, _h, raw = self.request(method, path, body, headers={"Origin": self.origin})
                         self.assertEqual(code, want, raw[:300])
         self.assertEqual(calls, [])
+        self.assertEqual(asked, [])
 
     def test_every_push_route_and_a_pass_answer_without_the_sessions_database(self):
         walked = {(m, p) for m, p, _fn, _a in push.ROUTES}
@@ -190,7 +199,8 @@ class PrivacyTest(ServeCase):
         def refuse(*a, **k):
             calls.append(a)
             raise AssertionError("journal serve reached for the chat transcript on a push")
-        with mock.patch.object(sqlite3, "connect", refuse), mock.patch.object(privacy, "view", refuse):
+        with mock.patch.object(sqlite3, "connect", refuse), mock.patch.object(privacy, "view", refuse), \
+                no_model() as asked:
             for (method, _pattern), samples in PUSH_SAMPLES.items():
                 for body, path, want in samples:
                     with self.subTest(method=method, path=path):
@@ -203,6 +213,40 @@ class PrivacyTest(ServeCase):
                                    send=lambda sub, body, **k: sent.append(body) or push.webpush.Result("sent", 201))
         self.assertEqual(pushed, ["2026-10-15-morning"])
         self.assertEqual(calls, [])
+        self.assertEqual(asked, [])
+
+    def test_the_model_fence_is_not_vacuous(self):
+        """Each way to a model the fence watches records an attempt and fails, the facade included (the real
+        ``agent.ask``, which ``helpers`` keeps as ``real_ask``), and a failure swallowed by its caller is still
+        counted."""
+        from helpers import real_ask
+        from journal import agent
+        self.cfg.agent = {"command": ["true"]}   # a companion that would answer: the fence must stop it first
+        with no_model() as asked:
+            for where, run in (("Config.companion", lambda: self.cfg.companion().ask("q", 5)),
+                               ("agent.ask", lambda: agent.ask(self.cfg, "q", 5)),
+                               ("the facade", lambda: real_ask(self.cfg, "q", 5)),
+                               ("CommandCompanion", lambda: agent.CommandCompanion(self.cfg).ask("q", 5)),
+                               ("NoCompanion", lambda: agent.NoCompanion(self.cfg).ask("q", 5))):
+                with self.subTest(where), self.assertRaises(AssertionError):
+                    run()
+            try:
+                self.cfg.companion().ask("q", 5)
+            except Exception:  # noqa: BLE001 - a route that swallows the failure
+                pass
+        self.assertEqual(len(asked), 6)
+
+    def test_doctor_checks_the_companion_without_asking_it(self):
+        """``GET /api/v1/doctor`` builds the configured companion for its ``one-shot tools`` row when the Hermes
+        command is found: through the fence it still answers that row, and no model is asked."""
+        home = Path(self.tmp.name) / "hermes-home"
+        home.mkdir()
+        self.cfg.hermes_home, self.cfg.adapter, self.cfg.agent = home, "hermes", {}
+        with mock.patch("journal.status.shutil.which", return_value="/opt/hermes/bin/hermes"), no_model() as asked:
+            code, _h, body = self.request("GET", "/api/v1/doctor")
+        self.assertEqual(code, 200, body[:300])
+        self.assertIn("one-shot tools", [r["check"] for r in json.loads(body)])
+        self.assertEqual(asked, [])
 
     def test_the_status_route_leaves_out_what_the_privacy_pass_knows(self):
         with mock.patch("journal.privacy.window_open") as window, mock.patch("journal.notebook.open_items") as items, \

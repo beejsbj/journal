@@ -4588,3 +4588,17 @@ line of his that copies the mark never leaves a bound on her later searches. An 
 that echoes it has the line dropped. Left as known: `journal_search` refuses in a finite turn the engine did not start
 (a kanban card, his own `hermes chat -q`); an engine one-shot that starts a gateway itself would pass its variables
 to it (not this host's setup: the gateway runs as a service).
+
+- **MODEL-WALK (2026-11-24) — "the web app calls no model" is fenced by behaviour at `ask`, not at building a
+  companion (issue #3).** The import fence (`test_serve_fence.py`) sees only what `serve/` imports itself; serve
+  loads `reflect`, which imports `agent`, so a route could reach a model by another module. `helpers.no_model()` now
+  records and fails `agent.ask`, the `ask` of every companion `Config.companion()` hands out (the outage probe asks the
+  same one) and the companion classes' own `ask`, and every serve route walk and the MCP tool walk run inside it and
+  assert nothing was recorded, so a route that catches the failure still fails the suite. **Why at `ask` and not
+  `Config.companion()` raising, as the issue first put it:** `journal doctor` (`GET /api/v1/doctor`) builds the
+  configured companion to read its `doctor_rows` (the `one-shot tools` row: a check of files, no model run) and
+  catches whatever that raises, so a raise there would be swallowed, and would wrongly fail the walk on any host
+  where the Hermes command is found. `test_doctor_checks_the_companion_without_asking_it` runs that branch through
+  the fence; `test_the_model_fence_is_not_vacuous` shows each watched way records. Verified by mutation: a swallowed
+  `reflect.agent.ask` call in the doctor route fails the GET walk. Not fenced here: a model reached by a process
+  serve spawns (`journal send`, `journal program`), which is the engine's own step with its usual fallback.

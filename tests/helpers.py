@@ -52,6 +52,46 @@ from journal import mirror  # noqa: E402
 
 mirror._mirror_to_session = _no_mirror  # tests that mirror patch journal.mirror._mirror_to_session themselves
 
+
+import contextlib  # noqa: E402
+
+
+@contextlib.contextmanager
+def no_model():
+    """README *Guarantees*, "the web app calls no model", held by behaviour (issue #3): while open, every way a model
+    is reached records the attempt and fails. That is ``agent.ask`` (the facade every model step calls), every
+    companion ``Config.companion()`` hands out (its ``ask``; the outage probe asks the same one), and the companion
+    classes' own ``ask`` (one built without ``Config.companion``). Yields the list of attempts: the caller asserts it
+    is empty, so a failure a route catches and swallows still fails the test.
+
+    The fence is at ``ask``, not at building a companion: ``journal doctor`` (``GET /api/v1/doctor``) builds the
+    configured one to read its ``doctor_rows``, a check of files that runs no model, and catches whatever that
+    raises, so a ``Config.companion`` that raised would be swallowed there and prove nothing."""
+    calls: list[tuple] = []
+
+    def refuse(where):
+        def ask(*a, **k):
+            calls.append((where, a, k))
+            raise AssertionError(f"a model was reached through {where}")
+        return ask
+
+    class Fenced:
+        """The configured companion, with its ``ask`` fenced; every other attribute (``doctor_rows``) is its own."""
+
+        def __init__(self, inner):
+            self._inner = inner
+            self.ask = refuse(f"{type(inner).__name__}.ask (from Config.companion)")
+
+        def __getattr__(self, name):
+            return getattr(self._inner, name)
+
+    real = Config.companion
+    with mock.patch.object(Config, "companion", lambda self: Fenced(real(self))), \
+            mock.patch.object(agent, "ask", refuse("agent.ask")), \
+            mock.patch.object(agent.CommandCompanion, "ask", refuse("CommandCompanion.ask")), \
+            mock.patch.object(agent.NoCompanion, "ask", refuse("NoCompanion.ask")):
+        yield calls
+
 PERSON = Names(user="Theo", companion="Iris", emoji="🌻", pronouns="he/him/his", frontmatter_source="iris-journal")
 CHAT = "100200300"
 
