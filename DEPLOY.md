@@ -16,6 +16,19 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## DOCTOR-STUB — `journal doctor` no longer warns "cron stub out of date" under a uv tool install (2026-11-24; CLI side; **no gateway restart**; no config or state change; closes #7)
+
+**What changes.** The cron-stub row compared the stub on disk with a stub rendered for the *asking* install's own
+`src`, so `journal doctor` from the `uv tool` CLI (its `src` is site-packages) called a correct stub out of date,
+while `hermes journal doctor` (the plugin's `src`) agreed with it. The row now reads the `SRC` the stub names and
+judges the stub itself: it must be what setup writes for that `src` and this profile, and that `src` must hold the
+`journal` package. Both faces give the same row. `hermes journal setup` is unchanged.
+**Side and restart.** `hermes/cron.py` is imported by neither `journal.hermes` at load nor the gateway (checked with
+the import list in the table above), and runs only in `journal doctor` and `hermes journal setup`, both fresh
+processes: `uv tool install --force` at the merge sha moves the CLI; the plugin pin moves with the next deploy.
+**First check.** `journal doctor` (uv CLI) and `hermes -p <profile> journal doctor`: the `cron stub` row is `ok` in
+both. **Rollback.** The previous sha; nothing was written.
+
 ## HERMES-ONESHOT-ENV — the engine's one-shots are known in the gateway (2026-11-23; tick and hook side; **gateway restart required, with the pin move**; no config or state change; **urgent**: before the late day reflections run)
 
 **What changes.** On a Hermes whose gateway runs every one-shot, a run's environment never reaches the process its
