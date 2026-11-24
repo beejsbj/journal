@@ -93,6 +93,11 @@ def edit(body: str, key: str, text: str, *, was: str | None = None, at: str | No
     new = body[:cut.text[0]] + lead + text + cut.tail + body[cut.text[1]:]
     wanted = [b for b, _c in parts]
     wanted[i] = {**block, "text": text}
+    # (the times line stays as written; it pairs with the new words only if they have as many paragraphs)
+    wanted[i].pop("times", None)
+    paired = document.paired_times(cut.times, text)
+    if paired:
+        wanted[i]["times"] = paired
     if not _same_entry(body, new, wanted, stem):
         raise Refused(422, "ambiguous-text", "written like that, these words would be read as something other than "
                                              "your words (a heading, a recording's embed or a line of the "

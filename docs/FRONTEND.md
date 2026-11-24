@@ -129,6 +129,9 @@ composer's own (`useCompose`). `/design` (linked from Settings) draws every part
   everything else escaped), her notes with times, the day's reflection (link + inline body), the program summary.
 - States: loading skeleton; 404 "Not an engine entry"; offline (cached document with the ribbon); write failure
   (composer keeps the text, shows the error line, Retry).
+- As built (PARAGRAPH-TIMES, issue #40): a typed block that kept its paragraph times shows the first paragraph's hour
+  in the margin (when he began, not when he saved) and each later one beside its paragraph where the hour changes
+  (`ui/Hours`); the write room does the same while he writes, from the stamps `useCompose` keeps beside the draft.
 - As built (WEB-UX; DECISIONS.md, WEB-UX-ENTRY-TABS): **no tabs**. A spread: the hours in the left margin, his column,
   her notes standing in the right margin beside the passage they follow (under it when the pane is under 840 px); her
   letter at the head (questions folded, "All 24 questions, in 10 parts"); "Her readings" unfold at the end (*What she

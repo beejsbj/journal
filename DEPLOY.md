@@ -16,6 +16,37 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## PARAGRAPH-TIMES — the write room keeps the hour each paragraph was begun (2026-11-24; serve side and the PWA; **no gateway restart**; no config or state change)
+
+**What changes.** The web app notes when each paragraph (each line that is not blank) of his words was begun while he
+writes, in the write room and the entry's own box, and a save sends those times. The server checks them
+(`actions.paragraph_times`: one per paragraph, none after the block's time, none more than 24 hours before it) and the
+block keeps them on one hidden line under its heading (`%% journal times:08:32 08:42 %%`); anything that does not hold
+is dropped and the words are saved with the block's one time, as before. The entry shows the first paragraph's hour
+beside the block and each later one beside its paragraph where the hour changes; the room does the same while he
+writes. Chat words, recordings, pictures, program answers, the CLI and MCP keep one time per block. A format change:
+DECISIONS.md, PARAGRAPH-TIMES; README *Entry file*.
+
+**Side and restart.** Serve side: `serve/writes.py`, `serve/document.py`, `serve/blocks.py` and the committed web build
+(`uv tool install --force` at the merge sha, then `systemctl --user restart journal-serve`). The engine modules it
+writes through change too (`entries.py`, `capture.py`, `actions.py`); the gateway imports `entries` and `capture`, but
+no gateway path passes times, and a block written without them is byte for byte what it was, so the gateway needs no
+restart (its next one picks the change up), and the code it has loaded reads a times line as the engine line it is
+(left out of his words everywhere). The tick and `journal write` are fresh processes and pass no times.
+
+**The PWA.** An installed app offers "Update available"; Reload takes the new build. Until then the old build sends
+no times and shows each block's one time; nothing breaks.
+
+**First checks.** `journal doctor` as usual. In the web app, write a note of two paragraphs a minute or more apart and
+save: the entry shows an hour beside each paragraph whose hour differs, and the file has the `%% journal times:… %%`
+line straight under the block's heading, his words below it as typed. Edit one word of that block in the web app: it
+saves, and the hours stay.
+
+**Rollback.** Reinstall serve at the previous sha and restart it; nothing in state to undo. Entries written meanwhile
+keep their times lines, which older code reads as before (an engine line: never his words, never shown), with one
+difference: the older web app's Edit and Delete refuse those blocks ("a line of the engine's own"; change them in the
+notes app, where the line can also be deleted by hand without harm).
+
 ## HERMES-ONESHOT-ENV — the engine's one-shots are known in the gateway (2026-11-23; tick and hook side; **gateway restart required, with the pin move**; no config or state change; **urgent**: before the late day reflections run)
 
 **What changes.** On a Hermes whose gateway runs every one-shot, a run's environment never reaches the process its

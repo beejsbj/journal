@@ -174,6 +174,7 @@ class Cut:
     tail: str = ""
     dash: bool = False
     refuse: str | None = None
+    times: tuple[str, ...] = ()   # the block's paragraph times as the file keeps them (``entries.TIMES_LINE``)
 
     def at(self, base: int) -> "Cut":
         return replace(self, unit=(self.unit[0] + base, self.unit[1] + base), text=(self.text[0] + base, self.text[1] + base))
@@ -210,6 +211,23 @@ def _plain_cut(text: str, lo: int, hi: int, unit: tuple[int, int], embed: bool =
     return Cut(unit, (pre + a, pre + b), refuse=refuse)
 
 
+def _times_line(section: str, at: int) -> tuple[tuple[str, ...], int]:
+    """The paragraph times on the line straight under the heading that ends at ``at`` (``entries.TIMES_LINE``), and
+    where the block's body starts after that line; ``((), at)`` when the block has none."""
+    if not section.startswith("\n", at):
+        return (), at
+    nl = section.find("\n", at + 1)
+    end = len(section) if nl < 0 else nl
+    m = entries.TIMES_LINE.match(section[at + 1:end])
+    return (tuple(m.group(1).split(" ")), end) if m else ((), at)
+
+
+def paired_times(times: tuple[str, ...] | list[str], text: str) -> list[str] | None:
+    """``times`` when there is one for each paragraph of ``text`` (``entries.paragraph_count``), else None: words he
+    changed since (a paragraph added or taken out, here or in his notes app) show the block's one time again."""
+    return list(times) if times and len(times) == entries.paragraph_count(text) else None
+
+
 def _words_parts(section: str, stem: str | None = None) -> list[tuple[dict, Cut]]:
     heads = list(_WORDS_HEAD.finditer(section))
     starts = [_key_start(section, m.start()) for m in heads]
@@ -224,7 +242,8 @@ def _words_parts(section: str, stem: str | None = None) -> list[tuple[dict, Cut]
                      "phase": None}, _plain_cut(section, 0, first, (keep, first), embed=False)))
     for i, m in enumerate(heads):
         source, meta = _source_meta(m.group(3))
-        name, text = _embed(section[m.end():ends[i]])
+        times, start = _times_line(section, m.end())
+        name, text = _embed(section[start:ends[i]])
         pics, text = _pictures(text, stem) if source == "photo" else ([], text)
         which, n = _answer_key_before(section, m.start()) or (None, None)
         block = {"kind": "his", "key": f"words:{len(out)}", "at": " ".join(x for x in m.group(1, 2) if x),
@@ -235,8 +254,12 @@ def _words_parts(section: str, stem: str | None = None) -> list[tuple[dict, Cut]
             block["interrupt"] = n
         if meta:
             block["meta"] = meta
-        out.append((block, _plain_cut(section, m.end(), ends[i], (begins[i], ends[i]),
-                                      photo_of=(stem or "") if source == "photo" else None)))
+        paired = paired_times(times, block["text"])
+        if paired:
+            block["times"] = paired
+        cut = _plain_cut(section, start, ends[i], (begins[i], ends[i]),
+                         photo_of=(stem or "") if source == "photo" else None)
+        out.append((block, replace(cut, times=times)))
     return out
 
 

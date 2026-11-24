@@ -87,6 +87,26 @@ def interrupt_mark(n: int) -> str:
 def block_mark(kind: str, key: str) -> str:
     """The hidden key line that opens a conversation block (``kind`` his or her)."""
     return f"%% journal {kind}:{key} %%"
+
+
+# The time each paragraph of a block of his was begun (issue #40; DECISIONS.md, PARAGRAPH-TIMES): a hidden line right
+# under the block's heading, one local ``HH:MM`` per paragraph (a line of his that is not blank), in the paragraphs'
+# order: ``%% journal times:23:12 23:15 23:31 %%``. Only the web app's typed blocks carry one; the heading keeps the
+# block's own time. It is an engine line like the others (``ENGINE_MARK``): every reader of his words already leaves it
+# out, his words can never hold one (``actions.refuse``), and a notes app hides it as a comment.
+TIMES_PREFIX = "%% journal times:"
+TIMES_LINE = re.compile(r"^%% journal times:([0-9]{2}:[0-9]{2}(?: [0-9]{2}:[0-9]{2})*) %%[ \t]*$")
+
+
+def times_mark(times: Sequence[str]) -> str:
+    """The hidden line that keeps a block's paragraph times (``HH:MM`` each)."""
+    return f"{TIMES_PREFIX}{' '.join(times)} %%"
+
+
+def paragraph_count(text: str) -> int:
+    """How many paragraphs ``text`` has as the web app counts them: its lines that are not blank (the write room
+    starts a paragraph at every Enter, and the entry shows his words line for line)."""
+    return sum(1 for line in (text or "").split("\n") if line.strip())
 # A companion reply (or a reply-context line) folded into the conversation: an Obsidian callout, every line "> ".
 # The engine's callouts in a conversation: her reply (opened by its ``journal her:`` key line) and the reply
 # context above one of his messages (right after his ``journal his:`` key line). A callout of his own is his text.
@@ -394,10 +414,15 @@ def block_heading(at: datetime, source: str, meta: dict | None = None) -> str:
 
 
 def _raw_block(at: datetime, text: str, source: str, audio: str | None = None, meta: dict | None = None,
-               images: Sequence[str] = ()) -> str:
-    """One block of his words: heading, then the kept recording or pictures as Obsidian embeds, then his words."""
+               images: Sequence[str] = (), times: Sequence[str] = ()) -> str:
+    """One block of his words: heading, then the kept recording or pictures as Obsidian embeds, then his words.
+    ``times``: one ``HH:MM`` per paragraph of a typed block (``TIMES_LINE``), kept on the line under the heading; a
+    block with a recording or pictures, or with a count that does not match its paragraphs, carries none."""
     embed = f"![[{audio}]]\n\n" if audio else "".join(f"![[{name}]]\n\n" for name in images)
-    return f"{block_heading(at, source, meta)}\n\n{embed}{text.rstrip()}\n\n"
+    keep = bool(times) and not embed and len(times) == paragraph_count(text) and all(
+        re.fullmatch(r"[0-9]{2}:[0-9]{2}", t) for t in times)
+    mark = f"{times_mark(times)}\n" if keep else ""
+    return f"{block_heading(at, source, meta)}\n{mark}\n{embed}{text.rstrip()}\n\n"
 
 
 # The heading of a recording's block as the engine writes it: ``### HH:MM … · audio file …`` (or ``voice
@@ -460,10 +485,12 @@ def fill_audio_block(path: Path, audio: str, transcript: str | None, heading: st
 
 def record_reply(root: Path, prompt: dict, text: str, captured_at: datetime, source: str = "text",
                  audio: str | None = None, names: Names = DEFAULT_NAMES, meta: dict | None = None,
-                 practice=None, images: Sequence[str] = ()) -> Path:
+                 practice=None, images: Sequence[str] = (), times: Sequence[str] = ()) -> Path:
     """Write or append the user's verbatim words to this prompt's entry file. A new file is titled and carries
     the bank of ``practice`` (the one the prompt was sent for; by default the built-in of the prompt's kind).
-    ``images``: pictures he sent with the words, kept beside the entry (``images.keep``) and embedded above them."""
+    ``images``: pictures he sent with the words, kept beside the entry (``images.keep``) and embedded above them.
+    ``times``: when each paragraph was begun (``_raw_block``); never on a program's answer, whose blocks the run
+    reads back line for line (``phase_blocks``)."""
     path = entry_path(root, prompt["stem"])
     body = path.read_text(encoding="utf-8") if path.exists() else _new_file(prompt, names, practice)
     span = words_span(body)
@@ -481,7 +508,8 @@ def record_reply(root: Path, prompt: dict, text: str, captured_at: datetime, sou
     keyed = bool(prompt.get("program") and (prompt.get("phase") or prompt.get("interrupt")))
     key = (interrupt_mark(prompt["interrupt"]) if prompt.get("interrupt") else phase_mark(prompt["phase"])) + "\n" \
         if keyed else ""
-    body = body[:s] + "\n" + words + key + _raw_block(captured_at, text, source, audio, meta, images) + body[e:]
+    body = body[:s] + "\n" + words + key + _raw_block(captured_at, text, source, audio, meta, images,
+                                                       () if keyed else times) + body[e:]
     _atomic_write(path, body)
     if keyed:
         add_phase_prompt(path, prompt)
