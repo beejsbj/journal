@@ -19,7 +19,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from . import config as jconfig
-from . import audio, capture, entries, hookstate, ledger, library, notebook, outage, schedule, sources, telegram
+from . import audio, capture, entries, hookstate, ledger, library, notebook, ops, outage, schedule, sources, telegram
 from .config import Config
 
 
@@ -68,6 +68,14 @@ def _model_outage(cfg: Config) -> dict | None:
             return "?"
     return {"since": local("down_since"), "error": st.get("last_error") or "model unreachable",
             "probes": outage.probes(st), "next_probe": local("next_probe_at")}
+
+
+def _ops(cfg: Config) -> dict | None:
+    """The operator's notice (``ops.summary``): how it is delivered and the incidents open; None if unreadable."""
+    try:
+        return ops.summary(cfg)
+    except Exception:  # noqa: BLE001 - status only
+        return None
 
 
 def status(cfg: Config, now: datetime | None = None, *, web: bool = False) -> dict:
@@ -128,6 +136,7 @@ def status(cfg: Config, now: datetime | None = None, *, web: bool = False) -> di
         "pending_annotation_replies": pending_reply,
         "deferred": waiting,
         "model_outage": _model_outage(cfg),
+        "ops": _ops(cfg),
         "undelivered": failed,
         "reflections": _reflections(cfg, data),
         "sweep": _read_json(cfg.state_dir / "sweep.json"),
@@ -287,6 +296,9 @@ def format_status(s: dict) -> str:
         o = s["model_outage"]
         lines.append(f"Model outage known since {o['since']} ({o['error']}): model work is held; "
                      f"{o['probes']} probe(s) so far, the next at {o['next_probe']}")
+    ops_line = ops.format_summary(s.get("ops") or {})
+    if ops_line:
+        lines.append(ops_line)
     if s.get("deferred"):
         lines.append("Deferred by an outage (model or speech-to-text): " + ", ".join(
             f"{d['id']} {d['what']} ({d['detail']})" for d in s["deferred"]))
@@ -358,6 +370,21 @@ def _channel_row(cfg: Config) -> tuple[str, str, str]:
             f"{where}; sent through `hermes journal deliver` (Hermes' senders): no fold, no reply-to, no buttons")
 
 
+def _ops_rows(cfg: Config) -> list[tuple[str, str, str]]:
+    """The operator's notice (``ops``): where it goes and whether what it runs is there. Nothing is run: no call to
+    GitHub is made here."""
+    rows = [("ops notice", "warn", p) for p in ops.problems(cfg)]
+    how = ops.delivery(cfg)
+    if how == "off":
+        return rows + [("ops notice", "ok", "off: no ops.repo set; incidents are kept and shown by `journal status`")]
+    exe = ops.command(cfg)[0] if how == "command" else ops.gh_path(cfg)
+    found = shutil.which(exe) is not None or Path(exe).is_file()
+    where = "ops.command" if how == "command" else f"issues in {ops.repo(cfg)} (label {ops.label(cfg)})"
+    open_now = len(ops.summary(cfg)["incidents"])
+    return rows + [("ops notice", "ok" if found else "fail",
+                    f"{where} via {exe}" + ("" if found else " (not found)") + f"; {open_now} incident(s) open")]
+
+
 def _writable_dir(path: Path) -> tuple[bool, str]:
     if path.is_dir():
         ok = os.access(path, os.W_OK | os.X_OK)
@@ -387,6 +414,7 @@ def doctor(cfg: Config, deep: bool = False, token: bool = True, web: bool = Fals
         rows.append(_hook_state_row(cfg))
     rows += _library_rows(cfg)
     rows.append(_channel_row(cfg))
+    rows += _ops_rows(cfg)
     if token and cfg.platform == "telegram":
         tok, where = telegram.resolve_token(cfg)
         rows.append(("telegram token", "ok" if tok else "fail", f"obtained from {where}" if tok else where))
