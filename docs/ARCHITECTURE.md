@@ -314,7 +314,7 @@ Storage, by owner:
 | `state_dir/hook-state.json` | engine | pending voice, pending packs, off-record turns, thread stamps (`last_his`, `last_send`, `today_injected_at`) |
 | `state_dir/today-cache.json` | tick | tasks/weather lines and `heard` (the time of his newest public chat message, read through the privacy pass; never its text), refreshed every `today.cache_minutes` |
 | `state_dir/practices/` or `practices_dir` | user, PWA | user definitions and his edits of the built-ins (`.library`: the defaults they began from) |
-| `state_dir/packs/`, `audio-stash/`, `mirror-queue.json`, `conversations.json`, `sweep.json`, `send-times.json`, `sent.jsonl`, `notebook.json` | engine | as today; **unservable** by the API |
+| `state_dir/packs/`, `audio-stash/`, `mirror-queue.json`, `conversations.json`, `sweep.json`, `send-times.json`, `sent.jsonl`, `notebook.json` | engine | as today; **unservable** by the API (`/status` shows the last sweep's time, read from `sweep.json`, and nothing else of it) |
 
 ## 4. Process model
 

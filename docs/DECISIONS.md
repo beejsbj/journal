@@ -4588,3 +4588,18 @@ line of his that copies the mark never leaves a bound on her later searches. An 
 that echoes it has the line dropped. Left as known: `journal_search` refuses in a finite turn the engine did not start
 (a kanban card, his own `hermes chat -q`); an engine one-shot that starts a gateway itself would pass its variables
 to it (not this host's setup: the gateway runs as a service).
+- **AUDIT-LEFTOVERS (2026-11-24) — what issue #50 took, and what it left.** Taken: (1) the web's `/status` serves
+  `sweep` as `{at}`: the doc listed `sweep.json` as unservable, and its database path and row id are chat-side, so the
+  web gets the time alone (the CLI's status line is unchanged); (2) `/status` and the hook state: already so on main
+  (`hook_state` is not read in web mode, `tests/test_serve.py` pins it); (3) the thin tuple readers WP7 kept
+  (`sweep.parse/rows/read`, `conversations.rows`) are called by no `src/` code, so they moved to
+  `tests/legacy_readers.py` and the suites that pin the row semantics call them there (WP13 had left this for exactly
+  that rewrite; `context.clean_user_text`, `agent.is_failure_text` and `mirror.turn_running` are not in the issue and
+  stay). **Not taken, needs the owner:** the platform-named fields. The ledger's `telegram` record (a prompt's send,
+  a reflection's send, an annotation reply; read at about twenty sites and by `standing`, `context`, `status`,
+  `reflect`) and the `telegram_history` source (a key in deployments' config and in `plugin.yaml`) would each need
+  read-old/write-new. The ledger is shared by a gateway that runs old code until it restarts and by a tick that runs
+  new code at once: a record written under the new name is invisible to the old reader, so a prompt could look unsent
+  and be sent twice. Options: (a) leave the names (cosmetic; recommended while in maintenance); (b) rename in two
+  releases, the first reading both names and writing the old, the second writing the new once every gateway has
+  restarted; (c) add `chat_history` as an alias for the source only, which is config-side and safe.

@@ -14,6 +14,7 @@ from pathlib import Path
 from unittest import mock
 
 from helpers import add_prompt, make_cfg
+import legacy_readers
 from test_sweep import FakeSessions, redirected
 
 from journal import capture, context, conversations, privacy, recovery, sweep
@@ -508,7 +509,7 @@ class WiderCopiesTest(Base):
         self.hers("Sure, what is it?", m(1))
         self.his("a thought", m(2), "30")
         self.hers("Sure, what is it?", m(3))
-        rows = conversations.rows(self.cfg, self.db.path, 0)
+        rows = legacy_readers.conversation_rows(self.cfg, self.db.path, 0)
         self.assertEqual([r[8] for r in rows if r[2] == "assistant"], [None, None])
 
     def test_a_message_resent_with_another_telegram_id_is_not_a_copy(self):
@@ -516,7 +517,7 @@ class WiderCopiesTest(Base):
         self.his("ok", m(1), "30")
         self.db.sql("update messages set active = 0")
         self.his("ok", m(2), "31")
-        rows = conversations.rows(self.cfg, self.db.path, 0)
+        rows = legacy_readers.conversation_rows(self.cfg, self.db.path, 0)
         self.assertEqual([r[8] for r in rows], [None, None])
 
 
