@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { uploadAudio, type ApiError, type Words } from "../api";
-import { loadDraft, newClientId, onDraft, saveDraft } from "../drafts";
+import { loadDraft, loadStamps, newClientId, onDraft, saveDraft, saveStamps } from "../drafts";
+import { restamp, stampsFor, timesToSend, type Stamps } from "../paragraphTimes";
 import { asApiError } from "../hooks";
 import { OFFLINE_WRITE, useOnline } from "../offline";
 import { duration } from "../format";
@@ -15,7 +16,8 @@ import "./Composer.css";
  * recording is uploaded first and named in the post; if the post fails the upload is reused, not sent again.
  *
  * The rules live in `useCompose`, which the inline box below and the write room (WriteRoom.tsx) both use: one set of
- * drafts, retries, uploads and offline lines, two ways of laying them out.
+ * drafts, retries, uploads and offline lines, two ways of laying them out. It also notes when each paragraph was
+ * begun (`paragraphTimes.ts`), kept beside the draft, and a save of typed words sends them (`times`).
  */
 /** The server forgets an upload nobody claimed after an hour; one older than this is uploaded again, not trusted. */
 const UPLOAD_FRESH_MS = 50 * 60 * 1000;
@@ -29,6 +31,8 @@ export interface Clip {
 export interface Compose {
   online: boolean;
   text: string;
+  /** When each line of `text` was begun (null: a blank line, or one whose start this box did not see). */
+  stamps: Stamps;
   edit: (value: string) => void;
   clip: Clip | null;
   record: (blob: Blob, seconds: number) => void;
@@ -54,6 +58,7 @@ export function useCompose({ draftKey, onSubmit, onDone }: {
 }): Compose {
   const online = useOnline();
   const [text, setText] = useState(() => loadDraft(draftKey));
+  const [stamps, setStamps] = useState<Stamps>(() => stampsFor(text, loadStamps(draftKey)));
   const [clip, setClip] = useState<Clip | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
@@ -70,6 +75,7 @@ export function useCompose({ draftKey, onSubmit, onDone }: {
   useEffect(() => onDraft(draftKey, (value, from) => {
     if (from === me.current || sending.current) return;
     setText(value);
+    setStamps(stampsFor(value, loadStamps(draftKey)));
     setError(null);
     setKeptAt(null);
     clientId.current = null;   // other words: a new write, not the retry of the last
@@ -88,6 +94,7 @@ export function useCompose({ draftKey, onSubmit, onDone }: {
     const words = carried ? "" : text;
     setKept(words.trim() !== "" || clip ? { text: words, clip: clip ? { blob: clip.blob, seconds: clip.seconds } : null } : null);
     setText(next);
+    setStamps(stampsFor(next, loadStamps(draftKey)));
     setClip(null);
     setError(null);
     setKeptAt(null);
@@ -100,6 +107,9 @@ export function useCompose({ draftKey, onSubmit, onDone }: {
   }, [clip]);
 
   const edit = (value: string) => {
+    const next = restamp(text, stamps, value, Date.now());
+    setStamps(next);
+    saveStamps(draftKey, next);   // (before the draft: a box that hears the draft change reads these with it)
     setText(value);
     setKeptAt({ at: Date.now(), stored: saveDraft(draftKey, value, me.current) });
     clientId.current = null;   // changed words are a new write, not the retry of the last
@@ -142,6 +152,9 @@ export function useCompose({ draftKey, onSubmit, onDone }: {
         const words: Words = { client_id: clientId.current as string };
         if (text.trim() !== "") words.text = text;
         if (uploaded.current) words.upload = uploaded.current.id;
+        // (a recording's words are its caption or a transcript to come: they keep the block's one time)
+        const times = words.text && !words.upload ? timesToSend(text, stamps) : undefined;
+        if (times) words.times = times;
         return onSubmit(words);
       };
       try {
@@ -156,6 +169,7 @@ export function useCompose({ draftKey, onSubmit, onDone }: {
       }
       saveDraft(draftKey, "", me.current);   // (the other boxes on this draft empty too: it is sent)
       setText("");
+      setStamps([null]);
       setClip(null);
       setKeptAt(null);
       clientId.current = null;
@@ -169,7 +183,7 @@ export function useCompose({ draftKey, onSubmit, onDone }: {
     }
   };
 
-  return { online, text, edit, clip, record, drop, busy, error, has, send, kept, restore, letGo: () => setKept(null), keptAt };
+  return { online, text, stamps, edit, clip, record, drop, busy, error, has, send, kept, restore, letGo: () => setKept(null), keptAt };
 }
 
 /** The offline line under a box: the write will fail, and what he wrote stays here. */

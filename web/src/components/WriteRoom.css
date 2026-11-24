@@ -84,10 +84,11 @@ html.room-open :is(.stage, .phone-top) { transform: scale(0.972); filter: bright
 /* focus: every paragraph but the one with the caret greys (30 % by day, 22 % at night) */
 .room-p { transition: opacity var(--d-4) var(--e-out); }
 .room-page.focus .room-p:not(.lit) { opacity: var(--focus-dim); }
-/* the hour he began, hung in the left margin beside his first line */
+/* the hours (ui/Hours' MarginHour): each paragraph's, hung in the left margin level with its first line (the room sets
+   its top), or the hour of the day beside the first line while nothing is written */
 .room-hour {
   position: absolute; top: 0.62em; right: calc(100% + 28px); width: var(--margin-l); text-align: right;
-  font: italic 400 15px / 1 var(--f-his); color: var(--text-3); animation: rise var(--d-4) var(--e-out) var(--d-3) both;
+  animation: rise var(--d-4) var(--e-out) var(--d-3) both;
 }
 
 /* a recording waiting to go with the words */

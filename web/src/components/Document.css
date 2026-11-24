@@ -52,6 +52,8 @@
 .block.his .words {
   margin: 0; font-size: 1.3125rem; white-space: pre-wrap; overflow-wrap: anywhere; text-wrap: pretty;
 }
+/* the hours of his paragraphs (ui/Hours) hang in this page's margin, across its own gap */
+.block.his .hour-lines { --hour-gap: var(--doc-gap); }
 /* a transcript that has not come: a quiet word in the book's italic, not a box */
 .block.his .transcript-pending { margin: 0; font: italic 400 17px / 1.5 var(--f-his); color: var(--text-3); }
 .replying { display: flex; align-items: baseline; gap: var(--s2); margin: 0 0 6px; font: 400 var(--t-small) / 1.45 var(--f-ui); color: var(--text-3); }
@@ -94,6 +96,8 @@
   .block.his > .margin time { padding-top: 0; }
   .block.his .source { margin-top: 0; justify-content: flex-start; }
   .block.his .words { font-size: 1.1875rem; }
+  /* no margin: a paragraph's hour, where it changes, is a small running head above it */
+  .block.his .hour-line > .margin-hour { position: static; display: block; width: auto; margin: 10px 0 4px; text-align: left; }
   .passage-notes { margin-top: var(--s4); max-width: none; }
   .document > .phase-divider, .document > .summary, .document > .empty { margin-left: 0; }
 }

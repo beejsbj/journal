@@ -100,6 +100,9 @@
 .ds-slip { max-width: 30rem; }
 
 /* voice and time */
+/* the hours specimen: his column with the margin the hours hang in */
+.ds .ds-hours { margin: var(--s5) 0; padding-left: calc(var(--margin-l) + 28px); max-width: calc(var(--margin-l) + 28px + var(--measure)); }
+.ds .ds-hours .read { font-size: 1.3125rem; }
 .ds-clocks { list-style: none; display: grid; gap: var(--s2); margin-top: var(--s4); }
 .ds-clocks li { display: flex; align-items: center; gap: var(--s3); font-size: var(--t-small); color: var(--text-2); }
 .ds-clocks .ribbon-mark { margin: 0 14px; }

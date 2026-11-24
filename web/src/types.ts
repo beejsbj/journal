@@ -107,6 +107,7 @@ export const Block = obj({
   interrupt: opt(num),   // a session-10 interrupt this block answers: labelled, and not a phase's words
   reply_to: nullable(str),
   meta: opt(obj({ duration: opt(num), file_name: opt(str) })),
+  times: opt(arr(str)),   // when each paragraph (a line that is not blank) was begun, "HH:MM", one each; absent: the one time
 });
 export type Block = Infer<typeof Block>;
 
