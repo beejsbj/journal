@@ -590,8 +590,8 @@ class ClosesTest(Base):
                    .replace("title: Daily gratitude", "title: Night pages\ncloses: day"))
         self.assertEqual(library.closer(self.cfg, "day").id, "pages")
         self.answered("2026-10-14-pages", "rain all day, walked anyway", at(23, 40))
-        due = reflect.due(self.cfg, ledger.snapshot(self.cfg.ledger_path), at(23, 45))
-        self.assertIn(("reflection", WED.date(), "annotated"), due)
+        due = reflect.due(self.cfg, ledger.snapshot(self.cfg.ledger_path), at(4, 45, WED + timedelta(days=1)))
+        self.assertIn(("reflection", WED.date(), "annotated"), due)  # (once the day has ended)
         rows = {n: d for n, s, d in status.doctor(self.cfg, token=False)}
         self.assertEqual(rows["day reflection"], "once the day has ended, after the pages entry is annotated, fallback 04:00 the next day")
 

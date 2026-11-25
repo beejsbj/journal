@@ -631,12 +631,18 @@ class PacedAnalysesTest(ReflectBase):
     def test_written_a_few_a_tick_oldest_first(self):
         self.two_days()
         IST = self.cfg.tz
-        _, log = self.reflect(datetime(2026, 10, 15, 23, 50, tzinfo=IST))
+        # The 14th's reflection was deferred by an outage when its day ended (15 Oct 04:00); now the 15th has ended
+        # too. (Since a reflection waits for its journal day to end, two come due together only after an outage.)
+        with ledger.locked(self.cfg.ledger_path) as data:
+            data.setdefault("reflections", []).append(
+                {"id": "2026-10-14-reflection", "kind": "reflection", "local_date": "2026-10-14",
+                 "deferred_since": datetime(2026, 10, 15, 4, 0, tzinfo=IST).isoformat()})
+        _, log = self.reflect(datetime(2026, 10, 16, 4, 50, tzinfo=IST))
         wrote = [l for l in log if l.startswith("wrote")]
         self.assertEqual(len(wrote), 1)
         self.assertTrue(wrote[0].startswith("wrote 2026-10-14-reflection.md (annotated)"), wrote)
         self.assertIn("analyses: 1 asked for this tick; the rest wait for the next (paced catch-up)", log)
-        _, log = self.reflect(datetime(2026, 10, 15, 23, 55, tzinfo=IST))
+        _, log = self.reflect(datetime(2026, 10, 16, 4, 55, tzinfo=IST))
         self.assertTrue([l for l in log if l.startswith("wrote 2026-10-15-reflection.md")])
 
     def test_sends_are_paced_and_a_stale_one_is_not_sent(self):
@@ -678,7 +684,9 @@ class HeldAnalysesTest(ReflectBase):
 
     def test_every_due_analysis_is_deferred(self):
         IST = self.cfg.tz
-        _, log = self.reflect(datetime(2026, 10, 15, 23, 50, tzinfo=IST))
+        _, log = self.reflect(datetime(2026, 10, 15, 4, 50, tzinfo=IST))  # the 14th has ended: held
+        self.assertEqual(len([l for l in log if "reflection deferred" in l]), 1)
+        _, log = self.reflect(datetime(2026, 10, 16, 4, 50, tzinfo=IST))  # still held; now the 15th has ended too
         self.assertEqual(len([l for l in log if "reflection deferred" in l]), 2)  # not the first alone
         self.assertFalse([l for l in log if "paced catch-up" in l])  # held asks are free
         for day in ("2026-10-14", "2026-10-15"):

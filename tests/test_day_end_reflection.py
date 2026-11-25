@@ -104,7 +104,7 @@ class WeekEndTest(tr.Base):
     def test_the_week_review_waits_for_its_last_day_to_end(self):
         add_prompt(self.cfg, kind="weekly", local_date="2026-10-18",
                    sent=datetime(2026, 10, 18, 20, 1, tzinfo=IST).astimezone(timezone.utc), message_id="30")
-        self.answer_prompt("weekly", "2026-10-18", "a week of rain, and I walked in it. the bus can wait",
+        self.answer_prompt("weekly", "2026-10-18", "rain all day, walked anyway. the soup was good. the bus can wait",
                            ist(18, 20, 30), "30")
         _, log = self.reflect(ist(18, 20, 40))
         self.assertFalse(any("week.md" in line for line in log), log)
