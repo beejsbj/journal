@@ -5029,6 +5029,20 @@ input found). A label the floor refuses answers 422 `off-the-record`, as the rou
   `flock` does not favour a waiting exclusive request), so the tick stays yielded for as long as that lasts. Bounded in
   practice by human-paced waiters (a `/next` or a Send each takes seconds).
 
+- **TODAY-QUICK-J (2026-11-25) — a line put down from Today is a `/j` note (issue #82, part 3).** The owner's call:
+  `/j` is the one gesture (no `/log`). Today's box therefore makes nothing new: `POST /entries` with the text and no
+  practice, which is `actions.note`, the same call the write room's *A note* and the chat's `/j` reach (a note of its
+  own, stamped now). It is one line to start with (Enter submits) because longer pieces belong to the write room; **on
+  review (2026-11-25)** it became a one-row `<textarea>` rather than an `<input>`: an input drops the newlines of a
+  pasted paragraph, which changed his words without a word. Shift+Enter adds a line, a multi-line paste keeps its
+  lines, and the box grows with them (up to six rows), so what is sent is what he sees; Enter ending an IME
+  composition is the composition's. A 413 (too long) is treated as a 422: kept in the box with the server's plain
+  reason and no Retry, since sending the same words again would fail the same way. It runs on the composer's own rules (`useCompose`, unchanged): the draft
+  kept in the tab under its own key, a retry the same write (`client_id`), the offline line, a 422 refusal (`/x`, an
+  engine line, the placeholder) kept in the box with no Retry. The button is a quiet secondary (*Put down*), not the
+  lamp: Today's lamp is *Write now* on her prompts. Not a new `ui/` part: it is a `TextField`-styled ruled line and a
+  `Button`, both drawn on `/design`; it lives in `components/` as `Composer` does.
+
 - **CHAT-1 (2026-11-25) — the chat face's first step: the tick's send, fold and annotation replies move into
   `journal/chat/` (issue #43, step 1 of its order).** A pure move. `journal/chat/send.py`: `send_prompt`,
   `count_send_failure`, `_attach` / `ATTACHED`, `_archive_sent` / `SENT_FIELDS`, `prune_sent`, `SEND_ATTEMPTS`,
