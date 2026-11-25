@@ -730,7 +730,10 @@ class ReadRoutesTest(ServeCase):
         self.assertIn("today", s)
         (self.cfg.state_dir / "sweep.json").write_text(json.dumps(
             {"db": "/somewhere/state.db", "last_id": 41, "at": "2026-11-20T10:00:00+00:00"}), encoding="utf-8")
-        self.assertEqual(self.get_json("/api/v1/status")["sweep"], {"at": "2026-11-20T10:00:00+00:00"})  # (#50)
+        s = self.get_json("/api/v1/status")   # neither the sweep nor the hook's injection count (ROUTE-OPENS)
+        self.assertNotIn("sweep", s)
+        self.assertNotIn("count", s["today"])
+        self.assertNotIn("last", s["today"])
         checks = [r["check"] for r in self.get_json("/api/v1/doctor")]
         self.assertNotIn("hook state", checks)
         self.assertNotIn("telegram token", checks)
