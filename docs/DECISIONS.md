@@ -4591,7 +4591,9 @@ to it (not this host's setup: the gateway runs as a service).
 
 - **PROMPT-DECKS (2026-11-24) — the prompt decks of #58 §2 ship as built-ins, none scheduled; a packaged practice with
   no schedule is not a ritual.** Seven new built-in definitions, all in the Library group "prompt decks". Each is
-  written fresh: the structure of the method, none of the book's text.
+  written fresh from the structure of its method. The one exception is a short attributed paraphrase: the 3-2-1's
+  four dialogue questions (phase 3: who are you, what do you want from me, what do you need me to know, what are you
+  bringing me) stay close to the book's, since they are the method; its source is in the `framework:` line.
   - **Practice or program, by PROGRAM-KINDS** (a practice is one message that can come back; anything with a
     sequence is a program):
 
@@ -4637,9 +4639,18 @@ to it (not this host's setup: the gateway runs as a service).
     owner's own highlights or notes is used: the third question's follow-up is written from Piver's idea, not from
     any note of his.
   - **Cautions said once, in the deck that needs it.** The 3-2-1's first phase says that if what comes up is more
-    than a page can hold, stop and take it to someone you trust (the book's own caution, in plain words); its
-    companion stance says not to interpret or diagnose. Finitude's companion line says "never morbid" and "one
-    question is enough".
+    than a page can hold, stop and take it to someone you trust (the book's own caution, in plain words), and that
+    the one chosen is not someone who has harmed him ("this isn't for that"); its last phase, where he writes as the
+    other, opens by saying that if it feels wrong rather than just strange, stop, and that `/abandon shadow` ends the
+    run with what he wrote kept (so 4.1 now says the step "may feel strange", not "wrong"). Its companion stance
+    says not to interpret or diagnose. Finitude's plain opener ends "If this is heavy today rather than clarifying,
+    leave it for another day"; its question about someone who has died asks what they loved about ordinary days,
+    not what they would give for his hour; its companion line says "never morbid" and "one question is enough".
+    (Added on review.)
+  - **`collapse_hours: 6` stays in the three practice files.** For a built-in it changes nothing (a built-in's
+    prompt folds by `windows.collapse_hours`, its record carrying no window), but `library.render` writes the key,
+    and `tools/gen_builtins.py --check` holds every packaged practice to that canonical form, so a file without it
+    fails the check.
   - **Each program carries `role:` and `mission:`** (the companion's stance on the turns that answer a phase), as
     ONE-SESSION-PROGRAMS does, and one summary line per phase (a second slot from the same phase prints only "_(in
     the answer above)_").

@@ -14,7 +14,7 @@ mission: Keep them moving through facing it, talking to it and being it. Don't i
 ---
 ## Phase 1: Choose it
 ### Introduction
-Pick someone who got under your skin, or who drew you in more than made sense. A dream image works too, or a feeling in your body. Choose one that still has some heat. If what comes up is more than a page can hold, stop there and take it to someone you trust.
+Pick someone who got under your skin, or who drew you in more than made sense. Not someone who has harmed you; this isn't for that. A dream image works too, or a feeling in your body. Choose one that still has some heat. If what comes up is more than a page can hold, stop there and take it to someone you trust.
 ### Questions
 **1.1** Who or what did you choose?
 ### Transition
@@ -31,7 +31,10 @@ Two: talk to it.
 One: be it.
 
 ## Phase 4: Be it
-**4.1** Now write as them, in the first person, for a few lines, and end with "I am …". It may feel wrong. Try it on anyway.
+### Introduction
+If this feels wrong rather than just strange, stop; you can /abandon shadow, and what you wrote stays.
+### Questions
+**4.1** Now write as them, in the first person, for a few lines, and end with "I am …". It may feel strange. Try it on anyway.
 **4.2** What do you notice, having worn it? Is something of this yours, kept at arm's length?
 
 ## Summary

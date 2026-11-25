@@ -584,7 +584,7 @@
       "mode": "companion",
       "shape": "a short opener (max ~900 characters)",
       "limit": 1100,
-      "plain": "A few questions about time running out. Take one; you don't need them all."
+      "plain": "A few questions about time running out. Take one; you don't need them all. If this is heavy today rather than clarifying, leave it for another day."
     },
     "companion": "finitude — what matters, given that time runs out; steady and plain, never morbid; one question is enough",
     "group": "prompt decks",
@@ -615,7 +615,7 @@
           },
           {
             "id": "5",
-            "text": "Think of someone who has died. What would they give for the ordinary hour you're in now?",
+            "text": "Think of someone who has died. What did they love about ordinary days?",
             "pinned": false
           },
           {
