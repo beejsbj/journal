@@ -346,6 +346,110 @@ class FloorTest(Base):
         self.assertFalse(any(r.get("entries") for r in self.recs()))
 
 
+class ClockTest(Base):
+    """The letter's deadline (``recovery.letter_deadline_minutes``) and its total hold cap (``recovery.hold_cap``): on
+    re-review (2026-11-25)."""
+
+    def test_a_chat_only_catch_up_has_no_deadline(self):
+        # his chat messages alone, no entry: nothing is held, so the 2 h deadline does not end the catch-up (main kept
+        # trying for up to max_age_hours)
+        self.db.add("morning!", T0 - timedelta(hours=1), mid="1")
+        self.db.add("Morning. Sleep well?", T0 - timedelta(hours=1, seconds=-20), role="assistant")
+        outage.trip(self.cfg, "exit 1: 503", T0)
+        self.db.add("are you there?", T0 + timedelta(hours=2), mid="13")
+        self.db.add(NOTICE, T0 + timedelta(hours=2, seconds=30), role="assistant", display_kind="failed_turn",
+                    meta=PROVIDER_DOWN)
+        outage.answered(self.cfg, BACK)
+        self.answers = [agent.AgentUnavailable("timed out after 150 s")]
+        for minutes in (0, 30, 60, 90, 120):
+            self.assertIn("catch-up deferred", self.recover(BACK + timedelta(minutes=minutes))[0])
+        (rec,) = self.recs()
+        self.assertEqual((rec["status"], rec.get("prompts")), ("waiting", []))
+        self.answers = ["Sorry, I was offline. I'm here now."]
+        self.assertEqual(self.recover(BACK + timedelta(minutes=150)),
+                         ["sent the catch-up for outage-3 (1 unanswered message(s))"])
+        self.assertEqual(len(self.sends()), 1)
+
+    def test_short_outages_while_the_letter_fails_do_not_hold_the_replies(self):
+        # the letter's request keeps timing out, and each ~110 min a failed request trips the breaker for 5 min (a
+        # short outage, never taken in): the deadline still comes 2 h after she was back, not every time she is
+        self.outage_with_entries()
+        self.annotated(self.morning, BACK)
+        self.answers = [agent.AgentUnavailable("timed out after 150 s")]
+        for minutes in (0, 30, 60, 90):
+            self.recover(BACK + timedelta(minutes=minutes))
+            self.reply(BACK + timedelta(minutes=minutes, seconds=1))
+        outage.trip(self.cfg, "exit 1: 503", BACK + timedelta(minutes=110))
+        outage.answered(self.cfg, BACK + timedelta(minutes=115))
+        late = BACK + timedelta(minutes=120)
+        self.assertEqual(self.reply(late), [f"replied to {self.morning} with its annotations"])
+        self.assertIn("none sent within 2 h of the model's return", self.recover(late)[0])
+
+    def test_long_outages_recurring_hold_the_replies_no_longer_than_the_cap(self):
+        # each outage after she is back is long enough to be taken in (60 min), so each moves the deadline: the total
+        # hold cap (3 deadlines, 6 h, under stale_hours) lets the replies go before they are stale
+        self.outage_with_entries()
+        self.annotated(self.morning, BACK)
+        self.answers = [agent.AgentUnavailable("timed out after 150 s")]
+        t, released = BACK, None
+        for _ in range(8):
+            for minutes in (0, 30, 60, 90):
+                now = t + timedelta(minutes=minutes)
+                self.recover(now)
+                if released is None and self.reply(now + timedelta(seconds=1))[:1] == [
+                        f"replied to {self.morning} with its annotations"]:
+                    released = now
+            outage.trip(self.cfg, "exit 1: 503", t + timedelta(minutes=100))
+            for minutes in (130, 160):
+                now = t + timedelta(minutes=minutes)
+                self.recover(now)
+                if released is None and self.reply(now)[:1] == [f"replied to {self.morning} with its annotations"]:
+                    released = now
+            t = t + timedelta(minutes=170)
+            outage.answered(self.cfg, t)
+        self.assertIsNotNone(released)
+        self.assertLessEqual(released - BACK, recovery.hold_cap(self.cfg) + timedelta(minutes=30))
+        self.assertEqual(recovery.hold_cap(self.cfg), timedelta(hours=6))
+        self.assertEqual(self.recs()[0]["status"], "noted")
+
+    def test_the_deadline_waits_while_he_talks_off_the_record(self):
+        # he opens a bare /x as she comes back and talks for 2.5 h: no letter and no released reply in that time
+        # (the clock stops in the window); once it has closed, the letter goes
+        self.outage_with_entries()
+        self.annotated(self.morning, BACK)
+        self.db.add("/x", BACK - timedelta(minutes=1), mid="20")
+        for i in range(0, 160, 10):
+            self.db.add(f"private {i}", BACK + timedelta(minutes=i), mid=str(30 + i))
+            self.db.add("mm", BACK + timedelta(minutes=i, seconds=20), role="assistant")
+        for minutes in range(0, 155, 5):
+            self.assertEqual(self.recover(BACK + timedelta(minutes=minutes)), [])
+            self.assertEqual(self.reply(BACK + timedelta(minutes=minutes, seconds=1))[0],
+                             "1 annotation reply waits for the catch-up message after the outage")
+        self.assertEqual((self.asked, self.sends(), self.recs()[0]["status"]), ([], [], "waiting"))
+        after = BACK + timedelta(minutes=200)  # (quiet for 45 min since his last words: the window has closed)
+        self.assertEqual(self.recover(after),
+                         ["sent the catch-up for outage-202610150400 (2 journal entries)"])
+        self.assertNotIn("private", self.asked[0][0])
+
+    def test_a_turn_still_running_is_left_to_the_chat_catch_up(self):
+        # an entries-only letter goes while his newest chat message is still being answered; that turn then fails:
+        # the chat catch-up must still see his message (the letter's rows stop below it)
+        outage.trip(self.cfg, "exit 1: 503", T0)
+        capture.capture_web(self.cfg, None, "wrote this in the app, the sea again", T0 + timedelta(hours=2))
+        outage.answered(self.cfg, BACK)
+        self.db.add("hello? are you back?", BACK + timedelta(minutes=1), mid="40")  # (her turn on it still runs)
+        self.answers = ["Back now. I read your note from the app; the sea again."]
+        self.assertEqual(self.recover(BACK + timedelta(minutes=2)),
+                         ["sent the catch-up for outage-202610150400 (1 journal entry)"])
+        self.db.add(NOTICE, BACK + timedelta(minutes=3), role="assistant", display_kind="failed_turn",
+                    meta=PROVIDER_DOWN)
+        self.answers = ["Sorry, that one failed. I'm here."]
+        self.assertEqual(self.recover(BACK + timedelta(minutes=10)),
+                         ["sent the catch-up for outage-1 (1 unanswered message(s))"])
+        self.assertIn("hello? are you back?", self.asked[-1][0])
+        self.assertEqual(len(self.sends()), 2)
+
+
 class PrivacyTest(Base):
     def test_an_outage_spanning_an_x_window_never_shows_its_words(self):
         outage.trip(self.cfg, "exit 1: 503", T0)

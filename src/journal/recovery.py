@@ -317,30 +317,74 @@ def _iso(value) -> datetime | None:
     return when if when.tzinfo is not None else None
 
 
-def _back(cfg: Config, rec: dict) -> datetime | None:
-    """When a model last came back for a letter record: the breaker's, when its outage is the record's or a later one
-    (the record may have been made while it lasted, and the chat been unreadable since; a later outage will be taken
-    in, ``_attach``); None while that outage lasts. Else (the breaker off, or its last outage released) the record's
-    ``back_at``, or when it was made."""
+def _back(cfg: Config, rec: dict, now: datetime) -> datetime | None:
+    """When a model last came back for a letter record: the breaker's, when its outage is the record's, or a later one
+    of ``letter_min`` or more (so far, while it lasts: ``_attach`` takes that one in); None while that outage lasts.
+    A shorter later outage (the letter's own failed request can trip the breaker) is never taken in, so it moves
+    nothing. Else (the breaker off, its last outage released, or a short one) the record's ``back_at``, or when it was
+    made."""
     key = _iso(rec.get("outage_down_since"))
     span = outage.span(cfg)
     try:
-        if span is not None and key is not None and span[0] >= key:
+        if span is not None and key is not None and span[0] >= key \
+                and (span[0] == key or (span[1] or now) - span[0] >= letter_min(cfg)):
             return span[1]
     except TypeError:
         pass
     return _iso(rec.get("back_at")) or _iso(rec.get("detected_at"))
 
 
+def hold_cap(cfg: Config) -> timedelta:
+    """The longest a letter may hold the replies in all, from the first time a model came back for it, whatever
+    moved or paused the deadline since (later outages, ``/x`` windows): three deadlines, and an hour under
+    ``stale_hours``, so the replies it lets go are still sent."""
+    return max(timedelta(0), min(3 * letter_deadline(cfg), outage.stale_after(cfg) - timedelta(hours=1)))
+
+
+def _spans(rec: dict, now: datetime) -> list[tuple[datetime, datetime]]:
+    """The record's off-the-record spans (``off_record``: ``[since, until]``, ``until`` None while open), merged."""
+    out = []
+    for item in rec.get("off_record") or []:
+        try:
+            since, until = _iso(item[0]), (_iso(item[1]) if item[1] else now)
+        except (IndexError, TypeError):
+            continue
+        if since is not None and until is not None and until > since:
+            out.append((since, until))
+    merged: list[tuple[datetime, datetime]] = []
+    for since, until in sorted(out):
+        if merged and since <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], until))
+        else:
+            merged.append((since, until))
+    return merged
+
+
+def _paused(rec: dict, frm: datetime, now: datetime) -> timedelta:
+    """How much of ``frm`` to ``now`` a bare ``/x`` window held the letter (the deadline clock stops in it)."""
+    total = timedelta(0)
+    for since, until in _spans(rec, now):
+        lo, hi = max(since, frm), min(until, now)
+        if hi > lo:
+            total += hi - lo
+    return total
+
+
 def _overdue(cfg: Config, rec: dict, now: datetime) -> bool:
-    """A waiting letter (a record tied to an outage) not sent ``letter_deadline`` after a model answered: there is to be
-    none (``run`` notes it before anything else, so an unreadable chat or a request that keeps failing cannot hold the
-    replies for longer, and ``held`` lets them go from that moment)."""
-    if not rec.get("outage_down_since") or rec.get("status") != "waiting":
+    """A waiting letter (a record tied to an outage, holding replies) not sent ``letter_deadline`` after a model
+    answered, not counting time a bare ``/x`` window held it; or held ``hold_cap`` in all since a model first came
+    back for it: there is to be none (``run`` notes it before anything else, so an unreadable chat or a request that
+    keeps failing cannot hold the replies for longer, and ``held`` lets them go from that moment). A record that holds
+    no replies (his chat messages alone) has no deadline: the deadline is there to let replies go, and a chat
+    catch-up keeps trying as before, up to ``max_age_hours``."""
+    if not rec.get("outage_down_since") or rec.get("status") != "waiting" or not rec.get("prompts"):
         return False
-    back = _back(cfg, rec)
     try:
-        return back is not None and now - back >= letter_deadline(cfg)
+        first = _iso(rec.get("first_back_at"))
+        if first is not None and now - first >= hold_cap(cfg):
+            return True
+        back = _back(cfg, rec, now)
+        return back is not None and now - back - _paused(rec, back, now) >= letter_deadline(cfg)
     except TypeError:
         return False
 
@@ -428,8 +472,10 @@ def _attach(cfg: Config, now: datetime, rec: dict | None, found: dict) -> dict |
         if target is not None and target.get("text"):
             return dict(target)  # written already: what it covers is fixed
         if back is not None and now - back >= letter_deadline(cfg) and (target is None
-                                                                        or target.get("outage_down_since") != key):
+                                                                        or target.get("outage_down_since") != key
+                                                                        or not target.get("prompts")):
             return dict(target) if target is not None else None  # too late to begin one: the replies go as before
+            # (a chat catch-up tied to this outage holding no replies stays one: it takes none in this late)
         first = down
         earlier = _iso(target.get("outage_down_since")) if target is not None else None
         if earlier is not None and earlier < down:
@@ -449,12 +495,17 @@ def _attach(cfg: Config, now: datetime, rec: dict | None, found: dict) -> dict |
                       entries=_material(cfg, covered))
         if back is not None:
             target["back_at"] = back.isoformat()
+            target.setdefault("first_back_at", back.isoformat())  # (``hold_cap`` counts from here, never moved)
         else:
             target.pop("back_at", None)  # (taken in by an outage that still lasts)
         if down < datetime.fromisoformat(target["offline_since"]):
             target["offline_since"] = key
         if not target.get("messages"):
-            target["last_row"] = max(int(target.get("last_row") or 0), int(found.get("newest") or 0))
+            upto = int(found.get("newest") or 0)
+            if found.get("pending") and found.get("his"):
+                upto = min(upto, int(found["his"][0]["row"]) - 1)  # his message whose live turn still runs (and any
+                # unanswered before it): if that turn fails, the chat catch-up must still see them
+            target["last_row"] = max(int(target.get("last_row") or 0), upto)
         return dict(target)
 
 
@@ -472,14 +523,51 @@ def _drop_messages(cfg: Config, rec: dict, log: list[str]) -> dict:
     return rec
 
 
-def _off_record(cfg: Config, now: datetime) -> bool:
+def _off_record(cfg: Config, now: datetime, rec: dict | None = None) -> bool:
     """A bare ``/x`` window is open, or the privacy pass cannot say (fail closed): no catch-up goes now. A window that
-    began after ``now`` (while the catch-up was being written) is open too."""
+    began after ``now`` (while the catch-up was being written) is open too. For a letter holding replies (``rec``),
+    the windows the pass sees are kept on the record (``off_record``): its deadline does not run in them, so neither
+    the letter nor the replies it lets go land in his off-the-record time. (A pass that cannot run keeps nothing: the
+    deadline runs, as the chat being unreadable must not hold the replies.)"""
     from . import privacy
     pv = privacy.view(cfg, now)
-    if pv.closed or pv.open_at(now):
+    if pv.closed:
         return True
-    return bool(pv.window) and pv.window["since"] > now
+    off = pv.open_at(now) or (bool(pv.window) and pv.window["since"] > now)
+    if rec is not None and rec.get("prompts") and rec.get("outage_down_since") and rec.get("status") == "waiting":
+        _keep_off(cfg, rec, pv, now, off)
+    return off
+
+
+def _keep_off(cfg: Config, rec: dict, pv, now: datetime, off: bool) -> None:
+    """Keep the off-the-record windows since a model came back on the letter's record: ``[since, until]``, ``until``
+    None while one is open; a window that has ended since is closed at its end (its last activity and the quiet
+    gap, or a prompt send), or ``now``."""
+    frm = _iso(rec.get("first_back_at")) or _iso(rec.get("back_at")) or now - hold_cap(cfg)
+    seen = []
+    for since, end in pv.windows:
+        if end is None:
+            w = pv.window or {}
+            end = None if off else min([now] + ([w["last"] + pv.quiet] if w.get("last") else [])
+                                       + [t for t in pv.sends if since < t <= now])
+        if end is None or end > frm:
+            seen.append([since.isoformat(), end.isoformat() if end is not None else None])
+    with ledger.locked(cfg.ledger_path) as d:
+        r = find(d, rec["id"])
+        if r is None:
+            return
+        spans = [list(item) for item in r.get("off_record") or []]
+        for since, until in seen:
+            same = next((item for item in spans if item and item[0] == since), None)
+            if same is None:
+                spans.append([since, until])
+            else:
+                same[1:] = [until]
+        for item in spans:  # one open before, not among the windows seen now: it has ended
+            if len(item) > 1 and item[1] is None and not any(item[0] == s for s, _ in seen):
+                item[1] = now.isoformat()
+        if spans != (r.get("off_record") or []):
+            r["off_record"] = spans
 
 
 def _duration(span: timedelta) -> str:
@@ -548,7 +636,7 @@ def run(cfg: Config, now: datetime, log: list[str], db: Path | None = None) -> N
         return
     if chat.busy():
         return  # she is answering something right now: don't talk over it
-    if _off_record(cfg, now):
+    if _off_record(cfg, now, rec):
         return  # he is talking off the record (or the pass cannot say): the catch-up waits for the window to close
     if rec.get("text"):  # written earlier; only the send failed
         _send(cfg, rec, now, log)
@@ -592,7 +680,7 @@ def run(cfg: Config, now: datetime, log: list[str], db: Path | None = None) -> N
         if rec["attempts"] >= ATTEMPTS:
             _note(cfg, rec, now, f"no usable reply after {ATTEMPTS} attempts: {reason}", log)
         return
-    if _off_record(cfg, now):  # again: a window he opened while it was being written (the text waits, checked)
+    if _off_record(cfg, now, rec):  # again: a window he opened while it was being written (the text waits, checked)
         log.append(f"{rec['id']}: catch-up written; it waits for the off-the-record window to close")
         return
     _send(cfg, rec, now, log)
