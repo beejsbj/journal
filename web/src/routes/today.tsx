@@ -319,6 +319,9 @@ export function TodayRoute() {
                         </li>
                       ))}
                     </ul>
+                    <ButtonLink href={`/days/${today.date}`} variant="quiet" size="small" class="whole-day" data-vt="push">
+                      The whole day, as one log <Chevron />
+                    </ButtonLink>
                   </Sec>
                 )}
               </div>

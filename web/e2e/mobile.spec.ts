@@ -75,6 +75,7 @@ const ROUTES: Array<[string, string]> = [
   ["today", "/"],
   ["entries", "/entries"],
   ["entry", "/entries/2026-10-14-evening"],
+  ["day", "/days/2026-10-14"],
   ["library", "/library"],
   ["library-detail", "/library/gratitude"],
   ["editor", "/library/gratitude/edit"],

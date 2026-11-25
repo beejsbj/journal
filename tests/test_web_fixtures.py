@@ -22,6 +22,7 @@ ROUTES = {
     "today": "/api/v1/today",
     "entries": "/api/v1/entries?limit=50",
     "days": "/api/v1/days?from=2026-10-01&to=2026-10-15",
+    "day": "/api/v1/days/2026-10-14",
     "entry-evening": "/api/v1/entries/2026-10-14-evening",
     "entry-session": "/api/v1/entries/2026-10-15-fix-life-s01",
     "entry-note": "/api/v1/entries/2026-10-15-j",

@@ -23,7 +23,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable
 
-from .. import actions, audio, capture, document, entries, images, ledger, library, location, reflect, slots, status, today, version
+from .. import actions, audio, capture, daylog, document, entries, images, ledger, library, location, reflect, slots, status, today, version
 from .. import settings as settings_
 from ..config import Config, effective_today, profile_from_home
 from . import auth
@@ -291,6 +291,18 @@ def days(req: Request):
             out.append({"date": day, "entries": by_day.get(day, []), "reflection": ref})
         d -= timedelta(days=1)
     return out
+
+
+def day_log(req: Request):
+    """One journal day as a log (issue #82): every line of every entry filed under it, his and hers, in time order,
+    each naming its entry and block (``daylog.day``). Read-only, over the entry files and the ledger only."""
+    raw = req.params["date"]
+    try:
+        date.fromisoformat(raw)
+    except ValueError:
+        raise HTTPError(400, "bad-request", f"not a date like 2026-10-14 (got {raw!r})") from None
+    return {**daylog.day(req.cfg, raw, req.lib()),
+            "voices": {"his": req.cfg.names.user or "You", "hers": req.cfg.names.companion}}
 
 
 def entry_doc(req: Request):
@@ -784,6 +796,7 @@ ROUTES: list[tuple[str, str, Callable, str]] = [
     ("GET", r"/api/v1/entries", entries_list, TOKEN),
     ("GET", r"/api/v1/entries/(?P<stem>[^/]+)", entry_doc, TOKEN),
     ("GET", r"/api/v1/days", days, TOKEN),
+    ("GET", r"/api/v1/days/(?P<date>\d{4}-\d{2}-\d{2})", day_log, TOKEN),
     ("GET", r"/api/v1/media/(?P<name>[^/]+)", media, TOKEN),
     ("GET", r"/api/v1/reflections", reflections, TOKEN),
     ("GET", r"/api/v1/insights/weeks", insights_weeks, TOKEN),

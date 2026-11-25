@@ -115,3 +115,4 @@
   .today-page .carry-link { padding: 0 var(--s1); margin-left: calc(-1 * var(--s1)); }
   .today-page .tasks li { min-height: var(--tap); display: flex; align-items: center; }
 }
+.today-page .whole-day { margin-top: var(--s2); }

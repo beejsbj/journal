@@ -1,0 +1,12 @@
+/* The day view (routes/day.tsx): the day's numeral and name, its lines, the days either side */
+.day-page { max-width: calc(var(--measure) + var(--margin-l) + var(--s5)); }
+.day-page .day-head { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0 var(--s4); align-items: end; margin-bottom: var(--s5); }
+.day-page .day-num { font-size: 72px; color: var(--text); }
+.day-page .day-title { margin: 0; }
+.day-page .day-dl .sub { margin: var(--s1) 0 0; font-size: var(--t-small); color: var(--text-3); }
+.day-page .day-nav { display: flex; justify-content: space-between; gap: var(--s3); margin-top: var(--s6); padding-top: var(--s3); border-top: 1px solid var(--hair); }
+
+@media (max-width: 760px) {
+  .day-page .day-head { margin-bottom: var(--s4); }
+  .day-page .day-num { font-size: 56px; }
+}

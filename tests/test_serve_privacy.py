@@ -29,6 +29,8 @@ SAMPLES = {
                                          ("/api/v1/entries/2026-10-15-fix-life-s01", 200),
                                          ("/api/v1/entries/2026-10-14", 404)],
     r"/api/v1/days": [("/api/v1/days?from=2026-10-01&to=2026-10-15", 200)],
+    r"/api/v1/days/(?P<date>\d{4}-\d{2}-\d{2})": [("/api/v1/days/2026-10-14", 200), ("/api/v1/days/2026-10-15", 200),
+                                                 ("/api/v1/days/2026-09-01", 200), ("/api/v1/days/2026-13-40", 400)],
     r"/api/v1/media/(?P<name>[^/]+)": [("/api/v1/media/2026-10-14-evening.ogg", 200),
                                        ("/api/v1/media/2026-10-14-stray.ogg", 404)],
     r"/api/v1/reflections": [("/api/v1/reflections", 200)],

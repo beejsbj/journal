@@ -16,6 +16,27 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## DAY-VIEW — a day as one log in the web app (2026-11-25; serve side only; **no gateway restart**; no config or state change)
+
+**What changes.** A new page, `/days/<date>`: every line of every entry filed under one day (chat notes, `/j` and web
+notes, a prompt entry's words and the conversation under it) in time order, her replies folded, each hour a link to
+the line in its entry (issue #82, part 1). A new route `GET /api/v1/days/{date}` (`daylog.day`, read-only over the
+entry files and the ledger, fenced like the other routes: `tests/test_serve_privacy.py` and the route-opens walk). The
+Entries list's day numerals link to it, Today's *Written today* ends with *The whole day, as one log*, and an entry
+opened from a line scrolls to that block. The service worker keeps the day's answer for offline reading. DECISIONS.md,
+DAY-VIEW.
+**Side and restart.** Serve side only: `src/journal/daylog.py` is new and imported by `serve/api.py` alone (the gateway
+does not load it: CLAUDE.md's import check lists neither), and the web build is in `serve/static/`. `uv tool install
+--force` at the merge sha and `systemctl --user restart journal-serve`. The gateway and the tick are untouched.
+**First checks.**
+- `curl` with the token: `GET /api/v1/days/<a day with entries>` answers 200 with `lines` in time order; `GET
+  /api/v1/days/2026-13-40` answers 400.
+- In the web app: the Entries list's day numeral opens the day; a line's hour opens its entry at that block; her
+  replies open in place; a phone shows it in one column with nothing scrolling sideways.
+- After an install the PWA shows "Update available": reload once.
+**Rollback.** `uv tool install --force` at the previous sha and `systemctl --user restart journal-serve`. Nothing to
+undo in state.
+
 ## X-FLOOR — `/x` refused at the bottom of the write path; `/j /x` off the record (2026-11-24; hook, tick and serve side; **gateway restart required**; no config or state change)
 
 **What changes.** Defence in depth (issue #46): the functions that put his words into an entry refuse off-the-record

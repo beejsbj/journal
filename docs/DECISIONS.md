@@ -4916,3 +4916,21 @@ gate strips as deep as the floor and a doubled `/j` before `/x` keeps nothing, a
 writer's and the sweep's per-message catch of `OffRecord` is a backstop: it drops that message from their own output
 and moves on, but records nothing for the other readers (with the gate and floor agreeing it is not reached by any
 input found). A label the floor refuses answers 422 `off-the-record`, as the route's own refusal does.
+
+- **DAY-VIEW (2026-11-25) — a day as one log, read from the files as they are (issue #82, part 1).** The owner's
+  call: storage stays (separate files, no format change, nothing merged); the web app shows a day as one log instead.
+  `daylog.day(cfg, date)` reads every entry the Entries list shows under that date (`document.all_entries`, so a hand
+  file named like an entry too) and returns each block (`document.blocks_of`, his words, his conversation messages, her
+  replies) as a line with its entry's stem and block key, in time order; `GET /api/v1/days/{date}` serves it. **Times:**
+  a words heading carries a time only, and a conversation marker or her reply carries a date only when it fell on
+  another day than the entry's, so a line's calendar day is worked out walking the entry in file order: the entry's
+  date, or the day of its first capture while the ledger has it; a dated marker sets the day; an hour earlier than the
+  one before means the next day. With no ledger record, an entry whose first time is before `windows.day_ends_at` is the
+  night after its date (an evening answered at 00:30). **Known limit** (a `shortcut:` in `daylog.py`): a note filed by
+  the calendar date at 00:30 before notes followed the journal day (NOTES-JOURNAL-DAY), and older than the ledger, is
+  placed a day late in its day's log; its file and the Entries list are right. **Her words** are lines of their own
+  (`kind: "hers"`), folded in the page and never mixed into his; the route reads only entry files and the ledger, and
+  entries never hold off-the-record words. **Not done:** her margin notes and readings (the entry shows them), a day
+  picker of its own (the Entries calendar and the numerals lead in), the week strip's days (they still filter the
+  Entries list), playing a recording in the log (its hour opens the entry, where the player is). A new part,
+  `ui/DayLog` (`LogEntry`, `LogLine`, `LogReplies`), is drawn on `/design`.
