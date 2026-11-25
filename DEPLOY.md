@@ -41,6 +41,45 @@ guard keep the old pass, which is the less private one. Serve does not import it
 **Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
 previous sha), then `hermes gateway restart`. Nothing to undo in state.
 
+## CATCH-UP-LETTER — one message after an outage, in place of late replies (2026-11-24; tick side; **no gateway restart needed**; new settings `recovery.letter`, `recovery.letter_min_minutes`, `recovery.letter_deadline_minutes`; no state migration)
+
+**What changes.** After a model outage the breaker knew of, at least `recovery.letter_min_minutes` (60) long, the
+replies to the journal entries he wrote while she was away are no longer sent one by one, late. The one outage
+catch-up message (`recovery.py`, which already answered his chat messages that got only Hermes' failure line) now
+also covers those entries: from the moment a model answers, `tick.reply_annotations` holds their replies (a log line
+"N annotation replies wait for the catch-up message after the outage"), and `recovery.run` writes one message from his
+words in the entries (his blocks only) and his unanswered chat messages, checked by `validate.check_catchup`, and
+sends it once. Each covered reply is then marked `annotation_reply.skipped: "letter"` and never sent; the notes are
+still written into the entries. With no usable message (three bad answers, six refused sends, or none sent
+`recovery.letter_deadline_minutes` (120) after a model answered, not counting time a bare `/x` window held it, and
+at most 6 h in all from her first return, always under `stale_hours`) the replies are released to the old path
+(paced, dropped once stale); no fixed line goes in her voice. A catch-up of his chat messages alone has no deadline (it
+keeps trying up to `max_age_hours`, as before). It waits while a bare `/x` window is open or the privacy pass cannot
+run; with `channel.platform: none` nothing happens. Ledger `recovery` records gain `outage_down_since`, `back_at`,
+`first_back_at`, `off_record`, `entries`, `prompts`. README *When no model is reachable* and the
+settings table; DECISIONS.md, CATCH-UP-LETTER.
+**Side and restart.** `recovery.py` and `tick.py` run only in the tick (neither is imported by `journal.hermes`; the
+gateway's function-level imports of `tick` in `programs.py` never call `reply_annotations` or `recovery.run`). The
+gateway does load `outage.py`, `prompts.py` and `config.py`, which gain only `outage.span`, the letter's request and two
+defaults, none called or read on a gateway path. So the tick takes it at its next run after the plugin pin moves.
+`plugin.yaml`'s `recovery` default and description show the three new keys in Hermes' settings form after the next
+gateway restart, which can ride the next window; an older loader ignores them, and the code defaults them (`letter`
+on, 60 minutes). Serve and MCP are untouched.
+**First checks.**
+- `journal status` right after the deploy: the catch-up line shows nothing new (no outage).
+- After the next outage of an hour or more: the tick's log has "N annotation replies wait for the catch-up message
+  after the outage" and then "sent the catch-up for outage-… (…, K journal entries)"; one message in the chat; the
+  covered prompts' `annotation_reply.skipped` is `letter`; their notes are in the entries. The vault checksum before
+  and after a manual probe that sends.
+- To keep the old behaviour, set `"recovery": {"letter": false}` in the config file.
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
+previous sha); no gateway restart, no ledger edit. Records marked `skipped: "letter"` stay skipped (the letter went in
+their place); the new record keys are ignored by the older code. A letter still **waiting** at the rollback has no
+`messages` key when it holds entries alone, so the older `recovery.run` reads it as it reads any waiting record: it
+skips it ("answered live since") once the chat has a real reply in its window, or takes it in as the record of the next
+chat catch-up (tested against the older module, `RollbackTest`). The replies it held go as before from the first tick
+on the older code.
+
 ## SHARED-READERS — MCP's readers move out of `serve/` into the core (2026-11-24; serve side and `journal mcp`; **no gateway restart**; no config or state change)
 
 **What changes.** A move, no behaviour change (issue #47): `serve/document.py` is now `document.py` in the core

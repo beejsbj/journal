@@ -205,6 +205,23 @@ def known(cfg: Config) -> dict | None:
     return st if st.get("down_since") else None
 
 
+def span(cfg: Config) -> tuple[datetime, datetime | None] | None:
+    """The outage the breaker holds for, or held for last: ``(down_since, None)`` while it is open, ``(down_since,
+    answered_at)`` once a model answered. None with the breaker off, when the last one ended by ``release`` (a refused
+    probe: no model was shown to be down), or when the file cannot say (a damaged time is as if not there)."""
+    if not breaker_on(cfg):
+        return None
+    st = ledger.read_state(_path(cfg))
+    if st.get("down_since"):
+        down = _when(st, "down_since")
+        return (down, None) if down is not None else None
+    last = st.get("last")
+    if not isinstance(last, dict):
+        return None
+    down, back = _when(last, "down_since"), _when(last, "answered_at")
+    return (down, back) if down is not None and back is not None else None
+
+
 def _held(cfg: Config, st: dict) -> ModelHeld:
     return ModelHeld(f"{HELD}: {st.get('last_error') or 'model unreachable'}"[:200])
 
