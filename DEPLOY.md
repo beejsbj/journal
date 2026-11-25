@@ -47,6 +47,19 @@ keep their times lines, which older code reads as before (an engine line: never 
 difference: the older web app's Edit and Delete refuse those blocks ("a line of the engine's own"; change them in the
 notes app, where the line can also be deleted by hand without harm).
 
+## DOCTOR-STUB — `journal doctor` no longer warns "cron stub out of date" under a uv tool install (2026-11-24; CLI side; **no gateway restart**; no config or state change; closes #7)
+
+**What changes.** The cron-stub row compared the stub on disk with a stub rendered for the *asking* install's own
+`src`, so `journal doctor` from the `uv tool` CLI (its `src` is site-packages) called a correct stub out of date,
+while `hermes journal doctor` (the plugin's `src`) agreed with it. The row now reads the `SRC` the stub names and
+judges the stub itself: it must be what setup writes for that `src` and this profile, and that `src` must hold the
+`journal` package. Both faces give the same row. `hermes journal setup` is unchanged.
+**Side and restart.** `hermes/cron.py` is imported by neither `journal.hermes` at load nor the gateway (checked with
+the import list in the table above), and runs only in `journal doctor` and `hermes journal setup`, both fresh
+processes: `uv tool install --force` at the merge sha moves the CLI; the plugin pin moves with the next deploy.
+**First check.** `journal doctor` (uv CLI) and `hermes -p <profile> journal doctor`: the `cron stub` row is `ok` in
+both. **Rollback.** The previous sha; nothing was written.
+
 ## HERMES-ONESHOT-ENV — the engine's one-shots are known in the gateway (2026-11-23; tick and hook side; **gateway restart required, with the pin move**; no config or state change; **urgent**: before the late day reflections run)
 
 **What changes.** On a Hermes whose gateway runs every one-shot, a run's environment never reaches the process its
