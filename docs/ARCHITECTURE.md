@@ -106,6 +106,10 @@ src/journal/
   agent.py            ask() facade + CommandCompanion (argv template); raises AgentUnavailable
   telegram.py         the Bot API; `TelegramChannel`, the `Channel` adapter for Telegram (+ reply_markup on send_html)
   ledger.py, notebook.py, outage.py, guard.py, status.py, tick.py, cli.py, migrate.py, location.py, audio.py, sources.py
+  chat/               the chat face (issue #43): send.py (`send_prompt`: one prompt record to the chat, its ledger
+                      account, `sent.jsonl`, re-sends, the mirror), fold.py (`fold`: a sent prompt's message edited once
+                      answered or expired), replies.py (`reply_annotations`); the tick runs them as its steps and still
+                      exports their names; alert.py (`Alert`, raised by both) sits beside it in the core
   library/            built-in definitions (package data)
     practices/morning.md evening.md midweek.md weekly.md
     programs/fix-life/program.md  programs/fix-life/sessions/01-anti-vision.md … 10-one-day-reset.md
@@ -351,7 +355,7 @@ lost (gateway restart mid-spawn) is advanced here, at most five minutes late. A 
 `phase_open`; the run's `opened_at`), with or without a chat; `send_due` then means "owed a delivery" (only with a
 chat), and `programs.phase_opened` is the one reader of the two. An interrupt opens at its time
 (`programs._open_interrupts`). Opening writes nothing to `sent.jsonl`, `send-times.json` or the thread stamps, so it
-is never a chat boundary; a `/x` window holds the delivery only. Deliveries reuse `tick.send_prompt(cfg, record,
+is never a chat boundary; a `/x` window holds the delivery only. Deliveries reuse `chat.send.send_prompt(cfg, record,
 log)`, extracted from `send_due`, so prompts, phases and one-off interrupts share retries, `sent.jsonl`, mirroring
 and folding.
 

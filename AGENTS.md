@@ -47,7 +47,7 @@ the transcript placeholder live there, `actions.refuse`), which takes its slot f
 5. **After.** Later ticks move program runs (`programs.py`: a phase is opened, its ledger record written with no
    `message_id`, then delivered when there is a chat; only the delivery waits for a `/x` window), fold the sent message where the platform allows edits
    (header, the opener as sent when it fits and parses, a status line; elsewhere the prompt is closed as sent), transcribe audio and describe pictures (`tick.process_audio`, `tick.process_images`),
-   annotate and reply (`tick.annotate`, `tick.reply_annotations`), write reflections (`reflect.py`), and catch up
+   annotate and reply (`tick.annotate`, `chat.replies.reply_annotations`), write reflections (`reflect.py`), and catch up
    after an outage (`recovery.py`, `outage.py`).
 
 `tick.py`'s docstring is the order of steps; README *Architecture* walks every module and step in full;

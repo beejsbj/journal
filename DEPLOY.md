@@ -16,6 +16,28 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## CHAT-1 — the tick's send, fold and annotation replies move into `journal/chat/` (2026-11-25; tick side; **no gateway restart needed**; no config or state change)
+
+**What changes.** Issue #43, its first step: a pure move, no behaviour change. `send_prompt` and its ledger account
+(`count_send_failure`, `_attach`, `sent.jsonl`'s `_archive_sent` and `prune_sent`) move to `journal/chat/send.py`,
+`fold` to `journal/chat/fold.py`, `reply_annotations` to `journal/chat/replies.py`, and `Alert` to `journal/alert.py`.
+Every definition is byte for byte what it was in `tick.py`, and `tick` still exports every moved name (the same
+objects), so `programs`, `ops`, `cli` and anything else that reaches them through `tick` is unchanged. The tick's steps,
+their order, its yield points and its locks are untouched. DECISIONS.md, CHAT-1.
+**Side and restart.** The code that moves runs in the tick and in what the tick's names are called from (`journal
+send`, `journal program …`), all fresh processes, which run it from the next tick once the plugin pin moves. The
+gateway does not load `tick` or `journal/chat/` at import (the import check above lists the same modules before and
+after this change), and the modules it does load (`capture.py`, `programs.py`, `slots.py`, `sweep.py`) change in
+docstrings and comments only; it never sends a prompt or folds in-process (it spawns `journal send` / `journal
+program`). So **no gateway restart is needed**; the next window's restart picks the docstrings up. Serve does not load
+any of this; `uv tool install --force` at the merge sha keeps what serve spawns on the same code.
+**First checks.**
+- `journal doctor`: no new failure.
+- The next ticks' `last-tick.json` lines read as before (a sent prompt: `sent <id> (opener: …)`; a fold: `folded <id>
+  (…)`; an annotation reply: `replied to <id> with its annotations`).
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` and the CLI at the
+previous sha. Nothing on disk changed, so nothing else.
+
 ## TICK-LOCK-YIELD — the tick lets a waiting `/next` or send go first (2026-11-24; tick side; **no gateway restart needed**; no config or state change)
 
 **What changes.** Issue #45. A `/next`, a phase step, `/start` or the web app's Send (each a spawned `journal program …`

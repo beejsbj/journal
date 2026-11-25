@@ -666,7 +666,10 @@ src/journal/
   today.py       the today block: collect (state + the tick's cache) → render; thread-start stamps; the cache step
   turncontext.py what the companion is told on one turn (notebook, pack or program block, today) under the two-block budget
   tick.py        send → sweep → conversations → programs → fold → audio → images → annotate → reply → reflect → recover → cache → prune;
-                 send_prompt delivers one prepared prompt (retries, sent.jsonl, re-sends, the mirror)
+                 the scheduler: what is due, the opener; the chat's work it calls lives in chat/
+  chat/          the chat face: send.py (send_prompt: one prepared prompt delivered, retries, sent.jsonl, re-sends, the
+                 mirror), fold.py (a sent prompt's message folded once answered or expired), replies.py (annotation replies)
+  alert.py       Alert: a bounded retry ran out (the tick reports it once and exits 1)
   ticklock.py    tick.lock: a waiting send or program step goes first at the tick's safe points (pause, waited, scheduled)
   status.py, migrate.py, cli.py
   guard.py       what the companion may not change

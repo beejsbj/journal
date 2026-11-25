@@ -5028,3 +5028,27 @@ input found). A label the floor refuses answers 422 `off-the-record`, as the rou
   **A stream of waiters can keep the tick yielded:** while waiters keep overlapping, the flag is never free (Linux
   `flock` does not favour a waiting exclusive request), so the tick stays yielded for as long as that lasts. Bounded in
   practice by human-paced waiters (a `/next` or a Send each takes seconds).
+
+- **CHAT-1 (2026-11-25) — the chat face's first step: the tick's send, fold and annotation replies move into
+  `journal/chat/` (issue #43, step 1 of its order).** A pure move. `journal/chat/send.py`: `send_prompt`,
+  `count_send_failure`, `_attach` / `ATTACHED`, `_archive_sent` / `SENT_FIELDS`, `prune_sent`, `SEND_ATTEMPTS`,
+  `EARLIER_OPENERS`, `SendFailed`. `journal/chat/fold.py`: `fold`, `_fold_edit`, `_fold_owed_again`,
+  `_folds_due_again`, `FOLD_*`. `journal/chat/replies.py`: `reply_annotations` and its helpers, `REPLY_ATTEMPTS`, and
+  `_newest_words` (which the tick's `annotate` also reads, through its import). `Alert` moves to `journal/alert.py`
+  so the chat face raises it without importing the tick (`SendFailed` is still an `Alert`, and `tick.Alert` is the same
+  class). **Proven unchanged:** an AST comparison of every top-level definition of the old `tick.py` with its new home
+  finds each one byte for byte; the full suite collects the same 2716 tests as main and passes; the goldens and
+  `gen_builtins.py --check` are untouched; the fences (`test_purity`, the serve and MCP fences, `test_route_opens`'
+  pinned module set) pass unchanged; the gateway loads the same modules at import.
+  - **The old names stay.** `tick` imports every moved name (the same objects), and the callers (`programs`, `ops`,
+    `cli`) still reach them through `tick`, so a test's patch of `tick.send_prompt` or `tick.fold` still reaches every
+    caller, and the tick's `run` still calls its steps through its own names (`tick.fold` patched still skips the
+    fold). Moving the callers to `chat` is left for when the operation they call changes (CHAT-2).
+  - **One test edit beyond imports, named here:** ten places in seven test files patched `tick.datetime` with a clock,
+    which `send_prompt` read for `sent_at` and `sent_at_local`. `send_prompt` now reads `chat.send`'s `datetime`, so
+    each of them patches that module with the same clock too (`test_tick_lock` binds one stepping clock to both, so
+    the order of `sent_at` across the two modules is the one clock's, as before). No assertion changed. The other
+    choice, `send_prompt` reading the tick's clock, would have tied the chat face back to the tick.
+  - **Kept as is:** the steps of `tick.run`, their order, `YIELDS_BEFORE` and every lock; `mirror.py` and
+    `recovery.py`, already modules of their own, stay where they are (moving them into `chat/` changes no seam), and
+    the readers (`sweep`, `conversations`) move last, as #43 orders.
