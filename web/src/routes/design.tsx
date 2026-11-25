@@ -328,6 +328,9 @@ export function DesignRoute() {
             { key: "r2", at: "23:16", plain: "And want for yourself?", text: "And want for yourself?" },
           ]} />
           <LogLine at="00:20" day="Thu" source="voice" href="#ds-her" label="Open in Evening journal">A spoken thought, after midnight: still the evening's.</LogLine>
+          <LogReplies who="Ada" replies={[
+            { key: "r3", at: "00:22", day: "Thu", plain: "Then let it be the evening's.", text: "Then let it be the evening's." },
+          ]} />
         </DayLog>
         <Letter from="Ada" at="Sunday" opener="The week leaned on the water. You wrote five evenings out of seven." class="ds-slip" />
         <Letter from="Ada" class="ds-slip">

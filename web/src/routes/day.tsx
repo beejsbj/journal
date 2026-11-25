@@ -25,6 +25,11 @@ function sourceWord(source: string | undefined): string | undefined {
   return key ? SOURCES[key] : undefined;
 }
 
+/** The weekday of a line written on another calendar day than the page's (after midnight, or added days later). */
+function weekdayIfOther(date: string | null | undefined, page: string): string | undefined {
+  return date && date !== page ? dayParts(date).w : undefined;
+}
+
 /** The log's rows: the entry's name where the entry changes, his lines, and each run of her replies folded. */
 export function logRows(log: Log): ComponentChildren[] {
   const titles = new Map(log.entries.map((e) => [e.stem, plainTitle(e.title)]));
@@ -44,13 +49,12 @@ export function logRows(log: Log): ComponentChildren[] {
       while (i + 1 < lines.length && lines[i + 1]?.kind === "hers" && lines[i + 1]?.stem === l.stem) run.push(lines[++i] as LogLineItem);
       out.push(
         <LogReplies key={`h:${l.stem}:${l.key}`} who={log.voices.hers}
-          replies={run.map((r) => ({ key: r.key, at: r.time, plain: r.text, text: <Markdown text={r.text} /> }))} />,
+          replies={run.map((r) => ({ key: r.key, at: r.time, day: weekdayIfOther(r.date, log.date), plain: r.text, text: <Markdown text={r.text} /> }))} />,
       );
       continue;
     }
-    const day = l.date && l.date !== log.date ? dayParts(l.date).w : undefined;
     out.push(
-      <LogLine key={`l:${l.stem}:${l.key}`} at={l.time} day={day} source={sourceWord(l.source)}
+      <LogLine key={`l:${l.stem}:${l.key}`} at={l.time} day={weekdayIfOther(l.date, log.date)} source={sourceWord(l.source)}
         href={`${href}#${l.key}`} label={`Open in ${title}`}>
         {l.text.trim() || (l.audio ? "(a recording)" : l.images?.length ? "(a picture)" : "")}
       </LogLine>,

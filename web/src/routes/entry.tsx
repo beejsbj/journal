@@ -420,7 +420,9 @@ export function EntryRoute({ stem = "" }: { stem?: string }) {
     const hash = location.hash.slice(1);
     if (!doc || !hash || seenHash.current === `${stem}#${hash}`) return;
     seenHash.current = `${stem}#${hash}`;
-    document.getElementById(decodeURIComponent(hash))?.scrollIntoView?.({ block: "center" });
+    let id = hash;
+    try { id = decodeURIComponent(hash); } catch { /* a malformed escape (#his:%E0): look for it as it stands */ }
+    document.getElementById(id)?.scrollIntoView?.({ block: "center" });
   }, [doc, stem]);
 
   // a word about what just happened, for a few seconds

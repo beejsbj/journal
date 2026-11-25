@@ -74,6 +74,19 @@ describe("the day view", () => {
     expect(late?.querySelector(".log-hour")?.getAttribute("aria-label")).toBe("00:20, Thu. Open in Evening journal");
   });
 
+  it("marks her reply after midnight with its weekday too", () => {
+    const log = DayLogShape({
+      ...fixtures.day,
+      lines: [
+        { stem: "2026-10-14-evening", key: "words:0", kind: "his", date: "2026-10-14", time: "23:12", text: "late", source: "text", audio: null, reply_to: null },
+        { stem: "2026-10-14-evening", key: "her:1", kind: "hers", date: "2026-10-15", time: "00:21", text: "Still up." },
+      ],
+    });
+    const host = mount(<DayLog>{logRows(log)}</DayLog>);
+    expect(host.querySelector(".log-hers-head")?.textContent).toBe("Ada · Thu 00:21");
+    expect(host.querySelector(".log-hers .margin-note .log-day")?.textContent).toBe("Thu ");
+  });
+
   it("says so when nothing was written that day", async () => {
     visit("/days/2026-10-01");
     stubFetch({ ...base, "/api/v1/days/2026-10-01": { ...fixtures.day, date: "2026-10-01", weekday: "Thu", entries: [], lines: [], reflection: null, prev: null, next: "2026-10-14" } });

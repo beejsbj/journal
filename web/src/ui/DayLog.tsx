@@ -49,10 +49,11 @@ export function LogLine({ at, day, source, href, label, children }: {
   );
 }
 
-/** Her replies after a line of his, folded under one head; each opens as her note with its time. */
+/** Her replies after a line of his, folded under one head; each opens as her note with its time (`day`: its weekday
+ *  when it fell after midnight, as for his lines). */
 export function LogReplies({ who, replies, open, onToggle }: {
   who: string;
-  replies: { key: string; at: string | null; text: ComponentChildren; plain: string }[];
+  replies: { key: string; at: string | null; day?: string | undefined; text: ComponentChildren; plain: string }[];
   open?: boolean;
   onToggle?: (open: boolean) => void;
 }) {
@@ -61,10 +62,10 @@ export function LogReplies({ who, replies, open, onToggle }: {
   return (
     <li class="log-hers">
       <Disclosure class="log-hers-fold" open={open} onToggle={onToggle}
-        head={<span class="log-hers-head"><span class="her-mark" aria-hidden="true" />{who}{n > 1 ? ` · ${n} replies` : first?.at ? ` · ${first.at}` : ""}</span>}
+        head={<span class="log-hers-head"><span class="her-mark" aria-hidden="true" />{who}{n > 1 ? ` · ${n} replies` : first?.at ? ` · ${first.day ? `${first.day} ` : ""}${first.at}` : ""}</span>}
         peek={first ? clip(first.plain, 90) : undefined}>
         {replies.map((r) => (
-          <MarginNote key={r.key} who={who} at={r.at ? <time>{r.at}</time> : undefined}>{r.text}</MarginNote>
+          <MarginNote key={r.key} who={who} at={r.at ? <>{r.day && <span class="log-day">{r.day} </span>}<time>{r.at}</time></> : undefined}>{r.text}</MarginNote>
         ))}
       </Disclosure>
     </li>
