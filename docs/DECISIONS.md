@@ -4986,3 +4986,13 @@ input found). A label the floor refuses answers 422 `off-the-record`, as the rou
     old name) fails seven of them.
   - **Also changed.** `context.py` kept a local cache under the key `"telegram"`
     for the quote verifier's chat text; renamed `"chat"` (no persisted name).
+
+- **TODAY-QUICK-J (2026-11-25) — a line put down from Today is a `/j` note (issue #82, part 3).** The owner's call:
+  `/j` is the one gesture (no `/log`). Today's box therefore makes nothing new: `POST /entries` with the text and no
+  practice, which is `actions.note`, the same call the write room's *A note* and the chat's `/j` reach (a note of its
+  own, stamped now). It is one line (an `<input>`, Enter submits; a pasted newline is dropped by the browser) because
+  longer pieces belong to the write room. It runs on the composer's own rules (`useCompose`, unchanged): the draft
+  kept in the tab under its own key, a retry the same write (`client_id`), the offline line, a 422 refusal (`/x`, an
+  engine line, the placeholder) kept in the box with no Retry. The button is a quiet secondary (*Put down*), not the
+  lamp: Today's lamp is *Write now* on her prompts. Not a new `ui/` part: it is a `TextField`-styled ruled line and a
+  `Button`, both drawn on `/design`; it lives in `components/` as `Composer` does.
