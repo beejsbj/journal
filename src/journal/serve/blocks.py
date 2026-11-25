@@ -22,9 +22,8 @@ from __future__ import annotations
 
 import re
 
-from .. import audio, capture, entries
+from .. import audio, capture, document, entries
 from ..config import Config
-from . import document
 
 # How the engine opens a conversation message whose words would read as Markdown at the start of a line
 # (``conversations._BLOCK_START``; ``tests/test_serve_blocks.py`` pins that the two agree): its words then go under
