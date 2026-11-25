@@ -9,6 +9,7 @@ from unittest import mock
 from zoneinfo import ZoneInfo
 
 from helpers import CHAT, CleanEnv, add_prompt, make_cfg
+import legacy_readers
 from test_reflect import Base as ReflectBase, FakeBot
 from test_sweep import FakeSessions
 
@@ -322,8 +323,8 @@ class NeverHisWordsTest(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_the_sweep_never_captures_one(self):
-        self.assertIsNone(sweep.parse(MIRRORED, None))
-        self.assertIsNone(sweep.parse("[Journal: Iris sent x]\nwords", "51"))
+        self.assertIsNone(legacy_readers.sweep_parse(MIRRORED, None))
+        self.assertIsNone(legacy_readers.sweep_parse("[Journal: Iris sent x]\nwords", "51"))
         log = []
         sweep.run(self.cfg, datetime.now(timezone.utc), log)
         p = ledger.snapshot(self.cfg.ledger_path)["prompts"][0]

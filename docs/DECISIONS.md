@@ -503,6 +503,30 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   count such rows read-only in a live database, then add `[System: ` to the skip prefixes and to the marks
   (`_LEFTOVER`).
 
+- **TICK-LOCK-WAIT (2026-11-24) — a `/next` or `journal send` waits behind a tick's model calls; measured, not fixed
+  (issue #45; needs a design).** `tools/measure_tick_lock.py` runs a real `tick.run` over a temporary root with one
+  annotation due, the clock pinned to a time when no ritual is due (a due opener would add a model call; the harness
+  prints which steps asked the model), and a fake companion, and a second party that takes `tick.lock` as a spawned
+  `journal program next` does (`programs.locked`). With a 3 s model call the second party, arriving 0.2 s in, waited 2.83 s; with 8 s, 7.85 s
+  (the tick itself added about 0.05 s). So the wait is the rest of the model call plus every step after it that also
+  calls a model. One call is bounded by its budget (the companion is killed 60 s after it): opener 240 s, annotation
+  180 s per prompt, picture 120 s per picture, day reflection or week review 480 s, outage catch-up 150 s, a program
+  phase's reflect text 120 s, bridge 60 s, insights 240 s. A tick that writes a reflection and annotates two entries
+  can hold the lock for 480 + 2 × 180 = 840 s (14 minutes) plus up to 60 s of kill grace per call, about 17 minutes
+  with three calls, though the usual annotation is far shorter. `journal send` (`tick.run(only=…)`) and
+  every spawned `journal program …` wait the same way and are never lost, only late (both are detached, so nothing
+  times out). Why it is not a small fix: the lock also orders sends. A `/next` that sent a phase while the tick sent a
+  ritual would race on "the newest message" that a reply is matched to (`tick.run`: the interrupts go before the
+  practices for that reason), and `programs.step` makes model calls itself. Options: (a) leave it: it only costs a
+  late reply in the few ticks a day that call a model, and the web app and chat both say "waiting" (recommended
+  while in maintenance); (b) the tick yields the lock between steps when someone waits (a waiter marker, or a second
+  lock file the waiter holds shared), which bounds the wait by the longest single step, not the whole tick, at the
+  price of every step re-reading what a transition may have changed; (c) the issue's own proposal for the tick-only
+  steps (annotate, reflect, images, recovery): the model call outside the lock and a re-check under the ledger lock
+  before writing, as sends already do, which leaves `programs.step` and sends under it; (d) a separate lock for program
+  transitions, which needs a rule for send order first. (b) or (c) is a package of its own with a gateway restart
+  (the gateway reaches `tick` through `programs`' function-level imports, not through `journal.hermes` at load).
+
 ## Taken by packages (recorded here; later packages follow them)
 
 - **WP0 — an unknown entry id is recognised only with the engine's authorship marker.** The spec's fallback
@@ -1373,7 +1397,6 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   the run, 404 until compiled. None of this opens the chat transcript or the privacy pass
   (`test_serve_programs.NoChatTest`).
 
-
 - **WP6 — the program block is read when the turn starts, from a queued pointer.** The dispatch hook (typed answers
   and voice or audio replies alike) queues `{run, session, phase, prompt}` under the turn's reply note in
   `hook-state.json` (`hookstate.remember_program` / `take_program`, a new section `programs`, same 15-minute
@@ -1935,7 +1958,6 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   the config file) and, for a key Hermes or the environment owns, the line that changes it; its "Saved" line names the
   layer written. This supersedes WP10's "The unit is not widened for the config file".
 
-
 - **TSAUTH (2026-10-20) — on the tailnet, signed in by Tailscale identity; no pairing (the owner's decision).** Opening
   the URL on any of his devices should just work. Choices:
   - **Both listeners, always.** `serve.socket` (an absolute path, at most 107 bytes, the `AF_UNIX` limit) is served
@@ -2094,9 +2116,6 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   the names the entry gives its pictures, `<stem>.ext`, `<stem>-N.ext`); and `agent.ask` with a picture on a
   companion that cannot take one returns None without marking the model as having answered (it ran nothing, so
   it is no sign an outage is over for `recovery`).
-
-
-
 
 - **WEBEDIT (2026-10-26) — the sacred-ground line in `AGENTS.md` (and `CLAUDE.md`, its symlink) amended.** The owner's
   reason: AGENTS.md speaks to the agents building the engine, so it states the engine's rule: "His words are append-only
@@ -2973,7 +2992,6 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     as Hermes' own errors, and with a token in the environment the target and the platform's config resolve and the
     router receives `Platform.DISCORD`, the chat and the text with a `MEDIA:` tag left as text; nothing was written
     outside the temporary home. Not checked: a real send to Discord (no sends in development).
-
 
 - **BUILTIN-EDIT (the owner, 2026-10-26) — a built-in is edited in place, with a way back to the default.** The
   owner asked that even built-ins be changed in place, with an option to reset to the default. Before, a built-in
@@ -4588,6 +4606,37 @@ line of his that copies the mark never leaves a bound on her later searches. An 
 that echoes it has the line dropped. Left as known: `journal_search` refuses in a finite turn the engine did not start
 (a kanban card, his own `hermes chat -q`); an engine one-shot that starts a gateway itself would pass its variables
 to it (not this host's setup: the gateway runs as a service).
+- **AUDIT-LEFTOVERS (2026-11-24) — what issue #50 took, and what it left.** Taken: (1) the web's `/status` serves
+  `sweep` as `{at}`: the doc listed `sweep.json` as unservable, and its database path and row id are chat-side, so the
+  web gets the time alone (the CLI's status line is unchanged); (2) `/status` and the hook state: already so on main
+  (`hook_state` is not read in web mode, `tests/test_serve.py` pins it); (3) the thin tuple readers WP7 kept
+  (`sweep.parse/rows/read`, `conversations.rows`) are called by no `src/` code, so they moved to
+  `tests/legacy_readers.py` and the suites that pin the row semantics call them there (WP13 had left this for exactly
+  that rewrite; `context.clean_user_text`, `agent.is_failure_text` and `mirror.turn_running` are not in the issue and
+  stay). **Not taken, needs the owner:** the platform-named fields. The ledger's `telegram` record (a prompt's send,
+  a reflection's send, an annotation reply; read at about twenty sites and by `standing`, `context`, `status`,
+  `reflect`) and the `telegram_history` source (a key in deployments' config and in `plugin.yaml`) would each need
+  read-old/write-new. The ledger is shared by a gateway that runs old code until it restarts and by a tick that runs
+  new code at once: a record written under the new name is invisible to the old reader, so a prompt could look unsent
+  and be sent twice. Options: (a) leave the names (cosmetic; recommended while in maintenance); (b) rename in two
+  releases, the first reading both names and writing the old, the second writing the new once every gateway has
+  restarted; (c) add `chat_history` as an alias for the source only, which is config-side and safe.
+- **INVISIBLE-PY (2026-11-24) — the invisible-character guard covers the Python source.** #63 guarded the built web
+  app; three literal U+FEFF in `library.py`, `programdefs.py` and `tests/test_library.py` still tripped Hermes'
+  scanner (it reads `.py`, tests included). Rule: a Python file writes such a character as an escape (`"\ufeff"`), and
+  `tests/test_install_scan.py` fails on a literal in any file under the repo root with an extension the scanner reads
+  (`SCANNABLE_EXTENSIONS`: Python including the root `__init__.py` and `tools/`, docs, JSON, shell, fixtures), minus
+  the scanner's excluded directories. A file that must hold one on purpose (a fixture) would be named as an exception
+  in that test, with its reason.
+- **DOCTOR-STUB (2026-11-24) — the doctor judges the cron stub by what it runs, not by the install that asks (issue
+  #7).** `cron.checks` compared the stub with `stub_text(src, home)` for the caller's `src`; from a `uv tool` CLI that
+  is site-packages, so a correct stub (naming the plugin's `src`) read "out of date" on one face and ok on the other.
+  Rule: `cron.stub_problem` reads the `SRC` out of the stub, requires the file to equal what setup writes for that
+  `src` and this profile, and requires `<SRC>/journal/cli.py` to exist; the asking install's own path no longer
+  matters. Not decided: whether doctor should also warn when the stub's `src` is a different *version* than the
+  running CLI; the `same version as tick` row already does that.
+  Accepted trade: a stub whose `SRC` still exists with `journal/cli.py` reads ok even if it is no longer the install
+  the profile uses; version skew between the two is covered by the `same version as tick` row, not by this one.
 
 - **CATCH-UP-LETTER (2026-11-24) — one message after an outage, in place of late replies (#42, the owner's decision 1
   of 2026-11-15, its last open item).** On main after OUTAGES and STALE-COUNT, an outage left two things for the chat:
