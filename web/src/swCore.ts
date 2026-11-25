@@ -3,7 +3,7 @@
  * rules are tested without a browser (`tests/swcore.test.ts`). `sw.ts` only wires them to the worker's events.
  *
  * The rules, in one allow-list:
- *  - the read views' answers (`today`, `entries`, an entry, `days`, `library`, `reflections`) are *network first*:
+ *  - the read views' answers (`today`, `entries`, an entry, `days`, a day, `library`, `reflections`) are *network first*:
  *    the server's answer is used and kept when it is a 200; only when the network fails, takes longer than
  *    `NETWORK_TIMEOUT_MS` or the server answers 5xx does the kept copy stand in, marked so the page can say "offline,
  *    as of 09:12";
@@ -41,6 +41,7 @@ export type Rule = "data" | "media" | "logout" | "never";
 const DATA_PATHS = [
   /^today$/,
   /^days$/,
+  /^days\/\d{4}-\d{2}-\d{2}$/,   // a day as one log (issue #82): an entry's lines, read offline as the entry is
   /^entries$/,
   /^entries\/[^/]+$/,
   /^library$/,

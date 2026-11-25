@@ -7,6 +7,7 @@ import { WriteRoom } from "./components/WriteRoom";
 import { Entries, Insights, Library, Mark, Pen, Plus, Settings, Today } from "./icons";
 import { forgetReads } from "./offline";
 import { EditorRoute, NewPracticeRoute } from "./routes/editor";
+import { DayRoute } from "./routes/day";
 import { EntriesRoute } from "./routes/entries";
 import { EntryRoute } from "./routes/entry";
 import { InsightsRoute } from "./routes/insights";
@@ -30,7 +31,7 @@ const DesignRoute = lazy(() => import("./routes/design").then((m) => m.DesignRou
 
 const NAV = [
   { href: "/", label: "Today", Icon: Today, match: (p: string) => p === "/" || p === "/today" },
-  { href: "/entries", label: "Entries", Icon: Entries, match: (p: string) => p.startsWith("/entries") },
+  { href: "/entries", label: "Entries", Icon: Entries, match: (p: string) => p.startsWith("/entries") || p.startsWith("/days/") },
   { href: "/library", label: "Library", Icon: Library, match: (p: string) => p.startsWith("/library") || p === "/new-practice" || p.startsWith("/runs") },
   { href: "/insights", label: "Insights", Icon: Insights, match: (p: string) => p.startsWith("/insights") },
 ];
@@ -187,6 +188,7 @@ function Shell() {
               <Route path="/today" component={TodayRoute} />
               <Route path="/entries" component={EntriesRoute} />
               <Route path="/entries/:stem" component={EntryRoute} />
+              <Route path="/days/:date" component={DayRoute} />
               <Route path="/library" component={LibraryRoute} />
               <Route path="/library/:id" component={LibraryDetailRoute} />
               <Route path="/library/:id/edit" component={EditorRoute} />

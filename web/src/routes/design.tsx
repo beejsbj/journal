@@ -11,7 +11,7 @@ import { INKS, chooseInk, savedInk, type Ink } from "../ink";
 import { withTransition } from "../shell/transition";
 import { useTitle } from "../title";
 import {
-  AudioPlayer, BackLink, Button, ButtonLink, Calendar, Clock, DefaultHint, Disclosure, Empty, ErrorLine, IconButton, Letter, MarginNote,
+  AudioPlayer, BackLink, Button, ButtonLink, Calendar, Clock, DayLog, DefaultHint, Disclosure, LogEntry, LogLine, LogReplies, Empty, ErrorLine, IconButton, Letter, MarginNote,
   Mark, Menu, ProgressStrip, Ribbon, Segmented, Sheet, Skeleton, Stepper, Switch, TextArea, TextButton, TextField, ThemeChoice,
   PageBack, Toast, TypedStepper, clockTime,
 } from "../ui";
@@ -317,6 +317,21 @@ export function DesignRoute() {
           <p class="read">First words, about the lighthouse. It came on at dusk the way it always does, without asking anyone.</p>
           <MarginNote who="Ada" at="08:02">Certainty you admire in the light, and want for yourself. It comes back on Friday, at the point.</MarginNote>
         </div>
+        <p class="ds-t-label">A day as one log · the hour opens the line in its entry; her replies fold under it</p>
+        <DayLog class="ds-daylog">
+          <LogEntry href="#ds-her">A note</LogEntry>
+          <LogLine at="19:30" href="#ds-her" label="Open in A note">The harbour lights came on early.</LogLine>
+          <LogEntry href="#ds-her">Evening journal</LogEntry>
+          <LogLine at="23:12" href="#ds-her" label="Open in Evening journal">First words, about the lighthouse. It came on at dusk the way it always does.</LogLine>
+          <LogReplies who="Ada" replies={[
+            { key: "r1", at: "23:14", plain: "Certainty you admire in the light.", text: "Certainty you admire in the light." },
+            { key: "r2", at: "23:16", plain: "And want for yourself?", text: "And want for yourself?" },
+          ]} />
+          <LogLine at="00:20" day="Thu" source="voice" href="#ds-her" label="Open in Evening journal">A spoken thought, after midnight: still the evening's.</LogLine>
+          <LogReplies who="Ada" replies={[
+            { key: "r3", at: "00:22", day: "Thu", plain: "Then let it be the evening's.", text: "Then let it be the evening's." },
+          ]} />
+        </DayLog>
         <Letter from="Ada" at="Sunday" opener="The week leaned on the water. You wrote five evenings out of seven." class="ds-slip" />
         <Letter from="Ada" class="ds-slip">
           <Markdown text={"> The tide does not argue with the shore.\n\nA line she quotes stands in from a hairline of her ink, in her italic; her Markdown goes through the safe renderer (**bold**, *italic*, lists, quotes), never as HTML."} />

@@ -5099,6 +5099,30 @@ input found). A label the floor refuses answers 422 `off-the-record`, as the rou
     the evening its closing entry was annotated now run at or after 04:00 the next day, and those asserting a loud
     send now assert a silent one; `test_practices_engine`'s doctor row reads "once the day has ended, …"; the pinned
     `today.json` fixtures gain `calendar_date`.
+- **DAY-VIEW (2026-11-25) — a day as one log, read from the files as they are (issue #82, part 1).** The owner's
+  call: storage stays (separate files, no format change, nothing merged); the web app shows a day as one log instead.
+  `daylog.day(cfg, date)` reads every entry the Entries list shows under that date (`document.all_entries`, so a hand
+  file named like an entry too) and returns each block (`document.blocks_of`, his words, his conversation messages, her
+  replies) as a line with its entry's stem and block key, in time order; `GET /api/v1/days/{date}` serves it. **Times:**
+  a words heading carries a time only, and a conversation marker or her reply carries a date only when it fell on
+  another day than the entry's. A block whose time matches a capture the ledger still has for the entry (same local
+  hour and minute, each used once in order; the words' captures for the words, the `conversation` ones for the
+  conversation) takes that capture's day, so an *Add* days later or backdated is placed when it was written.
+  Otherwise the words section and the conversation are each walked in file order, apart (an *Add* appends to the
+  words after a conversation may have begun, and must not push the conversation to the next day), from the entry's
+  start day: the day of its first capture while the ledger has it, else its date; a dated marker sets the day; an
+  hour earlier than the one before means the next day. With no ledger record, an entry whose first time is before
+  `windows.day_ends_at` is the night after its date (an evening answered at 00:30). **Known limit** (a `shortcut:` in
+  `daylog.py`): once the ledger has pruned an entry (weeks), file order alone places it, so a note filed by the
+  calendar date at 00:30 before notes followed the journal day (NOTES-JOURNAL-DAY) is placed a day late, a block
+  added days later reads as the entry's day, and a backdated one earlier than the block before it as the next day;
+  the files and the Entries list are right. A line on another calendar day than the page's (his or hers) shows its
+  weekday beside the hour. **Her words** are lines of their own
+  (`kind: "hers"`), folded in the page and never mixed into his; the route reads only entry files and the ledger, and
+  entries never hold off-the-record words. **Not done:** her margin notes and readings (the entry shows them), a day
+  picker of its own (the Entries calendar and the numerals lead in), the week strip's days (they still filter the
+  Entries list), playing a recording in the log (its hour opens the entry, where the player is). A new part,
+  `ui/DayLog` (`LogEntry`, `LogLine`, `LogReplies`), is drawn on `/design`.
 - **TODAY-QUICK-J (2026-11-25) — a line put down from Today is a `/j` note (issue #82, part 3).** The owner's call:
   `/j` is the one gesture (no `/log`). Today's box therefore makes nothing new: `POST /entries` with the text and no
   practice, which is `actions.note`, the same call the write room's *A note* and the chat's `/j` reach (a note of its

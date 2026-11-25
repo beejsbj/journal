@@ -281,7 +281,11 @@ export function EntriesRoute() {
                     const { n, w: wd } = dayParts(d.date);
                     return (
                       <div class="day" key={d.date} id={`day-${d.date}`}>
-                        <h3 class="day-tab"><span class="day-n">{n}</span> <span class="day-w">{wd}</span></h3>
+                        <h3 class="day-tab">
+                          <a href={`/days/${d.date}`} data-vt="push" aria-label={`${dayLabel(d.date)}: the whole day`}>
+                            <span class="day-n">{n}</span> <span class="day-w">{wd}</span>
+                          </a>
+                        </h3>
                         <div class="rows">
                           {d.items.map((e) => (
                             <EntryRow key={e.stem} entry={e} q={filters.q} i={i++} vt={vt} />

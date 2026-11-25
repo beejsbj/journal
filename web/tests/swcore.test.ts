@@ -74,7 +74,7 @@ describe("what the worker handles", () => {
   it("keeps the read views, on any origin", () => {
     for (const path of [
       "/api/v1/today", "/api/v1/entries", "/api/v1/entries?q=lighthouse&limit=20", "/api/v1/entries/2026-10-14-evening",
-      "/api/v1/days", "/api/v1/library", "/api/v1/library/gratitude", "/api/v1/reflections?week=2026-10-12",
+      "/api/v1/days", "/api/v1/days/2026-10-14", "/api/v1/library", "/api/v1/library/gratitude", "/api/v1/reflections?week=2026-10-12",
     ]) {
       expect(rule("GET", path), path).toBe("data");
     }
