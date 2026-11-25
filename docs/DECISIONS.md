@@ -5093,3 +5093,92 @@ input found). A label the floor refuses answers 422 `off-the-record`, as the rou
     over the platform's length limit (`programs._deliver`) send directly as before; they are outside this step's five
     kinds. They can move onto `deliver` when margin notes (#31) shape what a chat message is. "What a reply answers"
     is left for #31.
+
+- **MARGIN-FORMAT (2026-11-25; issue #31, its first step) — the entry format margin notes stand on: a stable key on
+  every block of his, and a margin note as one record at the end of her annotations section.** *A change to the entry
+  format.* The owner's answers of 2026-11-16 set the shape: margin notes are the annotations grown up, not a feature
+  beside them; a note, its thread and its state are **one record in the entry**, which the web app and the chat both
+  show and act on; the per-entry analysis stays in the entry, shown with it; old entries are not migrated. This step
+  is the format and its readers only: **nothing in the engine writes a note yet** (MARGIN-NOTES does).
+
+  ```markdown
+  ## Sam
+
+  %% journal block:b3f9a2c10 %%
+  ### 09:12 IST · text
+
+  The sea was loud.
+
+  ## Ada's annotations
+
+  - He comes back to the sea twice; the second time it is quiet.
+
+  ### Margin notes
+
+  %% journal:margin %%
+
+  %% journal note:n4c1e9a07 at:2026-11-25T09:14:00+05:30 state:open on:block:b3f9a2c10 %%
+  > [!note] Ada · 09:14 · on 09:12
+  > Which part of the quiet stayed with you?
+
+  %% journal his:web-9b21 %%
+  **09:20** — The gull, mostly.
+
+  %% journal her:n4c1e9a07-2 %%
+  > [!note]- Ada · 09:21
+  > The late ones always sound surprised.
+  ```
+
+  - **Block keys.** `entries.record_reply`, the one writer of his words section, puts `%% journal block:<id> %%` above
+    each block's heading, in the same write as the block (append-only holds: nothing is added to a block later), and
+    above a program's `phase:N` / `interrupt:N` line, so the line right above the heading stays the one older readers
+    read. `<id>` is `b` and eight hex digits of a hash of the capture's time, source and words
+    (`entries.new_block_key`): one capture always gets the same key, so the goldens stay byte for byte (they gained
+    the line: `tests/golden/*.entry.md`), and `-2`, `-3` … when the file already holds one. A block of his in
+    `## Conversation` already has a stable key (`his:<message id>`). The key survives appends, the web app's Edit
+    (it is outside the words the edit replaces), the lines other packages put under the heading (PARAGRAPH-TIMES,
+    #74, puts its `times:` line there) and an edit in a notes app that leaves the hidden line where it is; Delete
+    takes it with the block (`document._key_start`: a block's unit starts at its first key line). The document gives
+    each block of his an `anchor` (`block:<id>`, `his:<id>`, or null for a block written before keys, words above the
+    first heading and unmarked conversation text); `key` (`words:N` …) is unchanged, so no client changes.
+  - **Where notes live: the annotations section, after her analysis, under `### Margin notes` and its hidden line
+    `%% journal:margin %%`.** Inside her section, so an older reader reads the whole margin as hers (the safe way to
+    be wrong), and *grown up* in the file as the owner put it, not a section beside it. The hidden line tells it
+    from a `### Margin notes` line in her analysis, which can never carry one (`entries._hers` drops engine lines from
+    her text). `entries.annotations()` is now her analysis only (up to the margin); `annotations_pending` asks of the
+    analysis; `write_annotations` replaces the analysis and carries the margin over byte for byte.
+  - **A note is one record** (`margin.py`): its key line (`note:<id>`, `at:` when she wrote it, `state:` open,
+    resolved or dismissed, `closed:` when it stopped being open, then `on:` the anchor, last, so an anchor is the rest
+    of the line; a field this version does not know is kept), her words in a callout (`[!note]` open, `[!note]-` folded
+    once resolved or dismissed, the state at the end of its title, so a plain viewer and a notes app show it), then
+    the thread in the conversation's own grammar: his messages under `his:<id>` lines, her replies in callouts under
+    `her:<id>` lines, anything else his (what he types under a note in his notes app is his). A state change rewrites
+    the note's key line and its callout's title: both the engine's lines, never her words or his. `margin.render`
+    writes a note, `margin.parse` reads it back (`tests/test_margin_format.py` round-trips both); `on:entry` is a
+    note on the entry as a whole, and a note whose block is gone shows there.
+  - **Her words in the margin are hers, never his.** `entries.strip_callouts` (and with it every reader of his words)
+    drops a callout under a `note:` line as it drops one under `her:`; the margin sits outside his words section and
+    the conversation, so `raw_entry` never reads it. His replies in a thread are his words: `his_words` (and so
+    `entry_words`, `his_text`, the quote checks, packs, search through `document.parsed`) add them after the
+    conversation. `without_companion_replies` (the annotation input) drops her callouts in the margin too. Reflections
+    label each note and her replies as hers, and his replies as his (`reflect._her_replies_labelled`); MCP's
+    `journal_entry` text labels each voice; the document has `analysis.margin` (`[{id, anchor, at, state, closed, text,
+    thread}]`, `thread` as blocks) and `analysis.annotations` is the analysis alone. The web app's Edit and Delete
+    check the margin is left as it was (`serve/blocks._facts`).
+  - **Old entries read exactly as before.** An annotations section without the margin's hidden line is all analysis,
+    as it was; no file is migrated. `tests/test_margin_format.py` (`OldEntriesTest`) pins it.
+  - **Rejected.** *A `## Margin` section of its own*: the owner said grown out of the annotations, and an older
+    reader would treat it as no section at all. *Notes beside his blocks, inside his words section*: hers inside his
+    section, which append-only and the voices rule forbid. *His replies in his conversation section, linked to the
+    note*: the thread would be split across the file, against "one record". *Positional anchors* (`words:2`): a
+    Delete above renumbers them. *Obsidian block ids* (`^abc123` at the end of a line): visible in every viewer, and
+    on the heading line older readers parse. *A random key*: the goldens could not hold the file byte for byte.
+  - **Older code on a newer file** (a rollback): it reads a block's key line as an engine line everywhere; its
+    `phase_blocks` would carry the next block's key line into a program answer's text (a summary's or the insights'
+    copy), the web app's Edit of the block above a keyed one refuses it (`not-editable`), and its Delete of a keyed block leaves the key line behind. Notes, if any were
+    written by then, read as part of her annotations.
+  - **Left to the next steps** (the plan is on #31): context packs and annotation replies read the analysis only, not
+    the notes, until MARGIN-NOTES decides what of them she is given; a reply to a note is not written anywhere yet,
+    so its `/x` refusal (`capture.refuse_off_record`) comes with its writer (MARGIN-WEB, MARGIN-CHAT); a thread
+    block's `key` (`his:<id>`, `conv:N`) is unique within its thread, not the entry, which MARGIN-WEB settles when
+    the web app edits one.
