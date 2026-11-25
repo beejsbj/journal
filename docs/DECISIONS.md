@@ -5326,3 +5326,60 @@ input found). A label the floor refuses answers 422 `off-the-record`, as the rou
     **His replies in the margin reach the annotation model unlabelled** (`without_companion_replies`, `entries.py`,
     keeps his keyed replies as his words with nothing saying they are replies to a note): MARGIN-NOTES labels them
     when it writes replies.
+
+- **MARGIN-NOTES (2026-11-25; issue #31, its second step) — the annotation step writes margin notes, sparingly, into
+  the file only.** The owner's answers of 2026-11-25 bind it: notes are the annotations grown up; at most one a block
+  and three an entry a pass, none on a very short block, silence a fine answer; a dismissed note's point is not raised
+  again; notes follow the annotation-reply switch for the chat, which MARGIN-CHAT builds (this step sends nothing).
+  - **One request, not two.** The note rides on the annotation request (`prompts.annotation_request`, `notes=True`)
+    and on its timing, attempts and deferral (`tick.annotate`: ANNOTATE-QUIET's quiet after his newest words, the
+    paced catch-up, `annotate_attempts`, `outage.defer` while the model is unreachable, which uses no attempt and
+    writes nothing). A second call per entry would double the model time under the tick lock for a step whose
+    right answer is usually silence. *Rejected:* a notes pass of its own, and a pass again when he adds blocks to an
+    entry already annotated: today an annotated entry is not annotated again, and its later blocks get no note
+    either (an open point below).
+  - **The answer's shape: one line a note, after the bullets, `NOTE <key>: <her note>`** (as `FOLLOW-UP:` lines
+    are), `<key>` a block key the entry labels `[block <key>]` in the request (`NOTE [block <key>]:` and a list
+    marker are read too). Every line that starts `NOTE` (upper case, then a space, a colon, a bracket or a key and a
+    colon) leaves her analysis, well formed or not; a line that is not the shape is dropped and counted. A bullet
+    "Note how …" is hers and stays. *Rejected:* JSON (the annotation check already refuses an answer that opens
+    with `{`, and a broken JSON answer would take her analysis with it).
+  - **What code keeps (`margin_notes.choose`), each a floor of its own: a note dropped, never a broken file.** A key
+    of a block in his words section that has its own key line (a block written before keys, the later copy of a
+    copied key, and a message of his in the conversation take none here); a block of at least `MIN_WORDS` (10)
+    words; no open or dismissed note on that block already (a resolved one leaves the block open to a new note);
+    the first note a block; `MAX_NOTES` (3) kept an entry a pass, in her order; one line of 8 to `NOTE_LIMIT` (300)
+    characters, not opening like a heading, a callout, JSON or a fence, no `%%`, not the agent's failure copy; every
+    quotation and blockquote of his in it found in his words in this entry (`validate.unfound` against
+    `entries.his_words`: the words, his conversation lines, his replies in the margin); and `margin.render` must
+    write it so it reads back as hers. The log line says counts and reasons (`+2 margin notes; dropped 1 (no such
+    block)`), never words. The checks run again on the entry as it is when written, under the ledger lock, so a block
+    he deleted while the model answered takes no note.
+  - **One write, checked (`margin_notes.write`).** Her analysis and the notes go in one atomic write
+    (`entries.with_annotations`): the notes at the end of her annotations section under `### Margin notes` and its
+    hidden line (opened there when the entry has none), after the margin's earlier notes. **The existing annotations
+    section stays as it is**: her analysis paragraph or bullets first, the margin after it; her notes section
+    (`## <name>'s notes`) after both. Before writing, the result must keep his words, his raw entry, his blocks
+    (the document's) and the notes already there unchanged, and read back the new notes as written; otherwise her
+    analysis alone is written. Old entries are not touched: an entry whose blocks carry no key gets no request for
+    notes and is annotated byte for byte as before (`tests/test_margin_notes.py`, `OldEntryTest`).
+  - **What of her notes she is given back (the plan's open question for this step).** *The next note:* the
+    annotation request shows her notes so far on the entry apart from the entry (`margin_notes.margin_digest`), each
+    with its block and state, so a dismissed point is not made again; code backs that up by offering no block that
+    has an open or dismissed note. *Packs and the openers:* unchanged, her analysis only (`context` reads
+    `entries.annotations`); a note is a question beside one block, and in an opener's pack it would invite her to
+    ask it again. *Reflections* already read the margin, labelled (MARGIN-FORMAT). Reversible: a later step can add
+    open notes to a pack.
+  - **His replies in the margin are labelled his in the annotation input (MARGIN-FORMAT's last open note).** The
+    request leaves the margin out of the entry and shows it under its own heading: each reply under a `his:` key line
+    as `<His> reply (<his> own words)`, her replies as `Your reply`, text with no key line of his as not his (the
+    margin fails closed). `entries.without_companion_replies` is unchanged (its other reader, the quote check, wants
+    his replies as his words, unlabelled).
+  - **`/x` and no chat.** The request is built from the entry file, which never holds an off-the-record message
+    (`capture.refuse_off_record` below every writer), and the chat reply it aligns with goes through the privacy
+    pass as before; `OffRecordTest` pins that a `/x` message never reaches it. With `channel.platform: none` notes are
+    written as with a chat: they are file-only here.
+  - **Left open.** (1) *Blocks added after the entry was annotated get no note* (nor analysis, as today); a later pass
+    over new blocks, with the notes so far and their states, is the natural next step once the web margin shows
+    notes (MARGIN-WEB). (2) Notes on a message of his in `## Conversation` (`his:<id>` anchors): the format takes
+    them; this step offers none. (3) The analysis itself is still checked for shape only, not for its quotes.

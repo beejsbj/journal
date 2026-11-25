@@ -34,7 +34,8 @@ names them for each promise, and each idea here names its own.
 plain code. The model drafts openers, annotations and reflections. What speaks about him is checked against the
 record where a check exists: an opener that makes a claim about him in a recognised phrasing must carry a verified
 citation, and the quotes it cites must be his; a quote of his words in a reflection, a catch-up or a program's text
-must be found in his own words. Annotations are checked for shape only. Every model step has a floor: when the model
+must be found in his own words. Annotations are checked for shape only; a margin note is checked for shape, for its
+block and its caps, and for every quote of his in it. Every model step has a floor: when the model
 is unreachable or its answer fails its check, the journal does something plain and correct, never something
 unchecked where a check exists: openers and quotes are checked, annotations for shape only.
 
@@ -659,6 +660,9 @@ src/journal/
   audio.py       kept audio: metadata, ffprobe, transcription of audio files
   images.py      kept pictures: which files count, the size cap, the name they are kept under, descriptions
   entries.py     the entry files: create, append, annotate, companion notes; which files are entries
+  margin.py      a margin note's record in the entry (render, parse): her note on one block, its state and thread
+  margin_notes.py  the annotation step's margin notes: what she is shown, the NOTE lines parsed, caps, anchors and
+                 checks, her analysis and the notes in one checked write (file only; nothing sent)
   hookstate.py   what the gateway hook remembers between callbacks (voice notes awaiting STT, queued packs, off-record turns), on disk
   reflect.py     day reflections and week reviews: when, inputs, file, Telegram
   ledger.py      what was sent and captured (JSON under an exclusive flock)
@@ -747,7 +751,7 @@ _Woven in: [9.2] What simple joys touched you today?_
 <the companion's own note>
 ```
 
-**Block keys and margin notes.** Each block of your words carries a hidden key line (`%% journal block:<id> %%`) as the first line under its heading, written with the block and never changed, so a margin note can name the block it answers; it sits under the heading so it moves with the section when you drag or cut sections in your notes app. Don't edit it (deleting the block in the web app takes it along). If a block has paragraph times, their hidden line comes after the key. A margin note is the companion's note on one block of yours, kept at the end of her annotations section under `### Margin notes`: a hidden line with its id, time, state (`open`, `resolved`, `dismissed`) and the block it is on, her words in a callout (folded once it is resolved or dismissed), then the thread under it, each of your replies under its own hidden `his:` line and hers in callouts. Her words there are hers and never read as yours; your replies there are yours, and only those: anything else in the margin, a line typed under a note by hand included, counts as hers. Entries from before carry neither and read as they always did (DECISIONS.md, MARGIN-FORMAT; nothing writes margin notes yet).
+**Block keys and margin notes.** Each block of your words carries a hidden key line (`%% journal block:<id> %%`) as the first line under its heading, written with the block and never changed, so a margin note can name the block it answers; it sits under the heading so it moves with the section when you drag or cut sections in your notes app. Don't edit it (deleting the block in the web app takes it along). If a block has paragraph times, their hidden line comes after the key. A margin note is the companion's note on one block of yours, kept at the end of her annotations section under `### Margin notes`: a hidden line with its id, time, state (`open`, `resolved`, `dismissed`) and the block it is on, her words in a callout (folded once it is resolved or dismissed), then the thread under it, each of your replies under its own hidden `his:` line and hers in callouts. Her words there are hers and never read as yours; your replies there are yours, and only those: anything else in the margin, a line typed under a note by hand included, counts as hers. Entries from before carry neither and read as they always did (DECISIONS.md, MARGIN-FORMAT). The tick writes her notes with her annotations, sparingly: at most one a block and three an entry, none on a block of under ten words or one that already has an open or dismissed note, and only notes that pass their checks; they stay in the file (DECISIONS.md, MARGIN-NOTES).
 
 **Reflection file** (`2026-10-14-reflection.md`; a week review is the same with `kind: week`, dated the week's last day):
 

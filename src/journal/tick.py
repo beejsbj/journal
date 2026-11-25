@@ -42,8 +42,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from . import (agent, audio, capture, channel, compose, context, conversations, entries, images, ledger, library,
-               mirror, notebook, ops, outage, privacy, programs, prompts, recovery, reflect, schedule, slots, standing, sweep,
-               ticklock, today, validate, version)
+               margin_notes, mirror, notebook, ops, outage, privacy, programs, prompts, recovery, reflect, schedule, slots,
+               standing, sweep, ticklock, today, validate, version)
 from .alert import Alert
 # The chat face's steps and names (issue #43, CHAT-1: moved there unchanged). The tick still exports each of them, so
 # ``tick.send_prompt``, ``tick.fold``, ``tick.SEND_ATTEMPTS`` … are the same objects as before.
@@ -438,9 +438,11 @@ def annotate(cfg: Config, now: datetime, log: list[str]) -> None:
         reply = context.companion_reply_after(cfg, first, chat_id=p.get("chat_id"), platform=channel.platform_of(p)) \
             if not capture.by_face(p["captures"][0]) else None
         asked.add(path)
+        # the margin notes ride on the same request (MARGIN-NOTES): the blocks that may take one are labelled, her
+        # notes so far are shown apart from the entry, his replies in them labelled as his
+        ask, keys = margin_notes.request(cfg, body, path.stem, reply, log, p["id"])
         try:
-            text = agent.ask(cfg, prompts.annotation_request(cfg, entries.without_companion_replies(body), reply), 180,
-                             toolsets="none")
+            text = agent.ask(cfg, ask, 180, toolsets="none")
         except agent.AgentUnavailable as e:
             alert, gave_up, since = False, False, ""
             with ledger.locked(cfg.ledger_path) as data:
@@ -459,12 +461,18 @@ def annotate(cfg: Config, now: datetime, log: list[str]) -> None:
                               f"retrying every 30 minutes for up to 7 days")
             break  # the model is down for the other entries too; don't wait out another timeout
         ok = bool(text) and len(text) < 5000 and not text.lstrip().startswith("{")
+        proposed: list = []
         if ok:
+            text, proposed, malformed = margin_notes.split(text)   # (a NOTE line never stays in her analysis)
             text, followups = notebook.split_followups(text)
             ok = bool(text.strip())
         if ok:
             with ledger.locked(cfg.ledger_path):  # the hook and the conversation writer append under this lock
-                entries.write_annotations(path, text, cfg.names)
+                result = margin_notes.write(cfg, path, text, proposed if keys else [], now.astimezone(cfg.tz))
+            if malformed:
+                result["not the shape of a note"] += malformed
+            if proposed and not keys:
+                result["not asked for"] += len(proposed)
             added = 0
             for f in followups:  # the annotations are written: a notebook failure must not hold back completion
                 try:
@@ -474,7 +482,8 @@ def annotate(cfg: Config, now: datetime, log: list[str]) -> None:
                         added += 1
                 except Exception as e:  # noqa: BLE001
                     log.append(f"{p['id']}: follow-up not saved to the notebook ({type(e).__name__}: {e})")
-            log.append(f"annotated {p['id']}" + (f" (+{added} notebook)" if added else ""))
+            log.append(f"annotated {p['id']}" + (f" (+{added} notebook)" if added else "")
+                       + (f" ({margin_notes.describe(result)})" if margin_notes.describe(result) else ""))
         with ledger.locked(cfg.ledger_path) as data:
             q = ledger.find(data, p["id"])
             if q is not None:
