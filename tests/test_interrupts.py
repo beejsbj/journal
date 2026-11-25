@@ -16,7 +16,7 @@ from helpers import CHAT, add_prompt, make_cfg
 
 from journal import agent, audio, validate, capture, entries, ledger, library, outage, programdefs, programs, schedule, sweep, telegram
 from journal import tick
-from journal.serve import document
+from journal import document
 import test_programs as tp
 import test_programs_review as rv
 

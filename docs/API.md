@@ -92,7 +92,7 @@ Every `text` is the file's text with `ENGINE_MARK` lines removed; the server nev
 conversation messages) is the quoted line of hers his message answered, from the `↩ replying to` callout the
 conversation writer puts above his message. `prompt.opener`/`asked` come from the ledger record and are null once
 it is pruned. `voices` names the two voices for labels (`names.user`, else "You"; `names.companion`), so the client never guesses a name. Also present: `meta` (`mood`/`people`/`starred` when set) and the entry's `practice` as `{id, title,
-emoji}` (null for `/j` and companion-started notes). `writable` is false for a file that is only named like an entry (his own page): writes to it are `409 not-engine-entry`, so the app offers no composer or meta sheet there (WP12 review). Implemented in `serve/document.py` (WP9). `kind: "hers"`
+emoji}` (null for `/j` and companion-started notes). `writable` is false for a file that is only named like an entry (his own page): writes to it are `409 not-engine-entry`, so the app offers no composer or meta sheet there (WP12 review). Implemented in `document.py` (WP9; in `serve/` until issue #47 moved it into the core for MCP too). `kind: "hers"`
 blocks are rendered folded by the client and never merged into his. Program session entries add `summary`
 (the filled `## Summary`) and `phase` on his blocks (from `%% journal phase:N %%`). A block of his under
 `%% journal interrupt:N %%` (session 10's one-off questions) has `phase: null` and `interrupt: N` (the key is

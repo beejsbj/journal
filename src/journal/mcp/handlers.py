@@ -3,8 +3,8 @@ the tests call them directly.
 
 Each tool is a call into what the engine and the other faces already do, never a second model of the journal:
 
-* reads are ``journal serve``'s (``today.collect``, ``serve.api.filter_entries``, ``serve.document``), so an MCP
-  client sees what the web app sees, and nothing the web app may not: no chat transcript, no privacy results, no
+* reads are the core's readers the web app uses too (``today.collect``, ``document.filter_entries``, ``document``:
+  none of them in ``serve/``, issue #47), so an MCP client sees what the web app sees, and nothing the web app may not: no chat transcript, no privacy results, no
   packs, no notebook (``tests/test_mcp_fence.py`` fences the imports; ``tests/test_mcp.py`` runs every tool with
   ``sqlite3.connect`` made to fail);
 * his words are only appended, through ``actions`` (``answer`` for a practice, ``note`` otherwise; ``via="mcp"``)
@@ -28,14 +28,13 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Callable
 
-from .. import actions, audio, capture, commands, entries, ledger, library, programview, today
+from .. import actions, audio, capture, commands, document, entries, ledger, library, programview, today
+from ..actions import TEXT_LIMIT
 from ..config import Config
-from ..serve import api, document
-from ..serve.writes import TEXT_LIMIT
 
 LOCK_WAIT = 5.0      # seconds a write waits for the ledger lock (as a web write), then it is refused as busy
 TODAY_CHARS = 100_000   # the today block here is not cut to ``today.max_chars``: that is the chat's turn budget
-LIST_LIMIT = api.LIST_LIMIT
+LIST_LIMIT = document.LIST_LIMIT
 QUERY_LIMIT = 200    # characters of a search (as ``/entries?q``)
 
 
@@ -116,7 +115,7 @@ def entry_list(cfg: Config, now: datetime, *, query: str | None = None, kind: st
         limit, cursor = max(1, min(LIST_LIMIT, int(limit))), max(0, int(cursor))
     except (TypeError, ValueError):
         raise Refused("limit and cursor are whole numbers") from None
-    found = api.filter_entries(cfg, start, end, kind=(kind or "").strip() or None, q=q)
+    found = document.filter_entries(cfg, start, end, kind=(kind or "").strip() or None, q=q)
     lib = library.load(cfg)
     items = [s for s in (document.summary(cfg, path, lib) for path, _ in found[cursor:cursor + limit]) if s]
     return {"items": items, "next": cursor + limit if cursor + limit < len(found) else None}
@@ -130,7 +129,7 @@ def _entry_path(cfg: Config, stem) -> Path:
 
 
 def entry_document(cfg: Config, stem: str) -> dict:
-    """One entry as the web app's two-voice document (``serve.document.document``): every block says whose it is
+    """One entry as the web app's two-voice document (``document.document``): every block says whose it is
     (``kind``: ``his`` or ``hers``)."""
     return document.document(cfg, _entry_path(cfg, stem), library.load(cfg))
 

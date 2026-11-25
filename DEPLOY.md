@@ -55,6 +55,24 @@ skips it ("answered live since") once the chat has a real reply in its window, o
 chat catch-up (tested against the older module, `RollbackTest`). The replies it held go as before from the first tick
 on the older code.
 
+## SHARED-READERS — MCP's readers move out of `serve/` into the core (2026-11-24; serve side and `journal mcp`; **no gateway restart**; no config or state change)
+
+**What changes.** A move, no behaviour change (issue #47): `serve/document.py` is now `document.py` in the core
+(`journal.serve.document` stays an alias of the same module), `filter_entries` and `LIST_LIMIT` moved there from
+`serve/api.py` (which keeps both names), and `TEXT_LIMIT` moved to `actions.py` (`serve/writes.py` keeps the name).
+`mcp/handlers.py` imports nothing from `serve/` now; `test_mcp_fence.py` forbids it, and `test_serve_fence.py` fences
+the moved reader like a module of `serve/`. DECISIONS.md, SHARED-READERS.
+**Side and restart.** Serve side: `uv tool install --force` at the merge sha, then `systemctl --user restart
+journal-serve`. `journal mcp` is a process an MCP client starts, so it runs the new code from its next start (restart
+the client's server entry if one is running). **No gateway restart:** CLAUDE.md's import check lists neither
+`journal.document` nor `journal.actions` among what `journal.hermes` loads, and no gateway path imports them at run
+time (only `cli.py`'s `write`/`open` commands import `actions`, in their own process; `actions.py` gains one constant).
+The tick is untouched.
+**First checks.**
+- `journal doctor` is as before; the web app's History lists entries and an entry opens (the moved reader).
+- An MCP client's `journal_entries` and `journal_entry` answer as before.
+**Rollback.** `uv tool install --force` at the previous sha and restart `journal-serve`; nothing to undo in state.
+
 ## ROUTE-OPENS — the faces' walks record every file they open; the web status opens neither the hook's state nor the sweep's (2026-11-24; **serve side only, no gateway restart**)
 
 **What changes.** Issue #44: `tests/test_route_opens.py` runs the serve route walks (every GET, write and push route,

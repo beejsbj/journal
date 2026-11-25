@@ -15,7 +15,8 @@ from serve_helpers import EVENING, NOW, NOTE, SESSION
 from test_serve_writes import WriteCase, checksum
 
 from journal import conversations, entries, ledger
-from journal.serve import blocks, document, writes
+from journal import document
+from journal.serve import blocks, writes
 
 EVENING_STEM = "2026-10-14-evening"
 SESSION_STEM = "2026-10-15-fix-life-s01"

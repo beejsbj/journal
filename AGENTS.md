@@ -56,7 +56,7 @@ the transcript placeholder live there, `actions.refuse`), which takes its slot f
 ## Where state lives
 
 - **Entries**: `root`, one Markdown file per entry, kept audio and pictures beside it. Format in README *Entry file*;
-  parsed by `entries.py` and `serve/document.py`. The `%% journal … %%` lines are the writer's keys against double
+  parsed by `entries.py` and `document.py`. The `%% journal … %%` lines are the writer's keys against double
   writes; splice through those modules.
 - **State**: `state_dir` (default under Hermes `<HERMES_HOME>/plugin-data/journal`; `$JOURNAL_STATE_DIR` or the
   `state_dir` setting moves it), among others: `ledger.json`,
