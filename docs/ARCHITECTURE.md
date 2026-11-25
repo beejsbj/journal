@@ -323,8 +323,8 @@ Four processes may touch the journal; locks and order are fixed:
 | Process | Runs | Locks it takes |
 | --- | --- | --- |
 | Gateway (Hermes) with the plugin loaded | hooks, tools, slash commands | `ledger.locked`, `ledger.locked_state(hook-state.json / conversations.json)`; never `tick.lock` |
-| Tick (`journal tick`, every 5 min, fresh process) | send → privacy → sweep → conversations → programs → fold → audio → annotate → reply → reflect → recover → mirror → cache → prune → notebook | `tick.lock` (non-blocking: skips the round if held), then `ledger.locked` per write |
-| Spawned one-shots (`journal send <id>`, `journal program <action> <run>`) | one send or one program transition | `tick.lock` blocking, then `ledger.locked` |
+| Tick (`journal tick`, every 5 min, fresh process) | send → privacy → sweep → conversations → programs → fold → audio → annotate → reply → reflect → recover → mirror → cache → prune → notebook | `tick-run.lock` and `tick.lock` (non-blocking: skips the round if either is held), then `ledger.locked` per write; yields `tick.lock` to a waiter at its safe points (`ticklock.pause`) |
+| Spawned one-shots (`journal send <id>`, `journal program <action> <run>`) | one send or one program transition | `tick.lock` blocking (`ticklock.waited`: holding `tick-wait.lock` shared while it waits, so a running tick yields), then `ledger.locked` |
 | `journal serve` (long-running, user unit) | reads; small locked writes; spawns for anything that sends; a Web Push thread (a pass a minute) | `ledger.locked` / `locked_state` for writes (the push thread: `locked_state` on `serve-push.json` and `push-sent.json` only); **never** `tick.lock` |
 
 His words from a face (`actions.answer`, `actions.note`, `actions.add`: serve's `POST /entries`, `journal write`, MCP's
@@ -334,6 +334,12 @@ nothing. The tick's scheduled
 send re-reads its record under `ledger.locked` just before `chat.send` (OPEN-PROMPTS rule 2), so a face answer made
 during the opener's model call stops the send; one made between that check and the send attaches the delivery to the
 face's record (rule 3) instead of overwriting it.
+
+A tick yields `tick.lock` between steps when someone waits for it (`ticklock.py`, DECISIONS.md TICK-LOCK-YIELD): a
+send or transition waits for the rest of one step, or one model call inside a step, not for the whole tick; every
+send is still made under `tick.lock`, so the ledger's order of sends is the chat's. `tick-run.lock` (the tick's, for
+its whole run) and `tick-wait.lock` (the waiters' flag) come first: `tick-run.lock` → `tick-wait.lock` → `tick.lock`
+(a yielding tick lets go of `tick.lock` before it waits on the flag).
 
 Lock order is always `tick.lock` → `ledger.lock` → `<state>.lock`; no process takes them in another order
 (`tests/test_locks.py` runs a hook write, a tick and a serve write concurrently in-process and asserts no

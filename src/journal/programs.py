@@ -52,7 +52,8 @@ from datetime import date, datetime, timedelta, timezone
 from datetime import time as dtime
 from pathlib import Path
 
-from . import agent, audio, capture, compose, entries, ledger, library, mirror, notebook, outage, programdefs, prompts, validate
+from . import (agent, audio, capture, compose, entries, ledger, library, mirror, notebook, outage, programdefs, prompts,
+               ticklock, validate)
 from .config import Config, settle_minutes
 from .ports import ChannelError
 from .programdefs import Program
@@ -295,14 +296,10 @@ def _save(cfg: Config, run: dict) -> None:
 @contextlib.contextmanager
 def locked(cfg: Config):
     """The tick's lock, waited for: every transition outside the tick runs under it (a spawned ``journal program
-    …``), so it never races the tick's ``step`` or another spawn."""
-    cfg.state_dir.mkdir(parents=True, exist_ok=True)
-    with open(cfg.state_dir / "tick.lock", "a+") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
-        try:
-            yield
-        finally:
-            fcntl.flock(lock, fcntl.LOCK_UN)
+    …``), so it never races the tick's ``step`` or another spawn. A running tick lets it go first at its next safe
+    point (``ticklock``), so it waits for the rest of one step, not the whole tick."""
+    with ticklock.waited(cfg):
+        yield
 
 
 def _iso(at: datetime) -> str:
@@ -747,8 +744,7 @@ def _held_off(cfg: Config, run: dict, s: int, p: int, now: datetime, log: list[s
     sends its rituals before the programs step, and a ritual sent in this tick ended the window after ``now``, so
     only ``now`` still calls it open. Holding for that one tick leaves the ritual the newest message, so his reply
     to it is the ritual's and not the phase's; the phase goes out at the next tick, after it."""
-    clock = datetime.now(timezone.utc)
-    if not (_off_the_record(cfg, max(now, clock)) or _off_the_record(cfg, now)):
+    if not _off_the_record_now(cfg, now):
         return False
     log.append(f"{run['id']}: session {s} phase {p} held back: off the record (or the privacy pass cannot say); "
                f"the tick sends it once the window closes")
@@ -1192,6 +1188,13 @@ def settle(cfg: Config, run_id: str, now: datetime, log: list[str]) -> bool:
     return advance(cfg, run_id, now, log, reason="settle", capture_id=_capture_key(newest), expect=(s, p))
 
 
+def _off_the_record_now(cfg: Config, now: datetime) -> bool:
+    """``_off_the_record`` at the later of ``now`` and the clock, or at ``now``: either says open. See ``_held_off``
+    for why both. The tick yields ``tick.lock`` to a waiter (``ticklock``) and goes on with the same ``now``, so a
+    ``/x`` begun while it was yielded is after ``now`` and only the clock sees it."""
+    return (_off_the_record(cfg, max(now, datetime.now(timezone.utc))) or _off_the_record(cfg, now))
+
+
 def _off_the_record(cfg: Config, now: datetime) -> bool:
     """Whether a bare ``/x`` is holding the chat off the record (or the privacy pass cannot say). A phase send ends
     such a window (``privacy``: a prompt send does), so an automatic send while he is talking privately would make
@@ -1490,7 +1493,7 @@ def send_interrupts(cfg: Config, now: datetime, log: list[str], tried: set[str] 
     _open_interrupts(cfg, due, log)
     if not cfg.has_channel:
         return alerts  # no chat: an interrupt is opened at its time and answered on a face; nothing is sent
-    if due and _off_the_record(cfg, now):
+    if due and _off_the_record_now(cfg, now):
         # a send ends a bare /x window (privacy: a prompt send does), so his next private message would be filed;
         # they stay pending inside the grace window and are missed after it (``held_back`` is what makes that an
         # alert: a protocol day lost to a long /x, or to a privacy pass that cannot run, is not lost silently)
