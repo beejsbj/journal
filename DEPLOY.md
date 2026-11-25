@@ -44,6 +44,8 @@ flag and waits as before; an old tick ignores the flag.
 - No harness on the host is needed: `tools/measure_tick_lock.py --calls 3` runs on a temporary root only.
 **Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` and the CLI at the
 previous sha. The two new lock files can stay (nothing old reads them) or be removed while no tick runs.
+Roll back between ticks: an old tick does not know `tick-run.lock`, so one that starts while a new tick is yielded can run a
+whole tick inside the gap.
 
 ## X-FLOOR — `/x` refused at the bottom of the write path; `/j /x` off the record (2026-11-24; hook, tick and serve side; **gateway restart required**; no config or state change)
 

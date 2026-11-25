@@ -141,21 +141,37 @@ class YieldTest(TickLockCase):
         self.assertTrue(all(p.get("annotate_attempts") == 1 for p in snap["prompts"]))
 
     def test_a_tick_that_starts_while_another_is_yielded_skips_its_round(self):
-        """``tick-run.lock``: a scheduled tick that starts while another has yielded does not run in the gap (it would
-        interleave with the yielded one); it skips, as it would behind a running tick, and the yielded tick finishes."""
-        ready = threading.Event()
-        second: list = []
-
-        def during():  # the waiter holds tick.lock; the first tick is yielded
-            second.append(tick.run(self.cfg))
+        """``tick-run.lock``: the gap is the moment the first tick has let go of ``tick.lock`` and the waiter has not
+        yet taken it. Here the waiting flag is held (shared, as a waiter does) with no one taking ``tick.lock``, so
+        the first tick stays yielded and ``tick.lock`` is free. A second tick then finds nothing but ``tick-run.lock``
+        in its way: it must skip, not run in the gap."""
+        ran: list = []
         with mock.patch.object(tick, "datetime", _clock(QUIET)), \
-                mock.patch.object(tick, "fold", self.blocks_until_waited("fold", ready)), \
+                mock.patch.object(tick, "fold", lambda *a: self.events.append("fold")), \
                 mock.patch.object(tick, "process_audio", lambda *a: self.events.append("audio")):
-            ticker = self.thread(tick.run, self.cfg)
-            other = self.thread(self.waiter, ready, during)
-            self.join(other, ticker)
-        self.assertEqual(second, [(0, [])])  # skipped, nothing run
-        self.assertEqual(self.events, ["fold", "waiter", "audio"])  # (one fold: the second tick ran no step)
+            self.cfg.state_dir.mkdir(parents=True, exist_ok=True)
+            with open(self.cfg.state_dir / ticklock.WAIT, "a+") as flag:
+                fcntl.flock(flag, fcntl.LOCK_SH)  # a waiter's flag, and it never takes tick.lock
+                ticker = self.thread(tick.run, self.cfg)
+                try:
+                    _until(lambda: self._lock_free(ticklock.LOCK) and not self._lock_free(ticklock.RUN),
+                           "the first tick to yield (tick.lock free, tick-run.lock held)")
+                    ran.append(tick.run(self.cfg))  # a second tick, in the gap
+                finally:
+                    fcntl.flock(flag, fcntl.LOCK_UN)  # the waiter is gone: the first tick takes its lock back
+            self.join(ticker)
+        self.assertEqual(ran, [(0, [])])  # skipped, nothing run
+        self.assertEqual(self.events, ["fold", "audio"])  # (one of each: the second tick ran no step)
+
+    def _lock_free(self, name: str) -> bool:
+        """A non-blocking probe of one of the lock files: free when nobody holds it."""
+        with open(self.cfg.state_dir / name, "a+") as probe:
+            try:
+                fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return False
+            fcntl.flock(probe, fcntl.LOCK_UN)
+            return True
 
     def test_a_tick_still_skips_while_a_send_holds_the_lock(self):
         with ticklock.waited(self.cfg):

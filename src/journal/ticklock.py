@@ -115,6 +115,8 @@ def _flag_busy(path: Path) -> bool:
             fcntl.flock(flag, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             return True
+        except OSError:  # (cannot ask: nobody is taken to be waiting, as when the file cannot be opened)
+            return False
         fcntl.flock(flag, fcntl.LOCK_UN)
         return False
 
@@ -131,6 +133,8 @@ def pause() -> bool:
     try:
         with open(held.wait, "a+") as flag:  # every waiter has tick.lock, or has had it and let go
             fcntl.flock(flag, fcntl.LOCK_EX)
+    except OSError:  # (no flag file to wait on: the tick goes on, after taking its lock back below)
+        pass
     finally:
         fcntl.flock(held.lock, fcntl.LOCK_EX)  # behind the last of them
     held.yields += 1

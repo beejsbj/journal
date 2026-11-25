@@ -4955,3 +4955,6 @@ input found). A label the floor refuses answers 422 `off-the-record`, as the rou
   yield, never the lock: an old waiter raises no flag (the tick does not yield to it, as before), an old tick ignores
   the flag. `migrate` still takes `tick.lock` shared without raising the flag: it can slip into a tick's yield and copy
   the state between two of the tick's steps, which is as consistent as between two ticks.
+  **A stream of waiters can keep the tick yielded:** while waiters keep overlapping, the flag is never free (Linux
+  `flock` does not favour a waiting exclusive request), so the tick stays yielded for as long as that lasts. Bounded in
+  practice by human-paced waiters (a `/next` or a Send each takes seconds).
