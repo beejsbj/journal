@@ -307,7 +307,7 @@ def _replies_to(cfg: Config, rec: dict | None, path: Path, upto: date, data: dic
     blocks whose quoted message is that analysis (``conversations``' own test, ``answers_ours``)."""
     from .conversations import QUOTE_WORDS, in_root
     from .sweep import words
-    tg = (rec or {}).get("telegram") or {}
+    tg = ledger.send_of(rec)
     if not tg.get("message_id"):
         return []
     try:
@@ -540,7 +540,7 @@ def write_one(cfg: Config, kind: str, end: date, trigger: str, now: datetime,
 
 def _owed(rec: dict) -> bool:
     """A written analysis still to send: not sent, not skipped, attempts left."""
-    tg = rec.get("telegram") or {}
+    tg = ledger.send_of(rec)
     return bool(rec.get("written_at")) and not tg.get("message_id") and not tg.get("skipped") \
         and tg.get("attempts", 0) < SEND_ATTEMPTS
 
@@ -553,7 +553,7 @@ def _skip(cfg: Config, now: datetime, log: list[str]) -> None:
     with ledger.locked(cfg.ledger_path) as data:
         for rec in data.get("reflections") or []:
             if isinstance(rec, dict) and _owed(rec):
-                rec.setdefault("telegram", {}).update(skipped="no chat", skipped_at=now.isoformat())
+                ledger.send_slot(rec).update(skipped="no chat", skipped_at=now.isoformat())
                 skipped.append(str(rec.get("id")))
     for rid in skipped:
         log.append(f"{rid}: not sent: no chat (in its file)")
@@ -569,7 +569,7 @@ def send(cfg: Config, now: datetime, log: list[str]) -> list[str]:
     owed.sort(key=lambda r: (r.get("local_date") or "", r.get("kind") != "reflection"))  # oldest first, the day first
     room, waiting = outage.chat_room(cfg, now), 0
     for rec in owed:
-        tg = rec.get("telegram") or {}  # (the record's name for its send, whatever the platform)
+        tg = ledger.send_of(rec)  # (the record's send, whatever the platform)
         late = _lateness(cfg, rec, now)
         if late is not None and late > outage.stale_after(cfg):
             _skip_stale(cfg, rec, now, late, log)
@@ -593,7 +593,7 @@ def send(cfg: Config, now: datetime, log: list[str]) -> list[str]:
             q = find(data, rec["id"])
             if q is None:
                 continue
-            t = q.setdefault("telegram", {})
+            t = ledger.send_slot(q)
             if mid:
                 t.update(message_id=mid, sent_at=now.isoformat(), silent=rec.get("trigger") == "fallback")
                 t.pop("error", None)
@@ -629,7 +629,7 @@ def _skip_stale(cfg: Config, rec: dict, now: datetime, late: timedelta, log: lis
         q = find(data, rec["id"])
         if q is None:
             return
-        q.setdefault("telegram", {}).update(skipped="stale", skipped_at=now.isoformat())
+        ledger.send_slot(q).update(skipped="stale", skipped_at=now.isoformat())
     log.append(f"{rec['id']}: not sent: stale ({late.total_seconds() / 3600:.0f} h past its time; in its file)")
 
 

@@ -139,6 +139,39 @@ def capture_of_client(data: dict, client_id: str | None) -> tuple[dict, dict] | 
     return None
 
 
+# The send record of a reflection or week review (``message_id``, ``sent_at``, ``attempts``, ``error``, ``skipped``,
+# ``mirrored``) is kept under a name that says Telegram whatever the platform. PLATFORM-FIELDS renames it over two
+# releases: this one (release 1) reads ``chat`` and ``telegram`` and still writes ``telegram``, so a gateway that
+# runs older code reads every record this tick writes; release 2 writes ``chat``, once every reader is release 1.
+SEND_KEY = "telegram"      # the name written today, and by every release before this one
+SEND_KEY_NEW = "chat"      # the name read first, written from release 2 on
+SEND_KEYS = (SEND_KEY_NEW, SEND_KEY)  # a record's name for its send, in the order read
+
+
+def send_of(rec) -> dict:
+    """The record's send, read: under ``chat`` when it holds one, else under ``telegram``, else ``{}``. Not the
+    record's own dict when it has none, so a reader never makes a key by looking."""
+    if isinstance(rec, dict):
+        for key in SEND_KEYS:
+            found = rec.get(key)
+            if isinstance(found, dict) and found:
+                return found
+    return {}
+
+
+def send_slot(rec: dict) -> dict:
+    """The record's send, to change (inside ``locked``): the dict ``send_of`` reads when there is one, so a record
+    never ends up with the send half under each name; else a new one under ``SEND_KEY``."""
+    for key in SEND_KEYS:
+        found = rec.get(key)
+        if isinstance(found, dict) and found:
+            return found
+    slot = rec.get(SEND_KEY)
+    if not isinstance(slot, dict):
+        slot = rec[SEND_KEY] = {}
+    return slot
+
+
 def prompt_id(kind: str, local_date: str) -> str:
     return f"{local_date}-{kind}"
 

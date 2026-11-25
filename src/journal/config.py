@@ -523,10 +523,29 @@ class Config:
         return HermesCompanion(self)
 
     def source(self, name: str) -> dict:
-        return dict(self.sources.get(name) or {})
+        """A source's settings. A source with another name (``SOURCE_ALIASES``) is one source: its settings under
+        the old name, then those under the new name over them, whichever of the two is asked for."""
+        group = _alias_group(name)
+        out: dict = {}
+        for key in group:
+            out.update(self.sources.get(key) or {})
+        return out
 
     def source_enabled(self, name: str) -> bool:
         return bool(self.source(name).get("enabled"))
+
+
+# PLATFORM-FIELDS release 1: the source of his recent chat messages is named for the chat, not for Telegram. Both names
+# are read (the new one over the old); the old stays the name written and shown, and the default sits under it.
+SOURCE_ALIASES = {"telegram_history": "chat_history"}  # old name -> new name
+
+
+def _alias_group(name: str) -> tuple[str, ...]:
+    """The names one source goes by, the old first, so the new one's settings are applied last."""
+    for old, new in SOURCE_ALIASES.items():
+        if name in (old, new):
+            return (old, new)
+    return (name,)
 
 
 def _coords(value) -> tuple[float, float] | None:

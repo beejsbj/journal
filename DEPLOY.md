@@ -16,6 +16,31 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## PLATFORM-FIELDS — release 1 of 2: a reflection's send and the chat-history source are read under neutral names (2026-11-24; tick and hook side; **gateway restart required**; no config or state change)
+
+**What changes.** Issue #50, the owner's choice of two releases. A reflection's or week review's send record is kept in
+the ledger under `telegram` whatever the platform, and the source of his recent chat messages is `telegram_history` in
+the config. This release **reads** `chat` and `telegram` (new first) and `chat_history` and `telegram_history` (new
+over old), and **writes the old names exactly as before**: nothing on disk, in the config or in `plugin.yaml`
+changes, no warning is added, and a ledger written by this code is the ledger the code before it wrote. The
+point is the next release, which writes the new names and is safe only when every process that reads the ledger
+already knows them. DECISIONS.md, PLATFORM-FIELDS and PLATFORM-FIELDS-R2.
+**Side and restart.** `ledger.py`, `standing.py`, `context.py`, `conversations.py`, `reflect.py`, `outage.py`,
+`mirror.py` and `config.py` are loaded by the gateway (CLAUDE.md's import check lists them), so the hook side keeps
+the old code until `hermes gateway restart`, and **the restart is required**: this release exists so that the gateway,
+the long-lived reader of the ledger, is on code that reads the new names before the next release writes them. Until
+it restarts, nothing is wrong (this release writes only what the old code reads), but release 2 must not ship. Ride
+the next gateway window with the pin move. The tick runs it from its next run. Serve and MCP read none of these
+fields; serve side needs no step (`uv tool install --force` at the merge sha keeps the CLI and the pin on one sha).
+**First checks.**
+- After the restart, the gateway's log has no `journal` hook exception, and a reply to a prompt is captured as before.
+- `journal doctor` is as before (its `source telegram_history` row keeps its name); `same version as tick` is ok.
+- `journal status` after a tick shows the recent reflections as before, and the next reflection is sent once and
+  recorded under `telegram` in the ledger (no `chat` key appears on any record).
+- Record the time of the gateway restart: release 2 waits for it (DECISIONS.md, PLATFORM-FIELDS-R2).
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
+previous sha), `hermes gateway restart`. Nothing to undo in state: no record carries a new name.
+
 ## X-FLOOR — `/x` refused at the bottom of the write path; `/j /x` off the record (2026-11-24; hook, tick and serve side; **gateway restart required**; no config or state change)
 
 **What changes.** Defence in depth (issue #46): the functions that put his words into an entry refuse off-the-record
