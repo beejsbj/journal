@@ -92,7 +92,7 @@ config_schema:
       that capture the same chat (a predecessor); doctor fails while one of them is enabled.
   sources:
     type: dict
-    description: Context sources for openers (weather, telegram_history, tududi, scrobbler, listenbrainz, storyteller, audiobookshelf, grimmory), each {enabled, ...}. See the README.
+    description: Context sources for openers (weather, telegram_history (also read as chat_history), tududi, scrobbler, listenbrainz, storyteller, audiobookshelf, grimmory), each {enabled, ...}. See the README.
   guard:
     type: dict
     description: What the companion may not change (protected_paths, allowed_write_paths, protected_tokens, block_execute_code, restrict_hermes_cli, block_system_commands, escalate_to). See the README.

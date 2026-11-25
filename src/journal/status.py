@@ -209,7 +209,7 @@ def _reflections(cfg: Config, data: dict) -> dict:
     recs = sorted(data.get("reflections") or [], key=lambda r: r.get("local_date") or "")[-4:]
     rows = []
     for r in recs:
-        tg = r.get("telegram") or {}
+        tg = ledger.send_of(r)
         rows.append({"id": r.get("id"), "written": bool(r.get("written_at")), "trigger": r.get("trigger"),
                      "attempts": r.get("attempts", 0), "error": r.get("error"),
                      "sent": bool(tg.get("message_id")), "send_error": tg.get("skipped") or tg.get("error")})

@@ -527,8 +527,42 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   transitions, which needs a rule for send order first. (b) or (c) is a package of its own with a gateway restart
   (the gateway reaches `tick` through `programs`' function-level imports, not through `journal.hermes` at load).
 
-## Taken by packages (recorded here; later packages follow them)
+- **PLATFORM-FIELDS-R2 — write the platform-neutral names (open, after release 1 is deployed everywhere; issue #50
+  closes with it).** Release 1 (PLATFORM-FIELDS under *Taken*) reads `chat` and `telegram` for a reflection's send
+  record and `chat_history` and `telegram_history` for the source, and writes the old names. Release 2 is the step
+  that writes the new ones, and it waits for the one thing that makes it safe: **no process left that reads only the
+  old name.** A record written under `chat` is invisible to a reader that knows `telegram`, and a reflection that
+  looks unsent is sent again.
+  - **Precondition, checked before the PR merges, not after.** Release 1 is on the plugin pin, the CLI and serve (the
+    pin and the CLI are one sha, doctor's `same version as tick` row), and the gateway has been restarted at or after
+    that sha (`hermes gateway restart`: the gateway is the long-lived reader; the tick takes the new code on its next
+    run). The check is the gateway's start time against the release's merge time, and a log with no hook
+    exception; a gateway that predates release 1 blocks release 2.
+  - **The change.** `ledger.SEND_KEY = "chat"` (and `SEND_KEYS` keeps both, so the fallback read stays), so
+    `ledger.send_slot` makes new send records under `chat` and `send_of` still reads either; `reflect.send`'s mirror
+    reference names `ledger.SEND_KEY`; `DEFAULTS["sources"]` moves the default under `chat_history`, `SOURCE_ALIASES`
+    stays, `sources.check` and the doctor row say `chat_history`; `config.problems` warns once on the old key
+    (`sources.telegram_history is now sources.chat_history; the old name still works`), the docs and `plugin.yaml`
+    name the new key. A deployment's own config moves to `chat_history` in its overlay, after release 1 runs
+    everywhere: an older process ignores the new key and reads the default.
+  - **Migration: none needed, offered not required.** Old records are read under their old name for as long as the
+    fallback stays, and the tick's prune drops a reflection with the ledger after `KEEP_DAYS` (120): the old name is
+    gone from disk by itself 120 days after release 2. A one-shot rename (`telegram` → `chat` on every reflection,
+    under `ledger.locked`) would make the disk uniform at once, at the cost of one more write to a shared file on the
+    day of the deploy; recommended against, since the fallback read is a line.
+  - **Release 3 (optional, no earlier than 120 days after release 2):** drop the `telegram` fallback read and the
+    `telegram_history` alias, once no record carries the old name. Not planned; the fallback costs nothing.
+  - **Tests release 2 changes:** `tests/test_platform_fields.py` (writers' expectations of the old name become the
+    new, the reader tests stay as they are), the existing tests that pin `["telegram"]` on a written record
+    (`test_reflect.py`, `test_mirror.py`, `test_outage.py`), and the golden engine tests only if they hold a ledger.
 
+## Taken by packages (recorded here; later packages follow them)
+ **On review (2026-11-25):** the double-send guard is the tick's and the CLI's version, not the gateway's (the gateway
+  never sends a reflection; doctor's `same version as tick` row shows the tick's): release 2 ships only once the tick and
+  CLI run release 1 or later, and **its rollback goes to release 1 or later, never before it** (a tick from before
+  release 1 reads a `chat` send as unsent and sends it again). The gateway restart stays the condition for the
+  companion's context. `send_of` already prefers the name that says sent or skipped, and the mirror reference is
+  `ledger.SEND_KEY`, so release 2 is the one constant. Config: the new source name wins whatever layer it is set in.
 - **WP0 — an unknown entry id is recognised only with the engine's authorship marker.** The spec's fallback
   (`kind: <id>` or `practice: <id>` in the file's own front matter) alone would have turned a hand-written
   `2026-10-20-thoughts.md` with `kind: thoughts` into an engine entry, and `journal_add_note` (whose default
@@ -4710,7 +4744,8 @@ to it (not this host's setup: the gateway runs as a service).
   new code at once: a record written under the new name is invisible to the old reader, so a prompt could look unsent
   and be sent twice. Options: (a) leave the names (cosmetic; recommended while in maintenance); (b) rename in two
   releases, the first reading both names and writing the old, the second writing the new once every gateway has
-  restarted; (c) add `chat_history` as an alias for the source only, which is config-side and safe.
+  restarted; (c) add `chat_history` as an alias for the source only, which is config-side and safe. *The owner chose (b)
+  on 2026-11-24: see PLATFORM-FIELDS (release 1) under *Taken* and PLATFORM-FIELDS-R2 (open).*
 - **INVISIBLE-PY (2026-11-24) — the invisible-character guard covers the Python source.** #63 guarded the built web
   app; three literal U+FEFF in `library.py`, `programdefs.py` and `tests/test_library.py` still tripped Hermes'
   scanner (it reads `.py`, tests included). Rule: a Python file writes such a character as an escape (`"\ufeff"`), and
@@ -4916,6 +4951,41 @@ gate strips as deep as the floor and a doubled `/j` before `/x` keeps nothing, a
 writer's and the sweep's per-message catch of `OffRecord` is a backstop: it drops that message from their own output
 and moves on, but records nothing for the other readers (with the gate and floor agreeing it is not reached by any
 input found). A label the floor refuses answers 422 `off-the-record`, as the route's own refusal does.
+
+- **PLATFORM-FIELDS (2026-11-24) — release 1 of 2: the platform-named fields are read under their neutral names too
+  (issue #50, the owner's choice of 2026-11-24: rename over two releases).** AUDIT-LEFTOVERS left the rename for the
+  owner; he chose option (b). Release 1 changes what is *read* and nothing on disk: every writer still writes the old
+  name. Release 2 (PLATFORM-FIELDS-R2, open above) writes the new one once no reader is old.
+  - **The names.** A reflection's or week review's send record (`message_id`, `sent_at`, `attempts`, `error`,
+    `skipped`, `skipped_at`, `silent`, `mirrored`): `telegram` → **`chat`**. The source of his recent chat messages:
+    `telegram_history` → **`chat_history`**. Checked against the code: nothing keyed a ledger record or a source by
+    `chat` or `chat_history` before. (`chat` is also a citation kind in `validate`/`channel.cite`, a field of
+    `standing`'s result and a key in the web's capability list; none of them is a ledger record, so there is no
+    collision on the record a reader looks in.) The ledger's other fields are not platform-named: AUDIT-LEFTOVERS'
+    "twenty sites" were all this one record, on reflections (a prompt's send is the flat `message_id`/`sent_at`/`chat_id`
+    of its own record, and an annotation reply's is `annotation_reply`). The `telegram` *config section* (`chat_id`,
+    `token_*`, `annotation_replies`) holds settings of the Telegram adapter, which are Telegram's; it stays.
+  - **One reader, one writer.** `ledger.send_of(rec)` reads the record's send (`chat` when it holds one, else
+    `telegram`, else `{}`; it never makes a key by looking) and `ledger.send_slot(rec)` gives the dict to change (the
+    one `send_of` reads, else a new `telegram`), so a record never holds half a send under each name, and release 2
+    is one constant. Every reader (`standing`, `context`, `status`, `conversations`, `outage`, `reflect`) and every
+    writer (`reflect`'s send, skip and stale marks, `mirror._mark`, which takes the key a queued mirror carries,
+    from either release) goes through them; `tests/test_platform_fields.py` fences the old spelling out of the rest of
+    `src/`.
+  - **The source.** `Config.source(name)` treats `telegram_history` and `chat_history` as one source
+    (`config.SOURCE_ALIASES`): the settings under the old name (defaults included), the new name's over them,
+    whichever is asked for, so `chat_history: {enabled: false}` turns it off for every reader. The default stays under
+    `telegram_history`, and the doctor row, the plugin settings and the docs keep the old name for now. No warning on
+    either name yet.
+  - **What release 1 does not do for a deployment's own config.** A process on older code ignores `chat_history`, so
+    a deployment keeps `telegram_history` in its overlay until release 2's precondition holds.
+  - **Proof the second release is safe.** `tests/test_platform_fields.py` runs every reader on a ledger holding
+    each state of a send record (sent, skipped as no chat, skipped as stale, owed), then with every `telegram`
+    renamed to `chat`, and the readings are equal; `reflect.send` over a reflection sent under `chat` sends nothing; a
+    skip lands in the record's own `chat` dict; the mirror marks either name. A mutation (the readers' list cut to the
+    old name) fails seven of them.
+  - **Also changed.** `context.py` kept a local cache under the key `"telegram"`
+    for the quote verifier's chat text; renamed `"chat"` (no persisted name).
 
 - **DAY-VIEW (2026-11-25) — a day as one log, read from the files as they are (issue #82, part 1).** The owner's
   call: storage stays (separate files, no format change, nothing merged); the web app shows a day as one log instead.
