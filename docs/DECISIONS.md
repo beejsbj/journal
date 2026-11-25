@@ -1397,7 +1397,6 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   the run, 404 until compiled. None of this opens the chat transcript or the privacy pass
   (`test_serve_programs.NoChatTest`).
 
-
 - **WP6 — the program block is read when the turn starts, from a queued pointer.** The dispatch hook (typed answers
   and voice or audio replies alike) queues `{run, session, phase, prompt}` under the turn's reply note in
   `hook-state.json` (`hookstate.remember_program` / `take_program`, a new section `programs`, same 15-minute
@@ -1959,7 +1958,6 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   the config file) and, for a key Hermes or the environment owns, the line that changes it; its "Saved" line names the
   layer written. This supersedes WP10's "The unit is not widened for the config file".
 
-
 - **TSAUTH (2026-10-20) — on the tailnet, signed in by Tailscale identity; no pairing (the owner's decision).** Opening
   the URL on any of his devices should just work. Choices:
   - **Both listeners, always.** `serve.socket` (an absolute path, at most 107 bytes, the `AF_UNIX` limit) is served
@@ -2118,9 +2116,6 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   the names the entry gives its pictures, `<stem>.ext`, `<stem>-N.ext`); and `agent.ask` with a picture on a
   companion that cannot take one returns None without marking the model as having answered (it ran nothing, so
   it is no sign an outage is over for `recovery`).
-
-
-
 
 - **WEBEDIT (2026-10-26) — the sacred-ground line in `AGENTS.md` (and `CLAUDE.md`, its symlink) amended.** The owner's
   reason: AGENTS.md speaks to the agents building the engine, so it states the engine's rule: "His words are append-only
@@ -2997,7 +2992,6 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     as Hermes' own errors, and with a token in the environment the target and the platform's config resolve and the
     router receives `Platform.DISCORD`, the chat and the text with a `MEDIA:` tag left as text; nothing was written
     outside the temporary home. Not checked: a real send to Discord (no sends in development).
-
 
 - **BUILTIN-EDIT (the owner, 2026-10-26) — a built-in is edited in place, with a way back to the default.** The
   owner asked that even built-ins be changed in place, with an option to reset to the default. Before, a built-in
@@ -4734,9 +4728,139 @@ to it (not this host's setup: the gateway runs as a service).
   Accepted trade: a stub whose `SRC` still exists with `journal/cli.py` reads ok even if it is no longer the install
   the profile uses; version skew between the two is covered by the `same version as tick` row, not by this one.
 
+- **CATCH-UP-LETTER (2026-11-24) — one message after an outage, in place of late replies (#42, the owner's decision 1
+  of 2026-11-15, its last open item).** On main after OUTAGES and STALE-COUNT, an outage left two things for the chat:
+  the catch-up (`recovery.py`: one message to his chat messages that got only Hermes' failure line) and, once the
+  model was back, the annotation replies to every entry he wrote meanwhile, paced and up to 24 h late, one by one. A
+  prompt reply in the chat is both (a failed turn and an entry), so the same words could be answered twice, late. The
+  owner: "I was away, I read your letters": one message, and the notes still go into the files.
+  - **Built on the catch-up, not beside it.** One `recovery` record per outage still: a waiting chat catch-up takes in
+    the entries (`_attach`), and with no unanswered chat message the entries get a record of their own
+    (`outage-<UTC minute of down_since>`). A record is tied to the breaker's outage by `outage_down_since`, so it is
+    made once (idempotent across ticks and restarts: the record is the ledger's, and a record of that outage that
+    ended, sent or not, stops a second); an entries-only letter sets `last_row` to the newest chat row read, so the
+    chat scan never makes a second message for the same rows. The breaker having been open is the outage's evidence
+    (`outage_seen`), as OUTAGES' catch-up already treats a deferral the probe confirmed.
+  - **Which entries.** The breaker's outage (`outage.span`: `down_since` to the `answered_at` of the model that came
+    back; open: to now) when it lasted `recovery.letter_min_minutes` (60) or more; the prompts with his words from
+    `annotate_after_minutes` before it began (their notes fell due inside it) to its end whose reply is still owed and
+    would be annotated; not a program phase (a run has its own flow: its reflect phases, its own summaries). With the
+    breaker off nothing is known across ticks, so nothing changes. With `telegram.annotation_replies` off there are no
+    replies to replace, so no entries (the chat catch-up is unchanged).
+  - **When: at once, the first tick a model answers** (subject to the companion's turn lease and `/x`), **not after
+    the paced annotations.** Chosen because the owner put it as "when the model comes back", because the letter reads
+    his words in the entries rather than her notes (so it depends on no model step but its own), and because waiting
+    for every held annotation (two a tick) would hold the replies longer and need a "done" rule for work that may
+    defer for 7 days. The cost: the letter cannot lean on her considered notes; they are still written and are in the
+    entries. From the moment a model answers (the breaker's `last.answered_at`), `tick.reply_annotations` holds those
+    replies (`recovery.held`), before the record exists, because the tick's annotate step (which usually closes the
+    breaker) and reply step run before the recover step.
+  - **The floor: no letter, never a fixed line.** No model: it waits (deferred as before) and the replies stay held,
+    so nothing late goes; past `max_age_hours` it is noted and they are released, already stale. Three bad answers or
+    six refused sends, or none sent `letter_deadline_minutes` after a model came back (on review, below): the mirrored
+    note, and the replies are released to the old path (paced, dropped once stale, counted for her by STALE-COUNT). **Chosen over** a plain fixed line ("I was away; my notes are in the entries"):
+    code would be speaking in her voice and claiming she read something, which the model alone may write; and her
+    replies are her real words, which the old path still delivers when they are not stale.
+  - **Checked like the catch-up.** `validate.check_catchup`: short prose, no failure text, no technical account, and
+    every quote among his words it was shown (his messages, his lines of the conversation, his words in the entries:
+    `entries.his_text`, never her notes, folded replies or the opener). No citation rule: like the catch-up, the
+    message is prose to him, not a sourced opener; "uncited claims" are held off by the request (only what is given,
+    nothing invented) and by quotes being checked.
+  - **Privacy.** The whole message waits while a bare `/x` window is open now or the privacy pass cannot run (fail
+    closed; `privacy.view`, as program phases do): his catch-up is not a prompt send and ends no window, but it would
+    land in a private conversation. Its material holds nothing off the record: chat rows are those `scan` keeps
+    (`conversations.row_is_off` skips private ones), and entry words are his blocks, which capture writes only on the
+    record. Tested with an outage spanning an `/x` window, a window open at recovery, and a pass that cannot run.
+    `channel.platform: none`: `recovery.enabled` is now false without a channel (it already needed a chat id), so
+    nothing is asked, written or sent, and the replies are skipped `no chat` as before.
+  - **Product choices left to the owner** (the conservative pick taken, each a setting): a short outage (under 60
+    minutes) keeps the replies, barely late (`recovery.letter_min_minutes`); the letter can be switched off
+    (`recovery.letter: false`: the old behaviour); its length is the catch-up's (about 900 characters asked, 1,500 the
+    hard limit), in one message, talking about what he wrote as a whole rather than entry by entry; day reflections
+    and week reviews held by an outage are not folded into it (they are analyses, not replies, and keep OUTAGES' pace
+    and stale rule). Shown to her: the mirrored message says it was sent after reconnecting and is about his messages
+    and the N entries; covered replies are marked `skipped: "letter"`, which STALE-COUNT does not count (they were not
+    lost: the letter went in their place).
+  - **Tests.** `tests/test_catchup_letter.py`: the letter in place of the late replies and a later annotation not
+    sent; one per outage across ticks and processes; entries alone; one message with the chat catch-up; answered live
+    since (the entries stay); a quote of her note refused; the floor (bad answers release the replies; no model keeps
+    them held); a short outage, the setting off and the breaker off change nothing; an `/x` window inside the outage,
+    one open at recovery, and a privacy pass that cannot run; `channel.platform: none`. **Tests changed on purpose:**
+    `test_outage_breaker.py`'s `ConfigTest` lists the three new defaults. `test_recovery.py` passes unchanged (the
+    messages-only request is byte for byte the old one).
+  - **On review (2026-11-25, an independent Opus pass on f738750).** The design held (no reply goes out twice, nothing
+    off the record reaches the letter, her voice only through checked model text); these were changed:
+    - **A deadline** (`recovery.letter_deadline_minutes`, 120). Held replies had none: with a letter waiting and the
+      sessions database or the privacy pass unreadable, `run` stopped at the scan every tick and the replies stayed
+      held (still at +200 h in the probe); and a letter request that kept timing out while other steps' models
+      answered was deferred every 30 minutes with no attempt counted, until every reply was stale (92 asks in 46 h,
+      then no letter and no replies). Now, 120 minutes after a model came back (the breaker's `answered_at`; a later
+      outage pauses it, since that one will be taken in), the record is noted, checked before the scan so an unreadable
+      chat cannot block it, and `held` lets the replies go from that moment by itself; past it no letter is begun.
+      Two hours is well under `stale_hours` (24), so released replies still go. **Cost, named:** the note ends the
+      whole record, so in that rare case his unanswered chat messages in it get the mirrored note, not a reply, where
+      on main a chat catch-up alone could keep trying for up to `max_age_hours`.
+    - **`/x` again just before the send.** The check ran before the model call (up to 150 s); a window opened
+      meanwhile was missed. It runs again after the text is checked; a window then (one that began after the tick's
+      `now` counts as open) keeps the text for the next tick's resend.
+    - **Rollback without a ledger edit.** A record of entries alone, or one whose messages were answered live, has no
+      `messages` key (never `[]`): the older `run` reads `waiting.get("messages", [{}])[0]` and raised IndexError on
+      `[]` every tick (OPS-NOTICE would have filed `step_failing` after six). `RollbackTest` runs the older module
+      (from git history; skipped in a shallow clone, where the shape tests still run).
+    - **Her note says what is true.** "The replies go to the chat as usual" only for replies released and not stale;
+      otherwise how many go, or that they are too late and stay in the entries.
+    - **Two outages close together make one letter.** A record of an earlier outage not yet written takes in a later
+      one (its earliest start, the later end, the covered prompts taken again over the whole span), instead of two
+      letters minutes apart.
+    - **Kept as before, said plainly:** an outage under `letter_min_minutes`, `recovery.letter: false`, or the breaker
+      off keeps main's behaviour, which can answer one prompt reply twice (the chat catch-up, as a failed turn, and its
+      annotation reply). Accepted as the cost of a short outage's replies staying barely late.
+    - **Known limit, recorded rather than fixed:** words he adds to a covered prompt after the letter went but before
+      it is annotated get no reply of their own (it is already `skipped: "letter"`). Not re-opened because the reply
+      would carry her notes on the whole entry, answering again what the letter answered (the double answer this
+      package removes); words he adds in the chat after she is back are answered by her live turn anyway, so only
+      words added on a face are affected, and her notes on them are still written into the entry.
+    - Tests added: a quote of entry words that were never chat messages; a pass closed for the scan alone and one
+      closed at the send alone; an `/x` window in the outage with entry words written on a face; a window opened while
+      the letter was written; six refused sends; the deadline with the request failing, with the chat unreadable, and
+      with no record made; a note with stale replies; two outages merged; the rollback shape. Each was run with its fix
+      reverted and failed.
+  - **On re-review (2026-11-25, an independent Opus pass on e5100e3).** Nothing doubles, nothing leaks, rollback is
+    safe; the deadline's clock was changed:
+    - **A chat-only catch-up has no deadline again.** `_attach` ties a waiting chat catch-up to the outage even when it
+      takes in no entry (`prompts: []`), and the deadline then ended it at 120 minutes, where main kept trying for up
+      to `max_age_hours`. The deadline is there only to let held replies go, so `_overdue` is false for a record
+      holding none; and past the deadline such a record takes no entries in (it stays a chat catch-up).
+    - **Only a later outage the letter takes in moves the clock.** `_back` moved it for any later outage, including
+      one shorter than `letter_min_minutes` that `_attach` never takes in; the letter's own failed request can trip
+      the breaker for minutes, so a flaky provider held the replies until stale (still waiting 23 h after the model
+      came back, in the probe). Now only a later outage of `letter_min_minutes` or more (so far, while it lasts)
+      moves it. **And a total hold cap, both:** the record keeps `first_back_at` (the first time a model came back
+      for it, never moved), and `hold_cap` = min(3 × `letter_deadline_minutes`, `stale_hours` − 1 h) (6 h by default)
+      ends it whatever moved or paused the clock since, so the replies it lets go are always still sendable. Both
+      rather than one: the first keeps the usual case at the 2 h deadline; the cap bounds what no rule foresees
+      (long outages recurring, a window that never reads as closed).
+    - **The clock stops while he is off the record** (the orchestrator's decision). A bare `/x` window open after
+      she was back held the letter (rightly), but the deadline ran on, so the record was noted and the replies went
+      in the middle of his off-the-record conversation. Now `_off_record`, for a letter holding replies, keeps the
+      windows the privacy pass sees on the record (`off_record`: `[since, until]`, `until` null while open; one that
+      ended is closed at its last activity plus the quiet gap, or a prompt send), and the deadline does not count
+      the time inside them. A pass that cannot run keeps nothing, so an unreadable chat still lets the replies go at
+      the deadline (the first review's point); the hold cap applies in every case, so a window cannot hold them
+      forever. **Cost, named:** a window seen open and never seen again (the chat unreadable from then) pauses the
+      clock until the cap (6 h), not 2 h.
+    - **An entries-only letter's rows stop below a turn still running.** Its `last_row` was the newest row read,
+      which can be his message whose live turn has not ended (`scan`'s `pending`); had that turn then failed, the
+      chat catch-up (scanning after `last_row`) would not see it. Now, when pending, `last_row` stops below the first
+      of his unanswered messages.
+    - Tests (`ClockTest`): a chat-only catch-up past 120 minutes, then sent; a 5-minute outage at 110 minutes does
+      not move the deadline; 60-minute outages recurring every ~3 h are released within the cap; a 2.5 h `/x`
+      conversation after she is back releases nothing and sends nothing, and the letter goes once it closes; a turn
+      running when an entries-only letter goes, then failing, gets the chat catch-up. Each was run with its fix
+      reverted (the hold cap and the short-outage rule separately) and failed.
+
 **X-FLOOR, on re-review (2026-11-25).** `capture.opt_out` reads past every leading `/j` (`/j /j /x …` too), so the
 gate strips as deep as the floor and a doubled `/j` before `/x` keeps nothing, a photo or voice note included. The
 writer's and the sweep's per-message catch of `OffRecord` is a backstop: it drops that message from their own output
 and moves on, but records nothing for the other readers (with the gate and floor agreeing it is not reached by any
 input found). A label the floor refuses answers 422 `off-the-record`, as the route's own refusal does.
-
