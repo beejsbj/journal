@@ -4,7 +4,8 @@ A captionless photo inside a window is private, and her turn takes it in: her re
 she wrote nothing after the photo, the pass kept that mark until her turn ended, so her reply to his next *public*
 message, after the window had closed, was kept off the record too. The owner decided (2026-11-24, DECISIONS
 X-PHOTO-REPLY) to save that reply, accepting that it may describe the photo. ``DecidedTest`` is that one case;
-``StillPrivateTest`` is every input around it, each at least as private as before.
+``StillPrivateTest`` is every input around it, each at least as private as before (each passes on the pass before #10
+too).
 """
 from helpers import add_prompt
 from test_images import note as image_note
@@ -80,6 +81,34 @@ class DecidedTest(PhotoReplyBase):
         self.his("a public message after the window", m(60), "43")
         privacy._CACHE.clear()
         self.assertFalse(privacy.view(self.cfg, m(60.5)).tainted())
+
+
+    def test_compaction_copies(self):
+        """After the decided case, a compaction copies the rows in place: the photo's copy is private, her saved
+        reply's copy is not written twice, and a copy of her private answer in the window stays private."""
+        self.window_with_photo()
+        self.hers("window-private: noted.", m(3.5))  # (her answer to the photo: that photo's turn has ended)
+        self.his("", m(5), "44")  # a second photo she did not answer
+        self.his("a public message after the window", m(60), "43")
+        self.hers(REPLY, m(61))
+        self.tick(m(70))
+        self.assertEqual(self.files().count(REPLY), 1)
+        self.db.sql("update messages set active = 0")
+        self.hers("[CONTEXT COMPACTION — REFERENCE ONLY] Earlier turns were compacted", m(120))
+        self.his("", m(120), "42")
+        self.hers("window-private: noted.", m(120))
+        self.his("", m(120), "44")
+        self.his("a public message after the window", m(120), "43")
+        self.hers(REPLY, m(120))
+        log = self.tick(m(140))
+        self.assertEqual(self.leaked(), [], log)
+        self.assertEqual(self.files().count(REPLY), 1)
+        privacy._CACHE.clear()
+        pv = privacy.view(self.cfg, m(140))
+        rows = self.cfg.transcript().rows(since=m(-10))
+        for r in rows:
+            if r.copy and (r.platform_message_id in ("42", "44") or "window-private" in r.text):
+                self.assertIn(r.id, pv.private, r.text)
 
 
 class StillPrivateTest(PhotoReplyBase):
@@ -189,30 +218,3 @@ class StillPrivateTest(PhotoReplyBase):
         self.his("", m(30), "42")  # sent at minute 30, stored now
         self.hers(REPLY, m(101))
         self.assert_reply_private(m(102))
-
-    def test_compaction_copies(self):
-        """After the decided case, a compaction copies the rows in place: the photo's copy is private, her saved
-        reply's copy is not written twice, and a copy of her private answer in the window stays private."""
-        self.window_with_photo()
-        self.hers("window-private: noted.", m(3.5))  # (her answer to the photo: that photo's turn has ended)
-        self.his("", m(5), "44")  # a second photo she did not answer
-        self.his("a public message after the window", m(60), "43")
-        self.hers(REPLY, m(61))
-        self.tick(m(70))
-        self.assertEqual(self.files().count(REPLY), 1)
-        self.db.sql("update messages set active = 0")
-        self.hers("[CONTEXT COMPACTION — REFERENCE ONLY] Earlier turns were compacted", m(120))
-        self.his("", m(120), "42")
-        self.hers("window-private: noted.", m(120))
-        self.his("", m(120), "44")
-        self.his("a public message after the window", m(120), "43")
-        self.hers(REPLY, m(120))
-        log = self.tick(m(140))
-        self.assertEqual(self.leaked(), [], log)
-        self.assertEqual(self.files().count(REPLY), 1)
-        privacy._CACHE.clear()
-        pv = privacy.view(self.cfg, m(140))
-        rows = self.cfg.transcript().rows(since=m(-10))
-        for r in rows:
-            if r.copy and (r.platform_message_id in ("42", "44") or "window-private" in r.text):
-                self.assertIn(r.id, pv.private, r.text)
