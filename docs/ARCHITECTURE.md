@@ -59,7 +59,7 @@ review rounds; where this document disagrees with a candidate, this document win
 
 | Coupling | Modules and functions | Future home |
 | --- | --- | --- |
-| Reading `state.db` with Hermes row semantics (`display_kind`, `tool_calls`, `[Replying to: "…"]`, `Gateway message origin`, `[OUT-OF-BAND USER MESSAGE]`, `failed_turn` notices, compaction frames, `[Cron delivery:`, audio placeholders, `[Journal: ` mirrors) | `conversations.rows/classify/_ro/anchor/max_id`, `sweep.rows/read/_ro`, `recovery._rows/_his_text`, `context._his_messages/make_verifier/companion_reply_after`, `privacy.view` (via `conversations.rows`), `mirror.live_session/turn_running/busy` | `hermes/transcript.py` → `ports.Row` |
+| Reading `state.db` with Hermes row semantics (`display_kind`, `tool_calls`, `[Replying to: "…"]`, `Gateway message origin`, `[OUT-OF-BAND USER MESSAGE]`, `failed_turn` notices, compaction frames, `[Cron delivery:`, audio placeholders, `[Journal: ` mirrors) | Now behind `cfg.transcript()` (the `Transcript` port: `rows/anchor/max_id/busy`), read by `privacy.compute/view`, `conversations.classify`, `sweep.run`, `recovery.scan`, `context._his_messages/make_verifier/companion_reply_after`; `mirror.turn_running` (the thin tuple readers `conversations.rows` and `sweep.rows/read` moved to `tests/legacy_readers.py`; `live_session/busy` live in `hermes/transcript.py`) | `hermes/transcript.py` → `ports.Row` |
 | Asking the companion | `agent.argv` (`hermes chat --oneshot`), `agent.is_failure_text/is_failed_turn`, `cfg.hermes_env/profile_args` | `hermes/companion.py` (`HermesCompanion`), `agent.py` keeps `ask()` and `CommandCompanion` |
 | Hook glue that also orchestrates capture | `hermes/hooks.py` (`on_dispatch`, `_on_audio`, `_off_record`, `_remember_pack`, `on_llm_call`, `_take_pack`, `_capture_voice`, `_note_off_turn`, `off_record_block`) | engine side: `inbound.py`, `turncontext.py`; adapter keeps event↔dict translation |
 | Writing into her session | `mirror._mirror_to_session` (imports `gateway.mirror`) | `Transcript.mirror()` on the Hermes adapter; `NullTranscript.mirror()` returns `False` |
@@ -314,7 +314,7 @@ Storage, by owner:
 | `state_dir/hook-state.json` | engine | pending voice, pending packs, off-record turns, thread stamps (`last_his`, `last_send`, `today_injected_at`) |
 | `state_dir/today-cache.json` | tick | tasks/weather lines and `heard` (the time of his newest public chat message, read through the privacy pass; never its text), refreshed every `today.cache_minutes` |
 | `state_dir/practices/` or `practices_dir` | user, PWA | user definitions and his edits of the built-ins (`.library`: the defaults they began from) |
-| `state_dir/packs/`, `audio-stash/`, `mirror-queue.json`, `conversations.json`, `sweep.json`, `send-times.json`, `sent.jsonl`, `notebook.json` | engine | as today; **unservable** by the API |
+| `state_dir/packs/`, `audio-stash/`, `mirror-queue.json`, `conversations.json`, `sweep.json`, `send-times.json`, `sent.jsonl`, `notebook.json` | engine | as today; **unservable** by the API (`/status` shows the last sweep's time, read from `sweep.json`, and nothing else of it) |
 
 ## 4. Process model
 

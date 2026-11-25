@@ -156,6 +156,8 @@ def status(cfg: Config, now: datetime | None = None, *, web: bool = False) -> di
     if web:
         for key in ("conversations", "mirror_queued", "notebook_open", "hook_state"):
             out.pop(key)
+        # sweep.json holds the sessions database's path and a row id (the chat side): the web gets the time alone
+        out["sweep"] = {"at": out["sweep"].get("at")} if isinstance(out["sweep"], dict) else None
     return out
 
 
