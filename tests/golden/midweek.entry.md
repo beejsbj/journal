@@ -30,10 +30,12 @@ Tea & <toast>? **Bold** and _soft_ — a line.
 
 ## Sam
 
+%% journal block:b936421d7 %%
 ### 23:12 IST · text
 
 First words.
 
+%% journal block:b22c0c848 %%
 ### 23:40 IST · text
 
 A later reply.

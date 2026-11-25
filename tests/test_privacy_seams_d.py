@@ -8,6 +8,7 @@ every face, as in the chat. (5) The audio fill matched the recording's embed any
 edited. (6) Smaller edges: a description after the embed was deleted, the transcribing placeholder saved as his
 words, a conversation photo filed on phase 1's prompt, a private stashed picture kept for days, an unusable
 ``quiet_minutes`` raising past the window check, and MCP's journal_start inside a window."""
+import re
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -226,8 +227,9 @@ class FillAudioTest(unittest.TestCase):
     def test_an_embed_line_under_his_text_heading_is_not_the_block(self):
         self.by_hand("**Today** was long.", f"listen:\n\n![[{self.STEM}.ogg]]")
         self.assertTrue(self.fill())
-        self.assertIn(f"### 20:00 IST · text\n\nlisten:\n\n![[{self.STEM}.ogg]]\n\n### 20:05 IST · audio file · 0:30"
-                      f"\n\n![[{self.STEM}.ogg]]\n\nthe transcript", self.path.read_text())
+        self.assertRegex(self.path.read_text(), re.escape(f"### 20:00 IST · text\n\nlisten:\n\n![[{self.STEM}.ogg]]\n\n")
+                         + r"%% journal block:b[0-9a-f]{8} %%\n"   # (the recording's block keeps its own key line)
+                         + re.escape(f"### 20:05 IST · audio file · 0:30\n\n![[{self.STEM}.ogg]]\n\nthe transcript"))
 
     def test_no_recording_block_writes_nothing(self):
         self.by_hand(f"![[{self.STEM}.ogg]]\n\n{audio.TRANSCRIBING}", f"it was ![[{self.STEM}.ogg]]")

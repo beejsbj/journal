@@ -11,7 +11,8 @@ prompt's ledger record and the library for titles. The rules that matter:
   in ``## Conversation``; hers are the folded callouts the conversation writer keys with ``%% journal her:<id> %%``.
   A block is ``kind: "his"`` or ``kind: "hers"``; the client folds every ``hers``. What counts as hers is exactly
   what ``entries.strip_callouts`` removes from his words, so the search (``entries.his_words``) and the document
-  agree on whose words are whose.
+  agree on whose words are whose. Her margin notes (``margin.py``) are hers too, with the replies in their threads
+  (his are his): ``analysis.margin``, never ``blocks``.
 * **Text as written.** Each ``text`` is the file's text with the engine's hidden key lines removed and the
   surrounding blank lines trimmed; nothing is reflowed or rewritten.
 * **Only engine entries.** A stem must look like an entry name and ``entries.entry_key`` must accept the file
@@ -27,7 +28,7 @@ from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
 
-from . import audio, capture, entries, images, ledger, library, today
+from . import audio, capture, entries, images, ledger, library, margin, today
 from .config import Config
 
 STEM = entries.STEM
@@ -163,6 +164,16 @@ def _answer_key_before(section: str, at: int) -> tuple[str, int] | None:
     return None
 
 
+def _block_key_before(section: str, at: int) -> str | None:
+    """The block's own key (``entries.BLOCK_KEY``) among the key lines right above its heading, or None (a block
+    written before keys)."""
+    start = _key_start(section, at)
+    if start is None:
+        return None
+    m = entries.BLOCK_KEY.search(section, start, at)
+    return m.group(1) if m else None
+
+
 @dataclass(frozen=True)
 class Cut:
     """Where one block of his sits in the file, so that it can be edited or removed without touching anything else
@@ -185,11 +196,18 @@ class Cut:
 
 
 def _key_start(section: str, at: int) -> int | None:
-    """Where the ``%% journal phase:N %%`` / ``interrupt:N`` line that keys the heading at ``at`` starts (the line
-    ``_answer_key_before`` reads), else None."""
+    """Where the key lines above the heading at ``at`` start: its own key (``%% journal block:<id> %%``) and a
+    program's ``phase:N`` / ``interrupt:N`` line (the one ``_answer_key_before`` reads), else None. A block's unit
+    starts there, so deleting it takes its key lines with it."""
     head = section[:at].rstrip()
-    start = head.rfind("\n") + 1
-    return start if _ANSWER_KEY.match(head[start:].strip()) else None
+    found = None
+    while head:
+        start = head.rfind("\n") + 1
+        line = head[start:].strip()
+        if not (_ANSWER_KEY.match(line) or entries.BLOCK_KEY.match(line)):
+            break
+        found, head = start, head[:start].rstrip()
+    return found
 
 
 def _plain_cut(text: str, lo: int, hi: int, unit: tuple[int, int], embed: bool = True,
@@ -226,14 +244,16 @@ def _words_parts(section: str, stem: str | None = None) -> list[tuple[dict, Cut]
     if lead and not _NO_WORDS.match(lead.strip()):
         keep = min(1, len(section) - len(section.lstrip("\n")))   # (the blank line under the heading stays)
         out.append(({"kind": "his", "key": "words:0", "at": None, "source": "text", "text": lead, "audio": None,
-                     "phase": None}, _plain_cut(section, 0, first, (keep, first), embed=False)))
+                     "phase": None, "anchor": None}, _plain_cut(section, 0, first, (keep, first), embed=False)))
     for i, m in enumerate(heads):
         source, meta = _source_meta(m.group(3))
         name, text = _embed(section[m.end():ends[i]])
         pics, text = _pictures(text, stem) if source == "photo" else ([], text)
         which, n = _answer_key_before(section, m.start()) or (None, None)
+        own = _block_key_before(section, m.start())
         block = {"kind": "his", "key": f"words:{len(out)}", "at": " ".join(x for x in m.group(1, 2) if x),
-                 "source": source, "text": _clean(text), "audio": name, "phase": n if which == "phase" else None}
+                 "source": source, "text": _clean(text), "audio": name, "phase": n if which == "phase" else None,
+                 "anchor": f"block:{own}" if own else None}
         if pics:
             block["images"] = pics
         if which == "interrupt":   # a one-off question of session 10, not a phase: the client labels it (API.md §1)
@@ -306,7 +326,7 @@ def _his_message_cut(section: str, lo: int, hi: int, key: str, reply_to: str | N
     name, body = _embed(body)
     pics, body = _pictures(body, stem) if source == "photo" else ([], body)
     block = {"kind": "his", "key": key, "at": at, "source": source, "text": _clean(body), "audio": name,
-             "reply_to": reply_to}
+             "reply_to": reply_to, "anchor": key if key.startswith("his:") else None}
     if pics:
         block["images"] = pics
     if meta:
@@ -377,6 +397,20 @@ def blocks_of(body: str, stem: str | None = None) -> list[dict]:
     """The document's ``blocks`` for the entry text ``body`` (``stem``: the entry's, which says which pictures are the
     engine's own)."""
     return [block for block, _cut in block_parts(body, stem)]
+
+
+def margin_of(body: str, stem: str | None = None) -> list[dict]:
+    """Her margin notes (``margin.py``), each ``{id, anchor, at, state, closed, text, thread}``: ``anchor`` is the
+    block it is on (a block's ``anchor``; ``entry`` for the entry as a whole, or a block that is gone), ``at`` and
+    ``closed`` ISO times, ``text`` her words; ``thread`` the replies under it as blocks (``kind`` his or hers, in the
+    conversation's shapes). Her note and her replies are hers; only his replies are his words."""
+    out = []
+    for note in margin.notes(body):
+        thread = [{**b, "anchor": None} if b["kind"] == "his" else b
+                  for b in conversation_blocks(note.thread, stem)] if note.thread else []
+        out.append({"id": note.id, "anchor": note.anchor, "at": note.at, "state": note.state, "closed": note.closed,
+                    "text": note.text, "thread": thread})
+    return out
 
 
 def _notes(body: str) -> list[dict]:
@@ -466,7 +500,8 @@ def parsed(path: Path) -> dict | None:
         span = entries.words_span(body)
         blocks = words_blocks(body[span[0]:span[1]], path.stem) if span else []
         conv = entries.conversation_span(body)
-        said = _his_text(blocks + (conversation_blocks(body[conv[0]:conv[1]], path.stem) if conv else []))
+        said = _his_text(blocks + (conversation_blocks(body[conv[0]:conv[1]], path.stem) if conv else [])
+                         + [b for n in margin_of(body, path.stem) for b in n["thread"]])
         h1 = _H1.search(body)
         info = {
             "key": key, "fm": fm, "title": h1.group(1).strip() if h1 else None,
@@ -640,7 +675,7 @@ def document(cfg: Config, path: Path, lib=None) -> dict:
         "title": h1.group(1).strip() if h1 else entries.title_for(pid, cfg.names, p),
         "voices": {"his": cfg.names.user or "You", "hers": cfg.names.companion},
         "prompt": prompt, "blocks": blocks, "summary": summary_text,
-        "analysis": {"annotations": annotations or None, "notes": _notes(body),
+        "analysis": {"annotations": annotations or None, "notes": _notes(body), "margin": margin_of(body, stem),
                      "reflection": _reflection_for(cfg, stem)},
         "flags": {"annotated": bool(annotations), "has_conversation": bool(entries.conversation(body)),
                   "transcript_pending": audio.TRANSCRIBING in body or audio.NOT_TRANSCRIBED in words,

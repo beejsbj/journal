@@ -191,6 +191,13 @@ def render_document(doc: dict) -> str:
     analysis = doc.get("analysis") or {}
     if analysis.get("annotations"):
         out += [f"## Annotations — {she}", "", *_quoted(analysis["annotations"]), ""]
+    for note in analysis.get("margin") or []:   # hers; only his replies in its thread are his words
+        on = "the entry" if note["anchor"] == "entry" else f"his block {note['anchor']}"
+        state = "" if note["state"] == "open" else f" · {note['state']}"
+        out += [f"## Margin note — {she} · on {on}{state}", "", *_quoted(note["text"]), ""]
+        for b in note.get("thread") or []:
+            out.append((he if b["kind"] == "his" else she) + (f" · {b['at']}" if b.get("at") else ""))
+            out += [*_quoted(b["text"]), ""]
     for note in analysis.get("notes") or []:
         out += [f"## Note — {she}" + (f" · {note['at']}" if note.get("at") else ""), "", *_quoted(note["text"]), ""]
     if analysis.get("reflection"):

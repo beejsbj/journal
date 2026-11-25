@@ -67,10 +67,10 @@ def _find(body: str, key: str, was: str | None, at: str | None, stem: str | None
 
 def _facts(body: str) -> tuple:
     """What an edit of one block must leave as it was around the blocks: the entry's front matter, the companion's
-    annotations and notes, the program summary."""
+    annotations, margin notes and notes, the program summary."""
     notes = entries.notes_span(body)
-    return (entries.front_matter(body), entries.annotations(body), body[notes[0]:notes[1]] if notes else None,
-            entries.summary_text(body))
+    return (entries.front_matter(body), entries.annotations(body), entries.margin(body),
+            body[notes[0]:notes[1]] if notes else None, entries.summary_text(body))
 
 
 def _same_entry(old: str, new: str, wanted: list[dict], stem: str | None) -> bool:

@@ -157,7 +157,8 @@
       "source": "text",
       "text": "First words, about the lighthouse.",
       "audio": null,
-      "phase": null
+      "phase": null,
+      "anchor": null
     },
     {
       "kind": "his",
@@ -167,6 +168,7 @@
       "text": "A spoken thought.",
       "audio": "2026-10-14-evening.ogg",
       "phase": null,
+      "anchor": null,
       "meta": {
         "duration": 151
       }
@@ -178,7 +180,8 @@
       "source": "text",
       "text": "Later I thought of the harbour.",
       "audio": null,
-      "reply_to": null
+      "reply_to": null,
+      "anchor": "his:813"
     },
     {
       "kind": "hers",
@@ -193,7 +196,8 @@
       "source": "text",
       "text": "yes, and the gulls.",
       "audio": null,
-      "reply_to": "The harbour sounds like"
+      "reply_to": "The harbour sounds like",
+      "anchor": "his:816"
     }
   ],
   "summary": null,
@@ -205,6 +209,7 @@
         "text": "A note of hers."
       }
     ],
+    "margin": [],
     "reflection": "2026-10-14-reflection"
   },
   "flags": {

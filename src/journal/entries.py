@@ -57,6 +57,19 @@ _ANSWER_KEY = re.compile(r"^%% journal (phase|interrupt):([0-9]+) %%[ \t]*$", re
 WORDS_END_MARK = "%% journal:end-of-words %%"
 _WORDS_END = re.compile(r"^" + re.escape(WORDS_END_MARK) + r"[ \t]*$", re.M)
 _ONLY_HERS_AFTER = re.compile(r"\s*(?:\Z|## [^\n]*['’]s (?:[Aa]nnotations|[Nn]otes)[ \t]*$)", re.M)
+# Every block of his the engine writes into the words section opens with a hidden key line, above its heading (and
+# above a program's ``phase:N`` / ``interrupt:N`` line): ``%% journal block:<id> %%``. The key never changes, so a
+# margin note anchors to it and finds the block again after later appends, a web edit of the words, an edit in a notes
+# app that keeps the line, and the lines other packages put under the heading (DECISIONS.md, MARGIN-FORMAT). A block
+# of his in ``## Conversation`` is keyed already (``his:<message id>``); a block written before keys has none.
+BLOCK_KEY = re.compile(r"^%% journal block:([A-Za-z0-9][A-Za-z0-9-]*) %%[ \t]*$", re.M)
+# The margin: the companion's notes on single blocks of his, each with its thread and its state, a sub-section at the
+# end of her annotations section, after her analysis of the entry (``margin.py`` has a note's own grammar). The hidden
+# line under the heading tells it from a ``### Margin notes`` line in her analysis, which can never carry one
+# (``_hers`` drops every engine line from her text).
+MARGIN_HEADING = "### Margin notes"
+MARGIN_MARK = "%% journal:margin %%"
+_MARGIN = re.compile(r"^### Margin notes[ \t]*\n\n?" + re.escape(MARGIN_MARK) + r"[ \t]*$", re.M)
 
 
 def _words_end(body: str, start: int = 0) -> re.Match | None:
@@ -87,10 +100,29 @@ def interrupt_mark(n: int) -> str:
 def block_mark(kind: str, key: str) -> str:
     """The hidden key line that opens a conversation block (``kind`` his or her)."""
     return f"%% journal {kind}:{key} %%"
+
+
+def block_key_mark(key: str) -> str:
+    """The hidden key line that opens a block of his words (``BLOCK_KEY``)."""
+    return f"%% journal block:{key} %%"
+
+
+def new_block_key(body: str, captured_at: datetime, source: str, text: str) -> str:
+    """A key for a new block of his: ``b`` and eight hex digits of a hash of when it was captured, how and what it
+    says, so one capture always gets the same key (the goldens stay byte for byte); ``-2``, ``-3`` … when the file
+    already holds that key (the same words saved twice in one second, or a block he copied with its line)."""
+    seed = f"{captured_at.isoformat()}\n{source}\n{text}"
+    base = "b" + hashlib.sha256(seed.encode("utf-8")).hexdigest()[:8]
+    taken = set(BLOCK_KEY.findall(body))
+    key, n = base, 2
+    while key in taken:
+        key, n = f"{base}-{n}", n + 1
+    return key
 # A companion reply (or a reply-context line) folded into the conversation: an Obsidian callout, every line "> ".
 # The engine's callouts in a conversation: her reply (opened by its ``journal her:`` key line) and the reply
-# context above one of his messages (right after his ``journal his:`` key line). A callout of his own is his text.
-_CALLOUT = re.compile(r"^%% journal her:[^%\n]* %%\n> \[![a-z]+\][-+]? [^\n]*\n(?:>[^\n]*(?:\n|$))*", re.M)
+# context above one of his messages (right after his ``journal his:`` key line); in the margin, her note (opened by
+# its ``journal note:`` line) and her replies in its thread. A callout of his own is his text.
+_CALLOUT = re.compile(r"^%% journal (?:her|note):[^%\n]* %%\n> \[![a-z]+\][-+]? [^\n]*\n(?:>[^\n]*(?:\n|$))*", re.M)
 _REPLY_CONTEXT = re.compile(r"^(%% journal his:[^%\n]* %%\n)> \[!info\][-+]? ↩[^\n]*\n(?:>[^\n]*(?:\n|$))*\n?", re.M)
 
 
@@ -481,6 +513,9 @@ def record_reply(root: Path, prompt: dict, text: str, captured_at: datetime, sou
     keyed = bool(prompt.get("program") and (prompt.get("phase") or prompt.get("interrupt")))
     key = (interrupt_mark(prompt["interrupt"]) if prompt.get("interrupt") else phase_mark(prompt["phase"])) + "\n" \
         if keyed else ""
+    # the block's own key first, then the answer key: the line right above the heading stays the phase's, as older
+    # readers expect it (``document._answer_key_before``)
+    key = block_key_mark(new_block_key(body, captured_at, source, text)) + "\n" + key
     body = body[:s] + "\n" + words + key + _raw_block(captured_at, text, source, audio, meta, images) + body[e:]
     _atomic_write(path, body)
     if keyed:
@@ -501,7 +536,8 @@ def _answer_blocks(body: str, which: str, keep_empty: bool = False) -> dict[int,
     for i, m in enumerate(keys):
         if m.group(1) != which:
             continue
-        chunk = text[m.end():keys[i + 1].start() if i + 1 < len(keys) else len(text)]
+        # (the next block's own key line sits above its answer key, so it ends this chunk: never words)
+        chunk = ENGINE_MARK.sub("", text[m.end():keys[i + 1].start() if i + 1 < len(keys) else len(text)])
         lines = [l for l in chunk.strip("\n").splitlines()]
         if lines and lines[0].startswith("### "):
             lines = lines[1:]
@@ -550,7 +586,7 @@ def summary_text(body: str) -> str:
 # those. A key line alone counts too (it is never summary text), and so does a conversation key line (``his:`` or
 # ``her:``: old code appends conversation lines below the summary when a conversation sits above it). The summary's
 # own copy is written so that nothing in it has any of these shapes (``_summary_copy``).
-_KEY_LINE = r"%% journal (?:phase|interrupt):[0-9]+ %%[ \t]*"
+_KEY_LINE = r"%% journal (?:(?:phase|interrupt):[0-9]+|block:[A-Za-z0-9-]+) %%[ \t]*"
 _CONV_KEY_LINE = r"%% journal (?:his|her):[^%\n]* %%[ \t]*"
 _TIME_HEADING = r"### [0-9]{1,2}:[0-9]{2}\b[^\n]*"
 _STRAY_START = re.compile(rf"^(?:{_KEY_LINE}|{_CONV_KEY_LINE}|{_TIME_HEADING})$", re.M)
@@ -577,8 +613,16 @@ def _stray_blocks(rest: str) -> tuple[str, list[str], str]:
     if not first:
         return rest[:end], [], rest[end:]
     end = _section_end(rest, first.start())  # the rule that ends his words: a typed "## Today's notes" doesn't
-    cuts = [first.start()] + [m.start() for m in _STRAY_CUT.finditer(rest, first.start() + 1, end)] + [end]
+    cuts = [first.start()] + [m.start() for m in _STRAY_CUT.finditer(rest, first.start() + 1, end)
+                              if not _after_block_key(rest, m.start())] + [end]
     return rest[:cuts[0]], [rest[a:b].strip("\n") for a, b in zip(cuts, cuts[1:])], rest[end:]
+
+
+def _after_block_key(text: str, at: int) -> bool:
+    """Whether the line before ``at`` is a block's own key line (``BLOCK_KEY``): the answer key under it belongs to
+    the same block."""
+    start = text.rfind("\n", 0, max(at - 1, 0)) + 1
+    return at > 0 and bool(BLOCK_KEY.fullmatch(text, start, at - 1))
 
 
 def _place_block(head: str, block: str) -> str:
@@ -587,7 +631,7 @@ def _place_block(head: str, block: str) -> str:
     same key; any other at the end of his words."""
     span = words_span(head)
     at = len(head) if _CONV_BLOCK.match(block) or not span else span[1]
-    key = _ANSWER_KEY.match(block)
+    key = _ANSWER_KEY.match(block) or _ANSWER_KEY.match(block, block.find("\n") + 1 if BLOCK_KEY.match(block) else 0)
     if key and span:
         mine = list(_ANSWER_KEY.finditer(head, span[0], span[1]))
         same = [i for i, m in enumerate(mine) if (m.group(1), m.group(2)) == (key.group(1), key.group(2))]
@@ -691,8 +735,9 @@ def his_conversation(body: str) -> str:
 
 
 def his_words(body: str) -> str:
-    """Everything the user said in this entry: the words section, then their conversation lines."""
-    return "\n\n".join(t for t in (raw_entry(body), his_conversation(body)) if t)
+    """Everything the user said in this entry: the words section, then their conversation lines, then their replies
+    in the margin's threads."""
+    return "\n\n".join(t for t in (raw_entry(body), his_conversation(body), his_margin(body)) if t)
 
 
 def entry_words(body: str) -> str:
@@ -778,13 +823,13 @@ def without_summary(body: str) -> str:
 
 
 def without_companion_replies(body: str) -> str:
-    """The whole entry with the companion's folded conversation replies removed (annotation input, quote
-    checks): her chat replies must never read as the user's words."""
-    span = conversation_span(body)
-    if span:
-        s, e = span
-        inner = strip_callouts(body[s:e])
-        body = body[:s] + "\n" + (inner + "\n\n" if inner else "") + body[e:]
+    """The whole entry with the companion's folded conversation replies removed, and her margin notes and her
+    replies in their threads (annotation input, quote checks): her words must never read as the user's."""
+    for span in (margin_span(body), conversation_span(body)):   # (the later one first: offsets stay true)
+        if span:
+            s, e = span
+            inner = strip_callouts(body[s:e])
+            body = body[:s] + "\n" + (inner + "\n\n" if inner else "") + body[e:]
     # the engine's hidden key lines (``%% journal phase:2 %%`` in his words, the conversation mark) are not
     # his words either: the annotation model must not see them and the quote checker must not accept them
     return ENGINE_MARK.sub("", body)
@@ -817,21 +862,51 @@ def append_conversation(path: Path, blocks: str, names: Names = DEFAULT_NAMES) -
     _atomic_write(path, body[:s] + "\n" + middle + ("\n" + rest if rest else ""))
 
 
-def annotations(body: str) -> str:
+def _analysis_span(body: str) -> tuple[int, int] | None:
+    """Her analysis of the entry: the annotations section up to the margin, when it has one (``MARGIN_HEADING``)."""
     span = annotations_span(body)
+    if not span:
+        return None
+    m = _MARGIN.search(body, span[0], span[1])
+    return (span[0], m.start()) if m else span
+
+
+def margin_span(body: str) -> tuple[int, int] | None:
+    """The margin notes (``margin.py``): from under the margin's hidden line to the end of the annotations section;
+    None when the entry has no margin."""
+    span = annotations_span(body)
+    m = _MARGIN.search(body, span[0], span[1]) if span else None
+    return (_start_of(body, m), span[1]) if m else None
+
+
+def margin(body: str) -> str:
+    """The margin as written: her notes, their threads and their state lines ("" without a margin)."""
+    span = margin_span(body)
+    return body[span[0]:span[1]].strip() if span else ""
+
+
+def his_margin(body: str) -> str:
+    """His replies in the margin's threads (time markers kept), never her notes or her replies in them: what is not
+    one of her keyed callouts there is his, as in the conversation (``strip_callouts``)."""
+    return strip_callouts(margin(body))
+
+
+def annotations(body: str) -> str:
+    """Her analysis of the entry ("" while pending), without the margin notes after it."""
+    span = _analysis_span(body)
     text = body[span[0]:span[1]].strip() if span else ""
     return "" if text == PENDING else text
 
 
 def annotations_pending(body: str) -> bool:
-    span = annotations_span(body)
+    span = _analysis_span(body)
     return bool(span) and body[span[0]:span[1]].strip() in ("", PENDING) and bool(raw_entry(body))
 
 
 def write_annotations(path: Path, text: str, names: Names = DEFAULT_NAMES) -> None:
-    """Replace only the annotations; the user's words and the companion's notes are untouched."""
+    """Replace only her analysis; the user's words, the margin notes and the companion's notes are untouched."""
     body = path.read_text(encoding="utf-8")
-    span = annotations_span(body)
+    span = _analysis_span(body)
     if span is None:
         body = body.rstrip() + f"\n\n{names.annotations_heading}\n\n"
         span = (len(body), len(body))

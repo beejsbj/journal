@@ -230,6 +230,11 @@ def _label(cfg: Config, kind: str, end: date) -> tuple[str, str]:
 _HER_REPLY = re.compile(r"^%% journal her:[^%\n]* %%\n> \[!quote\][-+]? (.+?) · ([^\n]+)\n((?:>[^\n]*(?:\n|$))*)", re.M)
 _REPLY_CONTEXT = re.compile(r"^(%% journal his:[^%\n]* %%\n)> \[!info\][-+]? ↩[^\n]*\n(?:>[^\n]*(?:\n|$))*\n?", re.M)
 HER_REPLY_SHORT = 240  # characters kept of each of her chat replies when an entry is over INPUT_CAP
+# Her margin notes and her replies in their threads (``margin.py``): a ``[!note]`` callout under her ``note:`` or
+# ``her:`` key line. His replies there are keyed ``his:``; in the margin that line becomes a label, since they sit
+# under her annotations heading.
+_HER_NOTE = re.compile(r"^%% journal (note|her):[^%\n]* %%\n> \[!note\][-+]? (.+?) · ([^\n]+)\n((?:>[^\n]*(?:\n|$))*)", re.M)
+_HIS_IN_MARGIN = re.compile(r"^%% journal his:[^%\n]* %%[ \t]*$", re.M)
 
 
 def _her_replies_labelled(cfg: Config, text: str, keep: int | None = None) -> str:
@@ -238,13 +243,24 @@ def _her_replies_labelled(cfg: Config, text: str, keep: int | None = None) -> st
     who = cfg.names.companion
     them = cfg.names.user or "the user"
 
-    def one(m: re.Match) -> str:
-        body = "\n".join(l[1:].strip() for l in m.group(3).splitlines())
+    def labelled(what: str, lines: str) -> str:
+        body = "\n".join(l[1:].strip() for l in lines.splitlines())
         body = " ".join(body.split())
         if keep is not None:
             body = "" if keep == 0 else (body if len(body) <= keep else body[:keep].rsplit(" ", 1)[0] + " …")
-        label = f"[{who}'s chat reply, {m.group(2).strip()}: her words, not {them}'s"
+        label = f"[{who}'s {what}: her words, not {them}'s"
         return (f"{label}]\n" if not body else f"{label}] {body}\n") + "\n"
+
+    def one(m: re.Match) -> str:
+        return labelled(f"chat reply, {m.group(2).strip()}", m.group(3))
+
+    def note(m: re.Match) -> str:
+        what = "margin note" if m.group(1) == "note" else "reply in the margin"
+        return labelled(f"{what}, {m.group(3).strip()}", m.group(4))
+    span = entries.margin_span(text)
+    if span:   # his replies in the margin are his words: said so, as they sit under her heading
+        inner = _HIS_IN_MARGIN.sub(f"[{them}'s reply in the margin: his words]", text[span[0]:span[1]])
+        text = text[:span[0]] + _HER_NOTE.sub(note, inner) + text[span[1]:]
     return entries.ENGINE_MARK.sub("", _REPLY_CONTEXT.sub(r"\1", _HER_REPLY.sub(one, text)))
 
 

@@ -501,7 +501,9 @@ class InjectionTest(WriteCase):
         got = self.ok("POST", "/api/v1/entries", {"upload": json.loads(out)["upload"]}, want=201)
         text = self.entry(got["stem"])
         from journal import entries
-        self.assertIsNone(entries.ENGINE_MARK.search(text))
+        # the only engine line is the block's own key (MARGIN-FORMAT): nothing of the name came through as one
+        self.assertEqual([m.group(0).strip() for m in entries.ENGINE_MARK.finditer(text)
+                          if not entries.BLOCK_KEY.match(m.group(0).strip())], [])
         self.assertFalse([ln for ln in text.splitlines() if ln.startswith("> [!quote]")])
         self.assertEqual(len([ln for ln in text.splitlines() if 'audio file "rec' in ln]), 1)
 

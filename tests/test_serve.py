@@ -439,7 +439,7 @@ class DocumentTest(ServeCase):
             self.assertNotIn("%% journal", b["text"])
         self.assertEqual(doc["analysis"], {"annotations": "- a theme.", "notes": [{"at": "08:02 IST",
                                                                                    "text": "A note of hers."}],
-                                           "reflection": "2026-10-14-reflection"})
+                                           "margin": [], "reflection": "2026-10-14-reflection"})
         self.assertEqual(doc["flags"], {"annotated": True, "has_conversation": True, "transcript_pending": False,
                                        "audio": True})
         self.assertIsNone(doc["summary"])
