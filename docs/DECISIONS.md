@@ -5035,12 +5035,19 @@ input found). A label the floor refuses answers 422 `off-the-record`, as the rou
   file named like an entry too) and returns each block (`document.blocks_of`, his words, his conversation messages, her
   replies) as a line with its entry's stem and block key, in time order; `GET /api/v1/days/{date}` serves it. **Times:**
   a words heading carries a time only, and a conversation marker or her reply carries a date only when it fell on
-  another day than the entry's, so a line's calendar day is worked out walking the entry in file order: the entry's
-  date, or the day of its first capture while the ledger has it; a dated marker sets the day; an hour earlier than the
-  one before means the next day. With no ledger record, an entry whose first time is before `windows.day_ends_at` is the
-  night after its date (an evening answered at 00:30). **Known limit** (a `shortcut:` in `daylog.py`): a note filed by
-  the calendar date at 00:30 before notes followed the journal day (NOTES-JOURNAL-DAY), and older than the ledger, is
-  placed a day late in its day's log; its file and the Entries list are right. **Her words** are lines of their own
+  another day than the entry's. A block whose time matches a capture the ledger still has for the entry (same local
+  hour and minute, each used once in order; the words' captures for the words, the `conversation` ones for the
+  conversation) takes that capture's day, so an *Add* days later or backdated is placed when it was written.
+  Otherwise the words section and the conversation are each walked in file order, apart (an *Add* appends to the
+  words after a conversation may have begun, and must not push the conversation to the next day), from the entry's
+  start day: the day of its first capture while the ledger has it, else its date; a dated marker sets the day; an
+  hour earlier than the one before means the next day. With no ledger record, an entry whose first time is before
+  `windows.day_ends_at` is the night after its date (an evening answered at 00:30). **Known limit** (a `shortcut:` in
+  `daylog.py`): once the ledger has pruned an entry (weeks), file order alone places it, so a note filed by the
+  calendar date at 00:30 before notes followed the journal day (NOTES-JOURNAL-DAY) is placed a day late, a block
+  added days later reads as the entry's day, and a backdated one earlier than the block before it as the next day;
+  the files and the Entries list are right. A line on another calendar day than the page's (his or hers) shows its
+  weekday beside the hour. **Her words** are lines of their own
   (`kind: "hers"`), folded in the page and never mixed into his; the route reads only entry files and the ledger, and
   entries never hold off-the-record words. **Not done:** her margin notes and readings (the entry shows them), a day
   picker of its own (the Entries calendar and the numerals lead in), the week strip's days (they still filter the

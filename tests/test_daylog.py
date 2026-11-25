@@ -71,6 +71,44 @@ class DayLogTest(tc.Base):
         self.assertEqual(daylog.day(self.cfg, "2026-10-15")["prev"], None)
 
 
+class AddAfterTalkTest(tc.Base):
+    """An *Add* goes to the words section, below which a conversation may already have begun: the two sections are
+    placed apart, and a block the ledger has a capture for is placed on that capture's day."""
+
+    def setUp(self):
+        super().setUp()
+        add_prompt(self.cfg, kind="evening", local_date="2026-10-15", sent=m(80), message_id="600")   # 20:50
+        capture.capture(self.cfg, CHAT, "600", "the words", m(90), "text", "541")                     # 21:00
+        self.his('[Replying to: "Evening journal"]\n\n[Journal reply — saved …]\n\nthe words', m(90), "541")
+        self.hers("And then?", m(91))                                                                  # 21:01
+        self.his("and then the talk", m(95), "542")                                                    # 21:05
+        self.tick(m(150))
+        self.stem = "2026-10-15-evening"
+
+    def got(self, local_date="2026-10-15"):
+        return [(l["date"], l["time"], l["kind"], l["text"].strip()) for l in daylog.day(self.cfg, local_date)["lines"]]
+
+    def test_an_add_after_the_conversation_moves_none_of_it(self):
+        actions.add(self.cfg, self.stem, "one more thing", via="web", now=m(120))                      # 21:30
+        self.assertEqual(self.got(), [
+            ("2026-10-15", "21:00", "his", "the words"),
+            ("2026-10-15", "21:01", "hers", "And then?"),
+            ("2026-10-15", "21:05", "his", "and then the talk"),
+            ("2026-10-15", "21:30", "his", "one more thing"),
+        ])
+
+    def test_an_add_days_later_is_placed_on_its_own_day(self):
+        sunday = datetime(2026, 10, 18, 21, 30, tzinfo=IST)
+        actions.add(self.cfg, self.stem, "on Sunday", via="web", now=sunday)
+        self.assertEqual(self.got()[-1], ("2026-10-18", "21:30", "his", "on Sunday"))
+        self.assertEqual([d for d, *_ in self.got()[:-1]], ["2026-10-15"] * 3)
+
+    def test_a_backdated_add_earlier_than_the_block_before_it_stays_on_its_day(self):
+        actions.add(self.cfg, self.stem, "before it all", at=datetime(2026, 10, 15, 18, 0, tzinfo=IST), via="web",
+                    now=m(200))
+        self.assertEqual(self.got()[0], ("2026-10-15", "18:00", "his", "before it all"))
+
+
 class PlacingTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -101,6 +139,25 @@ class PlacingTest(unittest.TestCase):
 
     def test_a_block_with_no_time_keeps_no_time(self):
         self.assertEqual(self.place([None, "09:00 IST"]), [(None, None), ("2026-10-15", "09:00")])
+
+    def test_the_words_and_the_conversation_are_placed_apart(self):
+        """Words 21:00, her 21:01, his 21:05, an *Add* 21:30: the Add sits in the words, above the conversation."""
+        blocks = [{"key": "words:0", "at": "21:00 IST"}, {"key": "words:1", "at": "21:30 IST"},
+                  {"key": "her:a", "at": "21:01"}, {"key": "his:b", "at": "21:05"}]
+        self.assertEqual([(d.isoformat(), t) for d, t in daylog._placed(self.cfg, blocks, self.day, None)],
+                         [("2026-10-15", "21:00"), ("2026-10-15", "21:30"), ("2026-10-15", "21:01"),
+                          ("2026-10-15", "21:05")])
+
+    def test_a_capture_the_ledger_has_names_the_day(self):
+        """With the ledger: a block added on Sunday is Sunday's; without, file order alone (the shortcut)."""
+        blocks = [{"key": "words:0", "at": "19:30 IST"}, {"key": "words:1", "at": "21:30 IST"},
+                  {"key": "words:2", "at": "18:00 IST"}]
+        caps = ([datetime(2026, 10, 15, 19, 30, tzinfo=IST), datetime(2026, 10, 18, 21, 30, tzinfo=IST),
+                 datetime(2026, 10, 15, 18, 0, tzinfo=IST)], [])
+        self.assertEqual([(d.isoformat(), t) for d, t in daylog._placed(self.cfg, blocks, self.day, None, caps)],
+                         [("2026-10-15", "19:30"), ("2026-10-18", "21:30"), ("2026-10-15", "18:00")])
+        self.assertEqual([(d.isoformat(), t) for d, t in daylog._placed(self.cfg, blocks, self.day, None)],
+                         [("2026-10-15", "19:30"), ("2026-10-15", "21:30"), ("2026-10-16", "18:00")])
 
     def test_a_dated_marker_across_the_new_year(self):
         self.day = date(2026, 12, 31)

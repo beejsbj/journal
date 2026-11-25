@@ -9,13 +9,19 @@ moment an entry's first words were captured. Entries never hold off-the-record w
 anything is written), so nothing here can show them; the chat transcript is never opened.
 
 **Times.** An entry's words headings carry a time only (``### 23:12 IST · text``); a conversation marker or her reply
-carries a weekday and date when it falls on another day than the entry's (``**Fri 16 Oct 00:30**``). A line's
-calendar day is worked out walking the entry in file order (which is the order things were written): it starts on the
-entry's date, or the calendar day of its first capture when the ledger still has it; a dated marker sets the day; a
-time earlier than the one before it on the same day means the next day. With no ledger record, an entry whose first
-time is before ``windows.day_ends_at`` starts on the day after its date (the journal day: an evening answered at 00:30,
-a note put down then). ``shortcut: a note filed by the calendar date before the journal-day change and older than the
-ledger (weeks) is then placed a day late; upgrade by stamping the capture's date into the words heading if it matters.``
+carries a weekday and date when it falls on another day than the entry's (``**Fri 16 Oct 00:30**``). The two sections
+are placed apart, since an *Add* appends to the words after a conversation may have begun under them. A block whose
+time matches a capture the ledger still has for the entry (the same local hour and minute, each capture used once, in
+order: the words' captures for the words section, the ``conversation`` ones for the conversation) takes that
+capture's day: so a line added days later, or backdated, is placed when it was written. Otherwise a section is walked
+in file order (which is the order things were written): it starts on the entry's day (the calendar day of its first
+capture when the ledger has it, else the entry's date); a dated marker sets the day; a time earlier than the one
+before it on the same day means the next day. With no ledger record, an entry whose first time is before
+``windows.day_ends_at`` starts on the day after its date (the journal day: an evening answered at 00:30, a note put
+down then). ``shortcut: once the ledger has pruned an entry (weeks), its blocks are placed by file order alone: a note
+filed by the calendar date before the journal-day change is placed a day late, and a block added days later reads as
+the entry's day (a backdated one earlier than the block before it, as the next day); upgrade by stamping the
+capture's date into the words heading if it matters.``
 """
 from __future__ import annotations
 
@@ -59,35 +65,68 @@ def _dated(at: str | None, near: date) -> date | None:
     return None
 
 
+def _local(cfg: Config, at: str | None) -> datetime | None:
+    try:
+        return datetime.fromisoformat(at or "").astimezone(cfg.tz)
+    except (TypeError, ValueError):
+        return None
+
+
 def _first_capture_day(cfg: Config, rec: dict | None) -> date | None:
     for c in (rec or {}).get("captures") or []:
-        try:
-            return datetime.fromisoformat(c["at"]).astimezone(cfg.tz).date()
-        except (KeyError, TypeError, ValueError):
-            continue
+        local = _local(cfg, c.get("at") if isinstance(c, dict) else None)
+        if local is not None:
+            return local.date()
     return None
 
 
-def _placed(cfg: Config, blocks: list[dict], entry_day: date, start: date | None) -> list[tuple[date | None, str | None]]:
-    """(calendar day, "HH:MM") for each block of one entry, in its order (None, None for a block with no time)."""
-    ends = day_ends_at(cfg)
-    first = next((c for c in (_clock(b.get("at")) for b in blocks) if c), None)
-    day = start or (entry_day + timedelta(days=1) if first is not None and first < ends else entry_day)
-    last: tuple[int, int] | None = None
-    out = []
+def _capture_times(cfg: Config, rec: dict | None) -> tuple[list[datetime], list[datetime]]:
+    """The local times of the entry's captures in the ledger, in order: (the words', the conversation's)."""
+    words: list[datetime] = []
+    conv: list[datetime] = []
+    for c in (rec or {}).get("captures") or []:
+        local = _local(cfg, c.get("at") if isinstance(c, dict) else None)
+        if local is not None:
+            (conv if c.get("rule") == "conversation" else words).append(local)
+    return words, conv
+
+
+def _walk(blocks: list[dict], entry_day: date, start: date, times: list[datetime]) -> list[tuple[date | None, str | None]]:
+    """One section of an entry, in file order (see the module's *Times*)."""
+    day, last = start, None
+    pool = list(times)
+    out: list[tuple[date | None, str | None]] = []
     for b in blocks:
         clock = _clock(b.get("at"))
         if clock is None:
             out.append((None, None))
             continue
         named = _dated(b.get("at"), entry_day)
-        if named is not None:
+        hit = next((i for i, t in enumerate(pool) if (t.hour, t.minute) == clock), None)
+        if hit is not None:
+            day = pool.pop(hit).date()   # (the ledger knows when it was written)
+        elif named is not None:
             day = named
         elif last is not None and clock < last:
             day += timedelta(days=1)   # (written in order: an earlier hour is the next day)
         last = clock
         out.append((day, f"{clock[0]:02d}:{clock[1]:02d}"))
     return out
+
+
+def _placed(cfg: Config, blocks: list[dict], entry_day: date, start: date | None,
+            captures: tuple[list[datetime], list[datetime]] = ([], [])) -> list[tuple[date | None, str | None]]:
+    """(calendar day, "HH:MM") for each block of one entry, in its order (None, None for a block with no time). The
+    words section and the conversation are placed apart, each from the entry's start day; ``captures``: the local
+    times of the entry's ledger captures (``_capture_times``)."""
+    ends = day_ends_at(cfg)
+    first = next((c for c in (_clock(b.get("at")) for b in blocks) if c), None)
+    begin = start or (entry_day + timedelta(days=1) if first is not None and first < ends else entry_day)
+    words = [b for b in blocks if str(b.get("key") or "").startswith("words:")]
+    conv = [b for b in blocks if not str(b.get("key") or "").startswith("words:")]
+    placed = iter(_walk(words, entry_day, begin, captures[0]))
+    talk = iter(_walk(conv, entry_day, begin, captures[1]))
+    return [next(placed) if str(b.get("key") or "").startswith("words:") else next(talk) for b in blocks]
 
 
 def _line(stem: str, b: dict, day: date | None, hhmm: str | None) -> dict:
@@ -125,7 +164,8 @@ def day(cfg: Config, local_date: str, lib=None) -> dict:
         if s is None:
             continue
         blocks = document.blocks_of(body, path.stem)
-        placed = _placed(cfg, blocks, want, _first_capture_day(cfg, records.get(path.stem)))
+        rec = records.get(path.stem)
+        placed = _placed(cfg, blocks, want, _first_capture_day(cfg, rec), _capture_times(cfg, rec))
         prev_key = (want.isoformat(), "00:00")
         first_key = next(((d.isoformat(), t) for d, t in placed if d is not None), None)
         if first_key is not None:
