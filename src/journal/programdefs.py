@@ -184,7 +184,7 @@ class Program:
 def _split(text: str) -> tuple[dict[str, str], list[tuple[str, str]], str, list[str]]:
     """(front matter, its pairs, body, problems) — the same reader and the same strictness as a practice file."""
     problems: list[str] = []
-    text = text.replace("\r\n", "\n").removeprefix("﻿")
+    text = text.replace("\r\n", "\n").removeprefix("\ufeff")
     if not text.startswith("---\n"):
         return {}, [], text, ["no front matter: the file must start with a `---` block"]
     end = text.find("\n---\n", 3)

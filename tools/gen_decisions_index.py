@@ -134,8 +134,8 @@ def build(text: str) -> tuple[str, list[str]]:
              "",
              "## Index",
              "",
-             "Read this, then only the entries your change touches. *open*: raised and not yet decided; *decided*: taken "
-             "(the number table first, then the packages' entries); *superseded*: kept for the record, replaced by a later one.",
+             "Read this, then only the entries your change touches. *open*: listed under \"Raised by packages\" (a title may "
+             "say it was decided since: read the lead); *decided*: taken (the number table first, then the packages' entries); *superseded*: kept for the record, replaced by a later one.",
              ""]
     heads = {"table": "Numbered decisions", "open": "Open points (raised by packages)", "taken": "Taken by packages"}
     for key in ("table", "open", "taken"):
