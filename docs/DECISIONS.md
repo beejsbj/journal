@@ -503,6 +503,30 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   count such rows read-only in a live database, then add `[System: ` to the skip prefixes and to the marks
   (`_LEFTOVER`).
 
+- **TICK-LOCK-WAIT (2026-11-24) — a `/next` or `journal send` waits behind a tick's model calls; measured, not fixed
+  (issue #45; needs a design).** `tools/measure_tick_lock.py` runs a real `tick.run` over a temporary root with one
+  annotation due, the clock pinned to a time when no ritual is due (a due opener would add a model call; the harness
+  prints which steps asked the model), and a fake companion, and a second party that takes `tick.lock` as a spawned
+  `journal program next` does (`programs.locked`). With a 3 s model call the second party, arriving 0.2 s in, waited 2.83 s; with 8 s, 7.85 s
+  (the tick itself added about 0.05 s). So the wait is the rest of the model call plus every step after it that also
+  calls a model. One call is bounded by its budget (the companion is killed 60 s after it): opener 240 s, annotation
+  180 s per prompt, picture 120 s per picture, day reflection or week review 480 s, outage catch-up 150 s, a program
+  phase's reflect text 120 s, bridge 60 s, insights 240 s. A tick that writes a reflection and annotates two entries
+  can hold the lock for 480 + 2 × 180 = 840 s (14 minutes) plus up to 60 s of kill grace per call, about 17 minutes
+  with three calls, though the usual annotation is far shorter. `journal send` (`tick.run(only=…)`) and
+  every spawned `journal program …` wait the same way and are never lost, only late (both are detached, so nothing
+  times out). Why it is not a small fix: the lock also orders sends. A `/next` that sent a phase while the tick sent a
+  ritual would race on "the newest message" that a reply is matched to (`tick.run`: the interrupts go before the
+  practices for that reason), and `programs.step` makes model calls itself. Options: (a) leave it: it only costs a
+  late reply in the few ticks a day that call a model, and the web app and chat both say "waiting" (recommended
+  while in maintenance); (b) the tick yields the lock between steps when someone waits (a waiter marker, or a second
+  lock file the waiter holds shared), which bounds the wait by the longest single step, not the whole tick, at the
+  price of every step re-reading what a transition may have changed; (c) the issue's own proposal for the tick-only
+  steps (annotate, reflect, images, recovery): the model call outside the lock and a re-check under the ledger lock
+  before writing, as sends already do, which leaves `programs.step` and sends under it; (d) a separate lock for program
+  transitions, which needs a rule for send order first. (b) or (c) is a package of its own with a gateway restart
+  (the gateway reaches `tick` through `programs`' function-level imports, not through `journal.hermes` at load).
+
 ## Taken by packages (recorded here; later packages follow them)
 
 - **WP0 — an unknown entry id is recognised only with the engine's authorship marker.** The spec's fallback
