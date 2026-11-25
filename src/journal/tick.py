@@ -11,7 +11,8 @@
 3. Write the companion's annotations for captured entries that don't have them yet.
 4. Reply to each annotated message in the chat with its annotations; write and send the day
    reflection and week review when due (``reflect``); after a model outage that left his chat messages
-   unanswered, send one catch-up reply once a model answers again (``recovery``).
+   unanswered, or his entries without their replies, send one catch-up message once a model answers again, in place
+   of those replies (``recovery``: the letter).
    Everything sent is also mirrored into the companion's chat session (``mirror``).
 5. Prune the ledger and ``sent.jsonl`` (same retention, ``KEEP_DAYS``) and sweep the notebook. Every
    delivered prompt is also appended to ``sent.jsonl``, the engine's private memory of what it sent.
@@ -850,7 +851,9 @@ def reply_annotations(cfg: Config, now: datetime, log: list[str]) -> None:
     platform has no replies, or the prompt was made on another platform); exactly once.
 
     Oldest first, within the chat's pace (``outage.chat_room``: a few a tick, a few an hour; the rest wait for a later
-    tick), and never later than ``recovery.stale_hours`` after his words (``_skip_stale_reply``)."""
+    tick), and never later than ``recovery.stale_hours`` after his words (``_skip_stale_reply``). After an outage, the
+    replies to what he wrote while she was away are not sent one by one: one catch-up message goes in their place
+    (``recovery.held``; they are sent as before when it cannot be written)."""
     if not cfg.has_channel:   # (also with replies switched off: turned on later, they must not send the backlog)
         _skip_annotation_replies(cfg, now, log)
         return
@@ -858,6 +861,11 @@ def reply_annotations(cfg: Config, now: datetime, log: list[str]) -> None:
         return
     chat = None
     owed = [p for p in ledger.snapshot(cfg.ledger_path)["prompts"] if _reply_owed(p)]
+    held = recovery.held(cfg, now) if owed else set()  # (after an outage: one letter in place of these, ``recovery``)
+    if held & {p["id"] for p in owed}:
+        n = len(held & {p["id"] for p in owed})
+        log.append(f"{n} annotation repl{'y waits' if n == 1 else 'ies wait'} for the catch-up message after the outage")
+        owed = [p for p in owed if p["id"] not in held]
     owed.sort(key=lambda p: _newest_words(p) or datetime.fromisoformat(p.get("annotated_at") or now.isoformat()))
     room, waiting = outage.chat_room(cfg, now), 0
     for p in owed:

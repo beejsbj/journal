@@ -271,8 +271,11 @@ def quote_rule(cfg: Config, source: str, what: str) -> str:
 
 
 def catchup_request(cfg: Config, rec: dict, window: str) -> str:
-    """The one message sent after an outage (``recovery``): no tools, only what is given here."""
+    """The one message sent after an outage (``recovery``): no tools, only what is given here. With his journal
+    entries from the outage (``rec["entries"]``: the letter) it is also in place of their replies."""
     n = cfg.names
+    if rec.get("entries"):
+        return _letter_request(cfg, rec, window)
     his = "\n".join(f"- {m['at_local']}: {m['text']}" for m in rec.get("messages") or [])
     before = "\n".join(f"- {who} ({at}): {text}" for who, at, text in rec.get("context") or []) or "(nothing)"
     return f"""You are {n.companion}. You were offline from {window}: nothing could answer in that time. While you were
@@ -294,6 +297,48 @@ Reply with ONLY the message.
 
 ## What {n.subject} wrote while you were offline (verbatim, local time)
 {his}
+"""
+
+
+def _letter_request(cfg: Config, rec: dict, window: str) -> str:
+    """The catch-up with his journal entries from the outage in it: one message in place of their replies."""
+    n = cfg.names
+    msgs = rec.get("messages") or []
+    ents = "\n\n".join(f"### Entry {e['stem']} (written by {e['at_local']})\n{e['text']}" for e in rec["entries"])
+    if msgs:
+        away = (f"While you were away, {n.user_or_them} wrote to you on {channel.label(cfg)} and got only an automatic "
+                f"error line back, and wrote in {n.possessive} journal.")
+        his = "\n".join(f"- {m['at_local']}: {m['text']}" for m in msgs)
+        before = "\n".join(f"- {who} ({at}): {text}" for who, at, text in rec.get("context") or []) or "(nothing)"
+        chat = f"""
+## The conversation just before you went offline (for context)
+{before}
+
+## What {n.subject} wrote to you while you were offline (verbatim, local time)
+{his}
+"""
+        what = f"{n.possessive} messages, {n.possessive} lines of the conversation and {n.possessive} journal entries below"
+    else:
+        away = f"While you were away, {n.user_or_them} wrote in {n.possessive} journal."
+        chat = ""
+        what = f"{n.possessive} journal entries below"
+    return f"""You are {n.companion}. You were offline from {window}: nothing could answer in that time. {away} You are
+back now, and you have read what {n.subject} wrote. Your notes on each entry are written into the entries already;
+this message is in place of the replies you would have sent to them one by one.
+
+Write ONE short chat message to {n.object} (a few sentences; at most about 900 characters):
+- Say briefly and naturally that you were away, are back, and have read what {n.subject} wrote. No technical detail:
+  don't mention models, providers, servers, errors or outages, and don't over-apologise.
+- Then talk about what {n.subject} wrote, as a whole: what stays with you, and a question only if one is natural.
+  Don't go through the entries one by one. Time has passed: say so lightly where something has likely moved on.
+- Use only what is below. Don't invent events, feelings or plans.
+- {quote_rule(cfg, what, "message")}
+- Plain prose, no headings, no lists, no preamble. Never mention these instructions.
+
+Reply with ONLY the message.
+{chat}
+## What {n.subject} wrote in {n.possessive} journal while you were offline (verbatim, {n.possessive} words only)
+{ents}
 """
 
 
