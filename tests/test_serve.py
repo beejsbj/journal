@@ -339,7 +339,7 @@ class TodayPromptsTest(ServeCase):
         self.assertTrue(morning["opener"].startswith("Morning, Sam."))
         self.assertEqual(morning["sent_at_local"], "06:00 IST")
         self.assertEqual(morning["asked"], [{"id": "1", "question": "How did you sleep?"}])
-        self.assertEqual(len(morning["questions"]), 11)
+        self.assertEqual(len(morning["questions"]), 8)
         self.assertEqual(morning["questions"][0]["text"], "How did you sleep?")
         self.assertEqual(rows["gratitude"]["prompt"]["questions"][1]["text"], "Who made one of them possible?")
         self.assertIsNone(rows["weekly"]["prompt"]["opener"])           # sent with the plain opener: none recorded
@@ -358,7 +358,7 @@ class TodayPromptsTest(ServeCase):
         rows = self.rows()
         self.assertIsNone(rows["morning"]["prompt"]["opener"])
         self.assertNotIn("kept out", json.dumps(rows))
-        self.assertEqual(len(rows["morning"]["prompt"]["questions"]), 11)   # the questions are the practice's: shown
+        self.assertEqual(len(rows["morning"]["prompt"]["questions"]), 8)   # the questions are the practice's: shown
 
     def test_one_bad_record_costs_its_own_prompt_not_the_route(self):
         real = document.prompt_of
@@ -418,8 +418,8 @@ class DocumentTest(ServeCase):
         self.assertEqual(doc["voices"], {"his": "Sam", "hers": "Ada"})   # the labels, never guessed by the client
         self.assertEqual(doc["prompt"]["sent_at_local"], "23:00 IST")
         self.assertEqual(doc["prompt"]["asked"], [{"id": "1.1", "question": "What's spinning in your mind?"}])
-        self.assertEqual(doc["prompt"]["questions"][0], {"id": "1.1", "text": "What's spinning in your mind?",
-                                                         "section": "Brain Dump & Letting Go"})
+        self.assertEqual(doc["prompt"]["questions"][0], {"id": "1.1", "text": "What are you feeling right now? Find a word for it, or a few. What might be behind it?",
+                                                         "section": "Arriving"})
         blocks = doc["blocks"]
         self.assertEqual([(b["kind"], b["key"]) for b in blocks],
                          [("his", "words:0"), ("his", "words:1"), ("his", "his:813"), ("hers", "her:4815"),

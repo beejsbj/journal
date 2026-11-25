@@ -699,10 +699,10 @@ source: journal
 
 ## Prompt
 _Sent 23:00 IST · opener: ada_
-_Woven in: [9.2] What simple joys touched you today?_
+_Woven in: [5.1] What are you grateful for from today?_
 <opener>
 > [!question]- Questions
-> **1. Brain Dump & Letting Go** …
+> **1. Arriving** …
 
 ## Sam
 ### 23:12 IST · text

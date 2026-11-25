@@ -145,18 +145,22 @@ class ParseRenderTest(unittest.TestCase):
 
     def test_pin_survives_a_reorder(self):
         evening = library.builtins()["evening"]
-        self.assertEqual(evening.items()["9.2"], "What simple joys touched you today?")
+        self.assertEqual(evening.items()["2.2"], "What's the moment from today you'd tell as a story, even a small one?")
         text = evening.raw.replace(
-            "## 9. Gratitude\n- What moments from today are you thankful for?\n- What simple joys touched you today?",
-            "## 9. Gratitude\n- What simple joys touched you today? {#9.2}\n- What moments from today are you thankful for?")
+            "## 2. The Day\n- What went well today?",
+            "## 2. The Day\n- What's the moment from today you'd tell as a story, even a small one? {#2.2}\n"
+            "- What went well today?").replace(  # and the line's old place, after 2.1, emptied
+            "Let yourself be glad of it.\n- What's the moment from today you'd tell as a story, even a small one?\n",
+            "Let yourself be glad of it.\n")
         p = library.parse(text)
-        self.assertEqual(p.items()["9.2"], "What simple joys touched you today?")
-        self.assertEqual(p.items()["9.1"], "What moments from today are you thankful for?")
-        self.assertEqual([q.id for q in p.sections[8][1]], ["9.2", "9.1"])
-        self.assertEqual(p.items()["10.1"], "What brought you peace today?")  # later sections unaffected
-        self.assertIn("- What simple joys touched you today? {#9.2}\n", library.render(p))
+        self.assertEqual(p.items()["2.2"], "What's the moment from today you'd tell as a story, even a small one?")
+        self.assertTrue(p.items()["2.1"].startswith("What went well today?"))
+        self.assertEqual([q.id for q in p.sections[1][1]], ["2.2", "2.1", "2.3", "2.4"])
+        self.assertEqual(p.items()["5.1"], "What are you grateful for from today?")  # later sections unaffected
+        self.assertIn("- What's the moment from today you'd tell as a story, even a small one? {#2.2}\n", library.render(p))
         self.assertEqual(library.parse(library.render(p)), p)
-        self.assertIn("   [9.2] What simple joys touched you today?\n   [9.1] What moments", p.bank_with_ids())
+        self.assertIn("   [2.2] What's the moment from today you'd tell as a story, even a small one?\n   [2.1] What went well",
+                      p.bank_with_ids())
 
     def test_a_number_in_a_section_title_is_kept(self):
         text = GRATITUDE.replace("- Three", "## 3.5 hours of sleep\n- Three").replace("- Who made", "## 2. Who\n- Who made")
@@ -374,7 +378,7 @@ class LoadTest(CleanEnv):
         self.assertNotIn("evening", [x.id for x in lib.scheduled()])  # no slot in the file: on demand only
         self.assertEqual(lib.problems, [])
         self.assertTrue(lib.builtins["evening"].builtin)  # the built-in itself is untouched
-        self.assertEqual(library.builtins()["evening"].items()["9.2"], "What simple joys touched you today?")
+        self.assertEqual(library.builtins()["evening"].items()["5.1"], "What are you grateful for from today?")
 
     def test_enabled_false_hides_a_built_in(self):
         self.write("midweek.md", library.render(library.builtins()["midweek"]).replace("---\n## 1.", "enabled: false\n---\n## 1."))

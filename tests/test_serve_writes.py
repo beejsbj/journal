@@ -267,7 +267,7 @@ class WriteNowTest(WriteCase):
                          ("evening", "Evening journal", "2026-10-15-evening", 3, "23:00"))
         self.assertTrue(got["prompt"]["opener"].startswith("Evening"))
         self.assertEqual(got["prompt"]["opener_source"], "plain")
-        self.assertIn("What's spinning in your mind?", [q["text"] for q in got["prompt"]["questions"]])
+        self.assertIn("What are you feeling right now? Find a word for it, or a few. What might be behind it?", [q["text"] for q in got["prompt"]["questions"]])
         self.assertIn("23:00", got["fills"])
         self.assertEqual((checksum(self.cfg.root), (self.cfg.state_dir / "ledger.json").read_bytes()), before)
         self.assertEqual(self.spawned, [])

@@ -267,7 +267,7 @@ class SnapshotTest(Base):
     def test_sections_are_kept_with_their_titles(self):
         self.send(at(23, 1), only="evening")
         qs = self.prompt("2026-10-14-evening")["questions"]
-        self.assertEqual(qs[0], {"id": "1.1", "text": "What's spinning in your mind?", "section": "Brain Dump & Letting Go"})
+        self.assertEqual(qs[0], {"id": "1.1", "text": "What are you feeling right now? Find a word for it, or a few. What might be behind it?", "section": "Arriving"})
         self.assertEqual(len(qs), len(library.builtins()["evening"].questions))
 
     def test_a_practice_edited_after_the_send_keeps_its_old_questions_on_the_entry_page(self):

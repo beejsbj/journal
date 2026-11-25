@@ -30,52 +30,37 @@
             },
             {
               "id": "2",
-              "text": "How are you feeling — physically, mentally, emotionally?",
+              "text": "What are you feeling right now? Find a word for it, or a few. What might be behind it?",
               "section": null
             },
             {
               "id": "3",
-              "text": "What's on your chest right now?",
+              "text": "What does your heart want today: for you, for the people you love, for the world?",
               "section": null
             },
             {
               "id": "4",
-              "text": "Which of your values will you experiment with today?",
+              "text": "Two things you're grateful for, and why.",
               "section": null
             },
             {
               "id": "5",
-              "text": "What's your centering mantra?",
+              "text": "What matters most today?",
               "section": null
             },
             {
               "id": "6",
-              "text": "Two things you're grateful for — why?",
+              "text": "Where is today likely to get hard? What would the best part of yourself do there? Picture yourself meeting it a little better than usual.",
               "section": null
             },
             {
               "id": "7",
-              "text": "Top priority today?",
+              "text": "Who needs you today, and how will you show up?",
               "section": null
             },
             {
               "id": "8",
-              "text": "2-3 supporting goals for a successful day?",
-              "section": null
-            },
-            {
-              "id": "9",
-              "text": "Any worries about the day ahead? What's the plan?",
-              "section": null
-            },
-            {
-              "id": "10",
-              "text": "Who needs your support today? How will you show up?",
-              "section": null
-            },
-            {
-              "id": "11",
-              "text": "What would make today deeply satisfying?",
+              "text": "One intention for today, in a sentence.",
               "section": null
             }
           ],

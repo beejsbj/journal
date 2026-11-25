@@ -272,12 +272,12 @@ class PracticesCliTest(CleanEnv):
         self.assertIn("evening · Evening journal (built-in)\n", out)
         self.assertIn("schedule: daily 23:00\n", out)
         self.assertIn("plain opener: Evening, Sam 🌿 Let the day land.", out)
-        self.assertIn("1. Brain Dump & Letting Go\n   [1.1] What's spinning in your mind?\n", out)
-        self.assertIn("   [9.2] What simple joys touched you today?\n", out)
+        self.assertIn("1. Arriving\n   [1.1] What are you feeling right now? Find a word for it, or a few. What might be behind it?\n", out)
+        self.assertIn("   [5.2] You have lived this day. What do you want to carry into sleep?\n", out)
         code, out, _ = self.cli("show", "evening", "--json")
         data = json.loads(out)
         self.assertEqual((data["id"], data["source"], data["closes"]), ("evening", "builtin", "day"))
-        self.assertEqual(data["sections"][8]["questions"][1], {"id": "9.2", "text": "What simple joys touched you today?",
+        self.assertEqual(data["sections"][4]["questions"][1], {"id": "5.2", "text": "You have lived this day. What do you want to carry into sleep?",
                                                                "pinned": False})
         self.assertTrue(data["raw"].startswith("---\nkind: practice\nid: evening\n"))
         code, _, err = self.cli("show", "lunch")

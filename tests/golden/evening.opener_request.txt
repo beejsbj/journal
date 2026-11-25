@@ -5,40 +5,22 @@ His question set for this ritual is below, each with an id. The full set is alwa
 opener, folded. Weave into your opener whichever of these questions fit today — as many or as few as genuinely
 fit, in your own words, shaped by what you find (rain all day might turn "what simple joys touched you today?"
 into "what was cozy about today?"). You may also ask one question of your own. Don't paste the set as a list.
-1. Brain Dump & Letting Go
-   [1.1] What's spinning in your mind?
-   [1.2] What do you need to release before sleep?
-2. Day Review
-   [2.1] What went well today?
-   [2.2] What challenged you?
-   [2.3] What did you learn?
-3. Story-Worthy Moments
-   [3.1] What interesting moments happened, even if small?
-   [3.2] What made you smile or laugh?
-   [3.3] What surprised you?
-4. Wins & Celebrations
-   [4.1] What wins, big or small, did you experience?
-   [4.2] What are you proud of?
-5. Insights & Revelations
-   [5.1] What realizations or new understandings emerged?
-   [5.2] What did you learn about yourself or others?
-6. Values & Alignment
-   [6.1] How did you honor your values today?
-   [6.2] Where did you feel most/least aligned?
-7. Energy Awareness
-   [7.1] What energized you today?
-   [7.2] What drained your energy?
-8. Connection Reflection
-   [8.1] What attention bids did you notice?
-   [8.2] Which connections did you lean into?
-   [8.3] Who showed up for you, and who did you show up for?
-9. Gratitude
-   [9.1] What moments from today are you thankful for?
-   [9.2] What simple joys touched you today?
-10. Peace & Calming
-   [10.1] What brought you peace today?
-   [10.2] What's one thing you can appreciate about yourself?
-   [10.3] What do you want to carry into your sleep?
+1. Arriving
+   [1.1] What are you feeling right now? Find a word for it, or a few. What might be behind it?
+   [1.2] What's spinning in your mind? What do you need to put down before sleep?
+2. The Day
+   [2.1] What went well today? Where were you present, patient or kind? Let yourself be glad of it.
+   [2.2] What's the moment from today you'd tell as a story, even a small one?
+   [2.3] What gave you energy, and what drained it?
+   [2.4] Who showed up for you, and who did you show up for?
+3. One Moment, Looked at Again
+   [3.1] Pick one moment that caused more harm than it needed to. How present were you in it? What came of it, for you and for anyone else?
+   [3.2] Regret what deserves it, and leave out the guilt and the self-blame. What would you do differently, and is there anything to mend tomorrow?
+4. The Best Part of You
+   [4.1] What would the best part of yourself say about how you did today?
+5. Closing
+   [5.1] What are you grateful for from today?
+   [5.2] You have lived this day. What do you want to carry into sleep?
 
 Below is an automatically gathered context pack: a starting point, not the limit. It opens with where things
 stand (counted by the journal, not guessed). Go further with your read-only tools before you write — that's what

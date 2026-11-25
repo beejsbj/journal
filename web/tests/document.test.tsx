@@ -59,9 +59,10 @@ describe("Document: two voices, one page", () => {
     expect(letter.querySelector(".letter-asked")?.textContent).toBe("What's spinning in your mind?");
     const questions = must(letter.querySelector(".letter-questions"));
     expect(questions.getAttribute("data-open")).toBe("false");
-    expect(questions.querySelector(".disclosure-head")?.textContent).toContain("All 24 questions, in 10 parts");
+    expect(questions.querySelector(".disclosure-head")?.textContent).toContain("All 11 questions, in 5 parts");
     expect(questions.querySelectorAll("li.asked")).toHaveLength(1);
-    expect(questions.querySelector("li.asked")?.textContent).toContain("What's spinning in your mind?");
+    // the bank is the practice's current one, marked by the asked id (1.1), while the asked line above is the text as sent
+    expect(questions.querySelector("li.asked")?.textContent).toContain("What are you feeling right now?");
     // no stamp, clip or tape: the owner's call on round 02
     expect(letter.querySelector(".postmark, .clip, .tape, .fasten")).toBeNull();
   });

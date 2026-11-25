@@ -10,7 +10,7 @@
     "2026-10-14-morning",
     null
    ],
-   "text": "🌿 Morning journal · Wed 14 Oct\n\nMorning, Sam 🌿 Start wherever something feels alive — one line or a voice note is plenty.\n\n1. How did you sleep?\n2. How are you feeling — physically, mentally, emotionally?\n3. What's on your chest right now?\n4. Which of your values will you experiment with today?\n5. What's your centering mantra?\n6. Two things you're grateful for — why?\n7. Top priority today?\n8. 2-3 supporting goals for a successful day?\n9. Any worries about the day ahead? What's the plan?\n10. Who needs your support today? How will you show up?\n11. What would make today deeply satisfying?",
+   "text": "🌿 Morning journal · Wed 14 Oct\n\nMorning, Sam 🌿 Start wherever something feels alive — one line or a voice note is plenty.\n\n1. How did you sleep?\n2. What are you feeling right now? Find a word for it, or a few. What might be behind it?\n3. What does your heart want today: for you, for the people you love, for the world?\n4. Two things you're grateful for, and why.\n5. What matters most today?\n6. Where is today likely to get hard? What would the best part of yourself do there? Picture yourself meeting it a little better than usual.\n7. Who needs you today, and how will you show up?\n8. One intention for today, in a sentence.",
    "what": "Ada sent the morning prompt"
   },
   {
@@ -19,7 +19,7 @@
     "2026-10-14-morning",
     null
    ],
-   "text": "🌿 Morning journal · Wed 14 Oct\n\nMorning, Sam 🌿 Start wherever something feels alive — one line or a voice note is plenty.\n\n1. How did you sleep?\n2. How are you feeling — physically, mentally, emotionally?\n3. What's on your chest right now?\n4. Which of your values will you experiment with today?\n5. What's your centering mantra?\n6. Two things you're grateful for — why?\n7. Top priority today?\n8. 2-3 supporting goals for a successful day?\n9. Any worries about the day ahead? What's the plan?\n10. Who needs your support today? How will you show up?\n11. What would make today deeply satisfying?",
+   "text": "🌿 Morning journal · Wed 14 Oct\n\nMorning, Sam 🌿 Start wherever something feels alive — one line or a voice note is plenty.\n\n1. How did you sleep?\n2. What are you feeling right now? Find a word for it, or a few. What might be behind it?\n3. What does your heart want today: for you, for the people you love, for the world?\n4. Two things you're grateful for, and why.\n5. What matters most today?\n6. Where is today likely to get hard? What would the best part of yourself do there? Picture yourself meeting it a little better than usual.\n7. Who needs you today, and how will you show up?\n8. One intention for today, in a sentence.",
    "what": "Ada sent the morning prompt again"
   }
  ],
@@ -30,7 +30,7 @@
   "earlier_openers": [
    "Morning, Sam 🌿 Start wherever something feels alive — one line or a voice note is plenty."
   ],
-  "html": "<b>🌿 Morning journal · Wed 14 Oct</b>\n\nMorning, Sam 🌿 Start wherever something feels alive — one line or a voice note is plenty.\n\n<blockquote expandable>1. How did you sleep?\n2. How are you feeling — physically, mentally, emotionally?\n3. What's on your chest right now?\n4. Which of your values will you experiment with today?\n5. What's your centering mantra?\n6. Two things you're grateful for — why?\n7. Top priority today?\n8. 2-3 supporting goals for a successful day?\n9. Any worries about the day ahead? What's the plan?\n10. Who needs your support today? How will you show up?\n11. What would make today deeply satisfying?</blockquote>\n\n<i>Tap to open the questions · reply to this message anytime</i>",
+  "html": "<b>🌿 Morning journal · Wed 14 Oct</b>\n\nMorning, Sam 🌿 Start wherever something feels alive — one line or a voice note is plenty.\n\n<blockquote expandable>1. How did you sleep?\n2. What are you feeling right now? Find a word for it, or a few. What might be behind it?\n3. What does your heart want today: for you, for the people you love, for the world?\n4. Two things you're grateful for, and why.\n5. What matters most today?\n6. Where is today likely to get hard? What would the best part of yourself do there? Picture yourself meeting it a little better than usual.\n7. Who needs you today, and how will you show up?\n8. One intention for today, in a sentence.</blockquote>\n\n<i>Tap to open the questions · reply to this message anytime</i>",
   "id": "2026-10-14-morning",
   "kind": "morning",
   "local_date": "2026-10-14",
@@ -38,7 +38,7 @@
   "needs_edit": false,
   "opener": "Morning, Sam 🌿 Start wherever something feels alive — one line or a voice note is plenty.",
   "opener_source": "plain:agent-failed",
-  "plain_text": "🌿 Morning journal · Wed 14 Oct\n\nMorning, Sam 🌿 Start wherever something feels alive — one line or a voice note is plenty.\n\n1. How did you sleep?\n2. How are you feeling — physically, mentally, emotionally?\n3. What's on your chest right now?\n4. Which of your values will you experiment with today?\n5. What's your centering mantra?\n6. Two things you're grateful for — why?\n7. Top priority today?\n8. 2-3 supporting goals for a successful day?\n9. Any worries about the day ahead? What's the plan?\n10. Who needs your support today? How will you show up?\n11. What would make today deeply satisfying?",
+  "plain_text": "🌿 Morning journal · Wed 14 Oct\n\nMorning, Sam 🌿 Start wherever something feels alive — one line or a voice note is plenty.\n\n1. How did you sleep?\n2. What are you feeling right now? Find a word for it, or a few. What might be behind it?\n3. What does your heart want today: for you, for the people you love, for the world?\n4. Two things you're grateful for, and why.\n5. What matters most today?\n6. Where is today likely to get hard? What would the best part of yourself do there? Picture yourself meeting it a little better than usual.\n7. Who needs you today, and how will you show up?\n8. One intention for today, in a sentence.",
   "previous_message_ids": [
    "701"
   ],
@@ -51,52 +51,37 @@
    {
     "id": "2",
     "section": null,
-    "text": "How are you feeling — physically, mentally, emotionally?"
+    "text": "What are you feeling right now? Find a word for it, or a few. What might be behind it?"
    },
    {
     "id": "3",
     "section": null,
-    "text": "What's on your chest right now?"
+    "text": "What does your heart want today: for you, for the people you love, for the world?"
    },
    {
     "id": "4",
     "section": null,
-    "text": "Which of your values will you experiment with today?"
+    "text": "Two things you're grateful for, and why."
    },
    {
     "id": "5",
     "section": null,
-    "text": "What's your centering mantra?"
+    "text": "What matters most today?"
    },
    {
     "id": "6",
     "section": null,
-    "text": "Two things you're grateful for — why?"
+    "text": "Where is today likely to get hard? What would the best part of yourself do there? Picture yourself meeting it a little better than usual."
    },
    {
     "id": "7",
     "section": null,
-    "text": "Top priority today?"
+    "text": "Who needs you today, and how will you show up?"
    },
    {
     "id": "8",
     "section": null,
-    "text": "2-3 supporting goals for a successful day?"
-   },
-   {
-    "id": "9",
-    "section": null,
-    "text": "Any worries about the day ahead? What's the plan?"
-   },
-   {
-    "id": "10",
-    "section": null,
-    "text": "Who needs your support today? How will you show up?"
-   },
-   {
-    "id": "11",
-    "section": null,
-    "text": "What would make today deeply satisfying?"
+    "text": "One intention for today, in a sentence."
    }
   ],
   "scheduled": "2026-10-14T23:09:00+05:30",
@@ -138,7 +123,7 @@
      "is_disabled": true
     },
     "parse_mode": "HTML",
-    "text": "<b>🌿 Morning journal · Wed 14 Oct</b>\n\nMorning, Sam 🌿 Start wherever something feels alive — one line or a voice note is plenty.\n\n<blockquote expandable>1. How did you sleep?\n2. How are you feeling — physically, mentally, emotionally?\n3. What's on your chest right now?\n4. Which of your values will you experiment with today?\n5. What's your centering mantra?\n6. Two things you're grateful for — why?\n7. Top priority today?\n8. 2-3 supporting goals for a successful day?\n9. Any worries about the day ahead? What's the plan?\n10. Who needs your support today? How will you show up?\n11. What would make today deeply satisfying?</blockquote>\n\n<i>Tap to open the questions · reply to this message anytime</i>"
+    "text": "<b>🌿 Morning journal · Wed 14 Oct</b>\n\nMorning, Sam 🌿 Start wherever something feels alive — one line or a voice note is plenty.\n\n<blockquote expandable>1. How did you sleep?\n2. What are you feeling right now? Find a word for it, or a few. What might be behind it?\n3. What does your heart want today: for you, for the people you love, for the world?\n4. Two things you're grateful for, and why.\n5. What matters most today?\n6. Where is today likely to get hard? What would the best part of yourself do there? Picture yourself meeting it a little better than usual.\n7. Who needs you today, and how will you show up?\n8. One intention for today, in a sentence.</blockquote>\n\n<i>Tap to open the questions · reply to this message anytime</i>"
    }
   ],
   [
@@ -149,7 +134,7 @@
      "is_disabled": true
     },
     "parse_mode": "HTML",
-    "text": "<b>🌿 Morning journal · Wed 14 Oct</b>\n\nMorning, Sam 🌿 Start wherever something feels alive — one line or a voice note is plenty.\n\n<blockquote expandable>1. How did you sleep?\n2. How are you feeling — physically, mentally, emotionally?\n3. What's on your chest right now?\n4. Which of your values will you experiment with today?\n5. What's your centering mantra?\n6. Two things you're grateful for — why?\n7. Top priority today?\n8. 2-3 supporting goals for a successful day?\n9. Any worries about the day ahead? What's the plan?\n10. Who needs your support today? How will you show up?\n11. What would make today deeply satisfying?</blockquote>\n\n<i>Tap to open the questions · reply to this message anytime</i>"
+    "text": "<b>🌿 Morning journal · Wed 14 Oct</b>\n\nMorning, Sam 🌿 Start wherever something feels alive — one line or a voice note is plenty.\n\n<blockquote expandable>1. How did you sleep?\n2. What are you feeling right now? Find a word for it, or a few. What might be behind it?\n3. What does your heart want today: for you, for the people you love, for the world?\n4. Two things you're grateful for, and why.\n5. What matters most today?\n6. Where is today likely to get hard? What would the best part of yourself do there? Picture yourself meeting it a little better than usual.\n7. Who needs you today, and how will you show up?\n8. One intention for today, in a sentence.</blockquote>\n\n<i>Tap to open the questions · reply to this message anytime</i>"
    }
   ],
   [
