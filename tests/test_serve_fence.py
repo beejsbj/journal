@@ -2,7 +2,9 @@
 the chat transcript, its privacy results, packs, the mirror queue or the notebook, and none reaches a model
 (``agent``: README *Guarantees*, the web app calls no model). What the server reaches through
 the engine (``today.collect``, ``status.status``) is fenced by ``test_serve_privacy`` instead, which runs every
-route with ``sqlite3.connect`` made to fail."""
+route with ``sqlite3.connect`` made to fail and every way to a model fenced (``helpers.no_model``), and by
+``test_route_opens``, which runs the same walks recording every file they open. This fence is direct, not transitive:
+loading ``serve`` loads some forbidden modules through the engine (``test_route_opens.ModuleLoadTest`` pins which)."""
 import ast
 import unittest
 

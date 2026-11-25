@@ -503,6 +503,30 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   count such rows read-only in a live database, then add `[System: ` to the skip prefixes and to the marks
   (`_LEFTOVER`).
 
+- **TICK-LOCK-WAIT (2026-11-24) — a `/next` or `journal send` waits behind a tick's model calls; measured, not fixed
+  (issue #45; needs a design).** `tools/measure_tick_lock.py` runs a real `tick.run` over a temporary root with one
+  annotation due, the clock pinned to a time when no ritual is due (a due opener would add a model call; the harness
+  prints which steps asked the model), and a fake companion, and a second party that takes `tick.lock` as a spawned
+  `journal program next` does (`programs.locked`). With a 3 s model call the second party, arriving 0.2 s in, waited 2.83 s; with 8 s, 7.85 s
+  (the tick itself added about 0.05 s). So the wait is the rest of the model call plus every step after it that also
+  calls a model. One call is bounded by its budget (the companion is killed 60 s after it): opener 240 s, annotation
+  180 s per prompt, picture 120 s per picture, day reflection or week review 480 s, outage catch-up 150 s, a program
+  phase's reflect text 120 s, bridge 60 s, insights 240 s. A tick that writes a reflection and annotates two entries
+  can hold the lock for 480 + 2 × 180 = 840 s (14 minutes) plus up to 60 s of kill grace per call, about 17 minutes
+  with three calls, though the usual annotation is far shorter. `journal send` (`tick.run(only=…)`) and
+  every spawned `journal program …` wait the same way and are never lost, only late (both are detached, so nothing
+  times out). Why it is not a small fix: the lock also orders sends. A `/next` that sent a phase while the tick sent a
+  ritual would race on "the newest message" that a reply is matched to (`tick.run`: the interrupts go before the
+  practices for that reason), and `programs.step` makes model calls itself. Options: (a) leave it: it only costs a
+  late reply in the few ticks a day that call a model, and the web app and chat both say "waiting" (recommended
+  while in maintenance); (b) the tick yields the lock between steps when someone waits (a waiter marker, or a second
+  lock file the waiter holds shared), which bounds the wait by the longest single step, not the whole tick, at the
+  price of every step re-reading what a transition may have changed; (c) the issue's own proposal for the tick-only
+  steps (annotate, reflect, images, recovery): the model call outside the lock and a re-check under the ledger lock
+  before writing, as sends already do, which leaves `programs.step` and sends under it; (d) a separate lock for program
+  transitions, which needs a rule for send order first. (b) or (c) is a package of its own with a gateway restart
+  (the gateway reaches `tick` through `programs`' function-level imports, not through `journal.hermes` at load).
+
 ## Taken by packages (recorded here; later packages follow them)
 
 - **WP0 — an unknown entry id is recognised only with the engine's authorship marker.** The spec's fallback
@@ -4606,3 +4630,74 @@ to it (not this host's setup: the gateway runs as a service).
   falls in a `/x` window stays the privacy pass's. **Not covered:** `entries.fill_audio_block` (a transcript of his
   voice, never typed) and `capture.add_companion_note` (her words; a note in a `/x` turn is refused by the turn's mark,
   `tools.call`).
+
+- **ROUTE-OPENS (2026-11-24) — the faces' fence is held by what they open, and the import fence says it is direct
+  (issue #44).** `test_serve_fence` / `test_mcp_fence` check what `serve/` and `mcp/` import themselves; loading them
+  also loads `agent`, `mirror`, `notebook`, `ports` and `sqlite3` through the engine (at import; `conversations`,
+  `context` and `sweep`, which the audit listed, no longer load then). **Chosen:** reword AGENTS.md to say the fence is
+  direct, not make it transitive (a transitive fence fails today on modules serve loads and never calls), and pin that
+  set exactly (`ModuleLoadTest`) so it changes only by a decision. **The behavioural half:** `test_route_opens.py`
+  installs an audit hook (`open`, which `os.open` raises too, `os.listdir`, `os.scandir`; every thread, so the server's
+  handler threads are seen) and re-runs the existing walks (`test_serve_privacy`'s GET, write, Write-now and push
+  walks; `test_mcp.PrivacyTest`'s tool walk) unchanged, failing on any path under `state_dir` outside `ALLOWED` (a file
+  brings its lock and an atomic write's temporary file) and on the sessions database wherever it is. `NEVER` names
+  what must stay out (the notebook and its archive, `packs/`, `conversations.json`, the mirror queue, `sent.jsonl`,
+  `send-times.json`, `audio-stash/`, `tick.lock`, `hook-state.json`, `sweep.json`). A path test, not a content test: a
+  file's existence check (`stat`) is not recorded. **Found and settled (the orchestrator's call for the owner,
+  2026-11-24, option (a) of the open point the first draft raised):** `GET /api/v1/status` opened `hook-state.json`
+  (through `today.injections`, parsing the whole file, which also holds queued packs, voice notes awaiting transcripts
+  and off-record turn marks, for the today block's count and last time) and `sweep.json` (its watermark, served as
+  `{at}` since AUDIT-LEFTOVERS). Nothing of his or hers reached the client, but `status`'s docstring and API.md
+  Decision 2 said no web route reads the hook's records while API.md's `/status` row listed the injections. Now the web
+  status has no `sweep` and its `today` no `count`/`last` (`{enabled, cache_age_minutes}`), so no web route opens
+  either file; both are in `NEVER` with no exception, and API.md says so. The PWA calls `/status` only as a sign-in
+  probe and reads neither field; the CLI's `journal status` is unchanged. **Review of #77 (Claude Opus 5.5):** the hook
+  also records `sqlite3.connect` (SQLite opens its file in C, raising no `open` event), and a path opened relative to a
+  directory handle (`os.open(name, dir_fd=…)`, `os.scandir(fd)`) is kept as given, not resolved against the cwd, and
+  fails when its name is in `NEVER`.
+
+- **MODEL-WALK (2026-11-24) — "the web app calls no model" is fenced by behaviour at `ask`, not at building a
+  companion (issue #3).** The import fence (`test_serve_fence.py`) sees only what `serve/` imports itself; serve
+  loads `reflect`, which imports `agent`, so a route could reach a model by another module. `helpers.no_model()` now
+  records and fails `agent.ask`, the `ask` of every companion `Config.companion()` hands out (the outage probe asks the
+  same one) and the companion classes' own `ask`, and every serve route walk and the MCP tool walk run inside it and
+  assert nothing was recorded, so a route that catches the failure still fails the suite. **Why at `ask` and not
+  `Config.companion()` raising, as the issue first put it:** `journal doctor` (`GET /api/v1/doctor`) builds the
+  configured companion to read its `doctor_rows` (the `one-shot tools` row: a check of files, no model run) and
+  catches whatever that raises, so a raise there would be swallowed, and would wrongly fail the walk on any host
+  where the Hermes command is found. `test_doctor_checks_the_companion_without_asking_it` runs that branch through
+  the fence; `test_the_model_fence_is_not_vacuous` shows each watched way records. Verified by mutation: a swallowed
+  `reflect.agent.ask` call in the doctor route fails the GET walk. Not fenced here: a model reached by a process
+  serve spawns (`journal send`, `journal program`), which is the engine's own step with its usual fallback.
+
+- **AUDIT-LEFTOVERS (2026-11-24) — what issue #50 took, and what it left.** Taken: (1) the web's `/status` serves
+  `sweep` as `{at}`: the doc listed `sweep.json` as unservable, and its database path and row id are chat-side, so the
+  web gets the time alone (the CLI's status line is unchanged); (2) `/status` and the hook state: already so on main
+  (`hook_state` is not read in web mode, `tests/test_serve.py` pins it); (3) the thin tuple readers WP7 kept
+  (`sweep.parse/rows/read`, `conversations.rows`) are called by no `src/` code, so they moved to
+  `tests/legacy_readers.py` and the suites that pin the row semantics call them there (WP13 had left this for exactly
+  that rewrite; `context.clean_user_text`, `agent.is_failure_text` and `mirror.turn_running` are not in the issue and
+  stay). **Not taken, needs the owner:** the platform-named fields. The ledger's `telegram` record (a prompt's send,
+  a reflection's send, an annotation reply; read at about twenty sites and by `standing`, `context`, `status`,
+  `reflect`) and the `telegram_history` source (a key in deployments' config and in `plugin.yaml`) would each need
+  read-old/write-new. The ledger is shared by a gateway that runs old code until it restarts and by a tick that runs
+  new code at once: a record written under the new name is invisible to the old reader, so a prompt could look unsent
+  and be sent twice. Options: (a) leave the names (cosmetic; recommended while in maintenance); (b) rename in two
+  releases, the first reading both names and writing the old, the second writing the new once every gateway has
+  restarted; (c) add `chat_history` as an alias for the source only, which is config-side and safe.
+- **INVISIBLE-PY (2026-11-24) — the invisible-character guard covers the Python source.** #63 guarded the built web
+  app; three literal U+FEFF in `library.py`, `programdefs.py` and `tests/test_library.py` still tripped Hermes'
+  scanner (it reads `.py`, tests included). Rule: a Python file writes such a character as an escape (`"\ufeff"`), and
+  `tests/test_install_scan.py` fails on a literal in any file under the repo root with an extension the scanner reads
+  (`SCANNABLE_EXTENSIONS`: Python including the root `__init__.py` and `tools/`, docs, JSON, shell, fixtures), minus
+  the scanner's excluded directories. A file that must hold one on purpose (a fixture) would be named as an exception
+  in that test, with its reason.
+- **DOCTOR-STUB (2026-11-24) — the doctor judges the cron stub by what it runs, not by the install that asks (issue
+  #7).** `cron.checks` compared the stub with `stub_text(src, home)` for the caller's `src`; from a `uv tool` CLI that
+  is site-packages, so a correct stub (naming the plugin's `src`) read "out of date" on one face and ok on the other.
+  Rule: `cron.stub_problem` reads the `SRC` out of the stub, requires the file to equal what setup writes for that
+  `src` and this profile, and requires `<SRC>/journal/cli.py` to exist; the asking install's own path no longer
+  matters. Not decided: whether doctor should also warn when the stub's `src` is a different *version* than the
+  running CLI; the `same version as tick` row already does that.
+  Accepted trade: a stub whose `SRC` still exists with `journal/cli.py` reads ok even if it is no longer the install
+  the profile uses; version skew between the two is covered by the `same version as tick` row, not by this one.

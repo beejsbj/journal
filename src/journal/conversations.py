@@ -205,16 +205,6 @@ def same_db(t, cursor: dict) -> bool:
     return t.anchor(int(a["id"])) == a
 
 
-def rows(cfg: Config, db: Path, after_id: int, since_ts: float = 0.0, upto_id: int | None = None) -> list[tuple]:
-    """(id, ts, role, content, platform id, display kind, tool calls, uid, copy) for the chat, in stored order,
-    as Hermes stored them (``journal.hermes.transcript.raw_rows``). The engine reads ``cfg.transcript().rows()``;
-    this is the old shape, kept for callers of it."""
-    from .hermes.transcript import raw_rows
-    return [(r["id"], r["ts"], r["role"], r["content"], r["pmid"], r["display_kind"], r["tool_calls"], r["uid"],
-             r["copy"]) for r in raw_rows(db, cfg.chat_id, after_id, since_ts, upto_id, platform=cfg.platform,
-                                         users=cfg.owner_ids)]
-
-
 def _send_times(cfg: Config) -> list[str]:
     """When journal prompts went out (ledger, and every send in ``sent.jsonl``, re-sends included)."""
     out = set()
