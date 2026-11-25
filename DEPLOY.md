@@ -26,10 +26,12 @@ also covers those entries: from the moment a model answers, `tick.reply_annotati
 words in the entries (his blocks only) and his unanswered chat messages, checked by `validate.check_catchup`, and
 sends it once. Each covered reply is then marked `annotation_reply.skipped: "letter"` and never sent; the notes are
 still written into the entries. With no usable message (three bad answers, six refused sends, or none sent
-`recovery.letter_deadline_minutes` (120) after a model answered) the replies are released to the old path (paced,
-dropped once stale); no fixed line goes in her voice. It waits while a bare `/x`
-window is open or the privacy pass cannot run; with `channel.platform: none` nothing happens. Ledger `recovery`
-records gain `outage_down_since`, `back_at`, `entries`, `prompts`. README *When no model is reachable* and the
+`recovery.letter_deadline_minutes` (120) after a model answered, not counting time a bare `/x` window held it, and
+at most 6 h in all from her first return, always under `stale_hours`) the replies are released to the old path
+(paced, dropped once stale); no fixed line goes in her voice. A catch-up of his chat messages alone has no deadline (it
+keeps trying up to `max_age_hours`, as before). It waits while a bare `/x` window is open or the privacy pass cannot
+run; with `channel.platform: none` nothing happens. Ledger `recovery` records gain `outage_down_since`, `back_at`,
+`first_back_at`, `off_record`, `entries`, `prompts`. README *When no model is reachable* and the
 settings table; DECISIONS.md, CATCH-UP-LETTER.
 **Side and restart.** `recovery.py` and `tick.py` run only in the tick (neither is imported by `journal.hermes`; the
 gateway's function-level imports of `tick` in `programs.py` never call `reply_annotations` or `recovery.run`). The

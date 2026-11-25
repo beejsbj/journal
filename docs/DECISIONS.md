@@ -4775,3 +4775,36 @@ to it (not this host's setup: the gateway runs as a service).
       the letter was written; six refused sends; the deadline with the request failing, with the chat unreadable, and
       with no record made; a note with stale replies; two outages merged; the rollback shape. Each was run with its fix
       reverted and failed.
+  - **On re-review (2026-11-25, an independent Opus pass on e5100e3).** Nothing doubles, nothing leaks, rollback is
+    safe; the deadline's clock was changed:
+    - **A chat-only catch-up has no deadline again.** `_attach` ties a waiting chat catch-up to the outage even when it
+      takes in no entry (`prompts: []`), and the deadline then ended it at 120 minutes, where main kept trying for up
+      to `max_age_hours`. The deadline is there only to let held replies go, so `_overdue` is false for a record
+      holding none; and past the deadline such a record takes no entries in (it stays a chat catch-up).
+    - **Only a later outage the letter takes in moves the clock.** `_back` moved it for any later outage, including
+      one shorter than `letter_min_minutes` that `_attach` never takes in; the letter's own failed request can trip
+      the breaker for minutes, so a flaky provider held the replies until stale (still waiting 23 h after the model
+      came back, in the probe). Now only a later outage of `letter_min_minutes` or more (so far, while it lasts)
+      moves it. **And a total hold cap, both:** the record keeps `first_back_at` (the first time a model came back
+      for it, never moved), and `hold_cap` = min(3 × `letter_deadline_minutes`, `stale_hours` − 1 h) (6 h by default)
+      ends it whatever moved or paused the clock since, so the replies it lets go are always still sendable. Both
+      rather than one: the first keeps the usual case at the 2 h deadline; the cap bounds what no rule foresees
+      (long outages recurring, a window that never reads as closed).
+    - **The clock stops while he is off the record** (the orchestrator's decision). A bare `/x` window open after
+      she was back held the letter (rightly), but the deadline ran on, so the record was noted and the replies went
+      in the middle of his off-the-record conversation. Now `_off_record`, for a letter holding replies, keeps the
+      windows the privacy pass sees on the record (`off_record`: `[since, until]`, `until` null while open; one that
+      ended is closed at its last activity plus the quiet gap, or a prompt send), and the deadline does not count
+      the time inside them. A pass that cannot run keeps nothing, so an unreadable chat still lets the replies go at
+      the deadline (the first review's point); the hold cap applies in every case, so a window cannot hold them
+      forever. **Cost, named:** a window seen open and never seen again (the chat unreadable from then) pauses the
+      clock until the cap (6 h), not 2 h.
+    - **An entries-only letter's rows stop below a turn still running.** Its `last_row` was the newest row read,
+      which can be his message whose live turn has not ended (`scan`'s `pending`); had that turn then failed, the
+      chat catch-up (scanning after `last_row`) would not see it. Now, when pending, `last_row` stops below the first
+      of his unanswered messages.
+    - Tests (`ClockTest`): a chat-only catch-up past 120 minutes, then sent; a 5-minute outage at 110 minutes does
+      not move the deadline; 60-minute outages recurring every ~3 h are released within the cap; a 2.5 h `/x`
+      conversation after she is back releases nothing and sends nothing, and the letter goes once it closes; a turn
+      running when an entries-only letter goes, then failing, gets the chat catch-up. Each was run with its fix
+      reverted (the hold cap and the short-outage rule separately) and failed.

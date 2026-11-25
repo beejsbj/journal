@@ -51,7 +51,11 @@ notes are still written into the entries (the paced annotation step); only the c
   a send refused six times, or no letter sent ``recovery.letter_deadline_minutes`` (120) after a model answered (the
   chat unreadable, the request failing while other steps' models answer), no letter either, never a fixed line in
   her voice: the note in her chat session, and the replies are released to the old path (paced, and dropped once
-  stale). Two outages close together, the first's letter not yet written, make one letter.
+  stale). Two outages close together, the first's letter not yet written, make one letter. The deadline's clock
+  stops while a bare ``/x`` window holds the letter (``off_record``), and a later outage of ``letter_min`` or more
+  (one taken in) starts it again; a shorter one moves nothing. In all, a letter holds the replies at most
+  ``hold_cap`` (three deadlines, under ``stale_hours``) from her first return (``first_back_at``). A catch-up of his
+  chat messages alone holds no replies and has no deadline (up to ``max_age_hours``, as before).
 * Never while a bare ``/x`` window is open, or while the privacy pass cannot say (fail closed): the whole message
   waits, checked again just before it is sent (a window opened while it was being written). His words come from the entries (``entries.his_text``: his blocks only, which hold nothing off the record)
   and the chat rows ``scan`` keeps (never a private one). ``channel.platform: none``: nothing at all.
