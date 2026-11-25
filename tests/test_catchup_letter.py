@@ -4,6 +4,8 @@ are still written into the entries; only the chat side changes. The letter is th
 widened to the entries he wrote while she was away: one message per outage, idempotent across ticks and restarts,
 held while a bare ``/x`` window is open (or the privacy pass cannot say), nothing with ``channel.platform: none``,
 and with no usable letter the replies go as they did before (the floor)."""
+import importlib.util
+import subprocess
 import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -187,6 +189,39 @@ class LetterTest(Base):
                          ["sent the catch-up for outage-3 (2 unanswered message(s), 2 journal entries)"])
 
 
+    def test_a_quote_of_his_words_in_an_entry_passes(self):
+        # words written on a face only (no chat message): the quote check must know them from the entry
+        outage.trip(self.cfg, "exit 1: 503", T0)
+        capture.capture_web(self.cfg, None, "the harbour lights at dusk, again", T0 + timedelta(hours=2))
+        outage.answered(self.cfg, BACK)
+        self.answers = ['Back now. You wrote "the harbour lights at dusk" — what did they bring up?']
+        self.assertEqual(self.recover(BACK), ["sent the catch-up for outage-202610150400 (1 journal entry)"])
+
+    def test_two_outages_close_together_make_one_letter(self):
+        outage.trip(self.cfg, "exit 1: 503", T0)
+        self.morning = self.entry("morning", T0 + timedelta(hours=1), "slept badly, the sea again", "100", "11")
+        back1 = T0 + timedelta(hours=2)
+        outage.answered(self.cfg, back1)
+        self.answers = [outage.ModelHeld("held: exit 1")]  # down again before the first letter was written
+        self.recover(back1)
+        (first,) = self.recs()
+        self.assertEqual((first["status"], first["prompts"]), ("waiting", [self.morning]))
+        outage.trip(self.cfg, "exit 1: 503", back1 + timedelta(minutes=10))
+        self.evening = self.entry("evening", back1 + timedelta(hours=1), "a long walk, felt lighter", "101", "12")
+        back2 = back1 + timedelta(hours=3)  # (past the first's deadline: a later outage pauses it)
+        outage.answered(self.cfg, back2)
+        self.answers = [LETTER]
+        self.recover(back2)
+        self.recover(back2 + timedelta(minutes=5))
+        self.assertEqual(len(self.sends()), 1)
+        (rec,) = self.recs()
+        self.assertEqual((rec["status"], rec["id"]), ("sent", first["id"]))
+        self.assertEqual(sorted(rec["prompts"]), sorted([self.morning, self.evening]))
+        self.assertIn("You were offline from 15 Oct 09:30 to 15 Oct 14:30 IST", self.asked[-1][0])
+        for pid in (self.morning, self.evening):
+            self.assertEqual(self.prompt(pid)["annotation_reply"]["skipped"], "letter")
+
+
 class FloorTest(Base):
     def test_no_usable_letter_sends_the_replies_as_before(self):
         self.outage_with_entries()
@@ -200,6 +235,81 @@ class FloorTest(Base):
         log = self.reply(BACK + timedelta(minutes=5))  # released: the old path, paced and never stale
         self.assertEqual(log[0], f"replied to {self.morning} with its annotations")
         self.assertNotIn("skipped", self.prompt(self.morning)["annotation_reply"])
+
+    def test_six_refused_sends_release_the_replies(self):
+        self.outage_with_entries()
+        self.annotated(self.morning, BACK)
+        self.bot.fail = recovery.SEND_ATTEMPTS
+        for i in range(recovery.SEND_ATTEMPTS):
+            self.recover(BACK + timedelta(minutes=5 * i))
+        self.assertEqual(len(self.asked), 1)  # written once; only the send failed
+        self.assertEqual(self.recs()[0]["status"], "noted")
+        self.assertIn("refused it 6 times); the replies to the entries go to the chat as usual",
+                      self.mirror.calls[-1]["text"])
+        self.assertEqual(self.reply(BACK + timedelta(minutes=30)), [f"replied to {self.morning} with its annotations"])
+
+    def test_a_request_that_keeps_failing_gives_way_at_the_deadline(self):
+        # the letter's own request times out while other steps' models answer: deferred every 30 minutes, never an
+        # attempt counted; past recovery.letter_deadline_minutes (120) there is no letter and the replies go
+        self.outage_with_entries()
+        self.annotated(self.morning, BACK)
+        self.answers = [agent.AgentUnavailable("timed out after 150 s")]
+        for minutes in (0, 30, 60, 90):
+            self.assertIn("catch-up deferred", self.recover(BACK + timedelta(minutes=minutes))[0])
+            self.assertEqual(self.reply(BACK + timedelta(minutes=minutes, seconds=1))[0],
+                             "1 annotation reply waits for the catch-up message after the outage")
+        late = BACK + timedelta(hours=2)
+        self.assertEqual(self.reply(late), [f"replied to {self.morning} with its annotations"])  # (held lets go first)
+        self.assertEqual(self.recover(late), ["outage-3: no catch-up sent (none sent within 2 h of the model's "
+                                              "return); noted in the chat session"])
+        self.assertEqual(self.recover(late + timedelta(minutes=30)), [])
+        self.assertEqual((len(self.asked), len(self.sends())), (4, 1))  # no letter after the deadline
+
+    def test_an_unreadable_chat_holds_the_replies_only_until_the_deadline(self):
+        self.outage_with_entries()
+        self.annotated(self.morning, BACK)
+        self.answers = [agent.AgentUnavailable("timed out after 150 s")]
+        self.recover(BACK)  # the letter's record waits
+        self.assertEqual(self.recs()[0]["status"], "waiting")
+        with mock.patch.object(privacy, "covering", lambda *a, **k: privacy.Closed("database is locked")):
+            self.assertEqual(self.recover(BACK + timedelta(minutes=90)),
+                             ["outage catch-up skipped: sessions database unavailable (ChatUnreadable)"])
+            self.assertEqual(self.reply(BACK + timedelta(minutes=90))[0],
+                             "1 annotation reply waits for the catch-up message after the outage")
+            late = BACK + timedelta(hours=2)
+            self.assertEqual(self.reply(late), [f"replied to {self.morning} with its annotations"])
+            self.assertEqual(self.recover(late), ["outage-3: no catch-up sent (none sent within 2 h of the model's "
+                                                  "return); noted in the chat session"])
+        self.assertEqual(self.recs()[0]["status"], "noted")
+        self.assertIn("the replies to the entries go to the chat as usual", self.mirror.calls[-1]["text"])
+
+    def test_no_record_by_the_deadline_begins_no_letter(self):
+        # the chat unreadable from the moment she is back: no record is ever made; the replies go at the deadline,
+        # and once the chat reads again no late letter takes them (the chat catch-up goes as before)
+        self.outage_with_entries()
+        self.annotated(self.morning, BACK)
+        with mock.patch.object(privacy, "covering", lambda *a, **k: privacy.Closed("database is locked")):
+            self.recover(BACK)
+            self.assertEqual(self.reply(BACK)[0], "1 annotation reply waits for the catch-up message after the outage")
+            self.assertEqual(self.reply(BACK + timedelta(hours=2)),
+                             [f"replied to {self.morning} with its annotations"])
+        self.recover(BACK + timedelta(hours=2, minutes=5))
+        self.assertFalse(any(r.get("entries") or r.get("prompts") for r in self.recs()))
+
+    def test_a_note_never_says_stale_replies_go(self):
+        # an outage of 26 h: his words are past stale_hours (24) when she is back; no usable letter
+        outage.trip(self.cfg, "exit 1: 503", T0)
+        pid = self.entry("morning", T0 + timedelta(minutes=30), "slept badly, the sea again", "100", "11")
+        back = T0 + timedelta(hours=26)
+        outage.answered(self.cfg, back)
+        self.answers = ['You said "I never slept at all".']
+        for i in range(recovery.ATTEMPTS):
+            self.recover(back + timedelta(minutes=i))
+        note = self.mirror.calls[-1]["text"]
+        self.assertIn("the replies to the entries are too late to send and stay in the entries", note)
+        self.assertNotIn("go to the chat as usual", note)
+        self.annotated(pid, back + timedelta(minutes=5))
+        self.assertIn("annotation reply not sent: stale", self.reply(back + timedelta(minutes=5))[0])
 
     def test_no_model_no_letter_and_the_replies_stay_held(self):
         self.outage_with_entries()
@@ -271,6 +381,121 @@ class PrivacyTest(Base):
             self.recover(BACK)
             self.reply(BACK)
         self.assertEqual((self.asked, self.sends()), ([], []))
+
+
+    def test_an_x_window_in_the_outage_and_entry_words_written_on_a_face(self):
+        outage.trip(self.cfg, "exit 1: 503", T0)
+        at = T0 + timedelta(hours=2)
+        self.db.add("/x", at, mid="20")
+        self.db.add("something private about work", at + timedelta(minutes=1), mid="21")
+        self.db.add(NOTICE, at + timedelta(minutes=1, seconds=30), role="assistant", display_kind="failed_turn",
+                    meta=PROVIDER_DOWN)
+        capture.capture_web(self.cfg, None, "the harbour lights at dusk, again", T0 + timedelta(hours=4))
+        outage.answered(self.cfg, BACK)
+        self.answers = ['Back now. You wrote "the harbour lights at dusk" — what did they bring up?']
+        self.recover(BACK)
+        (query, _), = self.asked
+        self.assertNotIn("something private", query)
+        self.assertIn("the harbour lights at dusk, again", query)  # (from the entry: it was never a chat message)
+        self.assertEqual(len(self.sends()), 1)
+
+    def test_a_window_opened_while_it_is_written_holds_the_send(self):
+        self.outage_with_entries()
+
+        def ask(cfg, query, budget, toolsets=None):  # (he types /x while the model writes, up to 150 s)
+            self.asked.append((query, toolsets))
+            self.db.add("/x", BACK + timedelta(seconds=30), mid="20")
+            self.db.add("private now", BACK + timedelta(seconds=40), mid="21")
+            return LETTER
+        with mock.patch.object(agent, "ask", ask):
+            self.assertEqual(self.recover(BACK),
+                             ["outage-3: catch-up written; it waits for the off-the-record window to close"])
+        self.assertEqual(self.sends(), [])
+        self.recover(BACK + timedelta(hours=1))  # quiet since: the window has closed; the checked text goes
+        self.assertEqual([s["text"] for s in self.sends()], [LETTER])
+        self.assertEqual(len(self.asked), 1)
+
+    def test_a_pass_closed_for_the_scan_alone_sends_nothing(self):
+        # entries alone; the pass cannot run over the scan's 72 h, though it can for now: nothing goes
+        outage.trip(self.cfg, "exit 1: 503", T0)
+        capture.capture_web(self.cfg, None, "the harbour lights at dusk, again", T0 + timedelta(hours=2))
+        outage.answered(self.cfg, BACK)
+        with mock.patch.object(privacy, "covering", lambda *a, **k: privacy.Closed("no database")):
+            self.assertEqual(self.recover(BACK),
+                             ["outage catch-up skipped: sessions database unavailable (ChatUnreadable)"])
+        self.assertEqual((self.asked, self.sends()), ([], []))
+
+    def test_a_pass_closed_at_the_send_alone_sends_nothing(self):
+        # the scan's pass runs, the one asked just before the send cannot: nothing goes
+        outage.trip(self.cfg, "exit 1: 503", T0)
+        capture.capture_web(self.cfg, None, "the harbour lights at dusk, again", T0 + timedelta(hours=2))
+        outage.answered(self.cfg, BACK)
+        view = privacy.view
+        with mock.patch.object(privacy, "covering", lambda cfg, oldest, now=None, db=None:
+                               view(cfg, now, since=oldest, db=db)), \
+                mock.patch.object(privacy, "view", lambda *a, **k: privacy.Closed("no database")):
+            self.assertEqual(self.recover(BACK), [])
+        self.assertEqual((self.asked, self.sends()), ([], []))
+        self.assertEqual(self.recs()[0]["status"], "waiting")
+
+
+class RollbackTest(Base):
+    """A letter still waiting when the code is rolled back: the older ``recovery.run`` reads a waiting record's first
+    message (``waiting.get("messages", [{}])[0]``), so a record of entries alone has no ``messages`` key at all."""
+    BEFORE = "d6c7f06"  # main just before CATCH-UP-LETTER
+
+    def waiting_letter(self):
+        self.db.add("morning!", T0 - timedelta(hours=1), mid="1")
+        self.db.add("Morning. Sleep well?", T0 - timedelta(hours=1) + timedelta(seconds=20), role="assistant")
+        outage.trip(self.cfg, "exit 1: 503", T0)
+        capture.capture_web(self.cfg, None, "wrote this in the app, the sea again", T0 + timedelta(hours=2))
+        outage.answered(self.cfg, BACK)
+        self.answers = [agent.AgentUnavailable("timed out after 150 s")]
+        self.recover(BACK)
+        (rec,) = self.recs()
+        self.assertEqual(rec["status"], "waiting")
+        return rec
+
+    def before_letter(self):
+        """The older module, from git history (skipped where the history is not there, as in a shallow clone)."""
+        try:
+            source = subprocess.run(["git", "show", f"{self.BEFORE}:src/journal/recovery.py"], capture_output=True,
+                                    text=True, check=True, cwd=Path(__file__).resolve().parents[1]).stdout
+        except (OSError, subprocess.CalledProcessError):
+            self.skipTest(f"{self.BEFORE} is not in this clone's history")
+        spec = importlib.util.spec_from_loader("journal._recovery_before_letter", loader=None)
+        module = importlib.util.module_from_spec(spec)
+        module.__package__ = "journal"
+        exec(compile(source, "recovery.py@" + self.BEFORE, "exec"), module.__dict__)
+        return module
+
+    def test_an_entries_only_record_has_no_messages_key(self):
+        rec = self.waiting_letter()
+        self.assertNotIn("messages", rec)
+        self.assertEqual(int(rec.get("messages", [{}])[0].get("row") or 0), 0)  # (the older code's read)
+
+    def test_a_record_whose_messages_were_answered_live_has_no_messages_key(self):
+        self.outage_with_entries()
+        self.answers = [agent.AgentUnavailable("timed out after 150 s")]
+        self.recover(BACK)  # the record waits with his chat messages and the entries
+        self.assertEqual(len(self.recs()[0]["messages"]), 2)
+        self.db.add("ok, you work again?", BACK + timedelta(minutes=1), mid="14")
+        self.db.add("I'm here.", BACK + timedelta(minutes=1, seconds=10), role="assistant")
+        log = self.recover(BACK + timedelta(minutes=35))
+        self.assertIn("messages were answered live since; the catch-up keeps his journal entries", log[0])
+        (rec,) = self.recs()
+        self.assertEqual(rec["status"], "waiting")
+        self.assertNotIn("messages", rec)
+        log = []
+        self.before_letter().run(self.cfg, BACK + timedelta(minutes=40), log)  # (the older code, on this shape)
+        self.assertEqual(log, [f"{rec['id']}: no catch-up (answered live since)"])
+
+    def test_the_older_code_runs_on_a_waiting_letter(self):
+        rec = self.waiting_letter()
+        older = self.before_letter()
+        log = []
+        older.run(self.cfg, BACK + timedelta(minutes=5), log)  # (raised IndexError on ``messages: []``)
+        self.assertEqual(log, [f"{rec['id']}: no catch-up (answered live since)"])
 
 
 class NoChatTest(Base):

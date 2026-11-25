@@ -137,7 +137,7 @@ config_schema:
     type: dict
     default: {enabled: true, max_age_hours: 48, breaker: true, probe_after_minutes: 5, probe_max_minutes: 30,
               catchup_per_tick: 2, sends_per_tick: 2, sends_per_hour: 4, stale_hours: 24, letter: true,
-              letter_min_minutes: 60}
+              letter_min_minutes: 60, letter_deadline_minutes: 120}
     description: >-
       After a model outage left his chat messages answered only by Hermes' failure line, send one catch-up
       reply once a model is reachable again (messages older than max_age_hours get a note in the chat
@@ -146,7 +146,8 @@ config_schema:
       (catchup_per_tick model calls a step, sends_per_tick and sends_per_hour messages to the chat), and a
       message more than stale_hours late is not sent (it stays in its file). With letter on, after an outage
       of letter_min_minutes or more, the one catch-up message also covers the journal entries he wrote
-      while she was away, in place of their replies (her notes are still written into the entries).
+      while she was away, in place of their replies (her notes are still written into the entries); with no
+      letter sent letter_deadline_minutes after a model answered, there is none and the replies go as before.
   capture:
     type: dict
     default: {mode: everything}

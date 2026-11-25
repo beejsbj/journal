@@ -696,7 +696,8 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(jconfig.DEFAULTS["recovery"],
                          {"enabled": True, "max_age_hours": 48, "breaker": True, "probe_after_minutes": 5,
                           "probe_max_minutes": 30, "catchup_per_tick": 2, "sends_per_tick": 2, "sends_per_hour": 4,
-                          "stale_hours": 24, "letter": True, "letter_min_minutes": 60})  # (CATCH-UP-LETTER)
+                          "stale_hours": 24, "letter": True, "letter_min_minutes": 60,
+                          "letter_deadline_minutes": 120})  # (CATCH-UP-LETTER)
         with tempfile.TemporaryDirectory() as t:
             cfg = make_cfg(Path(t))
             self.assertEqual([outage.probe_wait(cfg, n) for n in range(5)],

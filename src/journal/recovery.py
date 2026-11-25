@@ -47,11 +47,13 @@ notes are still written into the entries (the paced annotation step); only the c
   message; with no unanswered chat message the letter is a record of its own (``outage-<UTC minute>``), sent as a
   message of its own. Once sent, each covered prompt's reply is marked skipped, ``letter``, and never sent; its notes
   are still written. A later scan of the chat starts after the rows it covered.
-* Floor: no model, no letter (it waits, deferred, and the replies stay held: nothing late goes); three bad answers
-  or a send refused six times, no letter either, never a fixed line in her voice: the note in her chat session, and
-  the replies are released to the old path (paced, and dropped once stale).
+* Floor: no model, no letter (it waits, deferred, and the replies stay held: nothing late goes); three bad answers,
+  a send refused six times, or no letter sent ``recovery.letter_deadline_minutes`` (120) after a model answered (the
+  chat unreadable, the request failing while other steps' models answer), no letter either, never a fixed line in
+  her voice: the note in her chat session, and the replies are released to the old path (paced, and dropped once
+  stale). Two outages close together, the first's letter not yet written, make one letter.
 * Never while a bare ``/x`` window is open, or while the privacy pass cannot say (fail closed): the whole message
-  waits. His words come from the entries (``entries.his_text``: his blocks only, which hold nothing off the record)
+  waits, checked again just before it is sent (a window opened while it was being written). His words come from the entries (``entries.his_text``: his blocks only, which hold nothing off the record)
   and the chat rows ``scan`` keeps (never a private one). ``channel.platform: none``: nothing at all.
 """
 from __future__ import annotations
@@ -89,6 +91,16 @@ def letter_min(cfg: Config) -> timedelta:
     except (TypeError, ValueError):
         minutes = 60.0
     return timedelta(minutes=max(0.0, minutes))
+
+
+def letter_deadline(cfg: Config) -> timedelta:
+    """How long after a model answered the letter may still go (``recovery.letter_deadline_minutes``, 120): past it
+    there is none, and the replies it held go the old way while they are not stale (``stale_hours``)."""
+    try:
+        minutes = float(cfg.recovery.get("letter_deadline_minutes", 120))
+    except (TypeError, ValueError):
+        minutes = 120.0
+    return timedelta(minutes=minutes if minutes > 0 else 120.0)
 
 
 def max_age(cfg: Config) -> timedelta:
@@ -203,7 +215,7 @@ def _note(cfg: Config, rec: dict, now: datetime, why: str, log: list[str]) -> No
         what = (f"{n.companion} was offline from {window(cfg, rec, now)}; {n.user_or_them} wrote {_entries(len(ents))} "
                 f"meanwhile. No catch-up message was sent ({why})")
     if ents:
-        what += "; the replies to the entries go to the chat as usual"
+        what += _released(cfg, rec, now)
     with ledger.locked(cfg.ledger_path) as data:
         r = find(data, rec["id"])
         if r is not None:
@@ -212,6 +224,25 @@ def _note(cfg: Config, rec: dict, now: datetime, why: str, log: list[str]) -> No
     mirrored = mirror.to_chat(cfg, what, "\n".join(lines), log, ref=("recovery", rec["id"], None))
     log.append(f"{rec['id']}: no catch-up sent ({why}); noted in the chat session" if mirrored
                else f"{rec['id']}: no catch-up sent ({why})")
+
+
+def _released(cfg: Config, rec: dict, now: datetime) -> str:
+    """What becomes of the replies a letter that is not sent was to be in place of: released, they go the old way, but
+    only while they are not stale (``tick._skip_stale_reply``); said only as far as it is true."""
+    data = ledger.snapshot(cfg.ledger_path)
+    owed = [p for p in (ledger.find(data, pid) for pid in rec.get("prompts") or []) if p is not None
+            and not (p.get("annotation_reply") or {}).get("message_id")
+            and not (p.get("annotation_reply") or {}).get("skipped")]
+    if not owed:
+        return ""
+    late = outage.stale_after(cfg)
+    live = [p for p in owed if (w := _newest_words(p)) is not None and now - w <= late]
+    if len(live) == len(owed):
+        return "; the replies to the entries go to the chat as usual"
+    if live:
+        return (f"; {len(live)} of the {len(owed)} replies to the entries go to the chat as usual, the others are too "
+                "late and stay in the entries")
+    return "; the replies to the entries are too late to send and stay in the entries"
 
 
 def _skip(cfg: Config, rec: dict, now: datetime, why: str, log: list[str]) -> None:
@@ -278,6 +309,42 @@ def _letter_outage(cfg: Config, now: datetime) -> tuple[datetime, datetime | Non
     return down, back
 
 
+def _iso(value) -> datetime | None:
+    try:
+        when = datetime.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
+    return when if when.tzinfo is not None else None
+
+
+def _back(cfg: Config, rec: dict) -> datetime | None:
+    """When a model last came back for a letter record: the breaker's, when its outage is the record's or a later one
+    (the record may have been made while it lasted, and the chat been unreadable since; a later outage will be taken
+    in, ``_attach``); None while that outage lasts. Else (the breaker off, or its last outage released) the record's
+    ``back_at``, or when it was made."""
+    key = _iso(rec.get("outage_down_since"))
+    span = outage.span(cfg)
+    try:
+        if span is not None and key is not None and span[0] >= key:
+            return span[1]
+    except TypeError:
+        pass
+    return _iso(rec.get("back_at")) or _iso(rec.get("detected_at"))
+
+
+def _overdue(cfg: Config, rec: dict, now: datetime) -> bool:
+    """A waiting letter (a record tied to an outage) not sent ``letter_deadline`` after a model answered: there is to be
+    none (``run`` notes it before anything else, so an unreadable chat or a request that keeps failing cannot hold the
+    replies for longer, and ``held`` lets them go from that moment)."""
+    if not rec.get("outage_down_since") or rec.get("status") != "waiting":
+        return False
+    back = _back(cfg, rec)
+    try:
+        return back is not None and now - back >= letter_deadline(cfg)
+    except TypeError:
+        return False
+
+
 def _covered(cfg: Config, data: dict, down: datetime, end: datetime) -> list[dict]:
     """The prompts whose annotation reply the letter is in place of: his words from ``annotate_after_minutes`` before
     the outage began (their notes fell due in it) to its end; a reply still owed (not sent, not skipped); one that is
@@ -323,14 +390,17 @@ def _material(cfg: Config, covered: list[dict]) -> list[dict]:
 def held(cfg: Config, now: datetime) -> set[str]:
     """The prompts whose annotation reply waits for the letter (``tick.reply_annotations`` sends none of them): those a
     waiting record covers, and, from the moment a model answered and before any record exists, those the breaker's
-    outage covers. A record that ended without a letter (noted, skipped) holds nothing: they go as before."""
+    outage covers. A record that ended without a letter (noted, skipped) holds nothing: they go as before; nor does one
+    past ``letter_deadline`` (``_overdue``), nor the outage itself past it with no record made (the chat unreadable)."""
     if not letter_on(cfg):
         return set()
     data = ledger.snapshot(cfg.ledger_path)
     recs = [r for r in data.get("recovery") or [] if isinstance(r, dict)]
-    out = {pid for r in recs if r.get("status") == "waiting" for pid in r.get("prompts") or []}
+    out = {pid for r in recs if r.get("status") == "waiting" and not _overdue(cfg, r, now)
+           for pid in r.get("prompts") or []}
     found = _letter_outage(cfg, now)
-    if found is not None and not any(r.get("outage_down_since") == found[0].isoformat() for r in recs):
+    if found is not None and not any(r.get("outage_down_since") == found[0].isoformat() for r in recs) \
+            and (found[1] is None or now - found[1] < letter_deadline(cfg)):
         out |= {p["id"] for p in _covered(cfg, data, found[0], found[1] or now)}
     return out
 
@@ -339,7 +409,9 @@ def _attach(cfg: Config, now: datetime, rec: dict | None, found: dict) -> dict |
     """Take the entries he wrote in the breaker's outage into this outage's record (``rec``, the waiting chat
     catch-up), or open a record for them alone. Returns the record to act on (``rec`` itself when there is nothing to
     add), or None when there is none. Until its text is written the list is taken again on each pass, so an entry
-    written while the outage still lasts is in it too."""
+    written while the outage still lasts is in it too; and a record of an earlier outage not yet written takes in this
+    one (from the first's start to this one's end: one letter, not two minutes apart). Past ``letter_deadline`` no
+    letter is begun. An entries-only record has no ``messages`` key at all (older code reads its first message)."""
     if not letter_on(cfg):
         return rec
     span = _letter_outage(cfg, now)
@@ -353,15 +425,22 @@ def _attach(cfg: Config, now: datetime, rec: dict | None, found: dict) -> dict |
         if any(r.get("outage_down_since") == key and r.get("status") != "waiting" for r in recs):
             return rec  # this outage's letter is done (sent, noted or skipped)
         target = find(data, rec["id"]) if rec else None
-        if target is not None and (target.get("text") or target.get("outage_down_since") not in (None, key)):
-            return dict(target)  # written already (what it covers is fixed), or another outage's: this one waits
-        covered = _covered(cfg, data, down, back or now)
+        if target is not None and target.get("text"):
+            return dict(target)  # written already: what it covers is fixed
+        if back is not None and now - back >= letter_deadline(cfg) and (target is None
+                                                                        or target.get("outage_down_since") != key):
+            return dict(target) if target is not None else None  # too late to begin one: the replies go as before
+        first = down
+        earlier = _iso(target.get("outage_down_since")) if target is not None else None
+        if earlier is not None and earlier < down:
+            first = earlier  # an earlier outage's letter, not yet written: one letter for both
+            lo = first - timedelta(minutes=cfg.annotate_after_minutes)
+        covered = _covered(cfg, data, first, back or now)
         if target is None:
             if not covered:
                 return None
             target = {"id": f"outage-{down.astimezone(timezone.utc):%Y%m%d%H%M}", "status": "waiting",
-                      "detected_at": now.isoformat(), "offline_since": key, "messages": [], "reply_to": None,
-                      "context": []}
+                      "detected_at": now.isoformat(), "offline_since": key, "reply_to": None, "context": []}
             recs.append(target)
         elif not covered and not any(lo <= datetime.fromisoformat(m["at"]) <= (back or now)
                                      for m in target.get("messages") or []):
@@ -370,6 +449,8 @@ def _attach(cfg: Config, now: datetime, rec: dict | None, found: dict) -> dict |
                       entries=_material(cfg, covered))
         if back is not None:
             target["back_at"] = back.isoformat()
+        else:
+            target.pop("back_at", None)  # (taken in by an outage that still lasts)
         if down < datetime.fromisoformat(target["offline_since"]):
             target["offline_since"] = key
         if not target.get("messages"):
@@ -383,7 +464,8 @@ def _drop_messages(cfg: Config, rec: dict, log: list[str]) -> dict:
         r = find(d, rec["id"])
         if r is None:
             return rec
-        r.update(messages=[], reply_to=None, context=[])
+        r.pop("messages", None)  # (left out, never ``[]``: older code reads the first message of a waiting record)
+        r.update(reply_to=None, context=[])
         rec = dict(r)
     log.append(f"{rec['id']}: {cfg.names.possessive} messages were answered live since; the catch-up keeps "
                f"{cfg.names.possessive} journal entries")
@@ -391,10 +473,18 @@ def _drop_messages(cfg: Config, rec: dict, log: list[str]) -> dict:
 
 
 def _off_record(cfg: Config, now: datetime) -> bool:
-    """A bare ``/x`` window is open, or the privacy pass cannot say (fail closed): no catch-up goes now."""
+    """A bare ``/x`` window is open, or the privacy pass cannot say (fail closed): no catch-up goes now. A window that
+    began after ``now`` (while the catch-up was being written) is open too."""
     from . import privacy
     pv = privacy.view(cfg, now)
-    return pv.closed or pv.open_at(now)
+    if pv.closed or pv.open_at(now):
+        return True
+    return bool(pv.window) and pv.window["since"] > now
+
+
+def _duration(span: timedelta) -> str:
+    minutes = round(span.total_seconds() / 60)
+    return f"{minutes // 60:g} h" if minutes % 60 == 0 else f"{minutes} min"
 
 
 def _summary(rec: dict) -> str:
@@ -425,6 +515,9 @@ def run(cfg: Config, now: datetime, log: list[str], db: Path | None = None) -> N
         return
     data = ledger.snapshot(cfg.ledger_path)
     waiting = next((r for r in data.get("recovery") or [] if r.get("status") == "waiting"), None)
+    if waiting and _overdue(cfg, waiting, now):  # (before the scan: an unreadable chat must not hold the replies)
+        _note(cfg, waiting, now, f"none sent within {_duration(letter_deadline(cfg))} of the model's return", log)
+        return
     floor = _covered_rows({"recovery": [r for r in data.get("recovery") or [] if r.get("status") != "waiting"]})
     try:
         found = scan(cfg, db, now, floor)
@@ -498,6 +591,9 @@ def run(cfg: Config, now: datetime, log: list[str], db: Path | None = None) -> N
         log.append(f"{rec['id']}: catch-up attempt {rec['attempts']}/{ATTEMPTS} failed ({reason})")
         if rec["attempts"] >= ATTEMPTS:
             _note(cfg, rec, now, f"no usable reply after {ATTEMPTS} attempts: {reason}", log)
+        return
+    if _off_record(cfg, now):  # again: a window he opened while it was being written (the text waits, checked)
+        log.append(f"{rec['id']}: catch-up written; it waits for the off-the-record window to close")
         return
     _send(cfg, rec, now, log)
 
