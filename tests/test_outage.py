@@ -342,34 +342,34 @@ class ReflectOutageTest(ReflectBase):
 
     def test_an_outage_defers_and_backs_off(self):
         self.evening()
-        alerts, log = self.reflect(datetime(2026, 10, 14, 23, 45, tzinfo=IST))
+        alerts, log = self.reflect(datetime(2026, 10, 15, 4, 45, tzinfo=IST))
         self.assertEqual(alerts, [])
         self.assertTrue(any("reflection deferred, model unreachable" in l for l in log))
         rec = self.rec("2026-10-14-reflection")
         self.assertEqual(rec.get("attempts", 0), 0)
-        self.assertEqual(rec["deferred_since"], datetime(2026, 10, 14, 18, 15, tzinfo=timezone.utc).isoformat())
-        self.reflect(datetime(2026, 10, 14, 23, 55, tzinfo=IST))
+        self.assertEqual(rec["deferred_since"], datetime(2026, 10, 14, 23, 15, tzinfo=timezone.utc).isoformat())
+        self.reflect(datetime(2026, 10, 15, 4, 55, tzinfo=IST))
         self.assertEqual(len(self.asked), 1)  # within 30 minutes: not again
         for n in range(1, 6):  # an outage never uses up the attempts
-            self.reflect(datetime(2026, 10, 14, 23, 45, tzinfo=IST) + timedelta(minutes=35 * n))
+            self.reflect(datetime(2026, 10, 15, 4, 45, tzinfo=IST) + timedelta(minutes=35 * n))
         self.assertEqual(self.rec("2026-10-14-reflection").get("attempts", 0), 0)
         self.assertFalse((self.cfg.root / "2026-10-14-reflection.md").exists())
         self.assertEqual(self.bot.calls, [])
 
     def test_one_alert_after_six_hours(self):
         self.evening()
-        self.reflect(datetime(2026, 10, 14, 23, 45, tzinfo=IST))
-        alerts, _ = self.reflect(datetime(2026, 10, 15, 5, 40, tzinfo=IST))  # tried, five hours fifty-five in
+        self.reflect(datetime(2026, 10, 15, 4, 45, tzinfo=IST))
+        alerts, _ = self.reflect(datetime(2026, 10, 15, 10, 40, tzinfo=IST))  # tried, five hours fifty-five in
         self.assertEqual(alerts, [])
-        alerts, _ = self.reflect(datetime(2026, 10, 15, 6, 20, tzinfo=IST))
+        alerts, _ = self.reflect(datetime(2026, 10, 15, 11, 20, tzinfo=IST))
         self.assertEqual(len(alerts), 1)
-        self.assertIn("2026-10-14-reflection is still not written: the model has been unreachable since 14 Oct 23:45",
+        self.assertIn("2026-10-14-reflection is still not written: the model has been unreachable since 15 Oct 04:45",
                       alerts[0])
-        self.assertEqual(self.reflect(datetime(2026, 10, 15, 7, 0, tzinfo=IST))[0], [])
+        self.assertEqual(self.reflect(datetime(2026, 10, 15, 12, 0, tzinfo=IST))[0], [])
 
     def test_retried_for_days_then_written_on_recovery(self):
         self.evening()
-        self.reflect(datetime(2026, 10, 14, 23, 45, tzinfo=IST))
+        self.reflect(datetime(2026, 10, 15, 4, 45, tzinfo=IST))
         self.down = False
         # three days on: not yesterday's or today's day any more, but still owed
         alerts, log = self.reflect(datetime(2026, 10, 17, 10, 0, tzinfo=IST))
@@ -385,23 +385,23 @@ class ReflectOutageTest(ReflectBase):
 
     def test_a_bad_answer_still_uses_an_attempt(self):
         self.evening()
-        self.reflect(datetime(2026, 10, 14, 23, 45, tzinfo=IST))
+        self.reflect(datetime(2026, 10, 15, 4, 45, tzinfo=IST))
         # (not prose: one kind of bad answer; an invented quote is another: test_continuity, QuotesTest)
         self.down, self.answer = False, '{"reflection": "a confused model answering in JSON, long enough to count"}'
-        alerts, log = self.reflect(datetime(2026, 10, 15, 0, 30, tzinfo=IST))
+        alerts, log = self.reflect(datetime(2026, 10, 15, 5, 30, tzinfo=IST))
         self.assertTrue(any("reflection attempt 1/3 failed" in l for l in log))
         rec = self.rec("2026-10-14-reflection")
         self.assertEqual(rec["attempts"], 1)
         self.assertNotIn("deferred_since", rec)
         for n in range(2):
-            alerts, log = self.reflect(datetime(2026, 10, 15, 1, 0, tzinfo=IST) + timedelta(hours=n))
+            alerts, log = self.reflect(datetime(2026, 10, 15, 6, 0, tzinfo=IST) + timedelta(hours=n))
         self.assertEqual(len(alerts), 1)
         self.assertIn("was not written after 3 attempts", alerts[0])
 
     def test_given_up_after_seven_days(self):
         self.evening()
-        self.reflect(datetime(2026, 10, 14, 23, 45, tzinfo=IST))
-        alerts, _ = self.reflect(datetime(2026, 10, 21, 23, 50, tzinfo=IST))
+        self.reflect(datetime(2026, 10, 15, 4, 45, tzinfo=IST))
+        alerts, _ = self.reflect(datetime(2026, 10, 22, 4, 50, tzinfo=IST))
         self.assertEqual(len(alerts), 1)
         self.assertIn("was not written: the model was unreachable for 7 days", alerts[0])
         _, log = self.reflect(datetime(2026, 10, 22, 6, 0, tzinfo=IST))
@@ -412,8 +412,9 @@ class ReflectOutageTest(ReflectBase):
         self.evening()
         sent = self.prompt("evening", "2026-10-15", "23", "12", "Evening")
         self.answer_prompt("evening", "2026-10-15", "another rainy day, walked anyway", sent + timedelta(minutes=10), "12")
-        self.reflect(datetime(2026, 10, 15, 23, 50, tzinfo=IST))  # yesterday's and today's are both due
-        self.assertEqual(len(self.asked), 1)  # the second would only wait out another timeout
+        self.reflect(datetime(2026, 10, 15, 4, 45, tzinfo=IST))  # the 14th's: deferred
+        self.reflect(datetime(2026, 10, 16, 4, 50, tzinfo=IST))  # the 14th's (owed) and the 15th's are both due
+        self.assertEqual(len(self.asked), 2)  # the 15th's would only wait out another timeout
 
 
 class LegacyCalloutTest(ReflectBase):
@@ -430,7 +431,7 @@ class LegacyCalloutTest(ReflectBase):
                        "> Evening 🌻 the long tiring day opener.\n")
         wk = self.prompt("weekly", "2026-10-18", "20", "20", "End of the week.")
         self.answer_prompt("weekly", "2026-10-18", "a soft week", wk + timedelta(minutes=10), "20")
-        self.reflect(datetime(2026, 10, 18, 20, 40, tzinfo=IST))
+        self.reflect(datetime(2026, 10, 19, 4, 40, tzinfo=IST))
         query = self.asked[-1][0]
         self.assertIn("**What stood out** — rain.", query)
         self.assertNotIn("long tiring day opener", query)

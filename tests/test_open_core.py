@@ -13,6 +13,7 @@ from helpers import CHAT, NEUTRAL, CleanEnv, make_cfg
 
 from journal import (actions, agent, audio, capture, cli, context, conversations, entries, hookstate, ledger, privacy,
                      programs, reflect, slots, standing, status, sweep, telegram, tick)
+from journal.chat import send as chat_send  # (send_prompt's clock, moved from tick: issue #43)
 
 BUILD = context.build  # (Base stands a stub in for the pack; the no-chat line is checked in the real one)
 
@@ -81,7 +82,7 @@ class Base(CleanEnv):
         self.ask = unreachable
         for p in (mock.patch.object(telegram, "_call", self.bot), mock.patch.object(telegram, "token", lambda c: "T"),
                   mock.patch.object(agent, "ask", lambda *a, **k: self.ask(*a, **k)),
-                  mock.patch.object(tick, "datetime", Clock),
+                  mock.patch.object(tick, "datetime", Clock), mock.patch.object(chat_send, "datetime", Clock),
                   mock.patch.object(context, "build", lambda c, n, *a: "PACK")):
             p.start()
             self.addCleanup(p.stop)

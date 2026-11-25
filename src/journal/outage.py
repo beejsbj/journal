@@ -364,7 +364,7 @@ def stale_after(cfg: Config) -> timedelta:
 def _sent_times(data: dict) -> list[str]:
     """When each message the engine sent of its own went out: annotation replies, analyses, outage catch-ups."""
     out = [(p.get("annotation_reply") or {}).get("sent_at") for p in data.get("prompts") or [] if isinstance(p, dict)]
-    out += [(r.get("telegram") or {}).get("sent_at") for r in data.get("reflections") or [] if isinstance(r, dict)]
+    out += [ledger.send_of(r).get("sent_at") for r in data.get("reflections") or [] if isinstance(r, dict)]
     out += [r.get("sent_at") for r in data.get("recovery") or [] if isinstance(r, dict)]
     return [t for t in out if isinstance(t, str) and t]
 

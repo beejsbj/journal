@@ -209,7 +209,7 @@ def _reflections(cfg: Config, data: dict) -> dict:
     recs = sorted(data.get("reflections") or [], key=lambda r: r.get("local_date") or "")[-4:]
     rows = []
     for r in recs:
-        tg = r.get("telegram") or {}
+        tg = ledger.send_of(r)
         rows.append({"id": r.get("id"), "written": bool(r.get("written_at")), "trigger": r.get("trigger"),
                      "attempts": r.get("attempts", 0), "error": r.get("error"),
                      "sent": bool(tg.get("message_id")), "send_error": tg.get("skipped") or tg.get("error")})
@@ -453,7 +453,8 @@ def doctor(cfg: Config, deep: bool = False, token: bool = True, web: bool = Fals
         except Exception:  # noqa: BLE001 - the library row says why
             ends = None
         fall = f"fallback {when} the next day" if which == "day" else f"fallback {when} the day after the week"
-        timing = (f"after the {ends.id} entry is annotated, {fall}" if ends else
+        over = "once the day has ended, " if which == "day" else "once its last day has ended, "
+        timing = (f"{over}after the {ends.id} entry is annotated, {fall}" if ends else
                   f"no practice says closes: {which}, so only at the {fall}")
         rows.append((f"{which} {'reflection' if which == 'day' else 'review'}", "ok" if agent_on else "warn",
                      timing if agent_on else "on, but model steps are disabled: none will be written"))

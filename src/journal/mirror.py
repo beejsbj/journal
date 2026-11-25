@@ -108,7 +108,11 @@ def _mark(cfg: Config, ref, value) -> None:
     with ledger.locked(cfg.ledger_path) as data:
         rec = next((r for r in data.get(kind) or [] if r.get("id") == rid), None)
         if rec is not None:
-            (rec.setdefault(key, {}) if key else rec)["mirrored"] = value
+            if key in ledger.SEND_KEYS:  # a reflection's send, under whichever name the queue's writer used
+                target = ledger.send_slot(rec)
+            else:
+                target = rec.setdefault(key, {}) if key else rec
+            target["mirrored"] = value
 
 
 def to_chat(cfg: Config, what: str, body: str, log_lines: list[str] | None = None, ref=None) -> bool | str:

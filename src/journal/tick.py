@@ -21,6 +21,9 @@
    under the lock; filed as GitHub issues or through the operator's command, from fixed templates only, after the
    lock is released (``ops.deliver_due``), so a slow ``gh`` never holds up a tick or a send. Never fails the tick.
 
+The chat face's work the steps above call (``send_prompt``, ``fold``, ``reply_annotations``) lives in ``journal/chat/``
+(issue #43); this module still exports those names, so ``tick.send_prompt`` and the rest are the same objects.
+
 Silent when there is nothing to report; prints a line per action otherwise. The run exits non-zero,
 so the scheduler alerts, when a prompt could not be delivered after ``SEND_ATTEMPTS`` ticks, when a
 step crashed, when another bounded retry ran out, or when the model (or speech-to-text) has been
@@ -32,46 +35,32 @@ and a few chat messages a tick and an hour, and a message gone stale is recorded
 """
 from __future__ import annotations
 
+import contextlib
 import contextvars
-import fcntl
 import json
-import os
-import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from . import (agent, audio, capture, channel, compose, context, conversations, entries, images, ledger, library,
                mirror, notebook, ops, outage, privacy, programs, prompts, recovery, reflect, schedule, slots, standing, sweep,
-               today, validate, version)
+               ticklock, today, validate, version)
+from .alert import Alert
+# The chat face's steps and names (issue #43, CHAT-1: moved there unchanged). The tick still exports each of them, so
+# ``tick.send_prompt``, ``tick.fold``, ``tick.SEND_ATTEMPTS`` … are the same objects as before.
+from .chat.fold import (FOLD_ATTEMPTS, FOLD_RETRY_MINUTES, FOLD_SLACK, FOLD_STATE, _fold_edit,  # noqa: F401
+                        _fold_owed_again, _folds_due_again, fold)
+from .chat.replies import (REPLY_ATTEMPTS, _newest_words, _reply_owed, _reply_target,  # noqa: F401
+                           _skip_annotation_replies, _skip_stale_reply, reply_annotations)
+from .chat.send import (ATTACHED, EARLIER_OPENERS, SEND_ATTEMPTS, SENT_FIELDS, SendFailed,  # noqa: F401
+                        _archive_sent, _attach, count_send_failure, prune_sent, send_prompt)
 from .config import Config
 from .library import Practice
-from .ports import ChannelError, Keyboard
 
 ANNOTATE_ATTEMPTS = 3
 AUDIO_ATTEMPTS = 3
 IMAGE_ATTEMPTS = 2
-SEND_ATTEMPTS = 3
-# A fold that fails is tried again on a later tick, the wait doubling from five minutes (5, 10, 20 … 640 minutes):
-# FOLD_ATTEMPTS tries over about 21 hours (``FOLD_RETRY_MINUTES``' sum), so a night's token-helper or network outage
-# heals on its own; a refusal for good (``ChannelError.permanent``) gives up at once. See ``fold``.
-FOLD_RETRY_MINUTES = (5, 10, 20, 40, 80, 160, 320, 640)  # the wait after the 1st … 8th failure
-FOLD_ATTEMPTS = len(FOLD_RETRY_MINUTES) + 1
-FOLD_SLACK = timedelta(minutes=1)  # a retry is due a little early, so a tick that starts a few seconds soon still tries
-# a fold's account; a new message clears it (``fold_gave_up_captures``: his replies counted when a fold was given up
-# after its attempts, so a later one earns it one more try)
-FOLD_STATE = ("fold_attempts", "fold_error", "fold_retry_at", "fold_gave_up", "fold_gave_up_captures")
-EARLIER_OPENERS = 5  # the openers of earlier sends of one prompt a record keeps (so a quote of a folded one matches)
-REPLY_ATTEMPTS = 6
 KEEP_DAYS = 120
 ERRORS_KEPT = 200
-
-
-class Alert(RuntimeError):
-    """A bounded retry ran out: reported once, and the run exits 1 so the scheduler alerts."""
-
-
-class SendFailed(Alert):
-    """A prompt could not be delivered after SEND_ATTEMPTS ticks."""
 
 
 # the packs ``_opener`` builds while ``send_due`` holds them back until its pre-send check (rule 2 of OPEN-PROMPTS)
@@ -133,23 +122,6 @@ def _opener(cfg: Config, practice: Practice | str, now_local: datetime, pid: str
         return plain, f"plain:{reason}", [], []
     source = (cfg.names.companion or "companion").lower()  # recorded as "opener: <name>" in the entry
     return data["opener"].strip(), source, data.get("citations") or [], validate.asked(practice, data)
-
-
-SENT_FIELDS = ("id", "kind", "local_date", "scheduled", "sent_at", "sent_at_local", "chat_id", "message_id",
-               "previous_message_ids", "opener", "opener_source", "asked")
-
-
-def _archive_sent(cfg: Config, record: dict) -> None:
-    """Append every delivered prompt to ``sent.jsonl`` (pruned with the ledger, to KEEP_DAYS): the engine's
-    own memory of what it sent, not an archive. The journal never holds an unanswered prompt's opener."""
-    try:
-        path = cfg.state_dir / "sent.jsonl"
-        line = json.dumps({k: record[k] for k in SENT_FIELDS if k in record}, ensure_ascii=False)
-        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
-        with os.fdopen(fd, "a", encoding="utf-8") as fh:
-            fh.write(line + "\n")
-    except OSError:
-        pass  # the ledger still has it; never fail a delivered send over the archive
 
 
 def _practice_fields(p: Practice) -> dict:
@@ -260,269 +232,6 @@ def _answered_meanwhile(cfg: Config, pid: str, log: list[str]) -> bool:
     return answered
 
 
-def count_send_failure(cfg: Config, record: dict, error: Exception, log: list[str]) -> int:
-    """A send of ``record`` failed: count the attempt on its ledger entry (created with ``scheduled`` so prune keeps
-    the count) and raise ``SendFailed`` on the ``SEND_ATTEMPTS``-th. Returns the attempts so far."""
-    pid = record["id"]
-    with ledger.locked(cfg.ledger_path) as data:
-        q = ledger.find(data, pid)
-        # answered on a face while the send went out (captures, never delivered): nothing is owed, so nothing is
-        # counted. A delivered record (a re-send) counts as it always did.
-        answered = bool(q and q.get("captures") and not q.get("message_id"))
-        if answered:
-            pass
-        elif q is None:  # "scheduled" keeps prune() from dropping the attempt count
-            q = channel.stamp(cfg, {"id": pid, "kind": record["kind"], "local_date": record["local_date"],
-                                    "chat_id": cfg.chat_id, "scheduled": record["scheduled"]})
-            data["prompts"].append(q)
-        if not answered:
-            q["send_attempts"] = q.get("send_attempts", 0) + 1
-            q["send_error"] = str(error)[:300]
-        attempts = (q or {}).get("send_attempts", 0)
-    if answered:
-        log.append(f"{pid}: send failed ({error}); not counted: it was answered meanwhile")
-        return attempts
-    log.append(f"{pid}: send attempt {attempts}/{SEND_ATTEMPTS} failed ({error})")
-    if attempts >= SEND_ATTEMPTS:
-        raise SendFailed(f"{pid} was not delivered after {attempts} attempts: {error}") from error
-    return attempts
-
-
-def send_prompt(cfg: Config, record: dict, log: list[str], *, retry=None, refold=None, refold_bare=None,
-                label: str | None = None, keyboard: Keyboard | None = None) -> bool:
-    """Deliver one prepared prompt record and keep the ledger's account of it. Returns True when it was delivered.
-
-    ``record`` holds at least ``id``, ``kind``, ``local_date``, ``scheduled``, ``chat_id``, ``html`` and
-    ``plain_text``; every field is stored as given (and the platform, off Telegram: ``channel.stamp``). A send error
-    (``ports.ChannelError``) retries once at once with ``retry()``'s fields
-    (the plain opener) when given; a send that still fails counts an attempt on the record (``send_attempts``,
-    created with ``scheduled`` so prune keeps the count) and raises ``SendFailed`` on the ``SEND_ATTEMPTS``-th. A
-    delivered record is stored (a second send of the same id makes the new message current: the old one still
-    takes replies, is listed in ``previous_message_ids``, and is edited to ``refold(old)``'s text, ``old`` being the record it replaced, as it stood; if Telegram cannot parse
-    that, ``refold_bare(old)``'s; a platform that cannot edit leaves it as sent), appended to
-    ``sent.jsonl`` and mirrored into the companion's chat (``label``: what was sent, default "the <kind> prompt").
-    Practices use it through ``send_due``; program phases and one-off interrupts will too."""
-    pid, kind, names = record["id"], record["kind"], cfg.names
-    channel.stamp(cfg, record)
-    chat = cfg.channel()
-    try:
-        try:
-            record["message_id"] = chat.send(cfg.chat_id, record["html"], keyboard=keyboard)
-        except ChannelError as e:
-            if retry is None:
-                raise
-            log.append(f"{pid}: send failed ({e}); retrying with the plain opener")
-            record.update(retry())
-            record["message_id"] = chat.send(cfg.chat_id, record["html"], keyboard=keyboard)
-    except Exception as e:
-        count_send_failure(cfg, record, e, log)
-        return False
-    record["sent_at"] = datetime.now(timezone.utc).isoformat()
-    record["sent_at_local"] = datetime.now(timezone.utc).astimezone(cfg.tz).strftime("%H:%M %Z")
-    replaced = None
-    with ledger.locked(cfg.ledger_path) as data:
-        q = ledger.find(data, pid)
-        if q is None:
-            data["prompts"].append(record)
-        elif not q.get("message_id") and (q.get("captures") or q.get("opened_via")):
-            _attach(q, record)  # words he wrote on a face meanwhile: the record keeps them, and gains the delivery
-        elif not q.get("message_id"):
-            q.update(record)
-        else:  # manual re-trigger: the new message becomes current; the old one still accepts replies
-            replaced = q["message_id"]
-            old = dict(q)
-            before = [*(q.get("previous_message_ids") or []), replaced]
-            if q.get("opener") and not q.get("program"):  # the replaced message keeps that opener when it folds
-                q["earlier_openers"] = [*(q.get("earlier_openers") or []), q["opener"]][-EARLIER_OPENERS:]
-            if q.get("program") and q.get("sent_at"):  # (practices' records stay as they were)
-                # the replaced message was current from then on: the sweep matches a message by its send time
-                q["earlier_sent_at"] = [*(q.get("earlier_sent_at") or []), q["sent_at"]]
-            # the entry stays where its replies already are (``capture.entry_stem`` may have moved it off a file
-            # of his): the new record's default stem must not send the next reply elsewhere
-            q.update({k: v for k, v in record.items() if k != "id" and not (k == "stem" and q.get("stem"))})
-            # every earlier message still takes replies: the ones before this re-send, the message it replaced, and
-            # the earlier halves of a phase that went out in two or more messages (``record`` carries the new ones)
-            q["previous_message_ids"] = list(dict.fromkeys([*before, *(record.get("previous_message_ids") or [])]))
-            q.pop("collapsed_at", None)
-            q["needs_edit"] = False
-            for k in FOLD_STATE:  # a new message: its fold starts afresh
-                q.pop(k, None)
-        if q is not None and "platform" not in record:  # sent on Telegram now (its records name none): a platform
-            q.pop("platform", None)  # an earlier send on another one wrote would make it that chat's (``same_chat``)
-    today.note_send(cfg)  # his next message starts a thread (and gets the today block)
-    _archive_sent(cfg, {**record, "id": pid, **({"previous_message_ids": [replaced]} if replaced else {})})
-    if replaced and refold is not None and chat.caps.edit and channel.same_chat(cfg, old):
-        try:
-            try:
-                chat.edit(cfg.chat_id, replaced, refold(old))
-            except ChannelError as e:
-                if refold_bare is None or "parse entities" not in str(e):
-                    raise
-                chat.edit(cfg.chat_id, replaced, refold_bare(old))  # without the opener
-        except ChannelError:
-            pass
-    log.append(f"sent {pid} (opener: {record.get('opener_source')}, wove {len(record.get('asked') or [])} questions)")
-    what = (f"{names.companion} sent {label or f'the {kind} prompt'}{' again' if replaced else ''} at "
-            f"{mirror.stamp(cfg, datetime.fromisoformat(record['sent_at']))}")
-    mirror.to_chat(cfg, what, record["plain_text"], log, ref=("prompts", pid, None))
-    return True
-
-
-ATTACHED = ("message_id", "sent_at", "sent_at_local", "chat_id", "platform")  # what a delivery gives a face's record
-
-
-def _attach(q: dict, record: dict) -> None:
-    """A delivery onto a record his words on a face made (the race of OPEN-PROMPTS rule 3: the scheduled send went out
-    with the tick's opener after he answered). The record keeps its own opener, questions, stem and captures, and
-    gains the delivery's fields, plus what the chat message says (``sent_opener``, ``sent_html``,
-    ``sent_plain_text``), which the fold and the sweep read. ``needs_edit``: the next tick folds the message to
-    "answered" instead of leaving its questions showing."""
-    for k in ATTACHED:
-        if k in record:
-            q[k] = record[k]
-    q["sent_opener"] = record.get("opener")
-    q["sent_opener_source"] = record.get("opener_source")
-    q["sent_html"] = record.get("html")
-    q["sent_plain_text"] = record.get("plain_text")
-    q.pop("collapsed_at", None)
-    q["needs_edit"] = True
-
-
-def fold(cfg: Config, now: datetime, log: list[str]) -> None:
-    """Fold answered or expired prompts (each after its own window, ``capture.window``): a practice's prompt keeps its
-    header and the opener it was sent with and puts a status line where the questions were; a program phase shrinks
-    to its header line. Where the message cannot be edited (a platform without edits, or a prompt sent on another
-    platform before the channel moved) it is closed in the ledger all the same and stays as it was sent.
-
-    A failed edit is retried on later ticks with a doubling wait (``FOLD_RETRY_MINUTES``; the record keeps
-    ``fold_attempts``, the last ``fold_error`` and ``fold_retry_at``, the time it is next due), one try a due tick, and
-    after the first failure that may pass (``ChannelError.permanent`` false: the token, the network) no other message
-    is edited this tick, since they would fail the same way. A fold that can never succeed (a permanent refusal) or
-    has failed ``FOLD_ATTEMPTS`` times is given up: the record is closed as if folded, the message stays as sent, and
-    ``fold_gave_up`` says so (``at``, ``reason``: ``permanent`` | ``attempts``, ``attempts``, ``error``). A permanent
-    give-up is never tried again unless the prompt is sent again. One after its attempts gets one more try each time
-    a reply of his is captured to the prompt after it (``fold_gave_up_captures`` counts them; the try failing gives it
-    up again, so it cannot loop). A fold that succeeds clears the retry fields, and since the channel works again,
-    makes the folds waiting out a backoff due on the next tick (still one try each a tick)."""
-    todo = []
-    for p in ledger.snapshot(cfg.ledger_path)["prompts"]:
-        if not p.get("message_id"):
-            continue
-        again = False  # a fold given up after its attempts, owed one more try by a later reply
-        if p.get("fold_gave_up"):
-            again = _fold_owed_again(p)
-            if not again:
-                continue
-        expired = not p.get("collapsed_at") and now - datetime.fromisoformat(p["sent_at"]) >= capture.window(cfg, p)
-        if p.get("phase_open") and not expired:
-            continue  # a program phase still taking answers folds when the run moves on (or when it expires)
-        if p.get("fold_retry_at") and now + FOLD_SLACK < datetime.fromisoformat(p["fold_retry_at"]):
-            continue  # a failed fold waits its turn
-        if expired or p.get("needs_edit") or again:
-            todo.append(p)
-    chat = cfg.channel() if todo else None
-    held = False  # a failure that may pass: the messages after it wait for the next tick, untried, attempts unspent
-    through = False  # an edit went through: the channel works, so folds waiting out a backoff need not wait
-    failed = set()  # ... except one that failed this very tick
-    for p in todo:  # network calls happen outside the ledger lock
-        answered = bool(p.get("captures"))
-        status = "answered ✓" if answered else "missed — reply anytime"
-        error = None
-        editable = chat.caps.edit and channel.same_chat(cfg, p)
-        if editable and held:
-            continue
-        try:
-            if editable:
-                _fold_edit(cfg, chat, p, status, log)
-        except ChannelError as e:
-            error = e
-        gave_up = wait = None
-        with ledger.locked(cfg.ledger_path) as data:
-            q = ledger.find(data, p["id"])
-            if q is None:
-                continue
-            if error is not None:
-                attempts = q["fold_attempts"] = q.get("fold_attempts", 0) + 1
-                q["fold_error"] = str(error)
-                if error.permanent or attempts >= FOLD_ATTEMPTS or q.get("fold_gave_up"):
-                    q.pop("fold_retry_at", None)
-                    gave_up = q["fold_gave_up"] = {"at": now.isoformat(), "attempts": attempts, "error": str(error),
-                                                   "reason": "permanent" if error.permanent else "attempts"}
-                    if error.permanent:
-                        q.pop("fold_gave_up_captures", None)
-                    else:  # his replies so far; the next one earns one more try (``_fold_owed_again``)
-                        q["fold_gave_up_captures"] = len(p.get("captures") or [])
-                else:
-                    wait = FOLD_RETRY_MINUTES[attempts - 1]
-                    q["fold_retry_at"] = (now + timedelta(minutes=wait)).isoformat()
-            else:
-                for k in FOLD_STATE:
-                    q.pop(k, None)
-            if wait is None:  # folded, closed, or given up
-                q["collapsed_at"] = q.get("collapsed_at") or now.isoformat()
-                if gave_up or len(q.get("captures", [])) == len(p.get("captures", [])):
-                    q["needs_edit"] = False  # a reply that landed mid-edit keeps its flag (a fold given up is done)
-        if error is None:
-            through = through or editable
-            log.append(f"folded {p['id']} ({status})" if editable else
-                       f"closed {p['id']} ({status}; {channel.platform_of(p)} cannot edit it here, so it stays as sent)")
-            continue
-        held = held or not error.permanent
-        failed.add(p["id"])
-        if gave_up:
-            why = "refused for good" if error.permanent else f"{gave_up['attempts']} attempts"
-            log.append(f"{p['id']}: fold failed ({error}); given up ({why}): closed, the message stays as sent")
-        else:
-            log.append(f"{p['id']}: fold failed ({error}); trying again in {wait} min")
-    if through:
-        _folds_due_again(cfg, now, log, failed)
-
-
-def _fold_owed_again(p: dict) -> bool:
-    """Whether a fold given up after its attempts is owed one more try: a reply of his was captured to the prompt
-    since (a permanent refusal never is; a record given up before the count was kept is not)."""
-    gave = p.get("fold_gave_up") or {}
-    seen = p.get("fold_gave_up_captures")
-    return gave.get("reason") == "attempts" and isinstance(seen, int) and len(p.get("captures") or []) > seen
-
-
-def _folds_due_again(cfg: Config, now: datetime, log: list[str], failed: set) -> None:
-    """After an edit went through, the folds waiting out a backoff after a failure that may pass (the token, the
-    network) are due on the next tick rather than at the end of their wait: whatever failed them has passed. Not one
-    that failed this tick (``failed``): its own failure is newer than the success."""
-    moved = []
-    with ledger.locked(cfg.ledger_path) as data:
-        for q in data.get("prompts") or []:
-            due = q.get("fold_retry_at")
-            if due and q.get("id") not in failed and not q.get("fold_gave_up") and datetime.fromisoformat(due) > now:
-                q["fold_retry_at"] = now.isoformat()
-                moved.append(q["id"])
-    if moved:
-        log.append(f"an edit went through: {len(moved)} fold(s) waiting to retry are due on the next tick")
-
-
-def _fold_edit(cfg: Config, chat, p: dict, status: str, log: list[str]) -> None:
-    """Edit one prompt's message to its fold; raises ``ChannelError``."""
-    bare = None  # the fold without the opener, for a message Telegram cannot parse with it
-    if p.get("program"):  # a phase message: its header line, from what the record says
-        folded = compose.folded_phase_html(p, "answered ✓" if p.get("captures") else "open — reply anytime", cfg.names)
-    else:
-        # the opener is the record's own (what was sent, the plain one after a fallback), under the check the
-        # web app makes of it; nothing is read from the chat, so a fold never carries what was said off the record
-        practice = library.for_prompt(cfg, p)
-        sent_local = datetime.fromisoformat(p["sent_at"]).astimezone(cfg.tz)
-        folded = compose.telegram_html(practice, sent_local, capture.stored_opener(cfg, p, sent=True), status,
-                                       cfg.names)
-        bare = compose.telegram_html(practice, sent_local, None, status, cfg.names)
-    try:
-        chat.edit(p["chat_id"], p["message_id"], folded)
-    except ChannelError as e:
-        if bare is None or "parse entities" not in str(e):
-            raise
-        log.append(f"{p['id']}: the opener could not be parsed ({e}); folding without it")
-        chat.edit(p["chat_id"], p["message_id"], bare)
-
-
 def _transcribing(p: dict) -> bool:
     return any(c.get("transcript") == "pending" for c in p.get("captures") or [])
 
@@ -533,7 +242,7 @@ def process_audio(cfg: Config, now: datetime, log: list[str]) -> None:
     A failing backend is an outage: the file waits (``outage``: retried at most every 30 minutes for up to
     7 days) without using an attempt. An empty transcript is a bad result and counts as one."""
     alerts: list[str] = []
-    down = False
+    down, ran = False, 0
     for p in ledger.snapshot(cfg.ledger_path)["prompts"]:
         if down:
             break
@@ -543,6 +252,9 @@ def process_audio(cfg: Config, now: datetime, log: list[str]) -> None:
                 continue
             if outage.waiting(c, now):
                 continue
+            if ran:  # between transcriptions (``ticklock``)
+                ticklock.pause()
+            ran += 1
             path = cfg.root / c["audio"]
             meta = dict(c.get("meta") or {})
             for k, v in audio.probe(cfg, str(path)).items() if path.is_file() else ():
@@ -644,6 +356,8 @@ def process_images(cfg: Config, now: datetime, log: list[str]) -> None:
                     log.append(f"image descriptions: {limit} asked for this tick; the rest wait for the next "
                                "(paced catch-up)")
                     break
+                if asked:  # between model calls (``ticklock``); the block is checked again before the note is written
+                    ticklock.pause()
                 asked += 1
                 try:
                     text = agent.ask(cfg, images.describe_request(name), 120, toolsets="none", image=str(path))
@@ -711,6 +425,8 @@ def annotate(cfg: Config, now: datetime, log: list[str]) -> None:
             continue  # he may still be writing: wait for quiet, so his later words are annotated with the rest
         if outage.waiting(p, now, cfg):
             continue
+        if asked:  # between model calls (``ticklock``); the entry is read after it
+            ticklock.pause()
         body = path.read_text(encoding="utf-8")
         if not entries.annotations_pending(body):
             continue
@@ -791,128 +507,6 @@ def _last_words(snap: dict, p: dict) -> datetime:
     return max(t for t in map(_newest_words, _entry_prompts(snap, p)) if t is not None)
 
 
-def _reply_target(p: dict) -> str | None:
-    """The captured message the annotations answer: the first capture that has a Telegram message id (digits; a
-    capture from anywhere else has none, and the annotations then go to the chat unthreaded)."""
-    for c in p.get("captures") or []:
-        mid = str(c.get("platform_message_id") or "")
-        if mid.isdigit():
-            return mid
-    return None
-
-
-def _reply_owed(p: dict) -> bool:
-    """An annotation reply still to send: annotated, not sent, not skipped, attempts left."""
-    reply = p.get("annotation_reply") or {}
-    return bool(p.get("annotated_at")) and not reply.get("message_id") and not reply.get("skipped") \
-        and reply.get("attempts", 0) < REPLY_ATTEMPTS
-
-
-def _skip_annotation_replies(cfg: Config, now: datetime, log: list[str]) -> None:
-    """No chat (``channel.platform: none``): each reply not sent is marked skipped, ``no chat``, and never sent,
-    also once a chat is configured later and replies are on (the owner, 2026-11-09). The annotations stay in the entry;
-    ``standing`` tells the companion how many there were, never their words. Nothing is attempted (rule 6)."""
-    skipped = 0
-    with ledger.locked(cfg.ledger_path) as data:
-        for p in data["prompts"]:
-            if _reply_owed(p):
-                p.setdefault("annotation_reply", {}).update(skipped="no chat", skipped_at=now.isoformat())
-                skipped += 1
-    if skipped:
-        log.append(f"no chat: {skipped} annotation repl{'y' if skipped == 1 else 'ies'} skipped (in the entries)")
-
-
-def _newest_words(p: dict) -> datetime | None:
-    """When his newest words in a prompt's captures were written (what an annotation reply answers)."""
-    times = []
-    for c in p.get("captures") or []:
-        try:
-            times.append(datetime.fromisoformat(c["at"]))
-        except (KeyError, TypeError, ValueError):
-            continue
-    return max(times, default=None)
-
-
-def _skip_stale_reply(cfg: Config, p: dict, now: datetime, newest: datetime, log: list[str]) -> None:
-    """An annotation reply that would come more than ``recovery.stale_hours`` after his words is not sent: it is
-    marked skipped, ``stale``, and stays in the entry (after an outage, or a tick that did not run)."""
-    with ledger.locked(cfg.ledger_path) as data:
-        q = ledger.find(data, p["id"])
-        if q is None:
-            return
-        q.setdefault("annotation_reply", {}).update(skipped="stale", skipped_at=now.isoformat())
-    hours = (now - newest).total_seconds() / 3600
-    log.append(f"{p['id']}: annotation reply not sent: stale ({hours:.0f} h after {cfg.names.possessive} words; "
-               "the annotations are in the entry)")
-
-
-def reply_annotations(cfg: Config, now: datetime, log: list[str]) -> None:
-    """Send each new annotation to the chat as a reply to the message it annotates (as a message of its own where the
-    platform has no replies, or the prompt was made on another platform); exactly once.
-
-    Oldest first, within the chat's pace (``outage.chat_room``: a few a tick, a few an hour; the rest wait for a later
-    tick), and never later than ``recovery.stale_hours`` after his words (``_skip_stale_reply``). After an outage, the
-    replies to what he wrote while she was away are not sent one by one: one catch-up message goes in their place
-    (``recovery.held``; they are sent as before when it cannot be written)."""
-    if not cfg.has_channel:   # (also with replies switched off: turned on later, they must not send the backlog)
-        _skip_annotation_replies(cfg, now, log)
-        return
-    if not cfg.telegram.get("annotation_replies", True):
-        return
-    chat = None
-    owed = [p for p in ledger.snapshot(cfg.ledger_path)["prompts"] if _reply_owed(p)]
-    held = recovery.held(cfg, now) if owed else set()  # (after an outage: one letter in place of these, ``recovery``)
-    if held & {p["id"] for p in owed}:
-        n = len(held & {p["id"] for p in owed})
-        log.append(f"{n} annotation repl{'y waits' if n == 1 else 'ies wait'} for the catch-up message after the outage")
-        owed = [p for p in owed if p["id"] not in held]
-    owed.sort(key=lambda p: _newest_words(p) or datetime.fromisoformat(p.get("annotated_at") or now.isoformat()))
-    room, waiting = outage.chat_room(cfg, now), 0
-    for p in owed:
-        newest = _newest_words(p)
-        if newest is not None and now - newest > outage.stale_after(cfg):
-            _skip_stale_reply(cfg, p, now, newest, log)
-            continue
-        if room <= 0:
-            waiting += 1
-            continue
-        path = Path(p.get("entry_path") or "")
-        text = entries.annotations(path.read_text(encoding="utf-8")) if path.is_file() else ""
-        error, mid = None, None
-        if not text:
-            error = "no annotations in the entry"
-        else:
-            try:
-                chat = chat or cfg.channel()
-                here = channel.same_chat(cfg, p)  # (a prompt made before the channel moved: no reply into the old chat)
-                mid = chat.send((p.get("chat_id") or cfg.chat_id) if here else cfg.chat_id,
-                                compose.annotation_html(p["kind"], text, cfg.names),
-                                reply_to=_reply_target(p) if here else None)
-            except (ChannelError, ValueError) as e:  # one prompt's bad reply never stops the others'
-                error = str(e)
-        with ledger.locked(cfg.ledger_path) as data:
-            q = ledger.find(data, p["id"])
-            if q is None:
-                continue
-            r = q.setdefault("annotation_reply", {})
-            if mid:
-                r.update(message_id=mid, sent_at=now.isoformat(), reply_to=_reply_target(q))
-                r.pop("error", None)
-            else:
-                r["attempts"] = r.get("attempts", 0) + 1
-                r["error"] = (error or "")[:300]
-        if mid:
-            room -= 1
-            log.append(f"replied to {p['id']} with its annotations")
-            what = (f"{cfg.names.companion}'s annotations on {Path(p.get('entry_path') or p['id']).stem}, sent at "
-                    f"{mirror.stamp(cfg, now)} as a reply to {cfg.names.possessive} entry")
-            mirror.to_chat(cfg, what, text, log, ref=("prompts", p["id"], "annotation_reply"))
-        else:
-            log.append(f"{p['id']}: annotation reply failed ({error})")
-    if waiting:
-        log.append(outage.pace_note(cfg, waiting, "annotation repl" + ("y" if waiting == 1 else "ies")))
-
-
 def _reflect(cfg: Config, now: datetime, log: list[str]) -> None:
     alerts = reflect.run(cfg, now, log)
     if alerts:
@@ -932,30 +526,6 @@ def _work_left(cfg: Config, p: dict) -> bool:
     if _transcribing(p):
         return True
     return images.describing(cfg) and any(c.get("describe") == "pending" for c in p.get("captures") or [])
-
-
-def prune_sent(cfg: Config, cutoff: str) -> None:
-    """Drop ``sent.jsonl`` lines sent before ``cutoff`` (ISO); the file is rewritten only when something goes."""
-    path = cfg.state_dir / "sent.jsonl"
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-        keep = []
-        for line in lines:
-            try:
-                when = json.loads(line).get("sent_at") or ""
-            except (json.JSONDecodeError, AttributeError):
-                when = ""
-            if not when or when >= cutoff:  # no readable date: keep rather than lose it by accident
-                keep.append(line)
-        if len(keep) == len(lines):
-            return
-        fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=".sent-")
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write("".join(l + "\n" for l in keep))
-        os.chmod(tmp, 0o600)
-        os.replace(tmp, path)
-    except OSError:
-        pass  # engine-private memory; the ledger is what matters
 
 
 def prune(cfg: Config, now: datetime) -> None:
@@ -1011,17 +581,13 @@ def run_backfill(cfg: Config, since, write: bool) -> tuple[int, list[str]]:
     reads: no lock, nothing created (not even the state dir)."""
     if not write:
         return 0, conversations.backfill(cfg, since, False)
-    cfg.state_dir.mkdir(parents=True, exist_ok=True)
-    with open(cfg.state_dir / "tick.lock", "a+") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+    with ticklock.waited(cfg):
         return 0, conversations.backfill(cfg, since, write)
 
 
 def run_sweep(cfg: Config) -> tuple[int, list[str]]:
     """``journal sweep``: one reconciliation pass now, waiting for a running tick."""
-    cfg.state_dir.mkdir(parents=True, exist_ok=True)
-    with open(cfg.state_dir / "tick.lock", "a+") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+    with ticklock.waited(cfg):
         log: list[str] = []
         n = sweep.run(cfg, datetime.now(timezone.utc), log)
         if not log:
@@ -1064,18 +630,39 @@ def files_as_error(line: str) -> bool:
     return "failed" in line or line.startswith(sweep.WITHHELD)
 
 
+# The scheduled tick's safe points between steps (``ticklock.pause``): before each of these, a waiting ``journal send``
+# or ``journal program …`` (or sweep, or backfill) takes ``tick.lock`` and the tick takes it back after it, with the
+# same ``now``. A step reads the ledger, runs, entries and the chat afresh when it starts, so what the waiter did is
+# simply there. Every send stays under the lock and every ledger record of a send or an opening takes the real time
+# (``send_prompt``, ``programs._open``), so the ledger's order of sends is the chat's. Not before ``send``: the tick's
+# interrupts and its practices go out together, a ritual due in the same tick the newest message (as before). Not
+# before ``sweep`` or ``conversations``: they read the chat right after the privacy pass, and call no model, so a
+# yield there would gain a waiter nothing. A tick's ``now`` already lagged the clock by its model calls; a yield adds the
+# waiter's time, and every comparison with ``now`` in the later steps errs towards "not yet" (the next tick's).
+# Inside a step, the loops that call a model once per item yield between items too (``annotate``, ``process_images``,
+# ``process_audio``, ``reflect.run``): no lock held there, and what they carry across items is theirs alone.
+YIELDS_BEFORE = frozenset({"privacy", "programs", "fold", "audio", "images", "annotate", "reply", "reflect", "recover",
+                           "mirror", "cache", "prune", "notebook"})
+
+
+@contextlib.contextmanager
+def _waited(cfg: Config):
+    with ticklock.waited(cfg):
+        yield True
+
+
 def run(cfg: Config, only: str | None = None, dry_run: bool = False,
         hold_off_record: bool = False) -> tuple[int, list[str]]:
     """One tick (or a manual send of ``only``). Returns (exit code, log lines).
 
-    A scheduled tick skips this round when another tick holds the lock; a manual send waits for it. With
-    ``hold_off_record`` a manual send is not made while a bare ``/x`` window is open (``_held_off_record``).
+    A scheduled tick skips this round when another tick is running or the lock is held; a manual send waits for it.
+    A scheduled tick lets a waiting send or program step go first at its safe points (``YIELDS_BEFORE``,
+    ``ticklock``). With ``hold_off_record`` a manual send is not made while a bare ``/x`` window is open
+    (``_held_off_record``).
     """
-    cfg.state_dir.mkdir(parents=True, exist_ok=True)
-    with open(cfg.state_dir / "tick.lock", "a+") as lock:
-        try:
-            fcntl.flock(lock, fcntl.LOCK_EX if only else fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
+    hold = _waited(cfg) if only else ticklock.scheduled(cfg)
+    with hold as ours:
+        if not ours:
             return 0, []
         now = datetime.now(timezone.utc)
         now_local = now.astimezone(cfg.tz)
@@ -1106,6 +693,8 @@ def run(cfg: Config, only: str | None = None, dry_run: bool = False,
                       ("notebook", lambda: notebook.sweep(cfg, now))]
         down = outage.known(cfg)  # (before and after: a line when this run found an outage, or saw one end)
         for name, step in steps:
+            if name in YIELDS_BEFORE:
+                ticklock.pause()  # (a send or program step waiting for tick.lock goes first: ``ticklock``)
             try:
                 step()
             except Alert as e:

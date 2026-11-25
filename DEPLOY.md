@@ -16,22 +16,203 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
-## X-PHOTO-REPLY — her reply after an unanswered captionless photo is saved (2026-11-24; tick and hook side; **gateway restart required**; no config or state change)
+## X-PHOTO-MARK — a `/x` photo, document or video is private by its own mark (2026-11-25; hook and tick side; **gateway restart required**; no config or state change)
 
-**What changes.** The owner's decision on issue #10, a deliberate weakening recorded in DECISIONS.md (X-PHOTO-REPLY):
-when a captionless photo sent inside a bare-`/x` window got no row of hers, her reply to his next public message
-after the window is saved (before, it was kept off the record with the photo). Only `privacy.compute` changes; the
-photo, its picture and its copies stay private, and every other input stays as private as before.
-**Side and restart.** `privacy.py` is loaded by the gateway (CLAUDE.md's import check lists it), so the hook side
-(the tool guard's end state, the hook's own view) keeps the old answer until `hermes gateway restart`: until then the
-guard still refuses the journal's writes in her turn on that message, which errs private. The tick runs it from its
-next run: its saved pass and the conversation writer save the reply from then on. Ride the next gateway window with
-the pin move. Nothing serve side.
+**What changes.** Issue #93. A `/x` photo, document or video with no other words, sent outside any off-the-record
+window, is now private in the privacy pass and takes her turn off the record (before, in text image mode, only his
+own row was held back, and her reply to it, or to his next public message when she had not answered it, read public
+to annotation alignment and the catch-up letter). A caption after the hook's marker is read as his caption, and
+Hermes' current vision note is read by its shape. Only more private: nothing that holds no mark changes.
+DECISIONS.md, X-PHOTO-MARK.
+**Side and restart.** `privacy.py` and `hermes/transcript.py` are loaded by the gateway at import (the hook's window
+check, the tool guard), so **the restart is required**: until it, the gateway's tool guard reads a `/x` photo outside a
+window as before (her turn on it is not refused journal writes by the guard; `tools.call`'s own check reads the same
+old pass). The tick runs the new pass from its next run, and saves its result, so the readers there (writer, sweep,
+alignment, catch-up) have it at once. Ride the next gateway window with the pin move. Serve: nothing to do (it reads
+no chat).
 **First checks.**
 - After the restart, the gateway's log has no `journal` hook exception, and a reply to a prompt is captured as before.
-- The next tick's log has no `privacy pass could not run` line.
-**Rollback.** The plugin and the CLI at the previous sha, and a gateway restart. A reply saved meanwhile stays in its
-entry: rolling back does not remove it (the engine never removes words it has written).
+- The next tick's log has no `privacy pass could not run`.
+- No live `/x` probe is needed; the behaviour is pinned by `tests/test_privacy_x_photo.py`.
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
+previous sha), `hermes gateway restart`. Nothing to undo in state: the saved pass is recomputed every tick, and rows
+it saved as private stay private (a floor).
+
+## DAY-VIEW — a day as one log in the web app (2026-11-25; serve side only; **no gateway restart**; no config or state change)
+
+**What changes.** A new page, `/days/<date>`: every line of every entry filed under one day (chat notes, `/j` and web
+notes, a prompt entry's words and the conversation under it) in time order, her replies folded, each hour a link to
+the line in its entry (issue #82, part 1). A new route `GET /api/v1/days/{date}` (`daylog.day`, read-only over the
+entry files and the ledger, fenced like the other routes: `tests/test_serve_privacy.py` and the route-opens walk). The
+Entries list's day numerals link to it, Today's *Written today* ends with *The whole day, as one log*, and an entry
+opened from a line scrolls to that block. The service worker keeps the day's answer for offline reading. DECISIONS.md,
+DAY-VIEW.
+**Side and restart.** Serve side only: `src/journal/daylog.py` is new and imported by `serve/api.py` alone (the gateway
+does not load it: CLAUDE.md's import check lists neither), and the web build is in `serve/static/`. `uv tool install
+--force` at the merge sha and `systemctl --user restart journal-serve`. The gateway and the tick are untouched.
+**First checks.**
+- `curl` with the token: `GET /api/v1/days/<a day with entries>` answers 200 with `lines` in time order; `GET
+  /api/v1/days/2026-13-40` answers 400.
+- In the web app: the Entries list's day numeral opens the day; a line's hour opens its entry at that block; her
+  replies open in place; a phone shows it in one column with nothing scrolling sideways.
+- After an install the PWA shows "Update available": reload once.
+**Rollback.** `uv tool install --force` at the previous sha and `systemctl --user restart journal-serve`. Nothing to
+undo in state.
+
+## NOTES-JOURNAL-DAY — notes follow the journal day (2026-11-25; hook, tick and serve side; **gateway restart required**; no config or state change)
+
+**What changes.** A note (a chat `/j`, a chat thread that became a note, the web app's *A note*, `journal write`,
+MCP's `journal_save`) put down before `windows.day_ends_at` (default 04:00) is filed under the day before, as a
+prompt answered then already was: a 00:30 note is `<last night's date>-j.md` (issue #82). Today shows the journal
+day: the web app's Today and its week strip, and the chat's today block (its header, practices, *entries today*, the
+latest reflection) read last night's day until `day_ends_at`; the block's "a new day starts a new block" turns at
+`day_ends_at` instead of midnight, and `journal status`' block count is per journal day. The day reflection, `GET
+/days` and the Entries list key on the entry's date, so they read the new notes on the same day. **No file is moved**:
+a note filed by the calendar date before this change stays under that date. DECISIONS.md, NOTES-JOURNAL-DAY.
+**On review (the owner's decision, 2026-11-25): the day reflection waits for the journal day to end.** It is no
+longer written when the evening entry is annotated (~22:40) but once `day_ends_at` has passed (04:00 by default), so
+it reads the after-midnight notes; the week review likewise waits for its Sunday to end (Monday 04:00). Both are now
+sent **silently** (they come in the night). A reply to a reflection (a reply to its message) is never filed as the
+answer to the morning prompt that may be open by then (`capture.match`, the sweep and the conversation writer leave it
+to the writer, which files it as a reply to the reflection). Her own note with no date follows the journal day. The
+today block names both days between midnight and `day_ends_at` ("journal day Thu 15 Oct 2026 · now Fri 00:35"), and
+says which day the tasks (still the calendar date's) are due. `GET /today` gains `calendar_date`. The first night after
+the deploy: a reflection already written that evening is unaffected; the next one comes at 04:00.
+**Side and restart.** `config.py`, `capture.py`, `conversations.py`, `today.py`, `slots.py`, `reflect.py`, `sweep.py`,
+`ledger.py` and `status.py` are all
+loaded by the gateway at import (CLAUDE.md's import check lists them), so **the restart is required**: until it, a
+`/j` the hook saves and the today block keep the calendar date while the tick's auto notes and the faces use the
+journal day. Ride the next gateway window with the pin move. The tick runs it from its next run. Serve side
+(`serve/api.py` and the core it imports): `uv tool install --force` at the merge sha and `systemctl --user restart
+journal-serve`.
+**First checks.**
+- After the restart, the gateway's log has no `journal` hook exception, and a reply to a prompt is captured as before.
+- Between midnight and `day_ends_at` (or with `JOURNAL_CONFIG` pointing at a copy whose `windows.day_ends_at` is a
+  few minutes ahead, on a temporary root): a note from the web app lands as `<yesterday>-j…md`, and Today's date and
+  *Written today* show yesterday with that note in it. After `day_ends_at`, Today shows the new day.
+- `journal doctor`'s day reflection row reads "once the day has ended, after the evening entry is annotated, …".
+- The next morning: `journal status` shows the day reflection written after `day_ends_at` (not at ~22:40), sent
+  silent; the morning prompt goes out as before.
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
+previous sha), `hermes gateway restart`, and serve's `uv tool install --force` at the previous sha with its restart.
+Nothing to undo in state: notes filed under last night's date stay there, as any entry does.
+
+## CHAT-2 — one send operation, `chat.deliver`, for the five kinds of send the engine makes on its own (2026-11-25; tick and hook side; **gateway restart**; no config or state change)
+
+**What changes.** Issue #43, its second step. `journal/chat/deliver.py`'s `deliver` sends one message to the
+journal's chat, lets its caller record the outcome, and mirrors what the caller says into the companion's session.
+The five kinds of send now go through it, each keeping its own rules and its own ledger account exactly: prompts,
+program phases and interrupts (`chat.send.send_prompt`), annotation replies (`chat.replies`), reflections and week
+reviews (`reflect.send`), the catch-up letter (`recovery._send`) and a program session's summary
+(`programs._send_summary`). No ledger field, message text, keyword, log line, mirror row or alert changes; the rules
+about whether anything is owed (no chat, `/x`, pacing, staleness, the letter's hold) stay where they were.
+DECISIONS.md, CHAT-2.
+**Side and restart.** `programs.py`, `recovery.py` and `reflect.py` change, and the gateway loads them at import; it
+now loads `journal.chat` and `journal.chat.deliver` too (the import check above: those two are added, nothing is
+removed). So this rides a **gateway restart** (`hermes gateway restart`, in a window). The tick and the spawned
+one-shots run it from the next tick once the plugin pin moves. Serve loads `programs` through the engine but never
+sends in-process (it spawns `journal send` / `journal program`); `uv tool install --force` at the merge sha keeps what
+it spawns on the same code.
+**First checks.**
+- `journal doctor`: no new failure.
+- The next ticks' `last-tick.json` lines read as before: `sent <id> (opener: …)`, `replied to <id> with its
+  annotations`, `sent reflection-<date> to <platform>`, `sent the catch-up for <id> (…)`; a session summary logs
+  nothing on success, as before.
+- The companion's session gets the same mirror rows after each send (`mirror-queue.json` empties as before).
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>`, the CLI at the
+previous sha, and a gateway restart. Nothing on disk changed, so nothing else.
+
+## CHAT-1 — the tick's send, fold and annotation replies move into `journal/chat/` (2026-11-25; tick side; **no gateway restart needed**; no config or state change)
+
+**What changes.** Issue #43, its first step: a pure move, no behaviour change. `send_prompt` and its ledger account
+(`count_send_failure`, `_attach`, `sent.jsonl`'s `_archive_sent` and `prune_sent`) move to `journal/chat/send.py`,
+`fold` to `journal/chat/fold.py`, `reply_annotations` to `journal/chat/replies.py`, and `Alert` to `journal/alert.py`.
+Every definition is byte for byte what it was in `tick.py`, and `tick` still exports every moved name (the same
+objects), so `programs`, `ops`, `cli` and anything else that reaches them through `tick` is unchanged. The tick's steps,
+their order, its yield points and its locks are untouched. DECISIONS.md, CHAT-1.
+**Side and restart.** The code that moves runs in the tick and in what the tick's names are called from (`journal
+send`, `journal program …`), all fresh processes, which run it from the next tick once the plugin pin moves. The
+gateway does not load `tick` or `journal/chat/` at import (the import check above lists the same modules before and
+after this change), and the modules it does load (`capture.py`, `programs.py`, `slots.py`, `sweep.py`) change in
+docstrings and comments only; it never sends a prompt or folds in-process (it spawns `journal send` / `journal
+program`). So **no gateway restart is needed**; the next window's restart picks the docstrings up. Serve does not load
+any of this; `uv tool install --force` at the merge sha keeps what serve spawns on the same code.
+**First checks.**
+- `journal doctor`: no new failure.
+- The next ticks' `last-tick.json` lines read as before (a sent prompt: `sent <id> (opener: …)`; a fold: `folded <id>
+  (…)`; an annotation reply: `replied to <id> with its annotations`).
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` and the CLI at the
+previous sha. Nothing on disk changed, so nothing else.
+
+## TODAY-QUICK-J — a line put down from Today (2026-11-25; serve side only; **no gateway restart**; no config or state change)
+
+**What changes.** Today has a one-line box under the week strip: Enter (or *Put down*) saves the line as a note,
+exactly as `/j` does in the chat (`POST /entries` with no practice: `actions.note`). The write room is unchanged and
+stays for longer pieces. `/x` is refused by the server as on every face, and the words stay in the box (issue #82,
+part 3). DECISIONS.md, TODAY-QUICK-J.
+**Side and restart.** The web app only (`web/`, built into `serve/static/`); no Python changes. `uv tool install
+--force` at the merge sha and `systemctl --user restart journal-serve`; the PWA then offers "Update available".
+**First checks.**
+- On Today, a line typed and Enter: "Saved as a note.", the box empties, and *Written today* lists it.
+- `/x something` typed there: refused with the server's reason, nothing saved (no new file under the configured
+  `root`), the words still in the box.
+**Rollback.** `uv tool install --force` at the previous sha and the serve restart. Notes made stay, as any note does.
+
+## TICK-LOCK-YIELD — the tick lets a waiting `/next` or send go first (2026-11-24; tick side; **no gateway restart needed**; no config or state change)
+
+**What changes.** Issue #45. A `/next`, a phase step, `/start` or the web app's Send (each a spawned `journal program …`
+or `journal send`) no longer waits for the whole tick when the tick is calling a model: the tick yields `tick.lock` at
+its safe points (between steps; between annotations, picture descriptions, transcriptions and reflections) and takes
+it back after the waiter. The wait is now the rest of one step or one model call (at most one budget; the longest is
+a reflection, 480 s), not the sum over the tick (about 17 minutes at worst). New module `ticklock.py`; two new lock
+files under `state_dir`, made on first use: `tick-wait.lock` (a waiter's flag) and `tick-run.lock` (held by a
+running tick, so a tick that starts while another is yielded skips its round). DECISIONS.md, TICK-LOCK-YIELD.
+**Side and restart.** The code that changes runs only in the CLI's own processes: the tick (`tick.run`, the steps'
+loops), and the spawned `journal send` / `journal program …` / `journal sweep` / `journal backfill-conversations`
+(`ticklock.waited`, `programs.locked`). The gateway loads `programs.py`, `reflect.py` and `ticklock.py` at import
+(the import check above lists them), but it never takes `tick.lock` itself (it spawns those commands) and
+`ticklock.pause` does nothing outside a scheduled tick, so a gateway still on the old code changes nothing: **no
+gateway restart is needed**; the next window's restart picks the code up for consistency. The tick, and what the
+gateway spawns (`python -m journal …` over the plugin's `src`), run the new code as fresh processes once the plugin
+pin moves; what serve spawns runs the `uv tool` install, so `uv tool install --force` at the merge sha (serve itself
+needs no restart: it imports none of this). Until both are moved the versions mix safely: an old waiter raises no
+flag and waits as before; an old tick ignores the flag.
+**First checks.**
+- `journal doctor`: no new failure; `ls <state_dir>/tick-*.lock` shows `tick-run.lock` after the first tick.
+- The next ticks' logs (`last-tick.json`) are as before, and `journal status` shows ticks every five minutes (a
+  tick that is skipped while another runs is silent, as before).
+- During a tick that annotates (or by `/next` while one runs), the `/next` answers within the rest of one model call;
+  the tick's own later steps still run (folds, replies) in that same tick.
+- No harness on the host is needed: `tools/measure_tick_lock.py --calls 3` runs on a temporary root only.
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` and the CLI at the
+previous sha. The two new lock files can stay (nothing old reads them) or be removed while no tick runs.
+Roll back between ticks: an old tick does not know `tick-run.lock`, so one that starts while a new tick is yielded can run a
+whole tick inside the gap.
+
+## PLATFORM-FIELDS — release 1 of 2: a reflection's send and the chat-history source are read under neutral names (2026-11-24; tick and hook side; **gateway restart required**; no config or state change)
+
+**What changes.** Issue #50, the owner's choice of two releases. A reflection's or week review's send record is kept in
+the ledger under `telegram` whatever the platform, and the source of his recent chat messages is `telegram_history` in
+the config. This release **reads** `chat` and `telegram` (new first) and `chat_history` and `telegram_history` (new
+over old), and **writes the old names exactly as before**: nothing on disk, in the config or in `plugin.yaml`
+changes, no warning is added, and a ledger written by this code is the ledger the code before it wrote. The
+point is the next release, which writes the new names and is safe only when every process that reads the ledger
+already knows them. DECISIONS.md, PLATFORM-FIELDS and PLATFORM-FIELDS-R2.
+**Side and restart.** `ledger.py`, `standing.py`, `context.py`, `conversations.py`, `reflect.py`, `outage.py`,
+`mirror.py` and `config.py` are loaded by the gateway (CLAUDE.md's import check lists them), so the hook side keeps
+the old code until `hermes gateway restart`, and **the restart is required**: this release exists so that the gateway,
+the long-lived reader of the ledger, is on code that reads the new names before the next release writes them. Until
+it restarts, nothing is wrong (this release writes only what the old code reads), but release 2 must not ship. Ride
+the next gateway window with the pin move. The tick runs it from its next run. Serve and MCP read none of these
+fields; serve side needs no step (`uv tool install --force` at the merge sha keeps the CLI and the pin on one sha).
+**First checks.**
+- After the restart, the gateway's log has no `journal` hook exception, and a reply to a prompt is captured as before.
+- `journal doctor` is as before (its `source telegram_history` row keeps its name); `same version as tick` is ok.
+- `journal status` after a tick shows the recent reflections as before, and the next reflection is sent once and
+  recorded under `telegram` in the ledger (no `chat` key appears on any record).
+- Record the time of the gateway restart: release 2 waits for it (DECISIONS.md, PLATFORM-FIELDS-R2).
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
+previous sha), `hermes gateway restart`. Nothing to undo in state: no record carries a new name.
 
 ## X-FLOOR — `/x` refused at the bottom of the write path; `/j /x` off the record (2026-11-24; hook, tick and serve side; **gateway restart required**; no config or state change)
 

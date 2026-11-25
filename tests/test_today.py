@@ -101,14 +101,20 @@ class ThreadStartTest(Base):
 
 
 class DayChangeTest(Base):
-    def test_a_chat_that_runs_past_midnight_meets_the_new_day(self):
+    def test_a_chat_that_runs_past_day_ends_at_meets_the_new_day(self):
+        """The block names the journal day (issue #82): midnight is no new day, ``windows.day_ends_at`` (04:00) is."""
         for day in (15, 16):
             (self.cfg.root / f"2026-10-{day}-j.md").write_text(
                 "---\ntype: journal\nkind: j\n---\n# Note\n\n## Theo\n\nsomething on the day\n", encoding="utf-8")
         self.assertIn("Thu 15 Oct", self.build(at(23, 30)))
         self.assertIsNone(self.build(at(23, 50)))
-        self.assertIn("Fri 16 Oct", self.build(at(0, 10, day=16)))
+        self.assertIsNone(self.build(at(0, 10, day=16)))       # (still Thursday's journal day: no second block)
         self.assertIsNone(self.build(at(0, 40, day=16)))
+        for t in (1, 2, 3):                                    # (a quiet chat: each message within 45 minutes)
+            self.build(at(t, 20, day=16))
+        self.assertIsNone(self.build(at(3, 50, day=16)))
+        self.assertIn("Fri 16 Oct", self.build(at(4, 10, day=16)))
+        self.assertIsNone(self.build(at(4, 40, day=16)))
 
     def test_a_start_that_found_nothing_to_say_is_not_spent(self):
         self.cfg.root.mkdir(parents=True, exist_ok=True)

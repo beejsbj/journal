@@ -87,6 +87,11 @@ composer's own (`useCompose`). `/design` (linked from Settings) draws every part
   left out when `/today` says `chat: false` (a journal with no chat).
 - Program card for each active run: "Session 3/10 · The Identity Construction Tracer · Phase 2/5 open since
   Sunday", buttons *Continue* (opens the Run screen), *Pause*.
+- **A line for today** (issue #82): under the week strip, one ruled line in his roman, Enter (or *Put down*) to put it
+  down. It does exactly what `/j` does in the chat: POST `/entries` with the text and no practice (`actions.note`), a
+  note of its own stamped now; "Saved as a note. Open it" for a few seconds after. The composer's rules hold
+  (`useCompose`: the draft kept in the tab, a retry the same write, the offline line); words the server refuses (`/x`,
+  an engine line) stay in the box with its reason and no Retry. The write room stays the place for longer pieces.
 - Scheduled one-offs today (session-10 interrupts) as a quiet list with times.
 - "Carry forward" quote from the latest reflection, linking to it.
 - Tasks due today (plain lines from the tick cache; read-only; absent when the source is off).
@@ -109,6 +114,12 @@ composer's own (`useCompose`). `/design` (linked from Settings) draws every part
 - As built (WEB-UX): the filters are a sentence with menus ("Showing every entry from any practice, newest first"),
   a search line, and a month calendar (`/days`, written days marked) on the same address; weeks, then days as numerals,
   then his first lines with the time beside the practice. No chips.
+- **A day as one log** (issue #82): a day's numeral in the list is a link to `/days/<date>`, every line of every entry
+  filed under that journal day (his words, the conversation under a prompt's entry, chat notes, `/j` and web notes) in
+  time order, from `GET /days/{date}`. Each line's hour opens it in its entry (`#<block key>`); her replies fold under
+  the line they follow (`ui/DayLog`), her words in her ink when opened; a line written after midnight carries its
+  weekday. Read-only, and read offline from the kept copy as an entry is. Today's *Written today* ends with *The whole
+  day, as one log*.
 
 ### 1.3 Entry (the two-voice document)
 
@@ -287,7 +298,7 @@ step is the pinned install; the PWA is already in the package.
   a new `sw.js` (served `no-cache`): the old worker keeps running until the person taps **Update available**, which
   activates the new one and reloads (drafts are in `sessionStorage`, so a reload loses nothing).
 - **Data.** The rules are one allow-list in `swCore.ts`, tested: `GET /api/v1/today`, `/entries` (every page and
-  filter), `/entries/<stem>`, `/days`, `/library`, `/library/<id>`, `/reflections` are **network first** (a 5 s limit),
+  filter), `/entries/<stem>`, `/days`, `/days/<date>`, `/library`, `/library/<id>`, `/reflections` are **network first** (a 5 s limit),
   the answer is stored when it is a `200`, and when the network fails, times out or the server answers `5xx` the stored
   answer (at most 7 days old; the last 200 are kept) stands in, marked `X-Journal-Cache: stale` with the time it was
   stored. Everything else on `/api` is not touched by the worker: writes (any method but GET), `/pair`, `/logout`,

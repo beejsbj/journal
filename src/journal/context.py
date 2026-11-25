@@ -102,7 +102,7 @@ def her_messages(cfg: Config, now_local: datetime) -> list[tuple[datetime, str]]
             add(at, f"your annotations on {what} (a reply to it)",
                 entries.annotations(path.read_text(encoding="utf-8", errors="replace")))
     for r in data.get("reflections") or []:
-        tg = r.get("telegram") or {}
+        tg = ledger.send_of(r)
         at = when(tg.get("sent_at")) if tg.get("message_id") else None
         path = Path(r.get("path") or "")
         if at and path.is_file():
@@ -330,7 +330,7 @@ def make_verifier(cfg: Config, db: Path | None = None):
         return None
 
     def telegram() -> str:
-        if "telegram" not in cache:
+        if "chat" not in cache:
             texts = []
             if chat.source is not None and chat.available():
                 from . import privacy
@@ -343,8 +343,8 @@ def make_verifier(cfg: Config, db: Path | None = None):
                     said = _his_chat_text(r)
                     if said and not conversations.row_is_off(cfg, pv, r, off):  # /x
                         texts.append(said)
-            cache["telegram"] = plain("\n".join(texts))
-        return cache["telegram"]
+            cache["chat"] = plain("\n".join(texts))
+        return cache["chat"]
 
     def verify(source: str, quote_norm: str) -> bool | None:
         q = fold(quote_norm)
