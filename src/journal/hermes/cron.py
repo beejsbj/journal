@@ -9,6 +9,7 @@ differs. Uninstall removes the job and the stub and leaves the journal, state an
 """
 from __future__ import annotations
 
+import ast
 import json
 import os
 import re
@@ -54,6 +55,30 @@ from journal.cli import main  # noqa: E402
 
 raise SystemExit(main(["tick"]))
 '''
+
+
+def stub_src(text: str) -> Path | None:
+    """The ``src`` directory a stub imports ``journal`` from, read back from the stub itself."""
+    m = re.search(r"^SRC = (.+)$", text, re.MULTILINE)
+    try:
+        value = ast.literal_eval(m.group(1)) if m else None
+    except (ValueError, SyntaxError):
+        return None
+    return Path(value) if isinstance(value, str) and value else None
+
+
+def stub_problem(text: str, home: Path) -> str | None:
+    """Why a stub on disk would not run a tick for this profile, or None when it would. It judges what the stub
+    runs (the ``src`` it names, the profile it sets), never the path of whichever install is asking: a doctor run
+    from a ``uv tool`` install sits at another path than the plugin the stub was rendered for, and the stub is right."""
+    src = stub_src(text)
+    if src is None:
+        return "it names no src directory"
+    if text != stub_text(src, home):
+        return "it is not what setup writes for this profile"
+    if not (src / "journal" / "cli.py").is_file():
+        return f"{src} holds no journal package"
+    return None
 
 
 def stub_path(home: Path) -> Path:
@@ -248,10 +273,13 @@ def checks(cfg: Config, src: Path, run: Runner | None = None) -> list[tuple[str,
     path = stub_path(home)
     if not path.is_file():
         rows.append(("cron stub", "fail", f"{path} missing: run `hermes journal setup`"))
-    elif path.read_text(encoding="utf-8") != stub_text(src, home):
-        rows.append(("cron stub", "warn", f"{path} is out of date: run `hermes journal setup`"))
     else:
-        rows.append(("cron stub", "ok", str(path)))
+        # What the stub runs is judged, not whether it matches ``src`` (the caller's own install): see stub_problem
+        problem = stub_problem(path.read_text(encoding="utf-8"), home)
+        if problem:
+            rows.append(("cron stub", "warn", f"{path} is out of date ({problem}): run `hermes journal setup`"))
+        else:
+            rows.append(("cron stub", "ok", str(path)))
     try:
         jobs = find_jobs(cfg, run)
     except Exception as e:

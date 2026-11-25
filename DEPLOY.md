@@ -34,6 +34,61 @@ The tick is untouched.
 - An MCP client's `journal_entries` and `journal_entry` answer as before.
 **Rollback.** `uv tool install --force` at the previous sha and restart `journal-serve`; nothing to undo in state.
 
+## MODEL-WALK — the route walks fence every way to a model (2026-11-24; tests and docs only; **no deploy, no restart**)
+
+**What changes.** Tests only (issue #3): `tests/helpers.py` gains `no_model()`, which records and fails every way to a
+model (`agent.ask`, the companion `Config.companion()` hands out, the companion classes' own `ask`), and the serve
+route walks (`test_serve_privacy.py`: GET, write and push routes, the Write-now view) and the MCP tool walk
+(`test_mcp.PrivacyTest`) run inside it, so a route that reached a model through a module serve loads fails the suite
+even when the route swallows the failure. README *Guarantees* and AGENTS.md say so. DECISIONS.md, MODEL-WALK.
+**Side and restart.** None: no file under `src/` changes, so nothing an install runs changes. Moving the pins to this
+sha is optional and needs no restart.
+**First checks.** None on the host; CI's suite is the check.
+**Rollback.** Nothing to roll back on a host.
+
+## TICK-LOCK-MEASURE — `tools/measure_tick_lock.py` and the measured wait on `tick.lock` (2026-11-24; tooling and docs only; **nothing to deploy**)
+
+A timing harness under a temporary root (no live state, no model, no chat) and the DECISIONS.md entry TICK-LOCK-WAIT
+that records what it measured for issue #45 and the options. Nothing the install runs changes: no restart, no config,
+no state. Rollback: none needed.
+
+## AUDIT-LEFTOVERS — `/status` serves the last sweep's time only; the old tuple readers leave the engine (2026-11-24; serve side, plus two removals the gateway need not see; **no gateway restart**; no config or state change)
+
+**What changes.** `/status` (the web's, `status.status(web=True)`) no longer returns `sweep.json` whole: `sweep` is
+`{"at": <time of the last sweep>}`, without the sessions database's path or the row id (the CLI's `journal status` still
+prints both). `sweep.parse`, `sweep.rows`, `sweep.read` and `conversations.rows`, which only tests called, move to
+`tests/legacy_readers.py` over `journal.hermes.transcript`. `/status`'s other fields, the ledger's `telegram` field and
+the `telegram_history` source name are untouched (DECISIONS.md, AUDIT-LEFTOVERS says why).
+**Side and restart.** `status.py` is imported by serve and the CLI, not by the gateway (the import list in the table
+above); `uv tool install --force` at the merge sha and `systemctl --user restart journal-serve`. `sweep.py` and
+`conversations.py` are loaded by the gateway but only lose functions nothing in `src/` called, so the running copy
+behaves the same and the removal rides the next restart.
+**First check.** `curl` the web `/api/v1/status` as the app does: `sweep` has the key `at` only (or is `null`).
+**Rollback.** The previous sha.
+
+## INVISIBLE-PY — no literal U+FEFF in the Python source (2026-11-24; source only; **no gateway restart of its own**; no config or state change)
+
+**What changes.** `library.py`, `programdefs.py` and `tests/test_library.py` held a literal U+FEFF (the byte-order mark
+a file may start with) inside a string. Hermes' install scanner reads `.py` files and reports it as HIGH
+`invisible_unicode`. They now write `"\ufeff"`: the same string at run time, so behaviour is byte for byte the same.
+`tests/test_install_scan.py` now also reads every file the scanner reads (the whole repo, by extension) for an invisible character.
+**Side and restart.** Both modules are loaded by the gateway, but the strings they hold are equal, so a gateway still
+running the old copy behaves identically; the change rides the next plugin pin move and needs no restart for itself.
+**First check.** The plugin install's scan no longer lists `invisible_unicode` for those files. **Rollback.** None needed.
+
+## DOCTOR-STUB — `journal doctor` no longer warns "cron stub out of date" under a uv tool install (2026-11-24; CLI side; **no gateway restart**; no config or state change; closes #7)
+
+**What changes.** The cron-stub row compared the stub on disk with a stub rendered for the *asking* install's own
+`src`, so `journal doctor` from the `uv tool` CLI (its `src` is site-packages) called a correct stub out of date,
+while `hermes journal doctor` (the plugin's `src`) agreed with it. The row now reads the `SRC` the stub names and
+judges the stub itself: it must be what setup writes for that `src` and this profile, and that `src` must hold the
+`journal` package. Both faces give the same row. `hermes journal setup` is unchanged.
+**Side and restart.** `hermes/cron.py` is imported by neither `journal.hermes` at load nor the gateway (checked with
+the import list in the table above), and runs only in `journal doctor` and `hermes journal setup`, both fresh
+processes: `uv tool install --force` at the merge sha moves the CLI; the plugin pin moves with the next deploy.
+**First check.** `journal doctor` (uv CLI) and `hermes -p <profile> journal doctor`: the `cron stub` row is `ok` in
+both. **Rollback.** The previous sha; nothing was written.
+
 ## HERMES-ONESHOT-ENV — the engine's one-shots are known in the gateway (2026-11-23; tick and hook side; **gateway restart required, with the pin move**; no config or state change; **urgent**: before the late day reflections run)
 
 **What changes.** On a Hermes whose gateway runs every one-shot, a run's environment never reaches the process its

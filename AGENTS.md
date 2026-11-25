@@ -106,8 +106,8 @@ Read `docs/DECISIONS.md` before changing anything, and your package's section of
   Hermes' speech-to-text, the one entry in `HERMES_ALLOWED`), and `sqlite3.connect` is called only by the transcript
   adapter and `sources.py`. `tests/test_serve_fence.py` and `tests/test_mcp_fence.py`:
   serve and mcp import nothing that reads the chat, its privacy results, packs, the mirror or the notebook (mcp no
-  model either). `tests/test_serve_privacy.py` runs every route with `sqlite3.connect` failing; a new route gets a
-  sample there.
+  model either). `tests/test_serve_privacy.py` runs every route with `sqlite3.connect` failing and every way to a model
+  fenced (`helpers.no_model`; `test_mcp.py` does the same for every tool); a new route gets a sample there.
 - **The engine owns sending and capture.** Serve, MCP and the companion spawn `journal send` / `journal program`; an
   HTTP worker never holds `tick.lock`.
 - **The core is stdlib.** `dependencies = []`; PyYAML (`journal[hermes]`), the MCP SDK (`journal[mcp]`) and
