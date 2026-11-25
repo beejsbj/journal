@@ -169,7 +169,7 @@ def prompt_texts(cfg: Config, p: dict) -> list[str]:
     for key in ("plain_text", "html", "sent_plain_text", "sent_html"):  # (sent_*: a delivery onto a face's record)
         if p.get(key):
             out.append(words(p[key]))
-    if p.get("program"):  # a phase folds to its own header line (tick.fold, programs): quoting that is a reply to it
+    if p.get("program"):  # a phase folds to its own header line (chat.fold, programs): quoting that is a reply to it
         out += [words(compose.folded_phase_html(p, s, cfg.names)) for s in PHASE_STATUSES]
     return [t for t in out if t]
 

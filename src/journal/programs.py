@@ -8,7 +8,7 @@ entry per session (``YYYY-MM-DD-<program>-sNN.md``, dated the day the session st
 **A phase is a ledger prompt** (``<run>-sNN-pM``, ``collapse_hours: 3``). It becomes current by being *opened*
 (``_open``: the record written with ``message_id: None``, ``sent_at`` the moment it became current, ``phase_open``),
 so a face can answer it with no chat at all (OPEN-PROGRAMS); with a chat it is then delivered by
-``tick.send_prompt``, so capture, the sweep, folding, threading, the mirror and annotation are the existing code
+``chat.send.send_prompt``, so capture, the sweep, folding, threading, the mirror and annotation are the existing code
 paths. ``send_due`` on the run's phase means "owed a delivery"; ``phase_opened`` says whether it is current. The phase that is
 open (``phase_open`` on its record) takes every message while it is visible and the newest prompt in the chat, not
 only the first (``capture.open_phase``, ``capture.superseded``); a break closes it.
@@ -565,8 +565,8 @@ def _open(cfg: Config, run: dict, s: int, p: int, record: dict, now: datetime) -
     opening a phase is never a chat boundary. ``send_due`` is then "owed a delivery": only with a chat.
 
     A record the chat already has (a ``/back``, a ``/start`` that takes the phase up again) keeps its message and its
-    send times; the delivery that follows (``tick.send_prompt``'s re-send) brings the new text. With no chat it gets
-    the new text now."""
+    send times; the delivery that follows (``chat.send.send_prompt``'s re-send) brings the new text. With no chat it
+    gets the new text now."""
     pid = record["id"]
     at = _iso(datetime.now(timezone.utc))
     with ledger.locked(cfg.ledger_path) as data:
@@ -636,8 +636,8 @@ def _answered_this_visit(cfg: Config, run: dict, s: int, p: int) -> bool:
 
 
 def _given_up(cfg: Config, pid: str) -> bool:
-    """The phase's delivery used its last attempt (``tick.SEND_ATTEMPTS``, alerted then): the engine does not try it
-    again on its own."""
+    """The phase's delivery used its last attempt (``chat.send.SEND_ATTEMPTS``, alerted then): the engine does not
+    try it again on its own."""
     from .tick import SEND_ATTEMPTS
     return (ledger.find(ledger.snapshot(cfg.ledger_path), pid) or {}).get("send_attempts", 0) >= SEND_ATTEMPTS
 
@@ -647,9 +647,9 @@ def _send_phase(cfg: Config, prog: Program, run: dict, s: int, p: int, now: date
     """Make the phase current (``_open``) if it is not yet, then deliver it when a delivery is owed. Returns True
     when it is current and nothing is owed any more (delivered, or no chat).
 
-    The delivery goes through ``tick.send_prompt`` (retries, ``sent.jsonl``, re-send semantics, the mirror). A phase
-    is never deferred for want of a model: a reflect phase without usable model text goes out with the template at
-    once.
+    The delivery goes through ``chat.send.send_prompt`` (retries, ``sent.jsonl``, re-send semantics, the mirror). A
+    phase is never deferred for want of a model: a reflect phase without usable model text goes out with the template
+    at once.
 
     ``auto``: the engine is delivering on its own (a settle, or the tick delivering a phase it owed), not because he
     asked. Such a delivery never closes a bare ``/x`` window (``_held_off``): it is held, ``send_due`` stays set, and
@@ -780,7 +780,7 @@ def _expire(cfg: Config, prog: Program, run: dict, now: datetime, log: list[str]
 
 def _owed_expiry_notice(cfg: Config, run: dict, now: datetime, log: list[str], alerts: list[str]) -> None:
     """Tell him the interrupts he had set were cancelled when the run expired. The send is tried on the tick that
-    expires the run and, if Telegram is down, on the next ones (``tick.SEND_ATTEMPTS`` in all), then alerted: he is
+    expires the run and, if Telegram is down, on the next ones (``chat.send.SEND_ATTEMPTS`` in all), then alerted: he is
     otherwise still expecting reminders that were quietly removed."""
     from .tick import SEND_ATTEMPTS
     owed = run.get("expiry_notice")
@@ -1444,7 +1444,7 @@ def send_interrupts(cfg: Config, now: datetime, log: list[str], tried: set[str] 
 
     Only the newest of several due at once goes (a tick that was down for an hour would otherwise send two or three
     questions back to back); the older ones are recorded as missed. A send that fails is tried again on the next tick
-    while the window lasts, and alerts, like any prompt, once ``tick.SEND_ATTEMPTS`` ticks have failed. Returns the
+    while the window lasts, and alerts, like any prompt, once ``chat.send.SEND_ATTEMPTS`` ticks have failed. Returns the
     alerts. ``tried`` (the tick's, shared by its two passes) holds the ids already attempted this tick: they are left
     alone, and each attempt made here is added."""
     from . import schedule, tick

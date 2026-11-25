@@ -20,6 +20,7 @@ from journal import commands as jcommands
 from journal.config import Names
 from journal.hermes import commands as hcommands
 from journal.hermes import hooks
+from journal.chat import send as chat_send  # (send_prompt's clock, moved from tick: issue #43)
 
 NAMES = Names(user="Sam", companion="Ada", emoji="🌿", pronouns="he/him/his", frontmatter_source="journal")
 T0 = datetime(2026, 10, 20, 10, 0, tzinfo=timezone.utc)  # 15:30 IST, a Tuesday
@@ -73,7 +74,7 @@ class Base(CleanEnv):
                 raise agent.AgentUnavailable("no model in this test")
             return self.model(query)
         for p in (mock.patch.object(telegram, "_call", self.bot), mock.patch.object(telegram, "token", lambda c: "T"),
-                  mock.patch.object(agent, "ask", ask), mock.patch.object(tick, "datetime", Clock),
+                  mock.patch.object(agent, "ask", ask), mock.patch.object(tick, "datetime", Clock), mock.patch.object(chat_send, "datetime", Clock),
                   mock.patch.object(programs, "datetime", Clock), mock.patch.object(hooks, "datetime", Clock)):
             p.start()
             self.addCleanup(p.stop)
