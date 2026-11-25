@@ -1,7 +1,8 @@
 """The import fence around ``journal mcp``, the same as ``journal serve``'s (API.md Decision 2): no module of
 ``journal/mcp`` imports what reads the chat transcript, its privacy results, packs, the mirror queue or the notebook,
-and none reaches a model (``agent``). What the face reaches through the engine is fenced by behaviour instead
-(``test_mcp.PrivacyTest`` runs every tool with ``sqlite3.connect`` made to fail)."""
+and none reaches a model (``agent``). Nor does it import ``serve/``: its readers are the core's (``document``, issue
+#47), shared with the web app and fenced in ``test_serve_fence``. What the face reaches through the engine is fenced
+by behaviour instead (``test_mcp.PrivacyTest`` runs every tool with ``sqlite3.connect`` made to fail)."""
 import unittest
 
 from helpers import ROOT
@@ -16,8 +17,9 @@ class FenceTest(unittest.TestCase):
         self.assertEqual([p.name for p in files], ["__init__.py", "handlers.py", "server.py"])
         for path in files:
             with self.subTest(path.name):
-                self.assertEqual(imported(path) & (FORBIDDEN | {"agent", "tools", "__import__", "importlib"}), set())
+                self.assertEqual(imported(path) & (FORBIDDEN | {"agent", "tools", "serve", "__import__", "importlib"}),
+                                 set())
 
     def test_the_fence_sees_an_import(self):
-        self.assertIn("serve", imported(FACE / "handlers.py"))
+        self.assertIn("document", imported(FACE / "handlers.py"))   # (the core's shared reader, not serve's)
         self.assertIn("sqlite3", imported(ROOT / "src" / "journal" / "hermes" / "transcript.py"))

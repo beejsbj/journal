@@ -16,6 +16,24 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## SHARED-READERS — MCP's readers move out of `serve/` into the core (2026-11-24; serve side and `journal mcp`; **no gateway restart**; no config or state change)
+
+**What changes.** A move, no behaviour change (issue #47): `serve/document.py` is now `document.py` in the core
+(`journal.serve.document` stays an alias of the same module), `filter_entries` and `LIST_LIMIT` moved there from
+`serve/api.py` (which keeps both names), and `TEXT_LIMIT` moved to `actions.py` (`serve/writes.py` keeps the name).
+`mcp/handlers.py` imports nothing from `serve/` now; `test_mcp_fence.py` forbids it, and `test_serve_fence.py` fences
+the moved reader like a module of `serve/`. DECISIONS.md, SHARED-READERS.
+**Side and restart.** Serve side: `uv tool install --force` at the merge sha, then `systemctl --user restart
+journal-serve`. `journal mcp` is a process an MCP client starts, so it runs the new code from its next start (restart
+the client's server entry if one is running). **No gateway restart:** CLAUDE.md's import check lists neither
+`journal.document` nor `journal.actions` among what `journal.hermes` loads, and no gateway path imports them at run
+time (only `cli.py`'s `write`/`open` commands import `actions`, in their own process; `actions.py` gains one constant).
+The tick is untouched.
+**First checks.**
+- `journal doctor` is as before; the web app's History lists entries and an entry opens (the moved reader).
+- An MCP client's `journal_entries` and `journal_entry` answer as before.
+**Rollback.** `uv tool install --force` at the previous sha and restart `journal-serve`; nothing to undo in state.
+
 ## HERMES-ONESHOT-ENV — the engine's one-shots are known in the gateway (2026-11-23; tick and hook side; **gateway restart required, with the pin move**; no config or state change; **urgent**: before the late day reflections run)
 
 **What changes.** On a Hermes whose gateway runs every one-shot, a run's environment never reaches the process its

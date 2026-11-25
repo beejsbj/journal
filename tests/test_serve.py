@@ -20,7 +20,8 @@ from serve_helpers import EVENING_NOW, HERS, IST, NEUTRAL, NOW, SESSION, ServeCa
 
 from journal import cli, entries, ledger, status, today, version
 from journal import config as jconfig
-from journal.serve import api, auth, document, sse, unit
+from journal import document
+from journal.serve import api, auth, sse, unit
 from journal.serve import app as serve_app
 
 
@@ -650,7 +651,7 @@ class ReadRoutesTest(ServeCase):
         self.assertEqual(rows[0]["stem"], "2026-10-15-morning-2")
 
     def test_a_picture_embed_is_no_audio(self):
-        from journal.serve import document
+        from journal import document
         from serve_helpers import NOTE
         path = self.cfg.root / "2026-10-15-j.md"
         path.write_text(NOTE + "\n![[diagram.png]]\n", encoding="utf-8")

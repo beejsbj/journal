@@ -27,7 +27,7 @@ from serve_helpers import HERS, IST, NOW, build_journal
 
 from journal import cli, ledger
 from journal.mcp import handlers
-from journal.serve import api, document
+from journal import document
 
 HAS_SDK = importlib.util.find_spec("mcp") is not None and importlib.util.find_spec("mcp.server.mcpserver") is not None
 
@@ -82,7 +82,7 @@ class ReadTest(Case):
         self.assertEqual(stems, ["2026-10-15-j", "2026-10-15-fix-life-s01", "2026-10-14-evening"])
         self.assertIsNone(got["next"])
         lib = __import__("journal.library", fromlist=["load"]).load(self.cfg)
-        self.assertEqual(got["items"], [document.summary(self.cfg, p, lib) for p, _ in api.filter_entries(self.cfg)])
+        self.assertEqual(got["items"], [document.summary(self.cfg, p, lib) for p, _ in document.filter_entries(self.cfg)])
         # his own pages (2026-10-14.md, a hand-written -thoughts.md) are never listed
         self.assertNotIn("2026-10-14", stems)
         self.assertNotIn("2026-10-14-thoughts", stems)

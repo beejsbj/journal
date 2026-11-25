@@ -14,7 +14,7 @@ from unittest import mock
 from test_practices_engine import GRATITUDE, Base, at
 
 from journal import compose, ledger, library, privacy, sweep, telegram, tick
-from journal.serve import document
+from journal import document
 
 LIVE = datetime(2026, 10, 14, 21, 31)
 

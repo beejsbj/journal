@@ -23,15 +23,15 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable
 
-from .. import actions, audio, capture, entries, images, ledger, library, location, reflect, slots, status, today, version
+from .. import actions, audio, capture, document, entries, images, ledger, library, location, reflect, slots, status, today, version
 from .. import settings as settings_
 from ..config import Config, effective_today, profile_from_home
-from . import auth, document
+from . import auth
 
 log = logging.getLogger(__name__)
 
 JSON_LIMIT = 1024 * 1024  # bytes of a JSON body
-LIST_LIMIT = 200          # most items one page of /entries may carry
+LIST_LIMIT = document.LIST_LIMIT   # most items one page of /entries may carry
 DAYS_LIMIT = 400          # widest /days or /insights range
 
 
@@ -242,12 +242,6 @@ def today_(req: Request):
             "location_source": location.place_source(req.cfg)}
 
 
-def _order(item: tuple[Path, tuple]) -> tuple:
-    path, _key = item
-    info = document.parsed(path) or {}
-    return (path.stem[:10], info.get("time") or "", path.stem)
-
-
 def _filtered(req: Request, start: date | None, end: date | None) -> list[tuple[Path, tuple]]:
     q = (req.query.get("q") or "").strip()
     if len(q) > 200:
@@ -256,28 +250,7 @@ def _filtered(req: Request, start: date | None, end: date | None) -> list[tuple[
                           program=req.query.get("program") or None, q=q, audio_only=req.query.get("audio") == "1")
 
 
-def filter_entries(cfg: Config, start: date | None = None, end: date | None = None, *, kind: str | None = None,
-                   program: str | None = None, q: str = "", audio_only: bool = False) -> list[tuple[Path, tuple]]:
-    """The engine entries that pass the filters, newest first: what ``/entries`` and ``/days`` page through, and
-    what ``journal mcp``'s ``journal_entries`` lists. ``q`` is a substring of **his words only**
-    (``document.matches``)."""
-    out = []
-    for path, key in document.all_entries(cfg):
-        day = path.stem[:10]
-        if (start and day < start.isoformat()) or (end and day > end.isoformat()):
-            continue
-        if kind and key[0] != kind:
-            continue
-        if program:
-            fm = (document.parsed(path) or {}).get("fm") or {}
-            if fm.get("program") != program and not (key[0] == program and key[1] is not None):
-                continue
-        if q and not document.matches(path, q):
-            continue
-        if audio_only and not (document.parsed(path) or {}).get("flags", {}).get("audio"):
-            continue
-        out.append((path, key))
-    return sorted(out, key=_order, reverse=True)
+filter_entries = document.filter_entries   # (moved to the core: issue #47)
 
 
 def entries_list(req: Request):
