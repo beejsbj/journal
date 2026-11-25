@@ -192,6 +192,15 @@ def critical_findings(root: Path) -> list[str]:
     return found
 
 
+INVISIBLE = re.compile("[\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff]")
+
+
+def invisible_in(files) -> list[str]:
+    """``path: U+XXXX at offset`` for each literal invisible character (Hermes' HIGH `invisible_unicode`) in the files."""
+    return [f"{p.relative_to(ROOT) if ROOT in p.parents else p}: U+{ord(m.group()):04X} at {m.start()}"
+            for p in files for m in INVISIBLE.finditer(p.read_text(encoding="utf-8"))]
+
+
 class InstallScanTest(unittest.TestCase):
     def test_the_tree_has_no_critical_finding(self):
         found = critical_findings(ROOT)
@@ -217,13 +226,32 @@ class InstallScanTest(unittest.TestCase):
     def test_the_built_web_app_carries_no_invisible_character(self):
         """Hermes reports a literal zero-width character as HIGH `invisible_unicode` on every deploy (#36). A minifier can
         turn an escape back into the literal, so this reads the build, not the source."""
-        invisible = re.compile("[\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff]")
         static = ROOT / "src" / "journal" / "serve" / "static"
         files = [p for p in static.rglob("*") if p.is_file() and p.suffix in SCANNABLE_EXTENSIONS | {".webmanifest", ".svg"}]
         self.assertTrue(any(p.suffix == ".js" for p in files), "the built bundle should be among the files read")
-        found = [f"{p.relative_to(ROOT)}: U+{ord(m.group()):04X} at {m.start()}"
-                 for p in files for m in invisible.finditer(p.read_text(encoding="utf-8"))]
-        self.assertEqual(found, [], "a literal invisible character in the built web app: write it as an escape or build it from its code point")
+        self.assertEqual(invisible_in(files), [], "a literal invisible character in the built web app: write it as an escape or build it from its code point")
+
+    def test_no_scanned_file_carries_an_invisible_character(self):
+        """The same finding on every file the scanner reads (`SCANNABLE_EXTENSIONS`: Python, docs, JSON, shell ... the
+        root `__init__.py` and `tools/` included; test trees too, since the invisible-character check has no test
+        exemption). A literal U+FEFF in a source file is written `"\\ufeff"`, the same string and invisible to the scanner."""
+        files = [p for p in sorted(ROOT.rglob("*"))
+                 if p.is_file() and not p.is_symlink() and p.suffix.lower() in SCANNABLE_EXTENSIONS
+                 and not any(part in EXCLUDED_DIRS for part in p.relative_to(ROOT).parts)]
+        names = {p.relative_to(ROOT).as_posix() for p in files}
+        for must in ("__init__.py", "src/journal/library.py", "tests/test_library.py", "README.md"):
+            self.assertIn(must, names, f"{must} should be among the files read")
+        self.assertTrue(any(n.startswith("tools/") and n.endswith(".py") for n in names))
+        self.assertEqual(invisible_in(files), [], "a literal invisible character in a scanned file: write it as an escape, e.g. \"\\ufeff\"")
+
+    def test_the_invisible_character_check_sees_one(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as t:
+            p = Path(t) / "x.py"
+            p.write_text('x = "\ufeff"\ny = "\u200b"\n', encoding="utf-8")   # literals this time, as a file would hold them
+            self.assertEqual(len(invisible_in([p])), 2)
+            p.write_text('x = "\\ufeff"\n', encoding="utf-8")                  # the escape is plain text
+            self.assertEqual(invisible_in([p]), [])
 
 
 if __name__ == "__main__":

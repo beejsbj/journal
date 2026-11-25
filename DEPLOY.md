@@ -30,6 +30,29 @@ behaves the same and the removal rides the next restart.
 **First check.** `curl` the web `/api/v1/status` as the app does: `sweep` has the key `at` only (or is `null`).
 **Rollback.** The previous sha.
 
+## INVISIBLE-PY — no literal U+FEFF in the Python source (2026-11-24; source only; **no gateway restart of its own**; no config or state change)
+
+**What changes.** `library.py`, `programdefs.py` and `tests/test_library.py` held a literal U+FEFF (the byte-order mark
+a file may start with) inside a string. Hermes' install scanner reads `.py` files and reports it as HIGH
+`invisible_unicode`. They now write `"\ufeff"`: the same string at run time, so behaviour is byte for byte the same.
+`tests/test_install_scan.py` now also reads every file the scanner reads (the whole repo, by extension) for an invisible character.
+**Side and restart.** Both modules are loaded by the gateway, but the strings they hold are equal, so a gateway still
+running the old copy behaves identically; the change rides the next plugin pin move and needs no restart for itself.
+**First check.** The plugin install's scan no longer lists `invisible_unicode` for those files. **Rollback.** None needed.
+
+## DOCTOR-STUB — `journal doctor` no longer warns "cron stub out of date" under a uv tool install (2026-11-24; CLI side; **no gateway restart**; no config or state change; closes #7)
+
+**What changes.** The cron-stub row compared the stub on disk with a stub rendered for the *asking* install's own
+`src`, so `journal doctor` from the `uv tool` CLI (its `src` is site-packages) called a correct stub out of date,
+while `hermes journal doctor` (the plugin's `src`) agreed with it. The row now reads the `SRC` the stub names and
+judges the stub itself: it must be what setup writes for that `src` and this profile, and that `src` must hold the
+`journal` package. Both faces give the same row. `hermes journal setup` is unchanged.
+**Side and restart.** `hermes/cron.py` is imported by neither `journal.hermes` at load nor the gateway (checked with
+the import list in the table above), and runs only in `journal doctor` and `hermes journal setup`, both fresh
+processes: `uv tool install --force` at the merge sha moves the CLI; the plugin pin moves with the next deploy.
+**First check.** `journal doctor` (uv CLI) and `hermes -p <profile> journal doctor`: the `cron stub` row is `ok` in
+both. **Rollback.** The previous sha; nothing was written.
+
 ## HERMES-ONESHOT-ENV — the engine's one-shots are known in the gateway (2026-11-23; tick and hook side; **gateway restart required, with the pin move**; no config or state change; **urgent**: before the late day reflections run)
 
 **What changes.** On a Hermes whose gateway runs every one-shot, a run's environment never reaches the process its

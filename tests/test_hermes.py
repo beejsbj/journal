@@ -178,6 +178,35 @@ class SetupTest(HermesHome):
         self.assertEqual(rows["cron job"][0], "ok")
         self.assertEqual(rows["plugin enabled"][0], "ok")
 
+    def test_the_stub_is_judged_by_what_it_runs_not_by_the_asking_install(self):
+        # issue #7: `journal doctor` from a uv tool install passes its own site-packages as `src`; the stub names the
+        # plugin's src. The two faces must agree: the stub is right.
+        fake = FakeCron()
+        cron.setup(self.cfg, self.src, run=fake)
+        other = Path(self.tmp.name) / "uv-tool" / "site-packages"
+        (other / "journal").mkdir(parents=True)
+        (other / "journal" / "cli.py").write_text("")
+        row = {n: (s, d) for n, s, d in cron.checks(self.cfg, other, run=fake)}["cron stub"]
+        self.assertEqual(row[0], "ok", row)
+
+    def test_a_stub_that_would_not_run_is_out_of_date(self):
+        fake = FakeCron()
+        path, _ = cron.write_stub(self.home, self.src)
+        good = path.read_text()
+        def stub_row():
+            return {n: (s, d) for n, s, d in cron.checks(self.cfg, self.src, run=fake)}["cron stub"]
+        gone = Path(self.tmp.name) / "moved" / "src"
+        for text in (good.replace(repr(str(self.src)), repr(str(gone))),             # its src is not there any more
+                     good.replace("SRC = ", "SRC_ = "),                             # names no src
+                     good + "# hand edit\n",                                         # not what setup writes
+                     good.replace(str(self.home), str(self.home / "other"))):       # another profile
+            path.write_text(text)
+            row = stub_row()
+            self.assertEqual(row[0], "warn", text)
+            self.assertIn("out of date", row[1])
+        path.write_text(good)
+        self.assertEqual(stub_row()[0], "ok")
+
     def test_parse_cron_list(self):
         jobs = cron.parse_cron_list("  a1b2c3d4e5f6 [paused]\n    Name:      Journal engine tick (Iris)\n"
                                     "    Schedule:  */5 * * * *\n    Deliver:   local\n")
