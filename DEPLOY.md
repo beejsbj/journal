@@ -16,6 +16,31 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## CHAT-2 — one send operation, `chat.deliver`, for every message the engine sends on its own (2026-11-25; tick and hook side; **gateway restart**; no config or state change)
+
+**What changes.** Issue #43, its second step. `journal/chat/deliver.py`'s `deliver` sends one message to the
+journal's chat, lets its caller record the outcome, and mirrors what the caller says into the companion's session.
+The five kinds of send now go through it, each keeping its own rules and its own ledger account exactly: prompts,
+program phases and interrupts (`chat.send.send_prompt`), annotation replies (`chat.replies`), reflections and week
+reviews (`reflect.send`), the catch-up letter (`recovery._send`) and a program session's summary
+(`programs._send_summary`). No ledger field, message text, keyword, log line, mirror row or alert changes; the rules
+about whether anything is owed (no chat, `/x`, pacing, staleness, the letter's hold) stay where they were.
+DECISIONS.md, CHAT-2.
+**Side and restart.** `programs.py`, `recovery.py` and `reflect.py` change, and the gateway loads them at import; it
+now loads `journal.chat` and `journal.chat.deliver` too (the import check above: those two are added, nothing is
+removed). So this rides a **gateway restart** (`hermes gateway restart`, in a window). The tick and the spawned
+one-shots run it from the next tick once the plugin pin moves. Serve loads `programs` through the engine but never
+sends in-process (it spawns `journal send` / `journal program`); `uv tool install --force` at the merge sha keeps what
+it spawns on the same code.
+**First checks.**
+- `journal doctor`: no new failure.
+- The next ticks' `last-tick.json` lines read as before: `sent <id> (opener: …)`, `replied to <id> with its
+  annotations`, `sent reflection-<date> to <platform>`, `sent the catch-up for <id> (…)`; a session summary logs
+  nothing on success, as before.
+- The companion's session gets the same mirror rows after each send (`mirror-queue.json` empties as before).
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>`, the CLI at the
+previous sha, and a gateway restart. Nothing on disk changed, so nothing else.
+
 ## CHAT-1 — the tick's send, fold and annotation replies move into `journal/chat/` (2026-11-25; tick side; **no gateway restart needed**; no config or state change)
 
 **What changes.** Issue #43, its first step: a pure move, no behaviour change. `send_prompt` and its ledger account
