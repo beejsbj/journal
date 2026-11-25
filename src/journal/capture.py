@@ -501,7 +501,7 @@ def note_context(cfg: Config, info: dict) -> str:
 
 def opt_out(cfg: Config, text: str) -> str | None:
     """The text after the opt-out command (``conversations.opt_out_prefix``, default ``/x``), "" for the bare
-    command, or None when the message doesn't start with it. A ``/j`` in front of it changes nothing: ``/j /x …`` is
+    command, or None when the message doesn't start with it. Any ``/j`` in front of it changes nothing (one or several): ``/j /x …`` is
     off the record as ``/x …`` is, and a bare ``/j /x`` is a bare ``/x`` (review of #78: read after ``/j`` was
     stripped, the command was kept as the words of a note). Every reader asks this, so they all agree: the hook, the
     privacy pass, the conversation writer, the sweep, the faces and the floor (``refuse_off_record``)."""
@@ -512,8 +512,12 @@ def opt_out(cfg: Config, text: str) -> str | None:
     if m:
         return text[m.end():]
     after_j = strip_command(text)
-    m = command.match(after_j) if after_j is not None else None
-    return after_j[m.end():] if m else None
+    while after_j is not None:  # every leading /j (``/j /j /x …``): the floor strips as deep as this does
+        m = command.match(after_j)
+        if m:
+            return after_j[m.end():]
+        after_j = strip_command(after_j)
+    return None
 
 
 def opt_out_inside(cfg: Config, text: str) -> bool:

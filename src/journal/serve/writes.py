@@ -522,6 +522,8 @@ def meta_patch(req: Request):
             raise HTTPError(409, "mtime", "the entry changed since you read it; reload it")
         try:
             capture.write_meta(req.cfg, path, changes)
+        except capture.OffRecord as e:  # (the route refuses first; the floor's own refusal answers the same)
+            raise HTTPError(422, "off-the-record", str(e)) from None
         except ValueError as e:
             raise HTTPError(409, "not-writable", str(e)) from None
         mtime = path.stat().st_mtime

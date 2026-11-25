@@ -4733,3 +4733,10 @@ to it (not this host's setup: the gateway runs as a service).
   running CLI; the `same version as tick` row already does that.
   Accepted trade: a stub whose `SRC` still exists with `journal/cli.py` reads ok even if it is no longer the install
   the profile uses; version skew between the two is covered by the `same version as tick` row, not by this one.
+
+**X-FLOOR, on re-review (2026-11-25).** `capture.opt_out` reads past every leading `/j` (`/j /j /x …` too), so the
+gate strips as deep as the floor and a doubled `/j` before `/x` keeps nothing, a photo or voice note included. The
+writer's and the sweep's per-message catch of `OffRecord` is a backstop: it drops that message from their own output
+and moves on, but records nothing for the other readers (with the gate and floor agreeing it is not reached by any
+input found). A label the floor refuses answers 422 `off-the-record`, as the route's own refusal does.
+

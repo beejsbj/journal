@@ -587,6 +587,25 @@ class OffRecordTest(CleanEnv):
         finally:
             con.close()
 
+    def test_a_doubled_j_before_x_is_off_the_record_too(self):
+        """Review of #78: opt_out read past one /j while the floor stripped two, so /j /j /x got past the gate."""
+        t = self.now - timedelta(minutes=10)
+        out = self.send("/j /j /x the secret plan", "921", t)
+        self.assertTrue(out["text"].startswith("[Off the record — Theo marked this message /x"), out["text"][:80])
+        self.assertIn("921", conversations.snapshot(self.cfg)["off"])
+        self.assertNotIn("secret", self.texts())
+        self.assertFalse([p for p in ledger.snapshot(self.cfg.ledger_path)["prompts"] if p.get("kind") == "j"])
+
+    def test_a_photo_captioned_doubled_j_x_keeps_nothing(self):
+        f = Path(self.tmp.name) / "pic.jpg"
+        f.write_bytes(b"\xff\xd8\xff")
+        ev = self.event("/j /j /x secret caption", "922", kind="PHOTO", media=[str(f)], types=["image/jpeg"])
+        out = hooks.on_dispatch(event=ev)
+        self.assertTrue(out["text"].startswith("[Off the record — Theo marked this message /x"), out["text"][:80])
+        self.assertIn("922", conversations.snapshot(self.cfg)["off"])
+        self.assertEqual([p.name for p in self.cfg.root.iterdir() if p.is_file()], [])  # no note, no picture kept
+        self.assertFalse([p for p in ledger.snapshot(self.cfg.ledger_path)["prompts"] if p.get("kind") == "j"])
+
     def test_j_then_x_through_the_hook_is_off_the_record_not_a_note(self):
         """On main the hook stripped /j and kept "/x secret" as the words of a /j note. Now /j /x is /x."""
         t = self.now - timedelta(minutes=10)

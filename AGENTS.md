@@ -103,7 +103,7 @@ Read `docs/DECISIONS.md` before changing anything, and your package's section of
   through `capture.opt_out` / `capture.opt_out_inside`, as `serve/writes.py` and `mcp/handlers.py` do; a new route or
   tool does the same. Under the callers, the writers of his words refuse it too (`capture.refuse_off_record`: in
   `capture.record`, `capture.write_words`, the one caller of `entries.record_reply`, `conversations.his_block` and
-  `serve/blocks.edit`; `tests/test_off_record_floor.py`), so a caller that forgot writes nothing.
+  `serve/blocks.edit`, `capture.write_meta`; `tests/test_off_record_floor.py`), so a caller that forgot writes nothing.
 - **Fences hold the shape.** `tests/test_purity.py`: Hermes is imported only under `hermes/` (and by `audio.py` for
   Hermes' speech-to-text, the one entry in `HERMES_ALLOWED`), and `sqlite3.connect` is called only by the transcript
   adapter and `sources.py`. `tests/test_serve_fence.py` and `tests/test_mcp_fence.py`:
