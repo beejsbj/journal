@@ -503,19 +503,6 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   count such rows read-only in a live database, then add `[System: ` to the skip prefixes and to the marks
   (`_LEFTOVER`).
 
-- **ROUTE-OPENS — should the web app's `GET /api/v1/status` stop reading the hook's state and the sweep's
-  watermark? (raised 2026-11-24 by ROUTE-OPENS, issue #44; not decided).** The new open-recording walk found that
-  `status.status(web=True)` opens `hook-state.json` through `today.injections` (it parses the whole file, which also
-  holds queued packs, voice notes awaiting transcripts and off-record turn marks, to return the today block's count and
-  last time) and `sweep.json` (returned raw as `sweep`). Nothing of his or hers reaches the client: two counters and a
-  row-id watermark. But `status`'s own docstring and API.md Decision 2 say no web route reads the hook's records, while
-  API.md's `/status` row says the web status includes the today-block injections, so the two documents disagree. The
-  PWA calls `/status` only as a sign-in probe and shows none of its fields. Options: **(a, recommended)** leave both out
-  of the web status (`today` without its injection counts, `sweep: null` when `web`), update API.md, and drop
-  `STATUS_ONLY` from `test_route_opens.py`, so serve never opens either file; nothing visible changes. **(b)** keep
-  them and record the exception in API.md Decision 2 (it stays pinned to `/status` by `test_only_status_reads_these`).
-  To close: the owner picks; (a) is a small serve-side package.
-
 - **TICK-LOCK-WAIT (2026-11-24) — a `/next` or `journal send` waits behind a tick's model calls; measured, not fixed
   (issue #45; needs a design).** `tools/measure_tick_lock.py` runs a real `tick.run` over a temporary root with one
   annotation due, the clock pinned to a time when no ritual is due (a due opener would add a model call; the harness
@@ -4638,9 +4625,18 @@ to it (not this host's setup: the gateway runs as a service).
   brings its lock and an atomic write's temporary file) and on the sessions database wherever it is. `NEVER` names
   what must stay out (the notebook and its archive, `packs/`, `conversations.json`, the mirror queue, `sent.jsonl`,
   `send-times.json`, `audio-stash/`, `tick.lock`, `hook-state.json`, `sweep.json`). A path test, not a content test: a
-  file's existence check (`stat`) is not recorded. Found: `GET /api/v1/status` opens `hook-state.json` and
-  `sweep.json`; pinned to that route as `STATUS_ONLY` (`test_only_status_reads_these`) and raised above (ROUTE-OPENS,
-  open) rather than changed here, since API.md documents part of it.
+  file's existence check (`stat`) is not recorded. **Found and settled (the orchestrator's call for the owner,
+  2026-11-24, option (a) of the open point the first draft raised):** `GET /api/v1/status` opened `hook-state.json`
+  (through `today.injections`, parsing the whole file, which also holds queued packs, voice notes awaiting transcripts
+  and off-record turn marks, for the today block's count and last time) and `sweep.json` (its watermark, served as
+  `{at}` since AUDIT-LEFTOVERS). Nothing of his or hers reached the client, but `status`'s docstring and API.md
+  Decision 2 said no web route reads the hook's records while API.md's `/status` row listed the injections. Now the web
+  status has no `sweep` and its `today` no `count`/`last` (`{enabled, cache_age_minutes}`), so no web route opens
+  either file; both are in `NEVER` with no exception, and API.md says so. The PWA calls `/status` only as a sign-in
+  probe and reads neither field; the CLI's `journal status` is unchanged. **Review of #77 (Claude Opus 5.5):** the hook
+  also records `sqlite3.connect` (SQLite opens its file in C, raising no `open` event), and a path opened relative to a
+  directory handle (`os.open(name, dir_fd=…)`, `os.scandir(fd)`) is kept as given, not resolved against the cwd, and
+  fails when its name is in `NEVER`.
 
 - **MODEL-WALK (2026-11-24) — "the web app calls no model" is fenced by behaviour at `ask`, not at building a
   companion (issue #3).** The import fence (`test_serve_fence.py`) sees only what `serve/` imports itself; serve
