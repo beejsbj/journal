@@ -397,8 +397,9 @@ def view(cfg: Config, now: datetime | None = None, since: datetime | None = None
         # a compaction copy whose original this view did not read (it is older than ``start``) is answered by the
         # original, and a saved answer is only a floor that ages out (#4): answer those originals from a slice each
         missing = sorted({o for o in v.copies.values() if o not in read and o not in saved})
+        uncertain: set[int] = set()
         if missing:
-            v.retake = _originals(cfg, chat, missing, start, starts, sends, off_ids, frozen, v.private)
+            v.retake = _originals(cfg, chat, missing, start, starts, sends, off_ids, frozen, v.private, uncertain)
         for rid, t in saved.items():
             if rid in read and read[rid] != t:
                 continue  # another row under this id (a replaced database): the saved answer was not about it
@@ -410,6 +411,8 @@ def view(cfg: Config, now: datetime | None = None, since: datetime | None = None
         for c, o in v.copies.items():  # (an original private by a saved result only)
             if o in v.private:
                 v.private.setdefault(c, read.get(c, v.private[o]))
+            elif o in uncertain:  # a window begun before its slice may cover it: the copy, never the original
+                v.private.setdefault(c, read[c])
         v.start = start
         for old, (at, _v) in list(_CACHE.items()):  # (a copy: the gateway asks from several threads)
             if time.time() - at >= CACHE_SECONDS:
@@ -424,14 +427,22 @@ SAME_LOOKUP = 64  # two originals this few ids apart are looked up in one read (
 
 
 def _originals(cfg: Config, chat, missing: list[int], start: datetime, starts: list[datetime],
-               sends: list[datetime], off_ids: set[str], frozen: dict, into: dict) -> dict:
+               sends: list[datetime], off_ids: set[str], frozen: dict, into: dict, uncertain: set) -> dict:
     """Answer the originals of compaction copies the view did not read (#4), adding every private row found to
     ``into`` (a re-take only adds). Each original's time comes from a read of its id (originals a few ids apart
-    share one read); then the pass runs over a slice from ``RECOMPUTE`` before it (a window or turn begun earlier)
-    to ``RECOMPUTE`` after it (a row he sent before it but queued is stored after it: ``_late``, ``_busy_starts``),
-    originals whose slices meet sharing one. So the cost is bounded by the slices, never a read back to the oldest
-    original. Raises (the view fails closed) when an original can't be read, or is read as newer than ``start``:
-    the view's own read should then have held it, and two reads that disagree answer nothing."""
+    share one read); then the pass runs over a slice from ``RECOMPUTE`` before it (a window or turn begun in
+    those hours) to ``RECOMPUTE`` after it (a row he sent before it but queued is stored after it: ``_late``,
+    ``_busy_starts``), originals whose slices meet sharing one, a saved window still open at a slice's start
+    widening it back to that window's start. So the cost is bounded by the slices, never a read back to the oldest
+    original.
+
+    A slice cannot see a window begun before it and kept open into it (his messages less than ``quiet_minutes``
+    apart, no prompt send): so the pass runs over the slice a second time with a window opened at its start, the
+    widest one that could be open there. An original private in that run but public in the real one could be
+    covered by an earlier window, and goes into ``uncertain``: the view makes its copies private, never the
+    original's id (``update`` would save that old row as private). Raises (the view fails closed) when an
+    original can't be read, is read as newer than ``start`` (the view's own read should then have held it: two
+    reads that disagree answer nothing), or is missing from its slice."""
     want, when, i = set(missing), {}, 0
     while i < len(missing):
         j = i
@@ -450,6 +461,7 @@ def _originals(cfg: Config, chat, missing: list[int], start: datetime, starts: l
             if datetime.fromisoformat(s) < lo and (e is None or datetime.fromisoformat(e) > lo):
                 lo = datetime.fromisoformat(s)
         if spans and lo <= spans[-1][1]:
+            spans[-1][0] = min(spans[-1][0], lo)  # (a saved window can take a later original's start back further)
             spans[-1][1] = max(spans[-1][1], hi)
             spans[-1][2].append(oid)
         else:
@@ -463,9 +475,13 @@ def _originals(cfg: Config, chat, missing: list[int], start: datetime, starts: l
         if not set(oids) <= {r.id for r in rows}:
             raise LookupError("a compaction copy's original was not in its slice")
         total += len(rows)
-        for rid, t in compute(cfg, rows, [h for h in starts if lo <= h < hi], sends, off_ids).private.items():
+        hooks = [h for h in starts if lo <= h < hi]
+        got = compute(cfg, rows, hooks, sends, off_ids).private
+        for rid, t in got.items():
             into.setdefault(rid, t)
-    return {"originals": len(want), "slices": len(spans), "rows": total}
+        wide = compute(cfg, rows, [lo, *hooks], sends, off_ids).private
+        uncertain.update(o for o in oids if o in wide and o not in got)
+    return {"originals": len(want), "slices": len(spans), "rows": total, "uncertain": len(uncertain)}
 
 
 def covering(cfg: Config, oldest: datetime | None, now: datetime | None = None, db: Path | None = None) -> View:
@@ -540,7 +556,9 @@ def update(cfg: Config, now: datetime, log: list[str] | None = None) -> View:
         return v
     if v.retake and log is not None:  # (counts only: never a row's words)
         log.append("privacy: answered {originals} compaction-copy original(s) older than the view from {slices} "
-                   "slice(s) of {rows} rows".format(**v.retake))
+                   "slice(s) of {rows} rows".format(**v.retake)
+                   + ("; the copies of {uncertain} read private (a window begun before the slice may cover them)"
+                      .format(**v.retake) if v.retake.get("uncertain") else ""))
     keep = now - timedelta(days=KEEP_DAYS)
     with conversations.locked(cfg) as st:
         st["privacy"] = {

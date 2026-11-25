@@ -208,3 +208,185 @@ class BusyBareXOwnTimeTest(Base):
 
 
 KEEP = privacy.KEEP_DAYS
+
+
+class SliceBoundsTest(Base):
+    """#4, the slice's bounds (review of PR #70): the slice reaches far enough each way, and a window begun before
+    it, which it cannot see, makes the copies private rather than public."""
+    cursor_first = False
+
+    def rotate(self, at, carried):
+        """Compaction with ``in_place`` false: ``carried`` (kind, text, Telegram id) go into a child session."""
+        self.db.sql("insert into sessions (id, source, chat_id, session_key, user_id, started_at, parent_session_id) "
+                    "values ('tg2', 'telegram', ?, 'k', ?, 5.0, 'tg')", self.cfg.chat_id, self.cfg.chat_id)
+        self.db.sql("update sessions set ended_at = 6.0, end_reason = 'compression' where id = 'tg'")
+        for kind, text, mid in carried:
+            if kind == "steer":
+                self.db.add("[OUT-OF-BAND USER MESSAGE — a direct message]\n" + text + "\n[/OUT-OF-BAND USER MESSAGE]",
+                            at, mid, display_kind="steer", session="tg2")
+            elif kind == "his":
+                self.db.add(text, at, mid, session="tg2")
+            else:
+                self.db.add(text, at, role="assistant", session="tg2")
+
+    def copies(self, end, carried, days=KEEP + 1):
+        """Ticks every six hours to ``end`` (as the live install runs), the saved pass aged out ``days`` later, then a
+        compaction carrying ``carried``: the copies the view reads private, and the view."""
+        k = 0
+        while m(k * 360) <= end:
+            self.tick(m(k * 360), steps=("privacy",))
+            k += 1
+        later = end + timedelta(days=days)
+        self.tick(later, steps=("privacy",))
+        at = later + timedelta(minutes=10)
+        self.rotate(at, carried)
+        privacy._CACHE.clear()
+        rows = self.cfg.transcript().rows(since=at - timedelta(minutes=1))
+        self.assertEqual(len(rows), len(carried))
+        pv = privacy.view(self.cfg, at + timedelta(minutes=5))
+        self.assertFalse(pv.closed, pv.why if pv.closed else "")
+        return {r.text for r in rows if pv.row(r.id)}, pv
+
+    def long_window(self, quiet, every, hours):
+        """A bare /x the hook answered, kept open by steered messages ``every`` minutes apart for ``hours`` (less than
+        ``quiet_minutes`` apart, no prompt send): its last message lies more than ``RECOMPUTE`` after the /x."""
+        self.cfg.conversations["quiet_minutes"] = quiet
+        conversations.note_off(self.cfg, None, m(0), thread_start=True)
+        t, n = 1, 0
+        while t < hours * 60:
+            self.steer(f"filler words {n}", m(t), str(100 + n))
+            t += every
+            n += 1
+        self.steer("busy-private words late in the long window", m(t), "71")
+        self.hers("busy-private reply late in the long window", m(t + 1))
+        self.his("public after the window", m(t + quiet + 600), "72")
+        self.hers("Sure, what is it?", m(t + quiet + 601))
+        private, pv = self.copies(m(t + quiet + 700), [("steer", "busy-private words late in the long window", "71"),
+                                                      ("hers", "busy-private reply late in the long window", None),
+                                                      ("his", "public after the window", "72")])
+        self.assertEqual(private, {"busy-private words late in the long window",
+                                   "busy-private reply late in the long window"})
+        self.assertEqual(pv.retake["uncertain"], 2)  # (answered by the window at the slice's start)
+
+    def test_a_window_begun_more_than_the_slice_before_a_quiet_day(self):
+        """``quiet_minutes`` a day, a message every 20 hours: the /x is 60 hours before the original."""
+        self.long_window(quiet=1440, every=20 * 60, hours=60)
+
+    def test_a_window_begun_more_than_the_slice_before_a_chatty_one(self):
+        """The default quiet, a message every 30 minutes for 50 hours."""
+        self.long_window(quiet=45, every=30, hours=50)
+
+    def test_the_copies_of_one_long_window_carried_early_and_late(self):
+        """One long window; a compaction carries an early row (within ``RECOMPUTE`` of the /x) and a late one (more
+        than twice that after it): two slices, the late one blind to the /x."""
+        self.cfg.conversations["quiet_minutes"] = 1440
+        conversations.note_off(self.cfg, None, m(0), thread_start=True)
+        self.steer("busy-private early words", m(1), "70")
+        self.hers("busy-private early reply", m(2))
+        for n, h in enumerate(range(20, 160, 20)):
+            self.steer(f"busy-private filler {n}", m(h * 60), str(100 + n))
+        self.steer("busy-private late words", m(150 * 60), "71")
+        self.hers("busy-private late reply", m(150 * 60 + 1))
+        end = m(150 * 60 + 1440 + 600)
+        self.his("public after the window", end, "72")
+        private, pv = self.copies(end + timedelta(minutes=30),
+                                  [("steer", "busy-private early words", "70"), ("hers", "busy-private early reply", None),
+                                   ("steer", "busy-private late words", "71"), ("hers", "busy-private late reply", None)])
+        self.assertEqual(len(private), 4)
+        self.assertEqual(pv.retake["slices"], 2)
+
+    def test_a_queued_x_stored_after_the_old_original(self):
+        """The slice reaches ``RECOMPUTE`` past the original: a bare /x he sent before it, queued and stored after it
+        (#5), makes it private."""
+        self.his("a question", m(0), "20")
+        self.steer("busy-private words sent after the x", m(2), "22")  # stored first
+        self.his("/x", m(1), "21")  # queued: stored after it, with the time he sent it
+        self.hers("busy-private reply", m(3))
+        self.his("public after the window", m(120), "24")
+        # (only that copy: another original's slice would reach past it and hide a slice that stops at its own)
+        private, pv = self.copies(m(130), [("steer", "busy-private words sent after the x", "22")])
+        self.assertEqual(private, {"busy-private words sent after the x"})
+        self.assertEqual(pv.retake["uncertain"], 0)
+
+    def test_a_public_original_after_a_quiet_gap_stays_public(self):
+        """The cost side: a slice that reaches back past the chat's last quiet gap proves the original public, and its
+        copy reads public. (A slice reaching back less far would only guess: a window opened at its start runs on
+        through his messages ten minutes apart, so the copy would read private.)"""
+        self.his("an old public message", m(-300), "10")
+        for n in range(18):
+            self.his(f"public words {n}", m(n * 10), str(20 + n))
+            self.hers(f"public reply {n}", m(n * 10 + 1))
+        self.his("public words late in the chat", m(180), "40")
+        private, pv = self.copies(m(200), [("his", "public words late in the chat", "40")], days=3)
+        self.assertEqual(private, set())
+        self.assertEqual(pv.retake["uncertain"], 0)
+
+
+class SliceReadsTest(unittest.TestCase):
+    """#4, over a transcript held in memory: a saved window takes the slice back to its start, and an original that
+    one of the slice's reads does not return closes the view."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.cfg = make_cfg(Path(self.tmp.name))
+        now = self.now = datetime.now(timezone.utc).replace(microsecond=0)
+        x = now - timedelta(days=13)  # a bare /x the hook answered, three days before the original
+        rows, t, i = [], x + timedelta(minutes=1), 1
+        while t < now - timedelta(days=10):
+            rows.append(Row(i, t, "user", "his", f"busy-private filler {i}", str(1000 + i)))
+            t, i = t + timedelta(minutes=30), i + 1
+        self.original = i
+        rows.append(Row(i, t, "user", "his", "busy-private words", str(1000 + i)))
+        rows.append(Row(i + 1, t + timedelta(hours=2), "user", "his", "public words", str(1001 + i)))
+        self.copy = i + 2
+        rows.append(Row(i + 2, now - timedelta(minutes=30), "user", "his", "busy-private words", str(1000 + i),
+                        copy=i))
+        self.rows, self.drop = rows, None
+        conversations.note_off(self.cfg, None, x, thread_start=True)
+        with conversations.locked(self.cfg) as st:  # the saved pass: its window, its private rows aged out
+            st["privacy"] = {"private": {}, "windows": [[x.isoformat(), (t + timedelta(minutes=45)).isoformat()]],
+                             "at": (now - timedelta(hours=1)).isoformat()}
+        test = self
+
+        class Dropping(FakeTranscript):
+            def rows(chat, after_id=0, since=None, upto_id=None):
+                found = super().rows(after_id, since, upto_id)
+                return [r for r in found if not (test.drop and test.drop(since) and r.id == test.original)]
+
+        patch = mock.patch.object(Config, "transcript", lambda cfg, db=None: Dropping(self.rows, source="memory"))
+        patch.start()
+        self.addCleanup(patch.stop)
+        privacy._CACHE.clear()
+
+    def test_a_saved_window_takes_the_slice_back_to_its_start(self):
+        """The /x lies more than ``RECOMPUTE`` before the original, but the saved window still open there takes the
+        slice back to it: the slice answers the original private, with no guess."""
+        v = privacy.view(self.cfg, self.now)
+        self.assertFalse(v.closed, v.why if v.closed else "")
+        self.assertTrue(v.row(self.copy))
+        self.assertTrue(v.row(self.original))
+        self.assertEqual(v.retake["uncertain"], 0)
+
+    def test_a_slice_shared_with_an_earlier_original_keeps_the_saved_windows_start(self):
+        """An earlier original (half a day before) whose slice meets this one's: the shared slice still begins at
+        the saved window's start, not at the earlier original's own lookback."""
+        early = next(r for r in self.rows if r.at >= self.now - timedelta(days=10, hours=12))
+        self.rows.append(Row(self.copy + 1, self.now - timedelta(minutes=20), "user", "his", early.text,
+                             early.platform_message_id, copy=early.id))
+        v = privacy.view(self.cfg, self.now)
+        self.assertFalse(v.closed, v.why if v.closed else "")
+        self.assertEqual((v.retake["slices"], v.retake["uncertain"]), (1, 0))
+        self.assertTrue(v.row(self.copy) and v.row(self.copy + 1))
+
+    def test_an_original_its_id_read_does_not_return_closes_the_view(self):
+        self.drop = lambda since: since is None
+        v = privacy.view(self.cfg, self.now)
+        self.assertTrue(v.closed)
+        self.assertIn("could not be read", v.why)
+
+    def test_an_original_its_slice_does_not_return_closes_the_view(self):
+        self.drop = lambda since: since is not None
+        v = privacy.view(self.cfg, self.now)
+        self.assertTrue(v.closed)
+        self.assertIn("not in its slice", v.why)

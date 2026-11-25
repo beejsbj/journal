@@ -33,7 +33,9 @@ guard keep the old pass, which is the less private one. Serve does not import it
 - After a compaction that carries rows older than two days (Hermes can carry a conversation's first exchange), the
   tick's log has `privacy: answered N compaction-copy original(s) older than the view from M slice(s) of K rows`:
   the re-take ran. K is about four days of the chat's rows per slice; a K near the whole conversation's row count is
-  the unbounded read the review of this section removed, and a reason to roll back.
+  the unbounded read the review of this section removed, and a reason to roll back. A tail `; the copies of U read
+  private (a window begun before the slice may cover them)` is the second run's guess (DECISIONS.md, PRIV4): those
+  copies stay out of the catch-up and the pack; U near N on a chat that was mostly public is worth a look.
 - The tick after that one, the conversation writer still writes public chat (an entry gains the newest public
   exchange, if there was one), so the pass is not stuck closed.
 **Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
