@@ -234,7 +234,7 @@ class PracticesCliTest(CleanEnv):
         code, out, err = self.cli("list")
         self.assertEqual((code, err), (0, ""))
         lines = out.splitlines()
-        self.assertEqual([l.split()[0] for l in lines], ["morning", "evening", "midweek", "weekly"])
+        self.assertEqual([l.split()[0] for l in lines], ["morning", "evening", "midweek", "weekly", "check-in", "finitude", "storyworthy"])  # the decks: on demand
         self.assertRegex(lines[1], r"^evening +Evening journal +daily 23:00 +built-in$")
         self.assertRegex(lines[2], r"^midweek +Midweek check-in +Wed 12:00 +built-in$")
         self.assertRegex(lines[3], r"^weekly +Weekly pattern scan +Sun 20:00 +built-in$")
@@ -246,14 +246,18 @@ class PracticesCliTest(CleanEnv):
         code, out, _ = self.cli("list")
         self.assertEqual(code, 0)
         lines = out.splitlines()
-        self.assertEqual([l.split()[0] for l in lines[:5]], ["morning", "gratitude", "midweek", "weekly", "evening"])
+        # an evening of his with no slot joins the unscheduled ones, by id
+        self.assertEqual([l.split()[0] for l in lines[:8]],
+                         ["morning", "gratitude", "midweek", "weekly", "check-in", "evening", "finitude", "storyworthy"])
         self.assertRegex(lines[1], rf"^gratitude +Daily gratitude +daily 21:30 +user +{self.dir / 'gratitude.md'}$")
-        self.assertRegex(lines[4], rf"^evening +Daily gratitude +on demand +edited +{self.dir / 'evening.md'}$")
+        self.assertRegex(lines[5], rf"^evening +Daily gratitude +on demand +edited +{self.dir / 'evening.md'}$")
         self.assertTrue(lines[-1].startswith(f"! {self.dir / 'broken.md'}: no front matter"))
         code, out, _ = self.cli("list", "--json")
         data = json.loads(out)
-        self.assertEqual([p["id"] for p in data["practices"]], ["morning", "gratitude", "midweek", "weekly", "evening"])
-        self.assertEqual([p["source"] for p in data["practices"]], ["builtin", "user", "builtin", "builtin", "fork"])
+        self.assertEqual([p["id"] for p in data["practices"]],
+                         ["morning", "gratitude", "midweek", "weekly", "check-in", "evening", "finitude", "storyworthy"])
+        self.assertEqual([p["source"] for p in data["practices"]],
+                         ["builtin", "user", "builtin", "builtin", "builtin", "fork", "builtin", "builtin"])
         self.assertEqual(data["practices"][1]["schedule"], [{"time": "21:30", "weekday": None}])
         self.assertEqual(data["practices_dir"], str(self.dir))
         self.assertEqual(len(data["problems"]), 1)
@@ -282,15 +286,16 @@ class PracticesCliTest(CleanEnv):
         self.assertTrue(data["raw"].startswith("---\nkind: practice\nid: evening\n"))
         code, _, err = self.cli("show", "lunch")
         self.assertEqual(code, 2)
-        self.assertIn("no practice 'lunch' (known: morning, evening, midweek, weekly)", err)
+        self.assertIn("no practice 'lunch' (known: morning, evening, midweek, weekly, check-in, finitude, storyworthy)",
+                      err)
 
     def test_validate_the_library_and_files(self):
         code, out, _ = self.cli("validate")
         self.assertEqual(code, 0)
-        self.assertEqual(out, f"ok: 4 practices (4 built-in, 0 user) in {self.dir}\n")
+        self.assertEqual(out, f"ok: 7 practices (7 built-in, 0 user) in {self.dir}\n")
         good = self.write("gratitude.md", GRATITUDE)
         fork = self.write("evening.md", GRATITUDE.replace("id: gratitude", "id: evening"))
-        self.assertEqual(self.cli("validate")[1], f"ok: 5 practices (3 built-in, 2 user) in {self.dir}\n")
+        self.assertEqual(self.cli("validate")[1], f"ok: 8 practices (6 built-in, 2 user) in {self.dir}\n")
         bad = self.write("bad.md", GRATITUDE.replace("21:30", "9pm"))
         code, out, _ = self.cli("validate")
         self.assertEqual(code, 1)
@@ -348,7 +353,7 @@ class PracticesCliTest(CleanEnv):
         self.assertIn("journal practices reset evening", err)
         code, _, err = self.cli("fork", "gratitude")
         self.assertEqual(code, 2)
-        self.assertIn("only a built-in can be forked (morning, evening, midweek, weekly, fix-life, ", err)
+        self.assertIn("only a built-in can be forked (morning, evening, midweek, weekly, check-in, finitude, storyworthy, fix-life, ", err)
 
     def test_fork_a_program_and_a_situational_definition(self):
         code, out, _ = self.cli("fork", "fix-life")

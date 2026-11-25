@@ -449,7 +449,7 @@ class RegisterTest(HermesHome):
         lines = out.getvalue().splitlines()
         self.assertEqual([l.split()[0] for l in lines[:4]], ["morning", "evening", "midweek", "weekly"])
         self.assertIn('"id": "midweek"', out.getvalue())
-        self.assertTrue(lines[-1].startswith("ok: 4 practices (4 built-in, 0 user) in "))
+        self.assertTrue(lines[-1].startswith("ok: 7 practices (7 built-in, 0 user) in "))
 
     def test_hermes_journal_without_config_explains(self):
         os.environ.pop("JOURNAL_CONFIG")

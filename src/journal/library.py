@@ -831,10 +831,16 @@ def _stamp(directory: Path) -> tuple:
 
 def builtin_ids() -> tuple[str, ...]:
     """The ids of the packaged rituals, in library order (morning, evening, midweek, weekly): read from the files,
-    once per process (the package does not change under a running one), so no second list can drift from them."""
+    once per process (the package does not change under a running one), so no second list can drift from them.
+
+    A ritual is a packaged practice that comes on a schedule. A packaged practice with none (the prompt decks:
+    ``storyworthy``, ``check-in``, ``finitude``) is not one: it gets no command of its own (``commands.specs``; it is
+    sent with ``/start <id>``), and its entries are recognised by their front matter, as his own practices' are
+    (``entries.known_ids``), so a hand-written file that shares its name is never taken for the engine's
+    (PROMPT-DECKS)."""
     global _builtin_ids
     if _builtin_ids is None:
-        _builtin_ids = tuple(builtins())
+        _builtin_ids = tuple(pid for pid, p in builtins().items() if p.schedule)
     return _builtin_ids
 
 

@@ -4588,3 +4588,64 @@ line of his that copies the mark never leaves a bound on her later searches. An 
 that echoes it has the line dropped. Left as known: `journal_search` refuses in a finite turn the engine did not start
 (a kanban card, his own `hermes chat -q`); an engine one-shot that starts a gateway itself would pass its variables
 to it (not this host's setup: the gateway runs as a service).
+
+- **PROMPT-DECKS (2026-11-24) — the prompt decks of #58 §2 ship as built-ins, none scheduled; a packaged practice with
+  no schedule is not a ritual.** Seven new built-in definitions, all in the Library group "prompt decks". Each is
+  written fresh: the structure of the method, none of the book's text.
+  - **Practice or program, by PROGRAM-KINDS** (a practice is one message that can come back; anything with a
+    sequence is a program):
+
+    | Deck | Kind | Why | `/start` |
+    | --- | --- | --- | --- |
+    | Homework for Life (`storyworthy`) | practice | one question, made to come back each night | `storyworthy` |
+    | Weekly check-in (`check-in`) | practice | one message a week, its questions independent | `check-in` |
+    | Finitude (`finitude`) | practice | independent questions, take one; nothing builds on another | `finitude` |
+    | Five questions (`five-questions`) | program, 5 phases | each question has a narrower follow-up; one at a time, in order | `five` |
+    | 3-2-1 shadow process (`three-two-one`) | program, 4 phases | face it, talk to it, be it: each step builds on the last | `shadow` |
+    | Values (`values`) | program, 4 phases | two lists, then their difference, then one quality to live | `values` |
+    | Mind sweep (`mind-sweep`) | program, 4 phases | empty out, two trigger lists, then sort: the order is the method | `sweep` |
+
+    The four programs are one-file `kind: situational` definitions, the spelling the format reads until PROGRAM-KINDS
+    package 1 (as ONE-SESSION-PROGRAMS); they never hold the one-program slot, so they start while fix-life is
+    unfinished. Five questions as one question a day for five days would need programs on a schedule (PROGRAM-KINDS
+    package 2): one sitting for now.
+  - **None ships scheduled** (the default the owner's delegate set: nothing new arrives in his chat uninvited). A
+    practice deck comes only when he asks (`/start <id>`, the web app's Write now or Send, MCP); to have one come on its
+    own he gives it a time in the Library (BUILTIN-EDIT), which also lets him choose between overlapping ones: the
+    weekly check-in and the Sunday pattern scan, Homework for Life and the evening's own story question (2.2 since
+    BOOKENDS). A program cannot be scheduled yet.
+  - **A packaged practice with no schedule is not a ritual** (`library.builtin_ids`, the one code change). Until now
+    every packaged practice was one of the four rituals, and three things keyed on that list: each gets a command of
+    its own (`commands.specs`: `/morning` …), an entry is recognised by that name alone (`entries.known_ids`), and the
+    off-the-record command may not take the name (`config`). The decks are asked for by `/start <id>` like any
+    practice of his own, so they get no command (no new names in Hermes' registry or Telegram's menu, none to allow
+    in a chat that gates commands), and their entries are recognised by their front matter (`practice:` and `type:
+    journal`), as his own practices' are, so a hand-written `2026-11-24-finitude.md` stays his. `builtin_ids` is now
+    the packaged practices with a schedule, read from the files as before: the four rituals, unchanged.
+    `library.builtins()` (every packaged practice) is what the engine sends from and what the Library shows.
+  - **Lineage** (in each program's `framework:` line, never sent; for the practices, which have no such line, here):
+    Homework for Life after Matthew Dicks, *Storyworthy* (ch. 3); the weekly check-in after Julia Cameron's weekly
+    check-ins in *The Artist's Way*, turned from morning pages and artist dates to his own practice, one thing done
+    for pleasure, coincidences and mood; finitude after Stephen Batchelor's questions in *Buddhism Without Beliefs*
+    (what am I here for, could I die without regrets, how much is compromise, what am I postponing) and Oliver
+    Burkeman, *Four Thousand Weeks* (borrowed time, "the last time"); five questions after Burkeman's chapter of that
+    name (ch. 14), the follow-ups his own or those he cites (James Hollis, Susan Piver; Jung's "next and most
+    necessary thing", put in other words), with the fourth's follow-up drawn from his gloss; the 3-2-1 shadow process
+    after *Integral Life Practice* (Wilber, Patten, Leonard and Morelli, ch. 4), written form; values after Donald
+    Robertson, *How to Think Like a Roman Emperor* (ch. 3, with the "desired" and "admired" lists); the mind sweep
+    after David Allen, *Getting Things Done*, its trigger lists written fresh as two short paragraphs. Nothing of an
+    owner's own highlights or notes is used: the third question's follow-up is written from Piver's idea, not from
+    any note of his.
+  - **Cautions said once, in the deck that needs it.** The 3-2-1's first phase says that if what comes up is more
+    than a page can hold, stop and take it to someone you trust (the book's own caution, in plain words); its
+    companion stance says not to interpret or diagnose. Finitude's companion line says "never morbid" and "one
+    question is enough".
+  - **Each program carries `role:` and `mission:`** (the companion's stance on the turns that answer a phase), as
+    ONE-SESSION-PROGRAMS does, and one summary line per phase (a second slot from the same phase prints only "_(in
+    the answer above)_").
+  - **Tests.** `tests/test_prompt_decks.py`: the seven load with no problem in their group; the practices have no
+    schedule and the scheduled practices are still the four rituals; no deck is a command or an entry id by name;
+    `/start` resolves every id and alias; each program runs from start to a completed summary holding every phase's
+    words. `test_library`, `test_golden` and `test_cli` name the three new practices where they list the packaged
+    ones. The web app's API fixtures are regenerated (the Library lists seven more); no golden changes (the four
+    rituals are untouched).

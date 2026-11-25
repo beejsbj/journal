@@ -86,7 +86,9 @@ class PracticeFilesTest(unittest.TestCase):
     """The packaged files carry what the engine still reads from code until WP2; they must say the same."""
 
     def test_the_files_are_the_four_rituals_in_order(self):
-        self.assertEqual(list(library.builtins()), list(KINDS))
+        """The scheduled ones; the unscheduled prompt decks beside them (PROMPT-DECKS) are not rituals."""
+        self.assertEqual([k for k, p in library.builtins().items() if p.schedule], list(KINDS))
+        self.assertEqual(library.builtin_ids(), KINDS)
 
     def test_plain_opener_from_the_file(self):
         for k in KINDS:

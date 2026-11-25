@@ -16,6 +16,33 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## PROMPT-DECKS — seven prompt decks, none scheduled (2026-11-24; content plus one library function; **no gateway restart needed**, the next one names them in the companion's skill; no config or state change)
+
+**What changes.** Seven built-in definitions in the Library's *Prompt decks* group: three practices in
+`src/journal/library/practices/` (`storyworthy`, `check-in`, `finitude`) and four one-file programs in
+`library/situational/` (`five-questions`, `three-two-one`, `values`, `mind-sweep`). **None is scheduled**: nothing new
+arrives in the chat; each comes only when he starts it. `library.builtin_ids()` (the rituals) now means the packaged
+practices that have a schedule, so the three practice decks get no command of their own and are not entry ids by name
+alone; the rituals and their commands are unchanged. DECISIONS.md, PROMPT-DECKS.
+**Side and restart.** `library.py` is loaded by the gateway, but nothing in this change needs it restarted:
+`builtin_ids` is computed once per process, and the running gateway computed it at load from the four files it had
+(the same four ids it gives now), so its commands and its entry ids are unchanged before and after a restart. The
+new files are read through `library.load`, which re-reads the package when it changes: after the plugin pin moves,
+`/start finitude` or `/start five` works in the chat, the tick sends and runs them, and `journal_program` lists the
+programs. The companion's skill (its *Kinds* list from each practice's `companion:` line, its *Programs* list) is
+rendered when the gateway loads the plugin, so she sees the decks named there after the next restart: let it ride
+the next window. Serve: `uv tool install --force` at the merge sha puts them in the Library (the unit restart is
+the usual one).
+**How it reaches his schedule.** It doesn't, unless he asks: no deck has a time. To have a practice deck come on its
+own, he gives it one in the Library (Edit, a time); that writes his version into the practices directory like any
+edit of a built-in.
+**First checks.** `journal practices list` names the three practice decks (no schedule) with no problem, and
+`journal program status` lists the four programs. `journal doctor` has no library problem. The chat's command menu is unchanged after the next
+gateway restart (no `/finitude`, `/storyworthy` or `/check-in`).
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
+previous sha). A run of one of the programs still in progress then names a program the library no longer has:
+abandon it first. A deck he has edited (and so scheduled) stays in his practices directory as his own practice.
+
 ## HERMES-ONESHOT-ENV — the engine's one-shots are known in the gateway (2026-11-23; tick and hook side; **gateway restart required, with the pin move**; no config or state change; **urgent**: before the late day reflections run)
 
 **What changes.** On a Hermes whose gateway runs every one-shot, a run's environment never reaches the process its
