@@ -152,32 +152,6 @@ def _drop(cfg: Config, names: list[str]) -> None:
             os.unlink(os.path.join(str(cfg.root), name))
 
 
-def parse(content: str, platform_message_id: str | None) -> dict | None:
-    """One stored user message → {message_id, quote, text, source, audio_path} (None: not a candidate). The old
-    entry point, over the Hermes adapter's reading (``journal.hermes.transcript.read``)."""
-    from .hermes.transcript import read
-    msg = read(content, platform_message_id)
-    if msg["kind"] != "his":
-        return None
-    return {k: msg[k] for k in ("message_id", "quote", "text", "source", "audio_path")}
-
-
-def rows(cfg: Config, db: Path, after_id: int, since: float) -> list[tuple]:
-    """(id, ts, platform id, content, display kind) of his rows after ``after_id`` and newer than ``since``, as
-    stored (the old shape, kept for callers of it; the sweep reads ``cfg.transcript()``)."""
-    from .hermes.transcript import raw_rows
-    return [(r["id"], r["ts"], r["pmid"], r["content"], r["display_kind"])
-            for r in raw_rows(db, cfg.chat_id, after_id, since, platform=cfg.platform, users=cfg.owner_ids)
-            if r["role"] == "user" and (r["ts"] is None or float(r["ts"]) > since)]  # (no time: kept, as stored)
-
-
-def __getattr__(name: str):
-    if name == "read":  # the row reading moved to the transcript adapter with the rest of Hermes' row semantics
-        from .hermes.transcript import read
-        return read
-    raise AttributeError(name)
-
-
 # ── matching (the hook's rules, at the message's own time) ───────────────────
 
 def prompt_texts(cfg: Config, p: dict) -> list[str]:

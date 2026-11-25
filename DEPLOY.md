@@ -16,6 +16,20 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## AUDIT-LEFTOVERS — `/status` serves the last sweep's time only; the old tuple readers leave the engine (2026-11-24; serve side, plus two removals the gateway need not see; **no gateway restart**; no config or state change)
+
+**What changes.** `/status` (the web's, `status.status(web=True)`) no longer returns `sweep.json` whole: `sweep` is
+`{"at": <time of the last sweep>}`, without the sessions database's path or the row id (the CLI's `journal status` still
+prints both). `sweep.parse`, `sweep.rows`, `sweep.read` and `conversations.rows`, which only tests called, move to
+`tests/legacy_readers.py` over `journal.hermes.transcript`. `/status`'s other fields, the ledger's `telegram` field and
+the `telegram_history` source name are untouched (DECISIONS.md, AUDIT-LEFTOVERS says why).
+**Side and restart.** `status.py` is imported by serve and the CLI, not by the gateway (the import list in the table
+above); `uv tool install --force` at the merge sha and `systemctl --user restart journal-serve`. `sweep.py` and
+`conversations.py` are loaded by the gateway but only lose functions nothing in `src/` called, so the running copy
+behaves the same and the removal rides the next restart.
+**First check.** `curl` the web `/api/v1/status` as the app does: `sweep` has the key `at` only (or is `null`).
+**Rollback.** The previous sha.
+
 ## INVISIBLE-PY — no literal U+FEFF in the Python source (2026-11-24; source only; **no gateway restart of its own**; no config or state change)
 
 **What changes.** `library.py`, `programdefs.py` and `tests/test_library.py` held a literal U+FEFF (the byte-order mark
