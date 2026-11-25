@@ -109,7 +109,8 @@ src/journal/
   library/            built-in definitions (package data)
     practices/morning.md evening.md midweek.md weekly.md
     programs/fix-life/program.md  programs/fix-life/sessions/01-anti-vision.md … 10-one-day-reset.md
-    situational/conversation-prep.md  situational/post-session-debrief.md
+    situational/conversation-prep.md  situational/post-session-debrief.md  (and thought-record, boundary-setting,
+    conflict-resolution)
   serve/              `journal serve`: app.py (ThreadingHTTPServer + router), api.py (one function per route),
                       auth.py (token, pairing, cookie, Origin), static.py, sse.py, unit.py (--print-unit),
                       push.py (Web Push: keys, subscriptions, the pass-a-minute thread, its routes) over
