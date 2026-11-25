@@ -79,11 +79,15 @@ the transcript placeholder live there, `actions.refuse`), which takes its slot f
 
 ## Contracts
 
-Read `docs/DECISIONS.md` before changing anything, and your package's section of `docs/WORK-PACKAGES.md` in full.
+Before changing anything, read the index at the top of `docs/DECISIONS.md` and then the entries your change touches (the
+index links each one; `tools/gen_decisions_index.py` keeps it and the entries' anchors current, CI runs it with
+`--check`), and your package's section of `docs/WORK-PACKAGES.md` in full.
 
 - **Tests are the contract for existing behaviour.** Where a doc and the tests disagree, the tests win; record the
   conflict in `docs/DECISIONS.md` rather than choosing silently.
-- `docs/DECISIONS.md`: decisions taken and open points. A package that would revisit one raises it there.
+- `docs/DECISIONS.md`: decisions taken and open points. A package that would revisit one raises it there. A new entry
+  is a `- **KEY (date) — title.** …` bullet in *Raised* (open) or *Taken*; run `python3 tools/gen_decisions_index.py` to give
+  it its anchor and its line in the index (a merge conflict inside the index: run it again).
 - `docs/WORK-PACKAGES.md`: the plan (WP0–WP14); read your package's section in full.
 - The spec, as each package references it: `docs/ARCHITECTURE.md`, `docs/PRACTICES.md` (definition format, programs,
   the today block), `docs/API.md` (serve routes, privacy at the surface, locking), `docs/FRONTEND.md` (the PWA),
