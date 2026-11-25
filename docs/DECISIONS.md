@@ -4588,6 +4588,13 @@ line of his that copies the mark never leaves a bound on her later searches. An 
 that echoes it has the line dropped. Left as known: `journal_search` refuses in a finite turn the engine did not start
 (a kanban card, his own `hermes chat -q`); an engine one-shot that starts a gateway itself would pass its variables
 to it (not this host's setup: the gateway runs as a service).
+- **INVISIBLE-PY (2026-11-24) — the invisible-character guard covers the Python source.** #63 guarded the built web
+  app; three literal U+FEFF in `library.py`, `programdefs.py` and `tests/test_library.py` still tripped Hermes'
+  scanner (it reads `.py`, tests included). Rule: a Python file writes such a character as an escape (`"\ufeff"`), and
+  `tests/test_install_scan.py` fails on a literal in any file under the repo root with an extension the scanner reads
+  (`SCANNABLE_EXTENSIONS`: Python including the root `__init__.py` and `tools/`, docs, JSON, shell, fixtures), minus
+  the scanner's excluded directories. A file that must hold one on purpose (a fixture) would be named as an exception
+  in that test, with its reason.
 - **DOCTOR-STUB (2026-11-24) — the doctor judges the cron stub by what it runs, not by the install that asks (issue
   #7).** `cron.checks` compared the stub with `stub_text(src, home)` for the caller's `src`; from a `uv tool` CLI that
   is site-packages, so a correct stub (naming the plugin's `src`) read "out of date" on one face and ok on the other.

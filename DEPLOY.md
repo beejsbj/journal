@@ -16,6 +16,16 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## INVISIBLE-PY — no literal U+FEFF in the Python source (2026-11-24; source only; **no gateway restart of its own**; no config or state change)
+
+**What changes.** `library.py`, `programdefs.py` and `tests/test_library.py` held a literal U+FEFF (the byte-order mark
+a file may start with) inside a string. Hermes' install scanner reads `.py` files and reports it as HIGH
+`invisible_unicode`. They now write `"\ufeff"`: the same string at run time, so behaviour is byte for byte the same.
+`tests/test_install_scan.py` now also reads every file the scanner reads (the whole repo, by extension) for an invisible character.
+**Side and restart.** Both modules are loaded by the gateway, but the strings they hold are equal, so a gateway still
+running the old copy behaves identically; the change rides the next plugin pin move and needs no restart for itself.
+**First check.** The plugin install's scan no longer lists `invisible_unicode` for those files. **Rollback.** None needed.
+
 ## DOCTOR-STUB — `journal doctor` no longer warns "cron stub out of date" under a uv tool install (2026-11-24; CLI side; **no gateway restart**; no config or state change; closes #7)
 
 **What changes.** The cron-stub row compared the stub on disk with a stub rendered for the *asking* install's own

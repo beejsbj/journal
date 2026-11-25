@@ -104,7 +104,7 @@ class ParseRenderTest(unittest.TestCase):
         self.assertEqual(library._parse(ended, None, False)[1],
                          ["no questions: the body needs at least one `- ` line"])
         # A byte-order mark (some editors write one) is not part of the first line.
-        p = library.parse("﻿" + GRATITUDE)
+        p = library.parse("\ufeff" + GRATITUDE)
         self.assertEqual((p.id, p.title, len(p.questions)), ("gratitude", "Daily gratitude", 2))
 
     def test_questions_above_the_first_heading_are_a_problem(self):
