@@ -4594,7 +4594,7 @@ to it (not this host's setup: the gateway runs as a service).
   mentor slot is "the best part of yourself", everywhere (no private variant); the morning intention ends with **no
   reserve clause** ("fate permitting", "God willing"), in the built-in too; the change comes as a PR he reads.
   - **Folded, not piled up.** The morning goes from 11 questions to 8 (still a flat list: ids `1`–`8`), the evening
-    from 10 sections and 23 questions to 5 sections and 10. Both are answered the same way as before (whatever pulls;
+    from 10 sections and 24 questions to 5 sections and 11. Both are answered the same way as before (whatever pulls;
     the plain opener already says so), so a shorter bank asks less of a tired morning or night. The companion's
     lines (`companion:`), the opener shapes and limits, the times and every other key are unchanged.
   - **Where each old question went** (morning): sleep kept (1); "how are you feeling" and "what's on your chest" are
@@ -4625,20 +4625,31 @@ to it (not this host's setup: the gateway runs as a service).
   - **History and edits.** Ids are positional, so `2.1` now names another question. Nothing already written moves:
     an entry keeps the bank it was sent with, and a ledger record's `asked` keeps the text it wove in. If he has edited
     either built-in, his version stays and the Library says the default has changed since (BUILTIN-EDIT).
+  - **A prompt sent before the change and answered after it** (fixed here, found in review): the entry's folded
+    question list was built from the practice as the library had it at the reply (`entries._prompt_md` read
+    `p.bank_lines()`), so such an entry would have folded the new questions under an opener that went out with the old
+    ones. It now folds the send record's snapshot (`library.snapshot_sections`, as `serve/document.prompt_of` and
+    `actions.view` already read it), and the practice's own questions only for a record with none (one sent before
+    snapshots, or over `SNAPSHOT_MAX_CHARS`). `library.bank_lines(sections)` formats either; `Practice.bank_lines`
+    calls it, so the goldens are unchanged. Tests: `tests/test_sent_as_sent.py`, the entry-file cases. The change is
+    in modules the gateway imports, so this package's deploy restarts the gateway (DEPLOY.md, BOOKENDS).
   - **Goldens.** `tests/golden/morning.*` and `evening.*` are regenerated (`python3 tests/test_golden.py --write`, a
     switch this change adds beside `test_golden_engine.py --write`; midweek and weekly come out byte-identical, which
     is the check that the writer reproduces the old goldens). The tests that pinned an old question (as a sample of
     the evening's bank) now pin the new one at the same place, except where they read a ledger's `asked` record, which
     keeps the old text (that is the point of recording it). The web app's API fixtures (`tests/fixtures/api/`,
-    `JOURNAL_UPDATE_FIXTURES=1`) are regenerated, and the two web tests that counted the old banks follow; no web
+    `JOURNAL_UPDATE_FIXTURES=1`) are regenerated, and the web tests that counted the old banks follow; no web
     source changes, so the committed build stands.
-  - **Raised, not changed: an old entry's "asked" mark in the web app.** An entry's document carries the practice's
-    *current* bank (`prompt.questions`) and the asked ids as recorded (`prompt.asked`), and the web app marks the bank
-    line whose id was asked (`ui/Letter.tsx`, `components/Prompt.tsx`). After this change an evening entry from before
-    it shows the new bank with `1.1` marked (now the feelings check) under the asked line as it was sent ("What's
-    spinning in your mind?"). The asked text is right; the mark beside the bank is not. The same happens after any
-    edit of a practice, his own included. To close: mark a bank line only when its text is the asked text, or show an
-    old entry the bank it was sent with (the entry file keeps it, folded under `## Prompt`).
+  - **Raised, not changed: the "asked" mark on a record with no snapshot.** An entry's document carries the questions
+    its send record kept (`prompt.questions`, from `library.snapshot_sections`) and the asked ids as recorded
+    (`prompt.asked`), and the web app marks the bank line whose id was asked (`ui/Letter.tsx`,
+    `components/Prompt.tsx`). Every record a send or a face writes keeps its snapshot, so an evening entry from before
+    this change still shows the old bank with the mark on the question really sent. Only a record with no snapshot
+    (one sent before snapshots existed, one over `SNAPSHOT_MAX_CHARS`, and hand-made test fixtures) falls back to the
+    practice's *current* bank, and there the mark can land on whatever question now has the asked id. The asked
+    line itself is always the text as sent. To close, if it ever matters: mark a bank line only when its text is the
+    asked text. The web app's evening fixture now carries a snapshot (`tests/serve_helpers.py`, `EVENING_SENT`), as
+    a real record does, and `web/tests/document.test.tsx` checks the mark is on the question sent.
   - **Not changed, noted:** `prompts.OPENER_REQUEST`'s example ("what simple joys touched you today?" turned into
     "what was cozy about today?") names a question the evening no longer has. It is an example of the move, not a
     question to ask, and changing it would rewrite every opener request; left as it is.

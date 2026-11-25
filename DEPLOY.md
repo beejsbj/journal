@@ -16,29 +16,37 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
-## BOOKENDS — the built-in morning and evening, folded (2026-11-24; content only; **no gateway restart needed**; no config or state change)
+## BOOKENDS — the built-in morning and evening, folded (2026-11-24; the built-ins' words, and the entry's folded questions; **gateway restart required, with the pin move**; no config or state change)
 
 **What changes.** The words of the two built-in practices `morning` and `evening` (`src/journal/library/practices/`):
 the feelings check, the heart's desire, the rehearsal of the hard moment with "the best part of yourself", one
 intention (morning); the feelings check, one moment looked at again (the Mindful Review), the same mentor line and a
-close (evening). The morning has 8 questions, the evening 5 sections and 10. Times, opener shapes, the companion's
-lines and every other key are unchanged; so is midweek and weekly. DECISIONS.md, BOOKENDS.
-**Side and restart.** Package data only, read by every face through `library.builtins()`, which re-reads the packaged
-files whenever their names, sizes or mtimes change (`library._stamp`). The gateway reads the new words at the next
-prompt after the plugin pin moves, with no restart; the tick (a fresh process) at its next run; serve after `uv tool
-install --force` (no unit restart needed for the same reason, though the usual restart does no harm). No module
-changes, and the ids are unchanged, so the commands Hermes registered at load (`/morning`, `/evening`) stay right.
-Deploy outside a ritual's hour (not between 05:55 and 06:05 or 22:55 and 23:05) so a send does not read half a
-reinstall.
+close (evening). The morning has 8 questions, the evening 5 sections and 11. Times, opener shapes, the companion's
+lines and every other key are unchanged; so is midweek and weekly. And a new entry's folded question list (under
+`## Prompt`) is now the set its prompt record carried (`entries._prompt_md` reads `library.snapshot_sections`), so a
+prompt sent before the move and answered after it keeps the questions it was sent with; a record with no snapshot
+uses the practice's own, as before. DECISIONS.md, BOOKENDS.
+**Side and restart.** The words are package data, read by every face through `library.builtins()`, which re-reads
+the packaged files whenever their names, sizes or mtimes change (`library._stamp`). The entry change is in
+`entries.py` and `library.py`, which the gateway imports (the capture hook writes entries): **restart the gateway
+with the pin move** (`hermes gateway restart`), in a window. The tick (a fresh process) runs the new code at its next
+run; serve after `uv tool install --force` and the usual unit restart. The ids are unchanged, so the commands Hermes
+registered at load (`/morning`, `/evening`) stay right.
+**When.** Deploy when no morning or evening prompt is open and unanswered: best after he has answered the evening
+and before the next morning goes out, and at least an hour from either ritual (the gateway restart's window rule),
+so no send reads half a reinstall. With the entry change this is belt and braces: between the pin move and the gateway restart the gateway
+still runs the old `entries.py` over the new words, and a reply to a prompt sent before the move would fold the new
+questions into his entry.
 **How it reaches his schedule.** The next morning and evening prompts after the pin moves carry the new questions.
-Entries already written keep the questions they were sent with, and a prompt sent before the move keeps its record.
+Entries already written keep the questions they were sent with, and a prompt sent before the move keeps its record
+and, when answered after it, folds the questions it carried.
 If he has edited either built-in (`<state dir>/practices/morning.md` or `evening.md`), his version keeps going out
 and the Library shows "the default has changed since you edited it", with the diff (`journal practices diff
 evening`); *Reset to default* takes the new one.
 **First checks.** `journal practices show morning` lists 8 questions ending "One intention for today, in a sentence.";
 `journal practices show evening` opens "1. Arriving". `journal doctor` has no library problem.
 **Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
-previous sha). No restart, nothing to undo.
+previous sha), then `hermes gateway restart`. Nothing to undo: entries written meanwhile keep what they folded.
 
 ## HERMES-ONESHOT-ENV — the engine's one-shots are known in the gateway (2026-11-23; tick and hook side; **gateway restart required, with the pin move**; no config or state change; **urgent**: before the late day reflections run)
 

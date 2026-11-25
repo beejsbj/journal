@@ -28,58 +28,28 @@
     "questions": [
       {
         "id": "1.1",
-        "text": "What are you feeling right now? Find a word for it, or a few. What might be behind it?",
-        "section": "Arriving"
+        "text": "What's spinning in your mind?",
+        "section": "Brain Dump & Letting Go"
       },
       {
         "id": "1.2",
-        "text": "What's spinning in your mind? What do you need to put down before sleep?",
-        "section": "Arriving"
+        "text": "What do you need to release before sleep?",
+        "section": "Brain Dump & Letting Go"
       },
       {
         "id": "2.1",
-        "text": "What went well today? Where were you present, patient or kind? Let yourself be glad of it.",
-        "section": "The Day"
+        "text": "What went well today?",
+        "section": "Day Review"
       },
       {
         "id": "2.2",
-        "text": "What's the moment from today you'd tell as a story, even a small one?",
-        "section": "The Day"
+        "text": "What challenged you?",
+        "section": "Day Review"
       },
       {
         "id": "2.3",
-        "text": "What gave you energy, and what drained it?",
-        "section": "The Day"
-      },
-      {
-        "id": "2.4",
-        "text": "Who showed up for you, and who did you show up for?",
-        "section": "The Day"
-      },
-      {
-        "id": "3.1",
-        "text": "Pick one moment that caused more harm than it needed to. How present were you in it? What came of it, for you and for anyone else?",
-        "section": "One Moment, Looked at Again"
-      },
-      {
-        "id": "3.2",
-        "text": "Regret what deserves it, and leave out the guilt and the self-blame. What would you do differently, and is there anything to mend tomorrow?",
-        "section": "One Moment, Looked at Again"
-      },
-      {
-        "id": "4.1",
-        "text": "What would the best part of yourself say about how you did today?",
-        "section": "The Best Part of You"
-      },
-      {
-        "id": "5.1",
-        "text": "What are you grateful for from today?",
-        "section": "Closing"
-      },
-      {
-        "id": "5.2",
-        "text": "You have lived this day. What do you want to carry into sleep?",
-        "section": "Closing"
+        "text": "What did you learn?",
+        "section": "Day Review"
       }
     ],
     "phases": []

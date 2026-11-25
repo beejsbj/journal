@@ -154,6 +154,17 @@ schedule.time: 21:30
 """
 
 
+# The question set the evening prompt of 2026-10-14 carried, as its send record keeps it (``library.question_snapshot``):
+# an older bank than the built-in's today, so the entry page shows what was sent, not what the library holds now.
+EVENING_SENT = [
+    {"id": "1.1", "text": "What's spinning in your mind?", "section": "Brain Dump & Letting Go"},
+    {"id": "1.2", "text": "What do you need to release before sleep?", "section": "Brain Dump & Letting Go"},
+    {"id": "2.1", "text": "What went well today?", "section": "Day Review"},
+    {"id": "2.2", "text": "What challenged you?", "section": "Day Review"},
+    {"id": "2.3", "text": "What did you learn?", "section": "Day Review"},
+]
+
+
 def build_journal(tmp: Path):
     """The journal: an evening entry (two words blocks, a voice note, a conversation with her keyed reply, notes,
     annotations), a program session entry with phases and a summary, a /j note, the day reflection, a user
@@ -183,6 +194,7 @@ def build_journal(tmp: Path):
             "chat_id": cfg.chat_id, "message_id": "500", "sent_at": datetime(2026, 10, 14, 23, 0, tzinfo=IST).isoformat(),
             "sent_at_local": "23:00 IST", "opener": "Evening 🌿", "opener_source": "ada",
             "asked": [{"id": "1.1", "question": "What's spinning in your mind?"}],
+            "questions": EVENING_SENT,  # the question set the prompt carried (an older bank than the built-in's now)
             "entry_path": str(root / "2026-10-14-evening.md"),
             "captures": [{"message_id": "501", "at": datetime(2026, 10, 14, 23, 12, tzinfo=IST).isoformat()}]})
     # The chat transcript, which the server must never open: a real sessions database holding a thread (his words

@@ -418,8 +418,10 @@ class DocumentTest(ServeCase):
         self.assertEqual(doc["voices"], {"his": "Sam", "hers": "Ada"})   # the labels, never guessed by the client
         self.assertEqual(doc["prompt"]["sent_at_local"], "23:00 IST")
         self.assertEqual(doc["prompt"]["asked"], [{"id": "1.1", "question": "What's spinning in your mind?"}])
-        self.assertEqual(doc["prompt"]["questions"][0], {"id": "1.1", "text": "What are you feeling right now? Find a word for it, or a few. What might be behind it?",
-                                                         "section": "Arriving"})
+        # the questions the prompt carried (its record's snapshot), not the built-in's current bank
+        self.assertEqual(doc["prompt"]["questions"][0], {"id": "1.1", "text": "What's spinning in your mind?",
+                                                         "section": "Brain Dump & Letting Go"})
+        self.assertEqual(len(doc["prompt"]["questions"]), 5)
         blocks = doc["blocks"]
         self.assertEqual([(b["kind"], b["key"]) for b in blocks],
                          [("his", "words:0"), ("his", "words:1"), ("his", "his:813"), ("hers", "her:4815"),
