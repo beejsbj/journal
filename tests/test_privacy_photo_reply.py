@@ -3,17 +3,68 @@
 A captionless photo inside a window is private, and her turn takes it in: her reply describing it is private. When
 she wrote nothing after the photo, the pass kept that mark until her turn ended, so her reply to his next *public*
 message, after the window had closed, was kept off the record too. The owner decided (2026-11-24, DECISIONS
-X-PHOTO-REPLY) to save that reply, accepting that it may describe the photo. ``DecidedTest`` is that one case;
-``StillPrivateTest`` is every input around it, each at least as private as before (each passes on the pass before #10
-too).
-"""
-from helpers import add_prompt
-from test_images import note as image_note
-from test_privacy_coverage import Base, m
+X-PHOTO-REPLY) to save that reply, accepting that it may describe the photo, and nothing else: the tool guard still
+refuses the journal's writes in that turn.
 
-from journal import capture, conversations, notebook, privacy
+The photo rows are shaped as the hook and Hermes store them (``test_privacy_x_photo``): inside a window the hook
+rewrites his message to its window marker and his text and records its id; Hermes puts its vision notes in front (text
+image mode) or the picture lines after it (native image mode). ``DecidedTest`` is the decided case in every such
+shape; ``StillPrivateTest`` is every input around it, each as private as on the pass before #10, the review's findings
+(a caption after the marker, a /x marker, a document, a video, a gateway note, an id the hook recorded with no marker)
+among them; ``GuardTest`` holds the tool guard to refusing.
+"""
+from datetime import datetime
+from unittest import mock
+
+from helpers import add_prompt
+from test_privacy_coverage import Base, m
+from test_privacy_x_photo import DOC, VIDEO, live_note, native_mode, old_note, text_mode
+
+from journal import capture, conversations, notebook, privacy, tools
 
 REPLY = "Her reply to the public message."
+
+
+def captionless(cfg) -> dict:
+    """A captionless picture sent inside a window, as stored: (stored text, whether the hook marked it)."""
+    thread = capture.off_record_note(cfg, thread=True)
+    return {
+        "text mode, the hook's window marker": (text_mode([live_note("window-private picture")], thread), True),
+        "text mode, the marker, stripped": (text_mode([live_note("window-private picture")], thread).rstrip(), True),
+        "text mode, older note": (text_mode([old_note("window-private picture")], thread), True),
+        "text mode, an album": (text_mode([live_note("window-private a", "/c/a.jpg"),
+                                           live_note("window-private b", "/c/b.jpg")], thread), True),
+        "text mode, no hook": (live_note("window-private picture"), False),
+        "native, the hook's window marker": (native_mode(thread), True),
+        "native, an album": (native_mode(thread, pictures=2), True),
+        "native, no hook": (native_mode(""), False),
+    }
+
+
+def not_captionless(cfg) -> dict:
+    """Pictures and attachments inside a window that are not a captionless picture: (stored text, hook-marked)."""
+    thread = capture.off_record_note(cfg, thread=True)
+    one = capture.off_record_note(cfg)
+    return {
+        "text mode, a caption after the window marker": (
+            text_mode([live_note("a picture")], thread + "window-private caption"), True),
+        "text mode, a caption, no hook": (text_mode([live_note("a picture")], "window-private caption"), False),
+        "native, a caption after the window marker": (native_mode(thread + "window-private caption"), True),
+        "native, a caption, no hook": (native_mode("window-private caption"), False),
+        "text mode, the /x marker": (text_mode([live_note("a picture")], one), True),
+        "native, the /x marker": (native_mode(one), True),
+        "text mode, an album with /x on a later line": (
+            text_mode([live_note("a"), live_note("b", "/c/b.jpg")], one + "first\n/x window-private line"), True),
+        "a document": (text_mode([DOC], thread), True),
+        "a document, no hook": (DOC, False),
+        "a video": (text_mode([VIDEO], thread), True),
+        "a picture and a document": (text_mode([live_note("a picture"), DOC], thread), True),
+        "a gateway note": ("[System note: The previous turn was interrupted by a gateway restart; the gateway is now "
+                           "back online.]", False),
+        "an id the hook recorded, no marker": (live_note("window-private picture"), True),
+        "a picture's turn with words after the marker": (
+            text_mode([live_note("a picture")], thread + "\n\nwindow-private second paragraph"), True),
+    }
 
 
 class PhotoReplyBase(Base):
@@ -28,13 +79,18 @@ class PhotoReplyBase(Base):
         rows = self.cfg.transcript().rows(since=m(-10))
         return next(r for r in rows if r.platform_message_id == "42")
 
-    def window_with_photo(self, photo=""):
-        """A bare /x the gateway answered at minute 2, then a photo with no caption at minute 3, and no row of hers
-        after it. The window closes at minute 48 (quiet_minutes, 45, after the photo)."""
+    def window_with_photo(self, photo=None, marked=True):
+        """A bare /x the gateway answered at minute 2, then a captionless picture at minute 3 (the hook records its
+        id and rewrites it when ``marked``), and no row of hers after it. The window closes at minute 48
+        (quiet_minutes, 45, after the photo)."""
+        if photo is None:
+            photo, marked = captionless(self.cfg)["text mode, the hook's window marker"]
         self.tick(m(-30))
         self.his("a question before it", m(0), "40")
         self.hers("Sure, go on.", m(1))
         conversations.note_off(self.cfg, None, m(2), thread_start=True)
+        if marked:
+            conversations.note_off(self.cfg, "42", m(3))
         self.his(photo, m(3), "42")
 
 
@@ -42,11 +98,11 @@ class DecidedTest(PhotoReplyBase):
     """The one case the owner changed: her reply to his next public message after the window is saved."""
 
     def test_her_reply_to_his_next_public_message_is_saved(self):
-        for photo in ("", image_note("window-private picture of a letter")):
-            with self.subTest(native=not photo):
+        for label, (photo, marked) in captionless(self.cfg).items():
+            with self.subTest(label):
                 self.tearDown()
                 self.setUp()
-                self.window_with_photo(photo)
+                self.window_with_photo(photo, marked)
                 self.his("a public message after the window", m(60), "43")
                 self.hers(REPLY, m(61))
                 private = self.private(m(62))
@@ -59,7 +115,9 @@ class DecidedTest(PhotoReplyBase):
 
     def test_two_photos_in_the_window(self):
         self.window_with_photo()
-        self.his("", m(5), "44")
+        thread = capture.off_record_note(self.cfg, thread=True)
+        conversations.note_off(self.cfg, "44", m(5))
+        self.his(native_mode(thread), m(5), "44")
         self.his("a public message after the window", m(60), "43")
         self.hers(REPLY, m(61))
         self.assertNotIn(REPLY, self.private(m(62)))
@@ -72,32 +130,23 @@ class DecidedTest(PhotoReplyBase):
         self.hers(REPLY, m(13))
         self.assertNotIn(REPLY, self.private(m(14)))
 
-    def test_the_turn_is_no_longer_tainted_for_the_tool_guard(self):
-        """The end state follows the rows: before his public message her next turn would take the photo in; after
-        it, her turn is on that message (the journal's writing tools are no longer refused in it)."""
-        self.window_with_photo()
-        privacy._CACHE.clear()
-        self.assertTrue(privacy.view(self.cfg, m(55)).tainted())
-        self.his("a public message after the window", m(60), "43")
-        privacy._CACHE.clear()
-        self.assertFalse(privacy.view(self.cfg, m(60.5)).tainted())
-
-
     def test_compaction_copies(self):
         """After the decided case, a compaction copies the rows in place: the photo's copy is private, her saved
         reply's copy is not written twice, and a copy of her private answer in the window stays private."""
-        self.window_with_photo()
+        photo, _ = captionless(self.cfg)["text mode, the hook's window marker"]
+        self.window_with_photo(photo)
         self.hers("window-private: noted.", m(3.5))  # (her answer to the photo: that photo's turn has ended)
-        self.his("", m(5), "44")  # a second photo she did not answer
+        conversations.note_off(self.cfg, "44", m(5))
+        self.his(photo, m(5), "44")  # a second photo she did not answer
         self.his("a public message after the window", m(60), "43")
         self.hers(REPLY, m(61))
         self.tick(m(70))
         self.assertEqual(self.files().count(REPLY), 1)
         self.db.sql("update messages set active = 0")
         self.hers("[CONTEXT COMPACTION — REFERENCE ONLY] Earlier turns were compacted", m(120))
-        self.his("", m(120), "42")
+        self.his(photo, m(120), "42")
         self.hers("window-private: noted.", m(120))
-        self.his("", m(120), "44")
+        self.his(photo, m(120), "44")
         self.his("a public message after the window", m(120), "43")
         self.hers(REPLY, m(120))
         log = self.tick(m(140))
@@ -111,18 +160,67 @@ class DecidedTest(PhotoReplyBase):
                 self.assertIn(r.id, pv.private, r.text)
 
 
+class GuardTest(PhotoReplyBase):
+    """The owner decided to save her reply, not to loosen the guard: in her turn on the message that cleared the
+    photo's mark, the journal's writes are still refused (``View.held``), until that turn ends and he writes again."""
+
+    def guard(self, at):
+        class Now(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return at
+        privacy._CACHE.clear()
+        with mock.patch.object(tools, "datetime", Now):
+            return tools._off_record_turn(self.cfg, None)
+
+    def test_the_guard_still_refuses_in_that_turn(self):
+        for label, (photo, marked) in captionless(self.cfg).items():
+            with self.subTest(label):
+                self.tearDown()
+                self.setUp()
+                self.window_with_photo(photo, marked)
+                self.assertTrue(self.guard(m(55)), "before his message: her next turn takes the photo in")
+                self.his("a public message after the window", m(60), "43")
+                self.assertTrue(self.guard(m(60.5)), "her turn on the message: the guard refuses")
+                self.db.add("let me write that down", m(60.7), role="assistant")  # a tool step of that turn
+                self.db.sql("update messages set tool_calls = ? where id = (select max(id) from messages)",
+                            '[{"id": "1"}]')
+                self.assertTrue(self.guard(m(60.8)))
+                self.hers(REPLY, m(61))
+                self.assertTrue(self.guard(m(61.5)), "her turn ended, his next message not yet read")
+                self.assertNotIn(REPLY, self.private(m(62)))  # … while her reply is saved
+                self.his("another public message", m(70), "45")
+                self.assertFalse(self.guard(m(70.5)), "a new turn of his: nothing private in it")
+
+    def test_a_steered_message_keeps_the_guard_too(self):
+        self.window_with_photo()
+        self.his("a public message after the window", m(60), "43")
+        self.steer("and one more thing", m(60.5), "44")
+        self.assertTrue(self.guard(m(60.6)))
+
+
 class StillPrivateTest(PhotoReplyBase):
-    """Every input around the decided case: each stays at least as private as before #10."""
+    """Every input around the decided case: each stays as private as before #10."""
 
     def assert_reply_private(self, at=m(62)):
         self.assertIn(REPLY, self.private(at))
 
-    def test_a_photo_with_a_caption_is_his_private_words(self):
-        self.window_with_photo(image_note("a picture") + "\n\nwindow-private caption")
-        self.his("a public message after the window", m(60), "43")
-        self.hers(REPLY, m(61))
-        self.assert_reply_private()
-        self.assertIn(self.photo_row(m(62)).id, privacy.view(self.cfg, m(62)).private)
+    def test_anything_but_a_captionless_picture(self):
+        """The review's findings 1 and 2: only a picture row holding nothing beyond Hermes' notes and the hook's
+        window marker counts. A caption, the /x marker, a document, a video, a gateway note, words, or an id the hook
+        recorded with no marker: her reply to his next public message stays private."""
+        for label, (stored, marked) in not_captionless(self.cfg).items():
+            with self.subTest(label):
+                self.tearDown()
+                self.setUp()
+                self.window_with_photo(stored, marked)
+                self.his("a public message after the window", m(60), "43")
+                self.hers(REPLY, m(61))
+                self.assert_reply_private()
+                self.assertIn(self.photo_row(m(62)).id, privacy.view(self.cfg, m(62)).private)
+                self.tick(m(70))
+                self.assertNotIn(REPLY, self.files())
+                self.assertNotIn("window-private", self.files())
 
     def test_a_photo_she_answered_before_his_next_message(self):
         """Her answer to the photo stays private; her reply to the next message was saved before #10 too."""
@@ -146,17 +244,22 @@ class StillPrivateTest(PhotoReplyBase):
 
     def test_a_private_message_waits_with_the_photo(self):
         """A private message in the window before the photo, with no reply of hers yet: her next turn answers it."""
+        thread = capture.off_record_note(self.cfg, thread=True)
         self.tick(m(-30))
         conversations.note_off(self.cfg, None, m(2), thread_start=True)
-        self.his("window-private words", m(2.5), "41")
-        self.his("", m(3), "42")
+        conversations.note_off(self.cfg, "41", m(2.5))
+        self.his(thread + "window-private words", m(2.5), "41")
+        conversations.note_off(self.cfg, "42", m(3))
+        self.his(text_mode([live_note("a picture")], thread), m(3), "42")
         self.his("a public message after the window", m(60), "43")
         self.hers(REPLY, m(61))
         self.assert_reply_private()
 
     def test_a_private_message_after_the_photo(self):
         self.window_with_photo()
-        self.his("window-private words after it", m(4), "41")
+        thread = capture.off_record_note(self.cfg, thread=True)
+        conversations.note_off(self.cfg, "41", m(4))
+        self.his(thread + "window-private words after it", m(4), "41")
         self.his("a public message after the window", m(60), "43")
         self.hers(REPLY, m(61))
         self.assert_reply_private()
@@ -188,7 +291,7 @@ class StillPrivateTest(PhotoReplyBase):
         may be his own words, ``privacy._in_cut``) is no captionless photo: it never clears at his next message."""
         notebook.add(self.cfg, "ask how the garden plan went")
         notes = notebook.render(self.cfg, "2026-10-15")  # her notebook, as the turn carried it: an engine block
-        self.window_with_photo(f"[Image attached at: /c/x.jpg]\n[screenshot]\n{notes}\n/x keep this out")
+        self.window_with_photo(f"[Image attached at: /c/x.jpg]\n[screenshot]\n{notes}\n/x keep this out", False)
         self.assertIn("keep this out", self.photo_row(m(4)).meta.get("cut") or "")
         self.his("a public message after the window", m(60), "43")
         self.hers(REPLY, m(61))
@@ -210,11 +313,14 @@ class StillPrivateTest(PhotoReplyBase):
 
     def test_a_queued_photo_and_her_reply_to_it(self):
         """The busy path: a photo sent inside the window, stored after his public message: her reply takes it in."""
+        thread = capture.off_record_note(self.cfg, thread=True)
         self.tick(m(-30))
         conversations.note_off(self.cfg, None, m(2), thread_start=True)
-        self.his("window-private words", m(3), "41")
+        conversations.note_off(self.cfg, "41", m(3))
+        self.his(thread + "window-private words", m(3), "41")
         self.hers("window-private reply", m(4))
         self.his("a public message after the window", m(100), "43")
-        self.his("", m(30), "42")  # sent at minute 30, stored now
+        conversations.note_off(self.cfg, "42", m(30))
+        self.his(text_mode([live_note("a picture")], thread), m(30), "42")  # sent at minute 30, stored now
         self.hers(REPLY, m(101))
         self.assert_reply_private(m(102))

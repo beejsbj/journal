@@ -404,6 +404,19 @@ def caption(text: str) -> str:
     return rest if rest and not rest.startswith(_ENVELOPES) else ""
 
 
+def after_pictures(text: str) -> str | None:
+    """What a text-mode picture row stores after Hermes' picture notes (``_IMAGE_NOTE``, one per picture of an album),
+    stripped: the hook's rewrite of his message, or nothing. None when the row does not open with a
+    picture note, or when another attachment's note (a document, a video) follows them: it is then no picture's row
+    alone. A finding for the privacy pass (``privacy._captionless``), never his words."""
+    rest, n = text, 0
+    while m := _IMAGE_NOTE.match(rest):
+        rest, n = rest[m.end():].lstrip(), n + 1
+    if not n or rest.startswith(_ATTACHMENT):
+        return None
+    return rest
+
+
 def clean_user_text(text: str) -> str:
     """His words alone, loosely: no gateway origin note, no quoted message he replied to, no journal hook note
     (the last two hold the companion's own text), no gateway note or timestamp in front, nothing after a native
@@ -485,6 +498,9 @@ def to_row(raw: Mapping) -> Row | None:
                 delivery=content is None or _like(stored, _DELIVERIES))
     if kind == "system":
         meta["caption"] = "" if withheld else caption(msg["text"])
+        rest = None if withheld else after_pictures(msg["text"])
+        if rest is not None:
+            meta["after_pictures"] = rest
     if withheld:
         meta["withheld"] = withheld
     if msg.get("images"):
