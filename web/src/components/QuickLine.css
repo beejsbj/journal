@@ -1,7 +1,7 @@
 /* QuickLine (components/QuickLine.tsx): one line of his on Today, a ruled line in his roman and a quiet send */
 .quick-line { display: grid; gap: var(--s2); margin: 0 0 var(--s5); }
 .quick-line-form { display: flex; align-items: end; gap: var(--s3); }
-.quick-line-box { flex: 1; min-width: 0; }
+.quick-line-box { flex: 1; min-width: 0; resize: none; overflow-y: auto; }
 .quick-line-form .button { flex: none; }
 .quick-line-said { margin: 0; font-size: var(--t-small); color: var(--text-3); }
 .quick-line .offline-note { margin: 0; }

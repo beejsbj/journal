@@ -19,7 +19,7 @@ const reads = {
 async function today() {
   visit("/");
   const host = mount(<App />);
-  const box = await until(() => must(host.querySelector<HTMLInputElement>("#quick-line")));
+  const box = await until(() => must(host.querySelector<HTMLTextAreaElement>("#quick-line")));
   return { host, box, form: must(box.closest("form")) };
 }
 
@@ -27,7 +27,8 @@ describe("a line put down on Today", () => {
   it("is one line of his, labelled, outside the write room", async () => {
     stubApi(reads);
     const { host, box } = await today();
-    expect(box.tagName).toBe("INPUT");
+    expect(box.tagName).toBe("TEXTAREA");   // (an <input> would flatten a pasted paragraph: his words changed silently)
+    expect(box.rows).toBe(1);
     expect(box.classList.contains("his")).toBe(true);
     expect(host.querySelector('label[for="quick-line"]')?.textContent).toBe("A line for today, saved as a note");
     expect(host.querySelector("dialog")).toBeNull();
@@ -81,5 +82,54 @@ describe("a line put down on Today", () => {
     const [a, b] = writes();
     expect((a?.body as { client_id: string }).client_id).toBe((b?.body as { client_id: string }).client_id);
     await until(() => expect(box.value).toBe(""));
+  });
+
+  const enter = (box: HTMLTextAreaElement, shift = false) =>
+    box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", shiftKey: shift, bubbles: true, cancelable: true }));
+
+  it("puts the line down on Enter; Shift+Enter is a new line, not a send", async () => {
+    const { writes } = stubApi({ ...reads, "POST /api/v1/entries": { stem: "2026-10-15-j-2", rule: "/j" } });
+    const { box } = await today();
+    await type(box, "The kettle,");
+    const shifted = enter(box, true);
+    expect(shifted).toBe(true);   // (not prevented: the browser adds the line)
+    await type(box, "The kettle,\nthe rain.");
+    expect(writes()).toHaveLength(0);
+    expect(enter(box)).toBe(false);   // Enter alone is taken: the line goes down
+    await until(() => expect(writes()).toHaveLength(1));
+    expect((writes()[0]?.body as { text: string }).text).toBe("The kettle,\nthe rain.");
+  });
+
+  it("keeps a pasted paragraph as it is, its lines shown and sent unchanged", async () => {
+    const { writes } = stubApi({ ...reads, "POST /api/v1/entries": { stem: "2026-10-15-j-2", rule: "/j" } });
+    const { box, form } = await today();
+    const words = "First line.\n\nSecond, after a blank.\nThird.";
+    await type(box, words);
+    expect(box.value).toBe(words);
+    expect(box.rows).toBe(4);   // the box grows with his lines (up to six), so what is sent is what he sees
+    await click(must(form.querySelector('button[type="submit"]')));
+    await until(() => expect(writes()).toHaveLength(1));
+    expect((writes()[0]?.body as { text: string }).text).toBe(words);
+  });
+
+  it("an empty box does not send on Enter", async () => {
+    const { writes } = stubApi({ ...reads, "POST /api/v1/entries": { stem: "2026-10-15-j-2", rule: "/j" } });
+    const { box } = await today();
+    await type(box, "   ");
+    enter(box);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(writes()).toHaveLength(0);
+  });
+
+  it("keeps words too long to save in the box with the plain reason, and offers no Retry", async () => {
+    const detail = "text is at most 20,000 characters";
+    stubApi({ ...reads, "POST /api/v1/entries": () => json({ error: "too-large", detail }, 413) });
+    const { host, box, form } = await today();
+    await type(box, "a very long line");
+    await click(must(form.querySelector('button[type="submit"]')));
+    const line = await until(() => must(host.querySelector(".quick-line .error-line")));
+    expect(line.textContent).toContain("at most 20,000 characters");
+    expect(line.querySelector("button")).toBeNull();
+    expect(box.value).toBe("a very long line");
   });
 });

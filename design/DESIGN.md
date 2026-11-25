@@ -238,7 +238,7 @@ All in `web/src/ui/` (TSX plus a CSS file each), exported from `web/src/ui/index
 | `Mark` | the margin j | the rail, the phone top, pairing | in `icons.tsx` |
 
 The app's own parts that follow the system without being in `ui/` (`web/src/components/`): `QuickLine` (Today's one
-line of his, a `TextField`'s ruled `.input.his` and a small secondary *Put down*, on `useCompose`), `Composer` (the inline box;
+line of his, a one-row textarea in the ruled `.input.his` that grows with his lines, and a small secondary *Put down*, on `useCompose`), `Composer` (the inline box;
 `rest` lets it rest as one line on a phone while nothing is in it or happening, drawn by its own sheet through
 `data-rest`), `WriteRoom`, `Document`, `BlockActions`, `Markdown`.
 
