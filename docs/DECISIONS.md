@@ -503,6 +503,19 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   count such rows read-only in a live database, then add `[System: ` to the skip prefixes and to the marks
   (`_LEFTOVER`).
 
+- **ROUTE-OPENS — should the web app's `GET /api/v1/status` stop reading the hook's state and the sweep's
+  watermark? (raised 2026-11-24 by ROUTE-OPENS, issue #44; not decided).** The new open-recording walk found that
+  `status.status(web=True)` opens `hook-state.json` through `today.injections` (it parses the whole file, which also
+  holds queued packs, voice notes awaiting transcripts and off-record turn marks, to return the today block's count and
+  last time) and `sweep.json` (returned raw as `sweep`). Nothing of his or hers reaches the client: two counters and a
+  row-id watermark. But `status`'s own docstring and API.md Decision 2 say no web route reads the hook's records, while
+  API.md's `/status` row says the web status includes the today-block injections, so the two documents disagree. The
+  PWA calls `/status` only as a sign-in probe and shows none of its fields. Options: **(a, recommended)** leave both out
+  of the web status (`today` without its injection counts, `sweep: null` when `web`), update API.md, and drop
+  `STATUS_ONLY` from `test_route_opens.py`, so serve never opens either file; nothing visible changes. **(b)** keep
+  them and record the exception in API.md Decision 2 (it stays pinned to `/status` by `test_only_status_reads_these`).
+  To close: the owner picks; (a) is a small serve-side package.
+
 ## Taken by packages (recorded here; later packages follow them)
 
 - **WP0 — an unknown entry id is recognised only with the engine's authorship marker.** The spec's fallback
@@ -4588,3 +4601,19 @@ line of his that copies the mark never leaves a bound on her later searches. An 
 that echoes it has the line dropped. Left as known: `journal_search` refuses in a finite turn the engine did not start
 (a kanban card, his own `hermes chat -q`); an engine one-shot that starts a gateway itself would pass its variables
 to it (not this host's setup: the gateway runs as a service).
+
+- **ROUTE-OPENS (2026-11-24) — the faces' fence is held by what they open, and the import fence says it is direct
+  (issue #44).** `test_serve_fence` / `test_mcp_fence` check what `serve/` and `mcp/` import themselves; loading them
+  also loads `agent`, `mirror`, `notebook`, `ports` and `sqlite3` through the engine (at import; `conversations`,
+  `context` and `sweep`, which the audit listed, no longer load then). **Chosen:** reword AGENTS.md to say the fence is
+  direct, not make it transitive (a transitive fence fails today on modules serve loads and never calls), and pin that
+  set exactly (`ModuleLoadTest`) so it changes only by a decision. **The behavioural half:** `test_route_opens.py`
+  installs an audit hook (`open`, which `os.open` raises too, `os.listdir`, `os.scandir`; every thread, so the server's
+  handler threads are seen) and re-runs the existing walks (`test_serve_privacy`'s GET, write, Write-now and push
+  walks; `test_mcp.PrivacyTest`'s tool walk) unchanged, failing on any path under `state_dir` outside `ALLOWED` (a file
+  brings its lock and an atomic write's temporary file) and on the sessions database wherever it is. `NEVER` names
+  what must stay out (the notebook and its archive, `packs/`, `conversations.json`, the mirror queue, `sent.jsonl`,
+  `send-times.json`, `audio-stash/`, `tick.lock`, `hook-state.json`, `sweep.json`). A path test, not a content test: a
+  file's existence check (`stat`) is not recorded. Found: `GET /api/v1/status` opens `hook-state.json` and
+  `sweep.json`; pinned to that route as `STATUS_ONLY` (`test_only_status_reads_these`) and raised above (ROUTE-OPENS,
+  open) rather than changed here, since API.md documents part of it.

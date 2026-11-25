@@ -16,6 +16,19 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## ROUTE-OPENS — the faces' walks record every file they open (2026-11-24; tests and docs only; **no deploy, no restart**)
+
+**What changes.** Tests only (issue #44): `tests/test_route_opens.py` runs the serve route walks (every GET, write
+and push route, the Write-now view) and the MCP tool walk again with every file open and directory listing recorded
+(`sys.addaudithook`, every thread), and fails on anything under `state_dir` outside an allowlist, or on the chat
+transcript; it also pins which forbidden modules loading `serve` and `mcp` brings in through the engine. AGENTS.md now
+says the import fence is direct, not transitive. Found and pinned, not changed: `GET /api/v1/status` reads
+`hook-state.json` (for the today block's counts, which API.md documents) and `sweep.json` (its watermark); the owner's
+choice is open in DECISIONS.md, ROUTE-OPENS. DECISIONS.md, ROUTE-OPENS.
+**Side and restart.** None: no file under `src/` changes. Moving the pins to this sha is optional and needs no restart.
+**First checks.** None on the host; CI's suite is the check.
+**Rollback.** Nothing to roll back on a host.
+
 ## HERMES-ONESHOT-ENV — the engine's one-shots are known in the gateway (2026-11-23; tick and hook side; **gateway restart required, with the pin move**; no config or state change; **urgent**: before the late day reflections run)
 
 **What changes.** On a Hermes whose gateway runs every one-shot, a run's environment never reaches the process its
