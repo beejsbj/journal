@@ -325,7 +325,9 @@ def compute(cfg: Config, rows: list[Row], hook_starts: list[datetime], sends: li
             v.bare = None  # her turn took the pictures in: her reply may describe them
             if v.window:
                 v.window["last"] = max(v.window["last"], now_t)  # her activity keeps the window going
-            if v.taint or inside(t):
+            if v.taint or inside(t) or (v.held and v.held_answered):
+                # (a row of hers after her turn on the message that cleared ``bare`` ended, before he writes again:
+                # no reply to that message, and the pictures are still in her context: private, as before #10)
                 private(rid, t)
             if row.meta.get("ends_turn") and v.taint:
                 v.answered = True

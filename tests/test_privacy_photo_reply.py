@@ -192,6 +192,18 @@ class GuardTest(PhotoReplyBase):
                 self.his("another public message", m(70), "45")
                 self.assertFalse(self.guard(m(70.5)), "a new turn of his: nothing private in it")
 
+    def test_her_rows_after_that_turn_ended_stay_private(self):
+        """Only her reply to that message is saved: a row of hers after that turn ended (a failed turn, then a tool
+        step of hers with no new message of his) stays private until he writes again, as before #10."""
+        self.window_with_photo()
+        self.his("a public message after the window", m(60), "43")
+        self.db.add("x", m(61), role="assistant", display_kind="failed_turn")
+        self.db.add("window-private: about the photo", m(62), role="assistant")
+        self.assertIn("window-private: about the photo", self.private(m(63)))
+        self.his("another public message", m(70), "45")
+        self.hers("a public answer", m(71))
+        self.assertNotIn("a public answer", self.private(m(72)))
+
     def test_a_steered_message_keeps_the_guard_too(self):
         self.window_with_photo()
         self.his("a public message after the window", m(60), "43")
