@@ -4595,3 +4595,12 @@ to it (not this host's setup: the gateway runs as a service).
   (`SCANNABLE_EXTENSIONS`: Python including the root `__init__.py` and `tools/`, docs, JSON, shell, fixtures), minus
   the scanner's excluded directories. A file that must hold one on purpose (a fixture) would be named as an exception
   in that test, with its reason.
+- **DOCTOR-STUB (2026-11-24) — the doctor judges the cron stub by what it runs, not by the install that asks (issue
+  #7).** `cron.checks` compared the stub with `stub_text(src, home)` for the caller's `src`; from a `uv tool` CLI that
+  is site-packages, so a correct stub (naming the plugin's `src`) read "out of date" on one face and ok on the other.
+  Rule: `cron.stub_problem` reads the `SRC` out of the stub, requires the file to equal what setup writes for that
+  `src` and this profile, and requires `<SRC>/journal/cli.py` to exist; the asking install's own path no longer
+  matters. Not decided: whether doctor should also warn when the stub's `src` is a different *version* than the
+  running CLI; the `same version as tick` row already does that.
+  Accepted trade: a stub whose `SRC` still exists with `journal/cli.py` reads ok even if it is no longer the install
+  the profile uses; version skew between the two is covered by the `same version as tick` row, not by this one.
