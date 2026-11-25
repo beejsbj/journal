@@ -16,6 +16,21 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## ROUTE-OPENS — the faces' walks record every file they open; the web status opens neither the hook's state nor the sweep's (2026-11-24; **serve side only, no gateway restart**)
+
+**What changes.** Issue #44: `tests/test_route_opens.py` runs the serve route walks (every GET, write and push route,
+the Write-now view) and the MCP tool walk again with every file open, directory listing and SQLite connection recorded
+(`sys.addaudithook`, every thread), and fails on anything under `state_dir` outside an allowlist, or on the chat
+transcript; it also pins which forbidden modules loading `serve` and `mcp` brings in through the engine. AGENTS.md now
+says the import fence is direct, not transitive. `status.status(web=True)` (the web's `GET /api/v1/status`) no longer
+returns `sweep` or the today block's injection count, so it opens neither `sweep.json` nor `hook-state.json`; the CLI's
+`journal status` is unchanged. DECISIONS.md, ROUTE-OPENS.
+**Side and restart.** Serve: `uv tool install --force` at the merge sha, then `systemctl --user restart journal-serve`.
+No gateway restart: `status.py` is not loaded by `journal.hermes` (checked with the import probe in AGENTS.md), and the
+change is inside `web=True` branches only, which no gateway path takes; the tick runs it from its next run unchanged.
+**First checks.** `curl` the signed-in `/api/v1/status`: no `sweep` key, and `today` has no `count`.
+**Rollback.** The CLI at the previous sha and a serve restart.
+
 ## MODEL-WALK — the route walks fence every way to a model (2026-11-24; tests and docs only; **no deploy, no restart**)
 
 **What changes.** Tests only (issue #3): `tests/helpers.py` gains `no_model()`, which records and fails every way to a
