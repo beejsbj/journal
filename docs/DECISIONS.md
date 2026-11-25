@@ -4591,25 +4591,36 @@ to it (not this host's setup: the gateway runs as a service).
 
 - **PRIV4 (2026-11-24) — an old compaction copy and a queued bare `/x` (#4, #5).** Two holes the BACKLOG-PRIVACY
   entries above left open; both fixes only make rows private, never the reverse.
-  - **A copy whose original the view did not read re-takes the pass from the original's time (#4).** A compaction
-    copy is private when its original is, and an original older than the view's recompute was answered only by its
-    saved id, which ages out at `KEEP_DAYS` (400). A copy of a private row older than that, with no mark of its own
-    (a message steered in inside a bare-`/x` window, her reply there), read as public to the outage catch-up, the
-    pack, the quote verifier and annotation alignment. Option (a) of the issue is taken: when a take holds a copy
-    whose original it did not read and no saved answer names private, `view` reads the originals' times and takes
-    the pass again from `RECOMPUTE` before the oldest, keeping the first take's answers (a re-take only adds), until
-    every copy's original was read. The hook's records it needs are kept for good since BACKLOG-PRIVACY. Option (b)
-    (keep saved private ids for good) was not taken: it grows with every private row and is still only a floor.
-    Cost: a view that holds such a copy reads back to its original (usually days, for a long-lived session's
-    carried tail) on each uncached call, the gateway's included, until the copy is older than the view; a copy whose
-    original is saved private costs nothing more. An original deleted between the two reads closes that view
-    (everything private) until the next read.
+  - **A copy whose original the view did not read is answered from a slice around the original (#4).** A
+    compaction copy is private when its original is, and an original older than the view's recompute was answered
+    only by its saved id, which ages out at `KEEP_DAYS` (400). A copy of a private row older than that, with no mark
+    of its own (a message steered in inside a bare-`/x` window, her reply there), read as public to the outage
+    catch-up, the pack and annotation alignment. Option (a) of the issue is taken, bounded: when a view holds a copy
+    whose original it did not read and no saved answer names private, `_originals` reads each such original by its
+    id (originals a few ids apart in one read) and runs the pass over a slice from `RECOMPUTE` before it to
+    `RECOMPUTE` after it (a row he sent before it but that was queued is stored after it), originals whose slices
+    meet sharing one; what a slice finds private is added to the view, nothing is taken from it. The hook's records
+    it needs are kept for good since BACKLOG-PRIVACY. Option (b) (keep saved private ids for good) was not taken: it
+    grows with every private row and is still only a floor.
+    Cost: a view that holds such a copy reads, besides its own hours, each original by id and one slice of about
+    four days per group of originals, on each uncached call (the gateway's on each of his messages and each
+    journal-writing tool call included) until the copy is older than the view. That is the common case, a copy of a
+    public row, and Hermes' compressor can carry a conversation's first exchange, so the original can be as old as
+    the conversation: the slice bounds it. Measured on a synthetic database with Hermes' indexes
+    (`tests/test_privacy_retake_cost.py`, an uncached view): 60 days and 20,000 rows, 240 ms on main, 375 ms here
+    (2.4 s for the first version of this fix, which re-took the whole view from the oldest original); 180 days and
+    60,000 rows, 620 ms on main, 675 ms here (8 s before). A copy whose original is saved private costs nothing more.
+    The tick logs each re-take (`privacy: answered N compaction-copy original(s) …`, counts only). An original
+    that can't be read by its id, is read as newer than the view's start (two reads that disagree) or is missing
+    from its slice closes that view (everything private) until the next read; no read steps back again.
   - **A bare `/x` stored as a row also opens its window at its own time (#5).** The pass opened a busy-path bare
     `/x`'s window at the stored-order clock (the latest time seen), so a message he sent after the `/x` but stored
     before it was read before any window existed and was public. The pass now gathers the own times of those rows
     before the walk and adds them to the hook's starts (`_busy_starts`), as the issue proposed; the walk still opens
     one where it reaches the row, as before. For a row stored in order the two are the same moment, so nothing
-    changes there. Whether Hermes can store the two in that order was not checked on a live gateway (the issue's
+    changes there. The window rule then reaches her rows too: a `/x` he sent at 10:01, queued during her turn
+    and stored after her 10:03 answer to his public 10:00 question, makes that answer private (the window is open from
+    10:01; more private, as the rule says, and pinned by a test). Whether Hermes can store the two in that order was not checked on a live gateway (the issue's
     open question): the fix holds either way and costs nothing when it cannot.
   - Not done here: #10 (a captionless photo that ends a window takes her next public reply off the record) and #11
     (compacting and dropping the `/x` records) trade privacy for something else and wait for the owner.

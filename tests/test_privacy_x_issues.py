@@ -3,12 +3,18 @@
 Each case failed on main before its fix. Every one asserts the safe outcome: off-the-record words stay out of every
 reader, and public words still reach the readers that show them.
 """
-from datetime import timedelta
+import tempfile
+import unittest
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from unittest import mock
 
+from helpers import FakeTranscript, make_cfg
 from test_privacy_coverage import Base, m
 
 from journal import context, conversations, privacy, recovery
-from journal.validate import norm
+from journal.config import Config
+from journal.ports import Row
 
 
 class OldOriginalCopyTest(Base):
@@ -68,13 +74,17 @@ class OldOriginalCopyTest(Base):
         self.assertNotIn("busy-private", said)
         self.assertIn("public after the window", said)
 
-    def test_the_quote_verifier_refuses_the_copies(self):
+    def test_the_pack_leaves_out_his_steered_copy(self):
+        """His own chat in the pack (capture mode ``everything``): the copy of his steered message is left out, his
+        public message's copy is in."""
+        self.cfg.capture = {"mode": "everything"}
+        self.cfg.sources["telegram_history"] = {"enabled": True, "days": 7, "limit": 25}
         at = self.long_ago()
         self.rotate(at)
         privacy._CACHE.clear()
-        verify = context.make_verifier(self.cfg)
-        self.assertFalse(verify("telegram:x", norm("busy-private reply")))
-        self.assertTrue(verify("telegram:x", norm("public after the window")))
+        said = " ".join(line for _at, line in context._his_messages(self.cfg, now=at + timedelta(minutes=5)))
+        self.assertNotIn("busy-private", said)
+        self.assertIn("public after the window", said)
 
     def test_the_saved_pass_keeps_the_copies(self):
         """The next tick saves the copies' own ids, with their own (recent) times."""
@@ -98,6 +108,41 @@ class OldOriginalCopyTest(Base):
         self.assertEqual(pv.start, m(30) - privacy.RECOMPUTE)
         rows = self.cfg.transcript().rows(since=m(39))
         self.assertTrue(rows and all(r.copy and pv.row(r.id) for r in rows))
+
+
+class DisagreeingReadsTest(unittest.TestCase):
+    """#4, its failure path: a transcript that returns an original by its id with a time the view's own read should
+    have held, but did not return it by time. The view fails closed at once, with no read stepping back."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.cfg = make_cfg(Path(self.tmp.name))
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        self.now = now
+        rows = [Row(1, now - timedelta(hours=1), "user", "his", "public words", "11"),
+                Row(2, now - timedelta(minutes=30), "user", "his", "public words", "11", copy=1)]
+        self.reads = 0
+
+        class Odd(FakeTranscript):
+            def rows(chat, after_id=0, since=None, upto_id=None):
+                self.reads += 1
+                found = super().rows(after_id, since, upto_id)
+                return [r for r in found if since is None or r.id != 1]  # the original, never by time
+
+        chat = Odd(rows, source="memory")
+        patch = mock.patch.object(Config, "transcript", lambda cfg, db=None: chat)
+        patch.start()
+        self.addCleanup(patch.stop)
+        privacy._CACHE.clear()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_the_view_fails_closed(self):
+        v = privacy.view(self.cfg, self.now)
+        self.assertTrue(v.closed)
+        self.assertIn("newer than the view's start", v.why)
+        self.assertLessEqual(self.reads, 2)
 
 
 class BusyBareXOwnTimeTest(Base):
@@ -133,6 +178,20 @@ class BusyBareXOwnTimeTest(Base):
         self.his("/x", m(1), "21")
         self.hers("a reply", m(2))
         self.assertNotIn("public words sent before the x", self.private(m(3)))
+
+    def test_her_answer_stored_before_a_queued_x_sent_before_it_is_private(self):
+        """The window rule, now by the /x's own time: a /x he sent at 10:01, queued during her turn and stored after
+        her 10:03 answer to his public 10:00 question, makes that answer private too (more private: the window
+        is open from 10:01). His question stays public."""
+        self.tick(m(-30))
+        self.his("a public question", m(0), "20")
+        self.hers("her answer, inside the window", m(3))
+        self.his("/x", m(1), "21")  # sent at 10:01, stored after her answer
+        self.hers("busy-private reply", m(4))
+        private = self.private(m(5))
+        self.assertIn("her answer, inside the window", private)
+        self.assertIn("busy-private reply", private)
+        self.assertNotIn("a public question", private)
 
     def test_the_stored_order_start_still_holds(self):
         """The old start is kept: a window from the /x's own time that lapsed before the row was stored still leaves

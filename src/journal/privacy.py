@@ -46,9 +46,10 @@ view already began that far back. Only the hook's end state (the last ``RECOMPUT
 ``view`` itself; the sweep, the writer and the others ask ``covering``. A compaction copy of a row (the transcript
 finds it in the same session, with a new time, or in a rotation's child session: ``Row.copy``) is private when its
 original is; a copy of her reply with no original private is still private inside an open window or tainted turn.
-A view that holds a copy whose original it did not read, and that no saved answer names private, re-takes the pass
-from ``RECOMPUTE`` before the original's time (saved answers age out, and are a floor, never proof that a row is
-public); the first take's answers are kept, so a re-take only adds.
+A view that holds a copy whose original it did not read, and that no saved answer names private, answers that
+original by a pass over a slice around it, from ``RECOMPUTE`` before it to ``RECOMPUTE`` after (saved answers age out,
+and are a floor, never proof that a row is public): ``_originals``. What a slice finds private is added to the view,
+never taken from it, and the cost is the slices', never a read back to the oldest original.
 
 The pass reads the chat as ``ports.Row``s from ``cfg.transcript()``; what a row is (his words, a notice, a frame,
 the end of her turn) the transcript decided, what is private is decided here and only here.
@@ -151,6 +152,7 @@ class View:
     closed: bool = False                           # the pass couldn't run: everything is private
     start: datetime | None = None                  # rows from here were recomputed; older ones: saved results only
     copies: dict = field(default_factory=dict)     # a compaction copy's row id → its original's
+    retake: dict | None = None                     # originals answered from older slices (#4): counts, for the log
 
     def row(self, row_id) -> bool:
         return self.closed or int(row_id) in self.private
@@ -389,24 +391,14 @@ def view(cfg: Config, now: datetime | None = None, since: datetime | None = None
         for rid, t in (frozen.get("private") or {}).items():
             saved[int(rid)] = datetime.fromisoformat(t)
         readable = chat.source is not None and chat.available()
-        floor: View | None = None
-        while True:
-            found = chat.rows(since=start) if readable else []
-            v = compute(cfg, found, [h for h in starts if h >= start], sends, off_ids)
-            read = {r.id: r.at for r in found}
-            if floor is not None:  # an earlier take's answers stay: a re-take only adds (more private, never less)
-                for rid, t in floor.private.items():
-                    v.private.setdefault(rid, t)
-                v.windows.extend(w for w in floor.windows if w not in v.windows)
-            # a compaction copy whose original this take did not read (it is older than ``start``) is answered by the
-            # original, and a saved answer is only a floor that ages out (#4): re-take from the original's time
-            missing = {o for o in v.copies.values() if o not in read and o not in saved}
-            if not missing:
-                break
-            older = [r.at for r in chat.rows(after_id=min(missing) - 1, upto_id=max(missing)) if r.id in missing]
-            if len(older) < len(missing):  # an original gone between two reads: its copies can't be answered
-                raise LookupError("a compaction copy's original could not be read")
-            floor, start = v, min(start, *older) - RECOMPUTE
+        found = chat.rows(since=start) if readable else []
+        v = compute(cfg, found, [h for h in starts if h >= start], sends, off_ids)
+        read = {r.id: r.at for r in found}
+        # a compaction copy whose original this view did not read (it is older than ``start``) is answered by the
+        # original, and a saved answer is only a floor that ages out (#4): answer those originals from a slice each
+        missing = sorted({o for o in v.copies.values() if o not in read and o not in saved})
+        if missing:
+            v.retake = _originals(cfg, chat, missing, start, starts, sends, off_ids, frozen, v.private)
         for rid, t in saved.items():
             if rid in read and read[rid] != t:
                 continue  # another row under this id (a replaced database): the saved answer was not about it
@@ -426,6 +418,54 @@ def view(cfg: Config, now: datetime | None = None, since: datetime | None = None
         return v
     except Exception as e:  # noqa: BLE001 - privacy fails closed
         return Closed(f"{type(e).__name__}: {e}"[:200])
+
+
+SAME_LOOKUP = 64  # two originals this few ids apart are looked up in one read (a compaction carries a run of rows)
+
+
+def _originals(cfg: Config, chat, missing: list[int], start: datetime, starts: list[datetime],
+               sends: list[datetime], off_ids: set[str], frozen: dict, into: dict) -> dict:
+    """Answer the originals of compaction copies the view did not read (#4), adding every private row found to
+    ``into`` (a re-take only adds). Each original's time comes from a read of its id (originals a few ids apart
+    share one read); then the pass runs over a slice from ``RECOMPUTE`` before it (a window or turn begun earlier)
+    to ``RECOMPUTE`` after it (a row he sent before it but queued is stored after it: ``_late``, ``_busy_starts``),
+    originals whose slices meet sharing one. So the cost is bounded by the slices, never a read back to the oldest
+    original. Raises (the view fails closed) when an original can't be read, or is read as newer than ``start``:
+    the view's own read should then have held it, and two reads that disagree answer nothing."""
+    want, when, i = set(missing), {}, 0
+    while i < len(missing):
+        j = i
+        while j + 1 < len(missing) and missing[j + 1] - missing[j] <= SAME_LOOKUP:
+            j += 1
+        when.update((r.id, r.at) for r in chat.rows(after_id=missing[i] - 1, upto_id=missing[j]) if r.id in want)
+        i = j + 1
+    if len(when) < len(want):  # an original gone between two reads: its copies can't be answered
+        raise LookupError("a compaction copy's original could not be read")
+    if any(t >= start for t in when.values()):
+        raise LookupError("a compaction copy's original is newer than the view's start, but the view did not read it")
+    spans: list[list] = []  # [lo, hi, the originals in it]
+    for oid, t in sorted(when.items(), key=lambda kv: kv[1]):
+        lo, hi = t - RECOMPUTE, t + RECOMPUTE
+        for s, e in frozen.get("windows") or []:  # begin at a saved window still open then, as ``view`` does
+            if datetime.fromisoformat(s) < lo and (e is None or datetime.fromisoformat(e) > lo):
+                lo = datetime.fromisoformat(s)
+        if spans and lo <= spans[-1][1]:
+            spans[-1][1] = max(spans[-1][1], hi)
+            spans[-1][2].append(oid)
+        else:
+            spans.append([lo, hi, [oid]])
+    total = 0
+    for lo, hi, oids in spans:
+        first, past = chat.first_id(lo), chat.first_id(hi)
+        after = min(oids) - 1 if first is None else min(first - 1, min(oids) - 1)
+        upto = None if past is None else max(past - 1, max(oids))
+        rows = chat.rows(after_id=after, since=lo, upto_id=upto)
+        if not set(oids) <= {r.id for r in rows}:
+            raise LookupError("a compaction copy's original was not in its slice")
+        total += len(rows)
+        for rid, t in compute(cfg, rows, [h for h in starts if lo <= h < hi], sends, off_ids).private.items():
+            into.setdefault(rid, t)
+    return {"originals": len(want), "slices": len(spans), "rows": total}
 
 
 def covering(cfg: Config, oldest: datetime | None, now: datetime | None = None, db: Path | None = None) -> View:
@@ -498,6 +538,9 @@ def update(cfg: Config, now: datetime, log: list[str] | None = None) -> View:
         if log is not None:
             log.append(f"privacy pass not saved: no sessions database at {chat.source}")
         return v
+    if v.retake and log is not None:  # (counts only: never a row's words)
+        log.append("privacy: answered {originals} compaction-copy original(s) older than the view from {slices} "
+                   "slice(s) of {rows} rows".format(**v.retake))
     keep = now - timedelta(days=KEEP_DAYS)
     with conversations.locked(cfg) as st:
         st["privacy"] = {
