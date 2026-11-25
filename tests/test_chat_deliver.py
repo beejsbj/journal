@@ -274,5 +274,54 @@ class ReflectionTest(ConversionCase):
         self.assertEqual((sent["attempts"], sent["error"]), (1, "the file is gone"))
 
 
+class CatchUpTest(ConversionCase):
+    def written(self, prompts=()):
+        """A catch-up letter written after an outage, not sent yet (its send failed or the window just closed)."""
+        from datetime import datetime, timezone
+        from journal import ledger
+        self.now = datetime(2026, 10, 14, 9, 0, tzinfo=timezone.utc)
+        with ledger.locked(self.cfg.ledger_path) as data:
+            data.setdefault("recovery", []).append(
+                {"id": "recovery-1", "status": "waiting", "text": "Sorry, I was **away**.", "reply_to": "4242",
+                 "window": "08:00 to 08:40", "messages": [{"at": self.now.isoformat(), "row": 3}],
+                 "prompts": list(prompts)})
+
+    def test_the_letter_is_one_delivery(self):
+        from journal import ledger, recovery
+        from helpers import add_prompt
+        add_prompt(self.cfg)
+        self.written(prompts=["2026-10-14-morning"])
+        spy, log = self.spy(recovery), []
+        recovery._send(self.cfg, ledger.snapshot(self.cfg.ledger_path)["recovery"][0], self.now, log)
+        self.assertEqual(len(spy.calls), 1)
+        self.assertEqual(self.chat.sends, [(self.cfg.chat_id, "Sorry, I was <b>away</b>.", {"reply_to": "4242"})])
+        self.assertEqual(self.events, ["send", "mirror"])
+        self.assertEqual(self.told[0][1:], ("Sorry, I was **away**.", ("recovery", "recovery-1", None)))
+        self.assertIn("was offline from 08:00 to 08:40", self.told[0][0])
+        self.assertEqual(log, ["sent the catch-up for recovery-1 (1 unanswered message(s))"])
+        data = ledger.snapshot(self.cfg.ledger_path)
+        r = data["recovery"][0]
+        self.assertEqual((r["status"], r["message_id"]), ("sent", "701"))
+        reply = ledger.find(data, "2026-10-14-morning")["annotation_reply"]
+        self.assertEqual((reply["skipped"], reply["letter"]), ("letter", "recovery-1"))  # in place of its reply
+
+    def test_a_failed_letter_counts_and_turns_into_a_note_on_the_last_attempt(self):
+        from journal import ledger, recovery
+        self.written()
+        notes = []
+        with mock.patch.object(recovery, "_note", lambda cfg, rec, now, why, log: notes.append(why)):
+            for n in range(1, recovery.SEND_ATTEMPTS + 1):
+                self.chat.fail = [ChannelError("Bad Gateway")]
+                log = []
+                recovery._send(self.cfg, ledger.snapshot(self.cfg.ledger_path)["recovery"][0], self.now, log)
+                self.assertEqual(log, [f"recovery-1: catch-up send attempt {n}/{recovery.SEND_ATTEMPTS} failed "
+                                       "(Bad Gateway)"])
+        self.assertEqual(notes, [f"Telegram refused it {recovery.SEND_ATTEMPTS} times"])
+        self.assertEqual(self.told, [])
+        r = ledger.snapshot(self.cfg.ledger_path)["recovery"][0]
+        self.assertEqual((r["status"], r["send_attempts"], r["send_error"]),
+                         ("waiting", recovery.SEND_ATTEMPTS, "Bad Gateway"))
+
+
 if __name__ == "__main__":
     unittest.main()
