@@ -225,7 +225,10 @@ class ReflectionTest(ConversionCase):
         from journal import ledger
         self.now = datetime(2026, 10, 14, 1, 0, tzinfo=timezone.utc)  # 06:30 in the helpers' zone, the morning after
         path = Path(self.tmp.name) / "reflection.md"
-        path.write_text("A quiet day, mostly writing.\n", encoding="utf-8")
+        from datetime import date
+        from journal import reflect
+        path.write_text(reflect.render(self.cfg, "reflection", date(2026, 10, 13), "A quiet day, mostly writing.", [],
+                                       self.now.astimezone(self.cfg.tz)), encoding="utf-8")
         with ledger.locked(self.cfg.ledger_path) as data:
             data.setdefault("reflections", []).append(
                 {"id": "reflection-2026-10-13", "kind": "reflection", "local_date": "2026-10-13", "path": str(path),
