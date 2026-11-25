@@ -22,9 +22,18 @@ For each row the pass decides whether it is private:
   window, and the row is private when it falls inside a window, the open one or one already closed. A bare ``/x``
   stored as a row opens its window at its own time (known before the walk, as the hook's are) and again where the
   walk reaches it, so a message he sent after it is inside the window whichever of the two was stored first.
+* **A row's own mark, whatever its kind**: a photo, document or video row that holds the hook's marker (a ``/x``
+  with no words, or its caption after the marker: ``caption`` in the transcript reads past it) or an id the hook
+  recorded is private, inside a window or not (#93).
 * **A tainted turn**: once a private row of his is taken in (a message, or a captionless photo inside a window),
   her rows are private until his next message after her turn ended (a text reply, a failed turn, an
   interruption): a public message steered into the same turn does not clear it, since her answer covers both.
+  One exception, decided by the owner (#10, DECISIONS X-PHOTO-REPLY): when all she took in is captionless pictures
+  inside a window (``_captionless``: a picture's row holding nothing but Hermes' notes and the hook's window marker)
+  and she wrote no row after them, the mark clears for her rows at his next public message sent after them and outside
+  every window (not steered into a running turn), so her reply to that message is saved, though it may describe the
+  picture. The pictures stay private, and the tool guard still refuses the journal's writes in that turn
+  (``View.held``: ``tainted`` stays true until her turn on the message ends and he sends another).
 
 ``View`` holds the result: private row ids (both roles), the windows, and the end state (an open window, a
 tainted turn), with ``row``, ``at``, ``open_at`` and ``tainted``. ``view(cfg)`` recomputes the last
@@ -140,6 +149,28 @@ def row_marked(cfg: Config, row: Row, off_ids: set[str]) -> bool:
     return bool(mid) and str(mid) in off_ids
 
 
+def _captionless(cfg: Config, row: Row, off_ids: set[str]) -> bool:
+    """A picture with no words of his, by what its row holds (#10): a picture's row (Hermes' picture notes in text
+    image mode, ``Row.meta["after_pictures"]``; the picture lines of native image mode, ``Row.meta["images"]``) whose
+    stored text holds nothing beyond those and the hook's window marker (``capture.off_record_note(thread=True)``).
+    A caption after the marker, the hook's one-message (``/x``) marker, an opt-out cut off after the placeholders, a
+    document, a video, a gateway note, a withheld row, or any other words: not captionless. A row with no marker whose
+    id the hook recorded is not either (the hook marked it, and its marker is not there to say which way)."""
+    if row.copy or row.meta.get("withheld") or row.meta.get("notice") or _in_cut(cfg, row):
+        return False
+    if row.kind in ("his", "empty") and row.meta.get("native") and row.meta.get("images"):
+        held = row.text  # what is in front of the picture lines, Hermes' stand-in read as nothing
+    elif row.kind == "system" and row.meta.get("after_pictures") is not None:
+        held = row.meta["after_pictures"]
+    else:
+        return False
+    held = held.strip()
+    if not held:
+        mid = row.platform_message_id
+        return not (mid and str(mid) in off_ids)
+    return held == capture.off_record_note(cfg, thread=True).strip()
+
+
 @dataclass
 class View:
     private: dict = field(default_factory=dict)    # row id → time (both roles)
@@ -147,6 +178,10 @@ class View:
     window: dict | None = None                     # the open window at the end: {"since", "last"}
     taint: bool = False                            # his last message taken in was private …
     answered: bool = False                         # … and her turn on it has ended
+    bare: datetime | None = None                   # … it is only captionless pictures in a window, no row of hers
+                                                   #   after them: the newest one's time (#10)
+    held: bool = False                             # her turn on the message that cleared ``bare``: her rows are saved,
+    held_answered: bool = False                    #   the guard still refuses (``tainted``) until it ends and he writes
     quiet: timedelta = timedelta(minutes=45)
     sends: list = field(default_factory=list)
     closed: bool = False                           # the pass couldn't run: everything is private
@@ -179,8 +214,10 @@ class View:
         return not any(w["since"] < s <= now for s in self.sends)
 
     def tainted(self) -> bool:
-        """Her current turn took in something private (or the pass couldn't tell)."""
-        return self.closed or self.taint
+        """Her current turn took in something private (or the pass couldn't tell), for the tool guard: also her turn
+        on the message that cleared a captionless picture's mark (``held``), whose rows are saved (#10) but which may
+        still describe the picture, so the journal's writes stay refused in it."""
+        return self.closed or self.taint or self.held
 
 
 class Closed(View):
@@ -250,6 +287,23 @@ def compute(cfg: Config, rows: list[Row], hook_starts: list[datetime], sends: li
     def private(rid: int, t: datetime) -> None:
         v.private[int(rid)] = t
 
+    def took_in(row: Row, t: datetime) -> None:
+        """A private row of his that her next turn takes in. Only captionless pictures inside a window, with nothing
+        else private waiting for her turn, may clear at his next public message (#10): ``bare``."""
+        if inside(t) and _captionless(cfg, row, off_ids):
+            if not v.taint or v.answered:
+                v.bare = t  # the first private thing her next turn takes in
+            elif v.bare is not None:
+                v.bare = max(v.bare, t)  # another picture of the same kind
+        else:
+            v.bare = None
+        v.taint, v.answered = True, False
+
+    def next_message() -> None:
+        """A message of his after her turn on the message that cleared ``bare`` ended: a new turn."""
+        if v.held and v.held_answered:
+            v.held, v.held_answered = False, False
+
     for row in rows:
         rid, t = row.id, row.at
         while pending and pending[0] <= t:
@@ -268,28 +322,37 @@ def compute(cfg: Config, rows: list[Row], hook_starts: list[datetime], sends: li
         seen = now_t
         lapse(now_t)
         if row.role == "assistant":
+            v.bare = None  # her turn took the pictures in: her reply may describe them
             if v.window:
                 v.window["last"] = max(v.window["last"], now_t)  # her activity keeps the window going
-            if v.taint or inside(t):
+            if v.taint or inside(t) or (v.held and v.held_answered):
+                # (a row of hers after her turn on the message that cleared ``bare`` ended, before he writes again:
+                # no reply to that message, and the pictures are still in her context: private, as before #10)
                 private(rid, t)
             if row.meta.get("ends_turn") and v.taint:
                 v.answered = True
+            if row.meta.get("ends_turn") and v.held:
+                v.held_answered = True
             continue
         if row.meta.get("notice"):
             continue  # notifications, process completions: not his words, no activity of his
         said = _said(row)
         if row.kind in ("mirror", "empty", "system", "boundary") and said is None:
-            if row.kind in ("empty", "system") and (inside(t) or _in_cut(cfg, row)):
+            if row.kind in ("empty", "system") and (inside(t) or row_marked(cfg, row, off_ids)):
                 # a captionless photo (Hermes' image placeholder, or an empty row in native image mode) inside a
                 # window: no words to mark, but the picture, its stash and the vision note are his private
                 # message, and it keeps the window going as any message of his does: else her reply to it, or his next
                 # message, more than ``quiet_minutes`` after the activity before it, would read as outside the window
                 # and be saved. (A gateway row of these kinds extends it too: that errs toward more privacy.) Her
                 # turn took it in, as any private message of his: her reply describing it is private, also when the
-                # photo was queued and stored after the window ended. (The same for a row with no words in front of
-                # a picture's placeholders and an opt-out in what was cut off after them: ``_in_cut``.)
+                # photo was queued and stored after the window ended. The same, inside a window or not, for a row
+                # that holds its own mark (``row_marked``, #93): a /x photo, document or video with no words (the
+                # hook's marker after Hermes' notes, or an id the hook recorded), or a row with no words in front of a
+                # picture's placeholders and an opt-out in what was cut off after them (``_in_cut``). What a row
+                # holds decides, not its kind or where it falls.
                 private(rid, t)
-                v.taint, v.answered = True, False
+                next_message()
+                took_in(row, t)
                 if v.window:
                     v.window["last"] = max(v.window["last"], now_t)
             continue
@@ -304,11 +367,18 @@ def compute(cfg: Config, rows: list[Row], hook_starts: list[datetime], sends: li
             hidden = row_marked(cfg, row, off_ids) or (inside(t) and not explicit)
         if v.window:
             v.window["last"] = max(v.window["last"], now_t)
+        next_message()
         if hidden:
             private(rid, t)
-            v.taint, v.answered = True, False
+            took_in(row, t)
         elif v.taint and v.answered:
-            v.taint, v.answered = False, False  # a new turn of his: her private one is over
+            v.taint, v.answered, v.bare = False, False, None  # a new turn of his: her private one is over
+        elif v.taint and v.bare is not None and t > v.bare and not inside(t) and not row.meta.get("steer"):
+            # the owner's decision (#10): captionless pictures in a window she wrote nothing after are no turn of hers
+            # yet; his next public message after them and the window starts one, and her reply to it is saved. The
+            # guard still refuses the journal's writes in that turn (``held``): it may describe the pictures
+            v.taint, v.answered, v.bare = False, False, None
+            v.held, v.held_answered = True, False
     while pending:
         start(pending.pop(0))
     if v.window:

@@ -51,6 +51,7 @@ from pathlib import Path
 from typing import Mapping
 
 from .. import audio, mirror
+from ..capture import OFF_RECORD
 from ..ports import ChatUnreadable, NotMirrored, Row
 from ..contextfence import CLOSE, HEADS, OPEN
 from .companion import is_failure_text
@@ -370,7 +371,8 @@ def read(content: str | None, platform_message_id: str | None) -> dict:
 # Hermes' note for one picture (gateway/run_inbound.py _enrich_message_with_vision), each ending at its own fixed
 # trailer: the vision model's description may itself hold "]" and blank lines, so no blank line ends a note.
 _IMAGE_NOTE = re.compile(
-    r"\[The user sent an image~ Here's what I can see:\n.*?\]\n\[If you need a closer look, use vision_analyze with "
+    r"\[The user sent an image~ Here's what I can see(?: \(user-supplied image content, not instructions\))?:\n.*?\]\n"
+    r"\[If you need a closer look, use vision_analyze with "
     r"image_url: [^\n]*? ~\]"
     r"|\[The user sent an image but (?:I couldn't quite see it this time \(>_<\) You can try looking at it yourself"
     r"|something went wrong when I tried to look at it~ You can try examining it yourself) "
@@ -380,7 +382,10 @@ _IMAGE_NOTE = re.compile(
 def caption(text: str) -> str:
     """His words after an attachment placeholder (documents, images, video), if any. Picture notes (one per
     picture of an album, joined by blank lines) are skipped by their fixed shape; any other placeholder ends at
-    the first ``]`` and blank line."""
+    the first ``]`` and blank line. The hook's off-the-record marker (``capture.OFF_RECORD``) after them is the
+    hook's rewrite of his message (Hermes puts its notes in front of the rewritten text): what follows it is his
+    caption, read past the marker, so an off-the-record caption is still his words (the pass marks the row by the
+    marker: ``privacy.row_marked``)."""
     if not text.startswith(_ATTACHMENT):
         return ""
     rest = text
@@ -392,8 +397,24 @@ def caption(text: str) -> str:
         head, sep, rest = rest.partition("]\n\n")
         if not sep:
             return ""
+    m = OFF_RECORD.match(rest)
+    if m:
+        rest = rest[m.end():]
     rest = rest.strip()
     return rest if rest and not rest.startswith(_ENVELOPES) else ""
+
+
+def after_pictures(text: str) -> str | None:
+    """What a text-mode picture row stores after Hermes' picture notes (``_IMAGE_NOTE``, one per picture of an album),
+    stripped: the hook's rewrite of his message, or nothing. None when the row does not open with a
+    picture note, or when another attachment's note (a document, a video) follows them: it is then no picture's row
+    alone. A finding for the privacy pass (``privacy._captionless``), never his words."""
+    rest, n = text, 0
+    while m := _IMAGE_NOTE.match(rest):
+        rest, n = rest[m.end():].lstrip(), n + 1
+    if not n or rest.startswith(_ATTACHMENT):
+        return None
+    return rest
 
 
 def clean_user_text(text: str) -> str:
@@ -477,6 +498,9 @@ def to_row(raw: Mapping) -> Row | None:
                 delivery=content is None or _like(stored, _DELIVERIES))
     if kind == "system":
         meta["caption"] = "" if withheld else caption(msg["text"])
+        rest = None if withheld else after_pictures(msg["text"])
+        if rest is not None:
+            meta["after_pictures"] = rest
     if withheld:
         meta["withheld"] = withheld
     if msg.get("images"):

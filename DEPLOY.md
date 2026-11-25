@@ -16,6 +16,50 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## X-PHOTO-REPLY — her reply after an unanswered captionless photo is saved (2026-11-25; tick and hook side; **gateway restart required**; no config or state change; **after X-PHOTO-MARK**)
+
+**What changes.** The owner's decision on issue #10, a deliberate weakening recorded in DECISIONS.md (X-PHOTO-REPLY):
+when a photo with no caption, sent inside a bare-`/x` window, got no row of hers, her reply to his next public
+message after the window is saved (before, it was kept off the record with the photo). That is the only row that
+changes, and only for the readers of the private set (the conversation writer, the sweep, packs, the quote checker,
+annotation alignment, the catch-up letter). What counts as captionless is decided by what the row holds: a picture's
+row with nothing beyond Hermes' notes and the hook's window marker, in text or native image mode. A captioned photo,
+a `/x` photo, a document, a video, a gateway note, and anything else private waiting for her turn stay as private as
+before. The tool guard's answer does not change: it still refuses the journal's writes in her turn on that message.
+The photo, its picture and its copies stay private. Built on X-PHOTO-MARK (#93): deploy that first, or both together.
+**Side and restart.** `privacy.py` and `hermes/transcript.py` are loaded by the gateway at import, so the hook side
+(the guard's end state, the hook's own view) keeps the old answer until `hermes gateway restart`. Until then the
+guard's answer is the same as after it (only the private set changed), and the hook's own view keeps that reply
+private, which errs private. The tick runs it from its next run: its saved pass and the conversation writer save the
+reply from then on. Ride the next gateway window with the pin move. Nothing serve side.
+**First checks.**
+- After the restart, the gateway's log has no `journal` hook exception, and a reply to a prompt is captured as before.
+- The next tick's log has no `privacy pass could not run` line.
+**Rollback.** The plugin and the CLI at the previous sha, and a gateway restart. A reply saved meanwhile stays in its
+entry: rolling back does not remove it (the engine never removes words it has written).
+
+## X-PHOTO-MARK — a `/x` photo, document or video is private by its own mark (2026-11-25; hook and tick side; **gateway restart required**; no config or state change)
+
+**What changes.** Issue #93. A `/x` photo, document or video with no other words, sent outside any off-the-record
+window, is now private in the privacy pass and takes her turn off the record (before, in text image mode, only his
+own row was held back, and her reply to it, or to his next public message when she had not answered it, read public
+to annotation alignment and the catch-up letter). A caption after the hook's marker is read as his caption, and
+Hermes' current vision note is read by its shape. Only more private: nothing that holds no mark changes.
+DECISIONS.md, X-PHOTO-MARK.
+**Side and restart.** `privacy.py` and `hermes/transcript.py` are loaded by the gateway at import (the hook's window
+check, the tool guard), so **the restart is required**: until it, the gateway's tool guard reads a `/x` photo outside a
+window as before (her turn on it is not refused journal writes by the guard; `tools.call`'s own check reads the same
+old pass). The tick runs the new pass from its next run, and saves its result, so the readers there (writer, sweep,
+alignment, catch-up) have it at once. Ride the next gateway window with the pin move. Serve: nothing to do (it reads
+no chat).
+**First checks.**
+- After the restart, the gateway's log has no `journal` hook exception, and a reply to a prompt is captured as before.
+- The next tick's log has no `privacy pass could not run`.
+- No live `/x` probe is needed; the behaviour is pinned by `tests/test_privacy_x_photo.py`.
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
+previous sha), `hermes gateway restart`. Nothing to undo in state: the saved pass is recomputed every tick, and rows
+it saved as private stay private (a floor).
+
 ## DAY-VIEW — a day as one log in the web app (2026-11-25; serve side only; **no gateway restart**; no config or state change)
 
 **What changes.** A new page, `/days/<date>`: every line of every entry filed under one day (chat notes, `/j` and web

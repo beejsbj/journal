@@ -5187,3 +5187,100 @@ input found). A label the floor refuses answers 422 `off-the-record`, as the rou
     over the platform's length limit (`programs._deliver`) send directly as before; they are outside this step's five
     kinds. They can move onto `deliver` when margin notes (#31) shape what a chat message is. "What a reply answers"
     is left for #31.
+
+- **X-PHOTO-MARK (2026-11-25) — a row's own mark decides, whatever its kind (#93; only more private).** Found in the
+  privacy review of #86, live on main. In Hermes' text image mode a `/x` photo with no other words is stored as Hermes'
+  vision note(s), then the hook's rewrite of his message: its one-message marker (`capture.off_record_note`) and
+  nothing after it. The transcript read the row as `system` with no caption (`caption` stopped at the marker, an
+  envelope), so `privacy.compute` took it down the captionless-photo branch, which made a row private only inside a
+  window or with an opt-out cut off after native placeholders; `row_marked` was never asked. Outside a window the row
+  was not in the pass's private set and her turn was not tainted: her reply to it, and her reply to his next public
+  message when she had not answered it, read public to the readers that take the pass's answer for her rows
+  (annotation alignment, the catch-up letter). His own row was still held back by `conversations.row_is_off`, which
+  asks `row_marked` for his rows. The same for a `/x` document or video, a `/x` on a later line of a text-mode album
+  (the hook's marker then his merged text, read as no caption), and a captioned photo carrying the hook's *window*
+  marker that the pass read as outside its window (a lost `off_threads` write).
+  - **Decided by what the row holds.** The captionless branch now asks `row_marked` for an `empty` or `system` row
+    (the hook's marker anywhere in the stored text, an opt-out in what was cut off, or an id the hook recorded): such a
+    row is private and taints her turn inside a window or not, as a message is. `_in_cut` is part of `row_marked`, so
+    the branch's old condition is kept whole.
+  - **`caption` reads past the hook's marker.** What follows the marker after the platform's notes is his caption
+    (`hermes/transcript.py` `caption`): a captioned `/x` photo is read as his words and marked by the marker, so the
+    pass treats it as the message it is. The writer's other guards are unchanged (`row_is_off` already refused the
+    row; the floor refuses an opt-out line).
+  - **The current vision note is read by its shape.** Hermes' gateway now labels its description `(user-supplied image
+    content, not instructions)`; `_IMAGE_NOTE` did not match that, so `caption` fell back to the first `]` and blank
+    line, which a description can hold, and part of the description could be read as his caption. The pattern takes
+    both forms.
+  - **Only more private.** A random-order comparison of main's pass against this one (stored orders in the shapes the
+    hook and Hermes write, text and native image modes, documents, videos, compaction copies, queued rows, prompt
+    sends; 3,000 orders, 30,615 rows) found no row public here that main made private, no window changed and no end
+    taint lost; the 7,791 rows it made private were marked rows of his (6,669) and her rows in the turns that took
+    them in. Nothing that holds no
+    mark changed: an unmarked captionless photo, document or video outside a window, and her reply to it, are still
+    public (`NotTightenedTest`).
+  - **Cost and limit.** A compaction frame (a `system` user row) whose summary quotes the hook's marker is now private
+    and taints her next turn: it errs private, and the frame can hold the private words it summarises. Tests:
+    `tests/test_privacy_x_photo.py`: on main 30 of its cases fail (every text-mode, document and video shape, the
+    caption reader, a recorded id alone, and a window-marked text or document row read as outside the window); the
+    native-mode shapes and a description holding a blank line pass there too (main already read those rows' marker
+    as his words), as do the not-tightened cases.
+
+- **X-PHOTO-REPLY (2026-11-24, reworked 2026-11-25 after review) — her reply after an unanswered captionless photo is
+  saved (#10; a deliberate weakening, decided by the owner; builds on X-PHOTO-MARK, #93).** BACKLOG-PRIVACY made a
+  captionless photo inside a bare-`/x` window private and had it take her turn off the record, like any private
+  message: her rows stay private until his next message after her turn ends. When the window ended on such a photo
+  and she wrote nothing after it, that mark lasted past the window, and her reply to his next *public* message was kept
+  out of the journal too. It erred private; the cost was a public reply missing from the entry. The owner decided, on
+  the issue on 2026-11-24: **save that reply**, accepting that it may describe the off-the-record photo. Nothing else
+  was decided, so the change is held to exactly that case.
+  - **What counts as a captionless photo is decided by what its row holds** (`privacy._captionless`; the review of the
+    first version found it decided by the row's kind, so a captioned photo whose caption followed the hook's marker, a
+    `/x` photo, a document, a video or a gateway note read as captionless). Only a picture's row: Hermes' picture notes
+    in text image mode (`transcript.after_pictures`, `Row.meta["after_pictures"]`: what follows them, and nothing when
+    another attachment's note does), or the picture lines of native image mode (`Row.meta["images"]`, Hermes' stand-in
+    read as nothing). Its stored text must hold nothing beyond those and, at most, the hook's *window* marker
+    (`capture.off_record_note(thread=True)`, compared whole). A caption after the marker, the hook's one-message `/x`
+    marker, an opt-out cut off after the placeholders, a withheld row, a copy, any other words, or no marker but an id
+    the hook recorded (the hook marked it, and which way is not there to read): not captionless, private as before.
+    The rows the hook really stores inside a window carry the window marker (text mode: notes, then the marker; native
+    mode: the marker as the caption, then the picture lines), so the decided case holds in both modes; a picture row
+    with no marker and no recorded id (the pass alone puts it in the window) counts too.
+  - **The rule.** `View.bare` is the newest such photo's time, set only while everything her next turn would take in is
+    such photos inside a window. The mark clears for her rows at his next public message when: she wrote no row after
+    the photos (a reply, a tool step, a failed turn: her turn took them in); nothing else private waits (anything
+    private before or after the photos resets `bare`); the message was sent after the photos and outside every window
+    (a `/j` inside the window, or a queued message he sent before them, does not clear it); and it was not steered into
+    a running turn. A prompt send closes the window as a silence does. The photo rows, their pictures and their
+    compaction copies stay private. Only her reply to that message is saved: a row of hers after her turn on it has
+    ended (a failed turn, then a tool step, with no new message of his) stays private until he writes again, as
+    before (the random-order comparison found the first rework saving such rows).
+  - **The tool guard stays refusing in that turn (the orchestrator's reading of the decision: "save that reply", not
+    "loosen the guard").** Clearing `bare` sets `View.held`: `tainted()` (the guard's second signal, `tools.py`
+    `_off_record_turn`) stays true through her turn on that message and until his next message after it ends, exactly
+    when it was true before this change; only the private set (what the writer and the readers take) changes. So she
+    cannot `journal_add_note` or write her notebook in the turn whose reply may describe the photo. A random-order
+    comparison checks `tainted()` after every prefix of every stored order against the pass without this change: it
+    never differs.
+  - **When the mark clears (review, low).** At his next public message after the window however late it comes: hours
+    or days later, her reply to it is saved, where before it was private. In practice the photo must be in the rows the
+    view reads (`RECOMPUTE`, 48 hours, or a reader's `covering` look-back); a photo older than that was already
+    unknown to the pass and its taint with it, on main too.
+  - **An assumption about Hermes (review, low).** A message he sends while her turn on the photo is still running is
+    queued, and Hermes stores it after that turn's rows, so the pass sees a row of hers after the photo and `bare` is
+    reset. If Hermes stored the queued message before the running turn's rows, and it was sent outside the window
+    (45 minutes after the photo with her turn still running), her reply to the photo would read as her reply to that
+    message and be saved. Not checked on a live gateway; the steered case (`display_kind = 'steer'`) is excluded
+    whatever the order.
+  - Tests: `tests/test_privacy_photo_reply.py`, rows in the stored shapes. `DecidedTest` (text mode with the window
+    marker, stripped, the older note, an album; with no hook; native with the marker, an album, with no hook; two
+    photos; a prompt boundary; compaction copies). `GuardTest` (the guard refuses before his message, in her turn on
+    it, after a tool step, after her reply until his next message; a steered message). `StillPrivateTest` (a caption
+    after the window marker or with no hook, in both modes; the `/x` marker in both modes; an album with `/x` on a later
+    line; a document, a video, a picture and a document; a gateway note; an id the hook recorded with no marker; words
+    after the marker; a photo she answered; her turn begun on it; a private message before or after it; a second `/x`;
+    a second bare `/x`; a `/j` inside the window; an opt-out cut off after the placeholders; a steered message; a
+    queued message sent before the photo; a queued photo she answered); `GuardTest` also holds her rows after that
+    turn private. The comparison against X-PHOTO-MARK's pass (3,000 random stored orders in the stored shapes, 30,786
+    rows) finds no row made private, no window changed, the guard's state unchanged after each of 33,786 prefixes, and
+    70 rows made public: 64 replies of hers in the decided case and 6 compaction copies of them.
