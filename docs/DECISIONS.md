@@ -503,8 +503,8 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   count such rows read-only in a live database, then add `[System: ` to the skip prefixes and to the marks
   (`_LEFTOVER`).
 
-- **TICK-LOCK-WAIT (2026-11-24) — a `/next` or `journal send` waits behind a tick's model calls; measured, not fixed
-  (issue #45; needs a design).** `tools/measure_tick_lock.py` runs a real `tick.run` over a temporary root with one
+- **TICK-LOCK-WAIT (2026-11-24) — a `/next` or `journal send` waits behind a tick's model calls; measured; fixed
+  by option (b), the owner's choice of 2026-11-24 (issue #45; TICK-LOCK-YIELD under *Taken by packages*).** `tools/measure_tick_lock.py` runs a real `tick.run` over a temporary root with one
   annotation due, the clock pinned to a time when no ritual is due (a due opener would add a model call; the harness
   prints which steps asked the model), and a fake companion, and a second party that takes `tick.lock` as a spawned
   `journal program next` does (`programs.locked`). With a 3 s model call the second party, arriving 0.2 s in, waited 2.83 s; with 8 s, 7.85 s
@@ -4986,6 +4986,48 @@ input found). A label the floor refuses answers 422 `off-the-record`, as the rou
     old name) fails seven of them.
   - **Also changed.** `context.py` kept a local cache under the key `"telegram"`
     for the quote verifier's chat text; renamed `"chat"` (no persisted name).
+
+- **TICK-LOCK-YIELD (2026-11-24) — the tick lets a waiting send or program step go first, between steps (issue #45,
+  TICK-LOCK-WAIT's option (b), the owner's choice).** `ticklock.py` owns `tick.lock` now. A waiter (`journal send`,
+  `journal program …` through `programs.locked`, `journal sweep`, `journal backfill-conversations`) that finds the
+  lock busy holds `tick-wait.lock` shared while it blocks, and lets go of it once it has `tick.lock`. The scheduled
+  tick asks at safe points (`ticklock.pause`) whether that flag is held (an exclusive try without blocking), and if so
+  lets go of `tick.lock`, waits for the flag exclusive (every waiter has had the lock: `flock` is not fair, so without
+  this wait the tick could take the lock straight back) and then for `tick.lock` behind the last waiter, and goes on
+  with the next step. No busy-poll: a waiter sleeps in `flock`; the tick asks only at its safe points. A third lock,
+  `tick-run.lock`, held by a scheduled tick for its whole run, makes a tick that starts while another is yielded skip
+  its round, as it skips behind a running tick: two ticks never interleave. All three are `flock`s, released by the
+  kernel when a process dies, so no marker goes stale. Sends and transitions keep waiting blocking; the scheduled tick
+  keeps not waiting.
+  **Continue, not end.** After a yield the tick takes the lock back and runs its remaining steps with the same `now`.
+  Ending would leave the rest (folds, replies, mirror, prune, the ops notice) five minutes late for nothing: each step
+  reads the ledger, runs, entries and the chat afresh when it starts, so what the waiter did is simply there. A tick's
+  `now` already lagged the clock by its model calls (minutes); a yield adds the waiter's time, and the later steps'
+  comparisons with `now` err to "not yet" (a settle, an expiry, an interrupt's time, a retry: all left to the next
+  tick), never to a double. **Where it yields** (`tick.YIELDS_BEFORE`): before `privacy`, `programs` and every step
+  from `fold` on; inside the steps that call a model once per item, between items (`annotate`, `process_images`,
+  `process_audio`, `reflect.run`), with no other lock held and nothing carried across items that a waiter writes (a
+  waiter never annotates, describes, transcribes or reflects; their per-item ledger writes find the record again;
+  `annotate` reads the entry after the yield; the image note checks its block again under the ledger lock). **Not**
+  before `send`: the tick's interrupts and practices go out together, a ritual due in that tick the newest message, as
+  before. Not before `sweep` or `conversations`: they read the chat right after the privacy pass and call no model.
+  **Ordering.** Every send is still made under `tick.lock`, one at a time, and every ledger record of a send or an
+  opening stamps the real time (`send_prompt`'s `sent_at`, `programs._open`, `_open_interrupts`), so the ledger's
+  order is the chat's and `capture.superseded` matches a reply to the prompt sent last
+  (`tests/test_tick_lock.py`: a `journal send` during the tick's opener goes after the tick's send and before its next
+  step; every send finds the lock held; ledger order equals chat order). **What it costs:** a waiter now waits for the
+  rest of one step, or one model call inside a step: at most one budget (the longest single call is a reflection,
+  480 s plus kill grace), no longer the sum. The head of the tick (`interrupts`, `send`) is one unit, so a waiter that
+  arrives during an opener waits for every opener due in that tick. `programs.step` makes its own model calls and is
+  not split. **Measured** (`tools/measure_tick_lock.py`, which now takes `--calls`): with three annotations due and a
+  3 s model call, a waiter arriving 0.2 s into the first waited 8.83 s on main and 2.80 s with this change (one
+  annotation: 2.83 s and 2.80 s, the rest of that call either way). **Mixed versions** during a deploy only lose the
+  yield, never the lock: an old waiter raises no flag (the tick does not yield to it, as before), an old tick ignores
+  the flag. `migrate` still takes `tick.lock` shared without raising the flag: it can slip into a tick's yield and copy
+  the state between two of the tick's steps, which is as consistent as between two ticks.
+  **A stream of waiters can keep the tick yielded:** while waiters keep overlapping, the flag is never free (Linux
+  `flock` does not favour a waiting exclusive request), so the tick stays yielded for as long as that lasts. Bounded in
+  practice by human-paced waiters (a `/next` or a Send each takes seconds).
 
 - **NOTES-JOURNAL-DAY (2026-11-25) — notes are filed by the journal day, and Today shows it (issue #82, part 2).**
   The owner's call (issue #82): a 00:30 line belongs to last night, as a prompt answered then already did

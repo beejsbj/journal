@@ -47,7 +47,7 @@ from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
 from . import agent, channel, compose, entries, ledger, library, mirror, notebook, outage, prompts, schedule, search, \
-    validate
+    ticklock, validate
 from .ports import ChannelError
 from .config import Config, journal_day
 
@@ -648,6 +648,8 @@ def run(cfg: Config, now: datetime, log: list[str]) -> list[str]:
         if asked >= limit:
             log.append(f"analyses: {limit} asked for this tick; the rest wait for the next (paced catch-up)")
             break
+        if asked:  # between model calls (``ticklock``)
+            ticklock.pause()
         msg, down = write_one(cfg, kind, end, trigger, now, log)
         if msg:
             alerts.append(msg)
