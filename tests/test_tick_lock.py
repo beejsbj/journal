@@ -144,27 +144,52 @@ class YieldTest(TickLockCase):
         """``tick-run.lock``: the gap is the moment the first tick has let go of ``tick.lock`` and the waiter has not
         yet taken it. Here the waiting flag is held (shared, as a waiter does) with no one taking ``tick.lock``, so
         the first tick stays yielded and ``tick.lock`` is free. A second tick then finds nothing but ``tick-run.lock``
-        in its way: it must skip, not run in the gap."""
+        in its way: it must skip, not run in the gap.
+
+        The test never probes the lock files (a probe's own ``flock`` can make the first tick's non-blocking take of
+        ``tick.lock`` fail, so it skips its round, and a probe can pass before the tick has taken anything). It
+        watches the tick itself: a spy on ``ticklock``'s ``flock`` sets ``yielded`` right after the tick's own
+        ``LOCK_UN`` of ``tick.lock``. From then on the state is fixed until the test lets go of the flag: the first
+        tick holds ``tick-run.lock`` and waits on the flag; ``tick.lock`` is free."""
+        yielded, real = threading.Event(), fcntl.flock
+
+        class Spy:
+            """``ticklock``'s ``fcntl``, telling the test when the tick lets go of ``tick.lock``."""
+            def __getattr__(self, name):
+                return getattr(fcntl, name)
+
+            @staticmethod
+            def flock(f, op):
+                real(f, op)
+                if op == fcntl.LOCK_UN and str(getattr(f, "name", "")).endswith(ticklock.LOCK):
+                    yielded.set()
+
         ran: list = []
         with mock.patch.object(tick, "datetime", _clock(QUIET)), \
                 mock.patch.object(tick, "fold", lambda *a: self.events.append("fold")), \
-                mock.patch.object(tick, "process_audio", lambda *a: self.events.append("audio")):
+                mock.patch.object(tick, "process_audio", lambda *a: self.events.append("audio")), \
+                mock.patch.object(ticklock, "fcntl", Spy()):
             self.cfg.state_dir.mkdir(parents=True, exist_ok=True)
+            first = second = None
             with open(self.cfg.state_dir / ticklock.WAIT, "a+") as flag:
                 fcntl.flock(flag, fcntl.LOCK_SH)  # a waiter's flag, and it never takes tick.lock
-                ticker = self.thread(tick.run, self.cfg)
                 try:
-                    _until(lambda: self._lock_free(ticklock.LOCK) and not self._lock_free(ticklock.RUN),
-                           "the first tick to yield (tick.lock free, tick-run.lock held)")
-                    ran.append(tick.run(self.cfg))  # a second tick, in the gap
+                    first = self.thread(tick.run, self.cfg)
+                    self.assertTrue(yielded.wait(DEADLINE), "the first tick never yielded")
+                    self.assertTrue(self._lock_free(ticklock.LOCK))  # the gap: yielded, and no one has it
+                    second = self.thread(lambda: ran.append(tick.run(self.cfg)))  # a second tick, in the gap
+                    second.join(DEADLINE / 2)  # it skips at once; a tick that ran would block on the flag
+                    skipped = not second.is_alive()
                 finally:
                     fcntl.flock(flag, fcntl.LOCK_UN)  # the waiter is gone: the first tick takes its lock back
-            self.join(ticker)
+            self.join(*(t for t in (first, second) if t))
+        self.assertTrue(skipped, "the second tick did not skip: it ran in the gap")
         self.assertEqual(ran, [(0, [])])  # skipped, nothing run
         self.assertEqual(self.events, ["fold", "audio"])  # (one of each: the second tick ran no step)
 
     def _lock_free(self, name: str) -> bool:
-        """A non-blocking probe of one of the lock files: free when nobody holds it."""
+        """A non-blocking probe of one of the lock files: free when nobody holds it. Only where nothing else is
+        about to take that lock (a probe holds it for an instant and a non-blocking taker would lose)."""
         with open(self.cfg.state_dir / name, "a+") as probe:
             try:
                 fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)
