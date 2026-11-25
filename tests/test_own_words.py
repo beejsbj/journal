@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
-from helpers import add_prompt, make_cfg
+from helpers import add_prompt, make_cfg, unkeyed
 from test_conversations import Base as ConversationBase
 from test_conversations import conv, m
 from test_sweep import NOW, SENT, FakeSessions
@@ -408,7 +408,7 @@ class SweepTest(SweepBase):
         self.db.add(native("", [pic], self.notes), self.stored, "3530")
         n, log = self.sweep()
         self.assertEqual(n, 1, log)
-        body = self.entry.read_text()
+        body = unkeyed(self.entry.read_text())
         self.assertIn("### 06:08 IST · photo\n\n![[2026-10-15-morning.jpg]]\n", body)
         self.assertNoneOfTheTurnIn(body)
         self.assertEqual((self.cfg.root / "2026-10-15-morning.jpg").read_bytes(), JPEG)
@@ -420,7 +420,7 @@ class SweepTest(SweepBase):
         pic = picture(self.cache / "img_4b5c6d.jpg", self.arrived)
         self.db.add(as_parts("", [pic], contextfence.wrap(self.notes)), self.stored, "3540")
         self.assertEqual(self.sweep()[0], 1)
-        body = self.entry.read_text()
+        body = unkeyed(self.entry.read_text())
         self.assertIn("### 06:08 IST · photo\n\n![[2026-10-15-morning.jpg]]\n", body)
         self.assertNoneOfTheTurnIn(body)
 
@@ -428,7 +428,7 @@ class SweepTest(SweepBase):
         pic = picture(self.cache / "img_3d4e5f.jpg", self.arrived)
         self.db.add(native("the sky this morning", [pic], contextfence.wrap(self.notes)), self.arrived, "3531")
         self.assertEqual(self.sweep()[0], 1)
-        body = self.entry.read_text()
+        body = unkeyed(self.entry.read_text())
         self.assertIn("### 06:08 IST · photo\n\n![[2026-10-15-morning.jpg]]\n\nthe sky this morning", body)
         self.assertNoneOfTheTurnIn(body)
 
@@ -440,7 +440,7 @@ class SweepTest(SweepBase):
         self.assertEqual(log, ["sweep: a picture of message 3532 was not kept (gone from Hermes' picture cache)"])
         self.db.add(native("still here", [str(self.cache / "img_gone2.jpg")], self.notes), self.stored, "3533")
         self.assertEqual(self.sweep()[0], 1)
-        body = self.entry.read_text()
+        body = unkeyed(self.entry.read_text())
         self.assertIn("· text\n\nstill here", body)
         self.assertNoneOfTheTurnIn(body)
 
@@ -462,7 +462,7 @@ class SweepTest(SweepBase):
         n, log = self.sweep()
         self.assertEqual(n, 1)
         self.assertIn("sweep: a picture of message 3542 was not kept (over images.max_mb)", log)
-        self.assertIn("· text\n\na big one", self.entry.read_text())
+        self.assertIn("· text\n\na big one", unkeyed(self.entry.read_text()))
         self.assertFalse(list(self.cfg.root.glob("*.jpg")))
 
     def test_a_copy_left_behind_by_a_failed_record_is_removed(self):
@@ -499,7 +499,7 @@ class SweepTest(SweepBase):
         pic = picture(self.cache / "img_9d0e1f.jpg", SENT + timedelta(hours=7))
         self.db.add(native("/j", [pic], self.notes), SENT + timedelta(hours=7, minutes=20), "3537")
         self.assertEqual(self.sweep()[0], 1)
-        body = (self.cfg.root / "2026-10-15-j.md").read_text()
+        body = unkeyed((self.cfg.root / "2026-10-15-j.md").read_text())
         self.assertIn("· photo\n\n![[2026-10-15-j.jpg]]", body)
         self.assertNoneOfTheTurnIn(body)
 

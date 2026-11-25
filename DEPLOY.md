@@ -16,6 +16,58 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## MARGIN-FORMAT — a stable key on every block of his, and the margin-note record in the entry format (2026-11-25; tick, hook and serve side; **gateway restart**; no config change)
+
+**What changes.** Issue #31, its first step: the entry format only. Every block of his the engine writes now carries
+a hidden `%% journal block:<id> %%` line, the first line under its heading (a program's `phase:N` line stays above
+the heading); a margin note is a record at the end of her annotations section, under `### Margin notes` and
+`%% journal:margin %%`. Readers know the margin (only his replies under a `his:` key line are his; everything else
+there is hers); nothing writes a note yet. The capture record in the ledger gains `block_key` (a new field on new
+captures; nothing reads it yet, older code ignores it). The web document gains `anchor` on his blocks and
+`analysis.margin` (always `[]` until notes are written); no web build changes. Old entries are not touched and read
+as before. DECISIONS.md, MARGIN-FORMAT.
+
+**Side and order.** One release; deploy in this order:
+1. **CLI and serve first.** `uv tool install --force` at the merge sha (the tick runs the new code from its next run)
+   and `systemctl --user restart journal-serve` (`document.py`, `margin.py`, `mcp/handlers.py`, `serve/blocks.py`).
+   From here on, blocks the tick and the faces write carry the key, and every reader on this side reads it.
+2. **The gateway in the same window as the CLI**: the plugin at the merge sha and `hermes gateway restart`. The
+   gateway loads `entries.py`, `capture.py` and `reflect.py` at import, so until the restart hook captures write
+   blocks without the key (harmless: such a block reads as one written before keys). The gateway also loads
+   `programs` and `programview` (`turncontext` → `programview.block` → `phase_blocks`): a keyed block, read by the old
+   gateway, gives the companion his session words with the key line in them, and an audio or photo answer that is
+   only the key line and the embed counts as answered, for a program session open between the CLI deploy and the
+   restart. So restart the gateway right after the CLI, not in a later window. The other way round (gateway first)
+   would leave the old tick, serve and web app reading keyed blocks; see Rollback for what that does.
+
+**First checks.**
+- `journal doctor` green; the import check above lists `journal.entries`, `journal.capture` and `journal.reflect`
+  (an unchanged set: `journal.margin` loads with `journal.document`, outside the gateway's import).
+- The next captured reply (any face, or the chat after the restart) has one `%% journal block:b… %%` line right
+  under its `### HH:MM` heading, and nothing else in the file changed: compare the entry before and after with
+  `diff` on a copy, not by printing it. Its capture record has `block_key` equal to that id (read the one field).
+- `GET /api/v1/entries/<that stem>`: its block has `"anchor": "block:b…"`, and `analysis.margin` is `[]`; an Edit of
+  that block from the web app keeps the key line.
+- A voice note after the restart is transcribed into its block (the fill steps over the key line).
+- Vault checksum before and after (only the new block's file differs).
+
+**Rollback.** The usual: the plugin and the CLI at the previous sha, a gateway restart. Files written in between keep
+their key lines; older code reads them as engine lines (never his words). Known effects until the next forward
+deploy (DECISIONS.md, MARGIN-FORMAT, *Older code on a newer file*): the older web app refuses Edit and Delete on every
+block that carries a key line (`not-editable`; nothing is left behind, and they work again after rolling forward); a
+voice note captured after the deploy and transcribed after the rollback keeps its placeholder (the recording is kept;
+set its capture's `transcript` back to `pending` after rolling forward, or transcribe it by hand; see the
+recovery conditions below); the older `phase_blocks` reads a keyed answer's key line as its first line, so a
+program's insights copy made then can carry it, and so do the program's other readers: a keyed schedule
+confirmation (`07:00`) written before the rollback and settled after it reads as the key line plus `07:00`,
+`parse_confirmation` returns None, no interrupts are scheduled and he is asked again, and `_short` prose slots and
+`programview` read a keyed answer the same way; a keyed photo block shows its picture embeds as text in the web app.
+
+**Audio recovery after a rollback** (verified): once on the new code, change the capture's `transcript` back to
+`pending`, under `ledger.locked` (or with the tick stopped). It works only while the kept recording is still beside
+the entry and the placeholder line is still in the block; it costs one more speech-to-text call, and the next tick
+fills the block.
+
 ## DAY-VIEW — a day as one log in the web app (2026-11-25; serve side only; **no gateway restart**; no config or state change)
 
 **What changes.** A new page, `/days/<date>`: every line of every entry filed under one day (chat notes, `/j` and web

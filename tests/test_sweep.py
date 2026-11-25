@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
-from helpers import CHAT, add_prompt, make_cfg
+from helpers import CHAT, add_prompt, make_cfg, unkeyed
 import legacy_readers
 
 from journal import capture, compose, entries, ledger, sweep, tick
@@ -97,7 +97,7 @@ class SweepTest(unittest.TestCase):
         self.assertEqual(n, 1, log)
         self.assertEqual(log, ["swept message 3528 into 2026-10-15-morning.md (next-message)"])
         body = self.entry.read_text()
-        self.assertIn("### 06:21 IST · text\n\nslept badly, the rain was loud", body)
+        self.assertIn("### 06:21 IST · text\n\nslept badly, the rain was loud", unkeyed(body))
         c = self.captures()[0]
         self.assertEqual((c["platform_message_id"], c["via"], c["rule"]), ("3528", "sweep", "next-message"))
         self.assertEqual(c["at"], (SENT + timedelta(minutes=20)).isoformat())
@@ -143,7 +143,7 @@ class SweepTest(unittest.TestCase):
         n, log = self.sweep()
         self.assertEqual(n, 1, log)
         body = self.entry.read_text()
-        self.assertIn("### 14:01 IST · voice transcript\n\nI slept okay, woke at five\n\nps: rain", body)
+        self.assertIn("### 14:01 IST · voice transcript\n\nI slept okay, woke at five\n\nps: rain", unkeyed(body))
         self.assertNotIn("![[", body)
         self.assertEqual(self.captures()[0]["source"], "voice")
 

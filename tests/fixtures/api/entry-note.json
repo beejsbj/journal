@@ -20,13 +20,15 @@
       "source": "text",
       "text": "call the harbour master",
       "audio": null,
-      "phase": null
+      "phase": null,
+      "anchor": null
     }
   ],
   "summary": null,
   "analysis": {
     "annotations": null,
     "notes": [],
+    "margin": [],
     "reflection": null
   },
   "flags": {

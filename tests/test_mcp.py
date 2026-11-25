@@ -22,7 +22,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from unittest import mock
 
-from helpers import CleanEnv, add_prompt, make_cfg, no_model
+from helpers import CleanEnv, add_prompt, make_cfg, no_model, unkeyed
 from serve_helpers import HERS, IST, NOW, build_journal
 
 from journal import cli, ledger
@@ -217,7 +217,7 @@ class SaveTest(Case):
         self.assertIsNone(got["answered"])
         self.assertEqual(got["stem"], "2026-10-15-j-2")  # 2026-10-15-j is taken: a /j note of its own
         # verbatim inside; the whole text's outer whitespace is trimmed, as every capture trims it (capture._web_record)
-        self.assertIn("### 09:12 IST · text\n\n" + words.strip() + "\n", Path(got["path"]).read_text(encoding="utf-8"))
+        self.assertIn("### 09:12 IST · text\n\n" + words.strip() + "\n", unkeyed(Path(got["path"]).read_text(encoding="utf-8")))
         after = _digest(self.cfg.root)
         self.assertEqual({k: v for k, v in after.items() if k in before}, before)  # nothing else changed
         doc = handlers.entry_document(self.cfg, got["stem"])
@@ -232,7 +232,7 @@ class SaveTest(Case):
         p = ledger.find(ledger.snapshot(self.cfg.ledger_path), "2026-10-15-morning")
         self.assertTrue(p["needs_edit"])
         self.assertEqual((p["captures"][0]["source"], p["captures"][0]["via"]), ("mcp", "mcp"))
-        self.assertIn("### 09:12 IST · text\n\nSlept well, woke at six.", Path(got["path"]).read_text(encoding="utf-8"))
+        self.assertIn("### 09:12 IST · text\n\nSlept well, woke at six.", unkeyed(Path(got["path"]).read_text(encoding="utf-8")))
 
     def test_a_practice_with_no_open_prompt_fills_its_slot_never_a_note(self):
         # OPEN-FACES: words for a practice go through actions.answer (slots.resolve): at 09:12 tonight's evening slot

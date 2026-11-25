@@ -8,7 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from helpers import CHAT, CleanEnv, add_prompt, make_cfg, real_ask
+from helpers import CHAT, CleanEnv, add_prompt, make_cfg, real_ask, unkeyed
 from serve_helpers import ServeCase
 from test_conversations import Base as ConversationBase
 from test_conversations import conv, m
@@ -146,7 +146,7 @@ class ReplyTest(ReceiveBase):
         self.assertEqual(self.kept(), ["2026-10-14-evening.jpg"])
         self.assertEqual((self.cfg.root / "2026-10-14-evening.jpg").read_bytes(), b"\xff\xd8jpeg")
         body = self.entry()
-        self.assertIn("### 14:30 IST · photo\n\n![[2026-10-14-evening.jpg]]\n\nthe lake at six\n", body)
+        self.assertIn("### 14:30 IST · photo\n\n![[2026-10-14-evening.jpg]]\n\nthe lake at six\n", unkeyed(body))
         self.assertIn("the lake at six", entries.his_words(body))
         cap = ledger.find(ledger.snapshot(self.cfg.ledger_path), self.prompt["id"])["captures"][0]
         self.assertEqual((cap["source"], cap["images"]), ("photo", ["2026-10-14-evening.jpg"]))
@@ -160,7 +160,7 @@ class ReplyTest(ReceiveBase):
     def test_a_photo_with_no_caption_is_still_an_answer(self):
         out = self.recv("", reply_to="700")
         self.assertEqual(out.action, "rewrite")
-        self.assertIn("### 14:30 IST · photo\n\n![[2026-10-14-evening.jpg]]\n", self.entry())
+        self.assertIn("### 14:30 IST · photo\n\n![[2026-10-14-evening.jpg]]\n", unkeyed(self.entry()))
 
     def test_more_photos_get_the_next_names_and_an_album_embeds_each(self):
         self.recv("one", reply_to="700")
@@ -186,7 +186,7 @@ class ReplyTest(ReceiveBase):
         self.assertTrue(out.text.startswith("[Journal note") and out.text.endswith("the view from the train"))
         self.assertEqual(self.kept(), ["2026-10-14-j.jpg"])
         self.assertIn("### 14:30 IST · photo\n\n![[2026-10-14-j.jpg]]\n\nthe view from the train\n",
-                      self.entry("2026-10-14-j"))
+                      unkeyed(self.entry("2026-10-14-j")))
 
     def test_a_redelivered_j_photo_is_the_same_note_not_a_pass_and_not_a_new_one(self):
         first = self.recv("/j the harbour", message_id="901")
@@ -219,7 +219,7 @@ class ReplyTest(ReceiveBase):
             out = self.recv("too big to keep", reply_to="700")
         self.assertEqual(out.action, "rewrite")
         self.assertEqual(self.kept(), [])
-        self.assertIn("### 14:30 IST · text\n\ntoo big to keep", self.entry())
+        self.assertIn("### 14:30 IST · text\n\ntoo big to keep", unkeyed(self.entry()))
 
     def test_a_redelivered_photo_is_kept_once(self):
         self.recv("once", reply_to="700")
@@ -516,7 +516,7 @@ class ConversationTest(ConversationBase):
         self.photo_row("first thing today", m(0), "573")
         self.tick(m(8))
         body = self.note().read_text()
-        self.assertIn("### 19:30 IST · photo\n\n![[2026-10-15-j.jpg]]\n\nfirst thing today", body)
+        self.assertIn("### 19:30 IST · photo\n\n![[2026-10-15-j.jpg]]\n\nfirst thing today", unkeyed(body))
 
     def test_a_replay_does_not_keep_the_picture_twice(self):
         self.his("one thing", m(0), "570")
@@ -683,7 +683,7 @@ class DescribeTest(ReceiveBase):
         self.assertTrue(body.startswith(before.rstrip()[:200]))
         words = entries.his_words(body)
         self.assertNotIn("frozen lake", words)  # not among his words
-        self.assertIn("### 14:30 IST · photo\n\n![[2026-10-14-evening.jpg]]\n\nthe lake\n", body)  # his block untouched
+        self.assertIn("### 14:30 IST · photo\n\n![[2026-10-14-evening.jpg]]\n\nthe lake\n", unkeyed(body))  # his block untouched
         notes = entries.notes_span(body)
         self.assertIn("_Photo 2026-10-14-evening.jpg:_ A frozen lake under a pale sky.", body[notes[0]:notes[1]])
         self.assertEqual(self.capture()["describe"], "done")

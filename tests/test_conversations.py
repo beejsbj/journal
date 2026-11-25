@@ -8,7 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from helpers import CHAT, CleanEnv, add_prompt, make_cfg, write_config
+from helpers import CHAT, CleanEnv, add_prompt, make_cfg, unkeyed, write_config
 import legacy_readers
 from test_sweep import FakeSessions, redirected
 
@@ -325,8 +325,8 @@ class AppendOnlyTest(Base):
         self.assertIn("> I hear you.", conv(after))  # the writer did run, into this entry
         self.assertEqual(entries.raw_entry(after), words)  # his section, byte for byte
         self.assert_kept(before, after)
-        self.assertEqual(after.count(words), 1)
-        self.assertLess(after.index(words), after.index(entries.CONVERSATION_MARK))
+        self.assertEqual(unkeyed(after).count(words), 1)
+        self.assertLess(unkeyed(after).index(words), unkeyed(after).index(entries.CONVERSATION_MARK))
 
     def test_a_note_of_his_is_untouched_when_its_chat_continues(self):
         info = capture.capture_note(self.cfg, self.AWKWARD, m(0), "text", "810")

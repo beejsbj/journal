@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
-from helpers import make_cfg
+from helpers import make_cfg, unkeyed
 
 from journal import agent, audio, context, conversations, entries, privacy, sweep, tick
 from journal.mcp import handlers as mcp_handlers
@@ -214,7 +214,7 @@ class FillAudioTest(unittest.TestCase):
         self.edit_first(mine)
         self.assertTrue(self.fill())
         self.assertEqual(self.his_blocks(), [mine, "the transcript"])
-        self.assertIn("### 20:05 IST · audio file · 0:30\n\n![[", self.path.read_text())
+        self.assertIn("### 20:05 IST · audio file · 0:30\n\n![[", unkeyed(self.path.read_text()))
 
     def by_hand(self, old, new):
         """An edit in his notes app (the web app refuses an embed line of his own, and removing a recording that is
@@ -227,7 +227,7 @@ class FillAudioTest(unittest.TestCase):
         self.by_hand("**Today** was long.", f"listen:\n\n![[{self.STEM}.ogg]]")
         self.assertTrue(self.fill())
         self.assertIn(f"### 20:00 IST · text\n\nlisten:\n\n![[{self.STEM}.ogg]]\n\n### 20:05 IST · audio file · 0:30"
-                      f"\n\n![[{self.STEM}.ogg]]\n\nthe transcript", self.path.read_text())
+                      f"\n\n![[{self.STEM}.ogg]]\n\nthe transcript", unkeyed(self.path.read_text()))
 
     def test_no_recording_block_writes_nothing(self):
         self.by_hand(f"![[{self.STEM}.ogg]]\n\n{audio.TRANSCRIBING}", f"it was ![[{self.STEM}.ogg]]")

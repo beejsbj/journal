@@ -191,6 +191,18 @@ def render_document(doc: dict) -> str:
     analysis = doc.get("analysis") or {}
     if analysis.get("annotations"):
         out += [f"## Annotations — {she}", "", *_quoted(analysis["annotations"]), ""]
+    times = {}   # a block's anchor -> its time, so a note says which block of his it is on ("his 09:12 block")
+    for b in doc.get("blocks") or []:
+        if b.get("anchor") and b["anchor"] not in times:
+            times[b["anchor"]] = (b.get("at") or "").split(" ")[0]
+    for note in analysis.get("margin") or []:   # hers; only his replies in its thread are his words
+        at = times.get(note["anchor"])
+        on = (f"his {at} block" if at else "one of his blocks") if note["anchor"] in times else "the entry"
+        state = "" if note["state"] == "open" else f" · {note['state']}"
+        out += [f"## Margin note — {she} · on {on}{state}", "", *_quoted(note["text"]), ""]
+        for b in note.get("thread") or []:
+            out.append((he if b["kind"] == "his" else she) + (f" · {b['at']}" if b.get("at") else ""))
+            out += [*_quoted(b["text"]), ""]
     for note in analysis.get("notes") or []:
         out += [f"## Note — {she}" + (f" · {note['at']}" if note.get("at") else ""), "", *_quoted(note["text"]), ""]
     if analysis.get("reflection"):

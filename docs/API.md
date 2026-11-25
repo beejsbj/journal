@@ -82,13 +82,25 @@ entry parser), never a second model.
     {"kind": "his", "key": "his:816", "at": "23:50", "source": "text", "text": "…", "audio": null, "reply_to": "the line of hers he answered"}
   ],
   "summary": null,
-  "analysis": {"annotations": "- …", "notes": [{"at": "08:02 IST", "text": "…"}], "reflection": "2026-10-14-reflection"},
+  "analysis": {"annotations": "- …", "notes": [{"at": "08:02 IST", "text": "…"}],
+               "margin": [{"id": "n4c1e9a07", "anchor": "block:b3f9a2c10", "at": "2026-10-14T23:50:00+05:30",
+                           "state": "open", "closed": null, "text": "…",
+                           "thread": [{"kind": "his", "key": "his:817", "at": "23:58", "source": "text", "text": "…",
+                                       "audio": null, "reply_to": null, "anchor": null}]}],
+               "reflection": "2026-10-14-reflection"},
   "flags": {"annotated": true, "has_conversation": true, "transcript_pending": false, "audio": true},
   "path": "/…/Journal/2026-10-14-evening.md", "mtime": 1760480000.0, "writable": true
 }
 ```
 
-Every `text` is the file's text with `ENGINE_MARK` lines removed; the server never reflows. `reply_to` (his
+Every `text` is the file's text with `ENGINE_MARK` lines removed; the server never reflows. Every block of his has
+`anchor`: the stable key a margin note names it by (`block:<id>` from the hidden line under a words block's heading,
+`his:<id>` for a conversation message, null for a block written before keys and for a later copy of a key already
+used above it); `key` is the block's name for Edit and Delete, as before. `analysis.annotations` is her analysis
+alone; `analysis.margin` is her margin notes (DECISIONS.md, MARGIN-FORMAT): each with the block it is on (`anchor`, or
+`entry` for the entry as a whole and for a block that is gone), when she wrote it, its `state` (`open`, `resolved`,
+`dismissed`) and `closed` time, her words, and its `thread` as blocks (`kind` his or hers). Her note and her replies
+are hers; only his replies under a `his:` key line are his words, and any other text in the margin is hers. `reply_to` (his
 conversation messages) is the quoted line of hers his message answered, from the `↩ replying to` callout the
 conversation writer puts above his message. `prompt.opener`/`asked` come from the ledger record and are null once
 it is pruned. `voices` names the two voices for labels (`names.user`, else "You"; `names.companion`), so the client never guesses a name. Also present: `meta` (`mood`/`people`/`starred` when set) and the entry's `practice` as `{id, title,
