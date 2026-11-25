@@ -667,6 +667,7 @@ src/journal/
   turncontext.py what the companion is told on one turn (notebook, pack or program block, today) under the two-block budget
   tick.py        send → sweep → conversations → programs → fold → audio → images → annotate → reply → reflect → recover → cache → prune;
                  send_prompt delivers one prepared prompt (retries, sent.jsonl, re-sends, the mirror)
+  ticklock.py    tick.lock: a waiting send or program step goes first at the tick's safe points (pause, waited, scheduled)
   status.py, migrate.py, cli.py
   guard.py       what the companion may not change
   privacy.py     /x: the one privacy pass over the chat's rows; every reader asks it

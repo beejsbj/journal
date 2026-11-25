@@ -52,7 +52,8 @@ from datetime import date, datetime, timedelta, timezone
 from datetime import time as dtime
 from pathlib import Path
 
-from . import agent, audio, capture, compose, entries, ledger, library, mirror, notebook, outage, programdefs, prompts, validate
+from . import (agent, audio, capture, compose, entries, ledger, library, mirror, notebook, outage, programdefs, prompts,
+               ticklock, validate)
 from .config import Config, settle_minutes
 from .ports import ChannelError
 from .programdefs import Program
@@ -295,14 +296,10 @@ def _save(cfg: Config, run: dict) -> None:
 @contextlib.contextmanager
 def locked(cfg: Config):
     """The tick's lock, waited for: every transition outside the tick runs under it (a spawned ``journal program
-    …``), so it never races the tick's ``step`` or another spawn."""
-    cfg.state_dir.mkdir(parents=True, exist_ok=True)
-    with open(cfg.state_dir / "tick.lock", "a+") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
-        try:
-            yield
-        finally:
-            fcntl.flock(lock, fcntl.LOCK_UN)
+    …``), so it never races the tick's ``step`` or another spawn. A running tick lets it go first at its next safe
+    point (``ticklock``), so it waits for the rest of one step, not the whole tick."""
+    with ticklock.waited(cfg):
+        yield
 
 
 def _iso(at: datetime) -> str:

@@ -16,6 +16,35 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## TICK-LOCK-YIELD — the tick lets a waiting `/next` or send go first (2026-11-24; tick side; **no gateway restart needed**; no config or state change)
+
+**What changes.** Issue #45. A `/next`, a phase step, `/start` or the web app's Send (each a spawned `journal program …`
+or `journal send`) no longer waits for the whole tick when the tick is calling a model: the tick yields `tick.lock` at
+its safe points (between steps; between annotations, picture descriptions, transcriptions and reflections) and takes
+it back after the waiter. The wait is now the rest of one step or one model call (at most one budget; the longest is
+a reflection, 480 s), not the sum over the tick (about 17 minutes at worst). New module `ticklock.py`; two new lock
+files under `state_dir`, made on first use: `tick-wait.lock` (a waiter's flag) and `tick-run.lock` (held by a
+running tick, so a tick that starts while another is yielded skips its round). DECISIONS.md, TICK-LOCK-YIELD.
+**Side and restart.** The code that changes runs only in the CLI's own processes: the tick (`tick.run`, the steps'
+loops), and the spawned `journal send` / `journal program …` / `journal sweep` / `journal backfill-conversations`
+(`ticklock.waited`, `programs.locked`). The gateway loads `programs.py`, `reflect.py` and `ticklock.py` at import
+(the import check above lists them), but it never takes `tick.lock` itself (it spawns those commands) and
+`ticklock.pause` does nothing outside a scheduled tick, so a gateway still on the old code changes nothing: **no
+gateway restart is needed**; the next window's restart picks the code up for consistency. The tick, and what the
+gateway spawns (`python -m journal …` over the plugin's `src`), run the new code as fresh processes once the plugin
+pin moves; what serve spawns runs the `uv tool` install, so `uv tool install --force` at the merge sha (serve itself
+needs no restart: it imports none of this). Until both are moved the versions mix safely: an old waiter raises no
+flag and waits as before; an old tick ignores the flag.
+**First checks.**
+- `journal doctor`: no new failure; `ls <state_dir>/tick-*.lock` shows `tick-run.lock` after the first tick.
+- The next ticks' logs (`last-tick.json`) are as before, and `journal status` shows ticks every five minutes (a
+  tick that is skipped while another runs is silent, as before).
+- During a tick that annotates (or by `/next` while one runs), the `/next` answers within the rest of one model call;
+  the tick's own later steps still run (folds, replies) in that same tick.
+- No harness on the host is needed: `tools/measure_tick_lock.py --calls 3` runs on a temporary root only.
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` and the CLI at the
+previous sha. The two new lock files can stay (nothing old reads them) or be removed while no tick runs.
+
 ## X-FLOOR — `/x` refused at the bottom of the write path; `/j /x` off the record (2026-11-24; hook, tick and serve side; **gateway restart required**; no config or state change)
 
 **What changes.** Defence in depth (issue #46): the functions that put his words into an entry refuse off-the-record
