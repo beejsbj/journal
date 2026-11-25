@@ -535,7 +535,9 @@ class StartCommandTest(CleanEnv):
         self.assertEqual(reply, "There's no practice called “nope”. You have: /start morning (Morning journal), "
                                 "/start evening (Evening journal), /start midweek (Midweek check-in), "
                                 "/start weekly (Weekly pattern scan), /start fix-life (Fix your entire life in 1 day), "
-                                "/start prep (Conversation prep), /start debrief (Post-session debrief).")
+                                "/start boundary (Setting a boundary), /start conflict (Working through a conflict), "
+                                "/start prep (Conversation prep), /start debrief (Post-session debrief), "
+                                "/start thought (Thought record).")
         self.assertEqual(self.spawned, [])
         self.assertTrue(commands.start("").startswith("Which practice? You have: /start morning"))
 
