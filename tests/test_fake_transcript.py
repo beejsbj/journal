@@ -17,6 +17,7 @@ from unittest import mock
 
 import test_conversations
 import test_privacy_coverage
+import test_privacy_x_issues
 import test_recovery
 import test_sweep
 from helpers import FakeTranscript, FakeTranscriptMixin, add_prompt, make_cfg
@@ -25,7 +26,7 @@ from journal import context, conversations, entries, privacy, recovery, sweep
 from journal.config import Config, Names
 from journal.ports import Row
 
-SUITES = (test_conversations, test_privacy_coverage, test_sweep, test_recovery)
+SUITES = (test_conversations, test_privacy_coverage, test_privacy_x_issues, test_sweep, test_recovery)
 
 
 def _faked(module) -> dict:

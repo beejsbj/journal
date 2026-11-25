@@ -4859,6 +4859,58 @@ to it (not this host's setup: the gateway runs as a service).
       running when an entries-only letter goes, then failing, gets the chat catch-up. Each was run with its fix
       reverted (the hold cap and the short-outage rule separately) and failed.
 
+- **PRIV4 (2026-11-24) — an old compaction copy and a queued bare `/x` (#4, #5).** Two holes the BACKLOG-PRIVACY
+  entries above left open; both fixes only make rows private, never the reverse.
+  - **A copy whose original the view did not read is answered from a slice around the original (#4).** A
+    compaction copy is private when its original is, and an original older than the view's recompute was answered
+    only by its saved id, which ages out at `KEEP_DAYS` (400). A copy of a private row older than that, with no mark
+    of its own (a message steered in inside a bare-`/x` window, her reply there), read as public to the outage
+    catch-up, the pack and annotation alignment. Option (a) of the issue is taken, bounded: when a view holds a copy
+    whose original it did not read and no saved answer names private, `_originals` reads each such original by its
+    id (originals a few ids apart in one read) and runs the pass over a slice from `RECOMPUTE` before it (a window
+    or turn begun in those hours; a saved window still open there takes it back to that window's start) to
+    `RECOMPUTE` after it (a row he sent before it but that was queued is stored after it), originals whose slices
+    meet sharing one; what a slice finds private is added to the view, nothing is taken from it. The hook's records
+    it needs are kept for good since BACKLOG-PRIVACY. Option (b) (keep saved private ids for good) was not taken: it
+    grows with every private row and is still only a floor.
+    A slice cannot see a window begun before it and kept open into it (his messages less than `quiet_minutes`
+    apart, no prompt send), and once the saved windows have aged out nothing records one (the re-review of this
+    section reproduced the leak, on main too). So the pass runs over each slice a second time with a window opened
+    at the slice's start, the widest one that could be open there; an original private in that run but public in
+    the real one could be covered by an earlier window, and its copies are answered private (its own id is not, so
+    `update` never saves the old row as private on a guess). No read is added. The limit, and its price: a public
+    copy reads private when the `RECOMPUTE` before its original had no quiet gap and no prompt send, and no saved
+    window answers for it: the readers of raw rows (the catch-up, the pack, alignment) then leave that copy out.
+    The second run costs no read, only the pass again over rows already in memory: re-run on the benchmark below
+    (single runs on a loaded host, so noisy), a view holding copies took 167 / 706 ms on main, 335 / 676 ms before
+    the second run and 168 / 599 ms with it (60 days and 20,000 rows / 180 days and 60,000). The tick's log counts
+    those originals.
+    Cost: a view that holds such a copy reads, besides its own hours, each original by id and one slice of about
+    four days per group of originals, on each uncached call (the gateway's on each of his messages and each
+    journal-writing tool call included) until the copy is older than the view. That is the common case, a copy of a
+    public row, and Hermes' compressor can carry a conversation's first exchange, so the original can be as old as
+    the conversation: the slice bounds it. Measured on a synthetic database with Hermes' indexes
+    (`tests/test_privacy_retake_cost.py`, an uncached view): 60 days and 20,000 rows, 240 ms on main, 375 ms here
+    (2.4 s for the first version of this fix, which re-took the whole view from the oldest original); 180 days and
+    60,000 rows, 620 ms on main, 675 ms here (8 s before). A copy whose original is saved private costs nothing more.
+    The tick logs each re-take (`privacy: answered N compaction-copy original(s) …`, counts only, with `; the
+    copies of U read private …` when the second run decided any). An original that can't be read by its id, is
+    read as newer than the view's start (two reads that disagree) or is missing from its slice closes that view
+    (everything private) until the next read; no read steps back again. Each bound is pinned by a test that fails
+    when it is moved (`SliceBoundsTest`, `SliceReadsTest`): the lookback, the look-ahead, the saved-window start,
+    the two closing reads and the second run.
+  - **A bare `/x` stored as a row also opens its window at its own time (#5).** The pass opened a busy-path bare
+    `/x`'s window at the stored-order clock (the latest time seen), so a message he sent after the `/x` but stored
+    before it was read before any window existed and was public. The pass now gathers the own times of those rows
+    before the walk and adds them to the hook's starts (`_busy_starts`), as the issue proposed; the walk still opens
+    one where it reaches the row, as before. For a row stored in order the two are the same moment, so nothing
+    changes there. The window rule then reaches her rows too: a `/x` he sent at 10:01, queued during her turn
+    and stored after her 10:03 answer to his public 10:00 question, makes that answer private (the window is open from
+    10:01; more private, as the rule says, and pinned by a test). Whether Hermes can store the two in that order was not checked on a live gateway (the issue's
+    open question): the fix holds either way and costs nothing when it cannot.
+  - Not done here: #10 (a captionless photo that ends a window takes her next public reply off the record) and #11
+    (compacting and dropping the `/x` records) trade privacy for something else and wait for the owner.
+
 **X-FLOOR, on re-review (2026-11-25).** `capture.opt_out` reads past every leading `/j` (`/j /j /x …` too), so the
 gate strips as deep as the floor and a doubled `/j` before `/x` keeps nothing, a photo or voice note included. The
 writer's and the sweep's per-message catch of `OffRecord` is a backstop: it drops that message from their own output
