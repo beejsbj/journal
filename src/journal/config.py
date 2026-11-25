@@ -127,6 +127,8 @@ DEFAULTS: dict[str, Any] = {
         "sends_per_tick": 2,       # annotation replies and analyses sent to the chat per tick
         "sends_per_hour": 4,       # and per hour; the rest wait for a later tick
         "stale_hours": 24,         # later than this (after his words, or an analysis's time), not sent: in the file
+        "letter": True,            # the catch-up also covers his entries from the outage, in place of their replies
+        "letter_min_minutes": 60,  # an outage shorter than this keeps the replies (barely late)
     },
     "capture": {                   # what gets journaled (capture_mode): "everything" or "arm"
         "mode": "everything",      # everything: every chat thread; arm: prompt replies, /j notes, program answers
