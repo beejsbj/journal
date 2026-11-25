@@ -387,7 +387,7 @@ def complete_session(cfg, run, session, now, log) -> None   # fills ## Summary, 
 ```
 
 All transitions run under `tick.lock` (blocking) in a spawned `journal program <action> <run>` or in the tick's
-`step`; the send itself goes through `tick.send_prompt`. A transition is recorded with `advance_key` =
+`step`; the send itself goes through `chat.send.send_prompt`. A transition is recorded with `advance_key` =
 `"<run>:<session>:<phase>:<last capture id or 'cmd'>"`; a second call with the same key is a no-op (a sweep
 re-capture, a redelivered update, a lost-then-retried spawn, or the tick and a spawn racing all collapse to one
 send). **One program at a time:** while a program has an unfinished run (active or on a break, mid-session or

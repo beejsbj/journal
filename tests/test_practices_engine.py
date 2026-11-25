@@ -20,6 +20,7 @@ from journal import (agent, capture, cli, compose, config, context, entries, led
 from journal import commands as jcommands
 from journal.config import Names, load
 from journal.hermes import commands, hooks, runtime
+from journal.chat import send as chat_send  # (send_prompt's clock, moved from tick: issue #43)
 
 IST = ZoneInfo("Asia/Kolkata")
 NAMES = Names(user="Sam", companion="Ada", emoji="🌿", pronouns="he/him/his", frontmatter_source="journal")
@@ -90,7 +91,7 @@ class Base(CleanEnv):
             self.asked.append(query)
             raise agent.AgentUnavailable("no model in this test")
         for p in (mock.patch.object(telegram, "_call", self.bot), mock.patch.object(telegram, "token", lambda c: "T"),
-                  mock.patch.object(agent, "ask", unreachable), mock.patch.object(tick, "datetime", Clock),
+                  mock.patch.object(agent, "ask", unreachable), mock.patch.object(tick, "datetime", Clock), mock.patch.object(chat_send, "datetime", Clock),
                   mock.patch.object(context, "build", lambda c, n, *a: "PACK")):
             p.start()
             self.addCleanup(p.stop)

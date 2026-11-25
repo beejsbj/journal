@@ -56,7 +56,7 @@ def open_phase(prompt: dict, at: datetime | None = None) -> bool:
 
 def sent_by(prompt: dict, at: datetime | None = None) -> datetime:
     """When the prompt was last sent by ``at`` (now, without it): a prompt sent again has its earlier sends in
-    ``earlier_sent_at`` (``tick.send_prompt``), and each kept taking replies until the next."""
+    ``earlier_sent_at`` (``chat.send.send_prompt``), and each kept taking replies until the next."""
     sends = [_aware(t) for t in [*(prompt.get("earlier_sent_at") or []), prompt["sent_at"]]]
     return max((t for t in sends if at is None or t <= at), default=min(sends))
 

@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 from helpers import CHAT, add_prompt, make_cfg
 
 from journal import capture, context, entries, ledger, notebook, reflect, telegram, tick, validate
+from journal.chat import send as chat_send  # (send_prompt's clock, moved from tick: issue #43)
 
 IST = ZoneInfo("Asia/Kolkata")
 GOOD = ('**What stood out** — The rain, and a walk in it anyway.\n\n'
@@ -179,7 +180,7 @@ class DayReflectionTest(Base):
             @classmethod
             def now(cls, tz=None):
                 return now.astimezone(tz) if tz else now
-        with mock.patch.object(tick, "datetime", Clock), mock.patch.object(tick, "send_due", lambda *a, **k: None), \
+        with mock.patch.object(tick, "datetime", Clock), mock.patch.object(chat_send, "datetime", Clock), mock.patch.object(tick, "send_due", lambda *a, **k: None), \
                 mock.patch.object(tick, "fold", lambda *a, **k: None):
             code, log = tick.run(self.cfg)
         self.assertEqual(code, 1)

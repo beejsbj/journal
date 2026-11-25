@@ -1,8 +1,8 @@
 """Slot states and slot resolution: where a practice stands, whatever face it was done on (OPEN-PROMPTS).
 
-A record is written when something happens: a delivery to the chat (``tick.send_prompt``) or his first words on a face
-(``actions.answer``). A slot that has neither is still a state, derived from the schedule. Every scheduled slot of a
-day has exactly one:
+A record is written when something happens: a delivery to the chat (``chat.send.send_prompt``) or his first words on a
+face (``actions.answer``). A slot that has neither is still a state, derived from the schedule. Every scheduled slot of
+a day has exactly one:
 
 * ``upcoming``: its time has not come, and it has no record;
 * ``due``: its time has come, it is inside its window, and it has no record, or only the record a failed send leaves

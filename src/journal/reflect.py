@@ -50,7 +50,7 @@ from pathlib import Path
 
 from . import agent, channel, compose, entries, ledger, library, mirror, notebook, outage, prompts, schedule, search, \
     ticklock, validate
-from .ports import ChannelError
+from .chat.deliver import Delivery, Mirror, deliver
 from .config import Config, day_ends_at, journal_day
 
 ATTEMPTS = 3
@@ -583,7 +583,7 @@ def send(cfg: Config, now: datetime, log: list[str]) -> list[str]:
     """Send each written analysis to the chat once, silently: a day reflection or week review is written once its last
     journal day has ended (``day_over``, 04:00 by default), so it comes in the night whichever way it was triggered (an
     annotated closing entry or the fallback). Before the owner's 2026-11-25 decision only the fallback's was silent."""
-    alerts, where = [], channel.label(cfg)
+    alerts: list[str] = []
     if not cfg.has_channel:
         _skip(cfg, now, log)
         return alerts  # no chat: the analysis is in its file, and nothing is attempted (OPEN-PROMPTS rule 6)
@@ -600,37 +600,45 @@ def send(cfg: Config, now: datetime, log: list[str]) -> list[str]:
             waiting += 1
             continue
         path = Path(rec.get("path") or "")
-        error, mid, title, body = None, None, "", ""
-        if not path.is_file():
-            error = "the file is gone"
+        if not path.is_file():  # nothing to send: the attempt is counted all the same
+            told = _sent_account(cfg, rec, now, "", "", Delivery(error="the file is gone"), alerts, log)
         else:
             title, _ = _label(cfg, rec["kind"], date.fromisoformat(rec["local_date"]))
             body = body_of(path.read_text(encoding="utf-8"))
-            try:
-                mid = cfg.channel().send(cfg.chat_id, compose.reflection_html(title, body, cfg.names), silent=True)
-            except ChannelError as e:
-                error = str(e)
-        with ledger.locked(cfg.ledger_path) as data:
-            q = find(data, rec["id"])
-            if q is None:
-                continue
-            t = ledger.send_slot(q)
-            if mid:
-                t.update(message_id=mid, sent_at=now.isoformat(), silent=True)
-                t.pop("error", None)
-            else:
-                t["attempts"] = t.get("attempts", 0) + 1
-                t["error"] = (error or "")[:300]
-                if t["attempts"] >= SEND_ATTEMPTS:
-                    alerts.append(f"{rec['id']} could not be sent to {where} after {t['attempts']} attempts: {error}")
-        log.append(f"sent {rec['id']} to {where}" if mid else f"{rec['id']}: {where} send failed ({error})")
-        if mid:
+            told = deliver(cfg, compose.reflection_html(title, body, cfg.names), log,
+                           silent=True,
+                           record=lambda d, rec=rec, title=title, body=body: _sent_account(
+                               cfg, rec, now, title, body, d, alerts, log)).told
+        if told is not None:
             room -= 1
-            mirror.to_chat(cfg, f"{title}, sent at {mirror.stamp(cfg, now)}", body, log,
-                           ref=("reflections", rec["id"], ledger.SEND_KEY))
     if waiting:
         log.append(outage.pace_note(cfg, waiting, "analys" + ("is" if waiting == 1 else "es")))
     return alerts
+
+
+def _sent_account(cfg: Config, rec: dict, now: datetime, title: str, body: str, d: Delivery, alerts: list[str],
+                  log: list[str]) -> Mirror | None:
+    """One analysis's send, accounted (``deliver``'s ``record``): sent, its send slot gets the message; not, an
+    attempt, the error, and an alert on the ``SEND_ATTEMPTS``-th. What the companion is told when it was sent; nothing
+    when the record is gone."""
+    mid, error, where = d.message_id, None if d.error is None else str(d.error), channel.label(cfg)
+    with ledger.locked(cfg.ledger_path) as data:
+        q = find(data, rec["id"])
+        if q is None:
+            return None
+        t = ledger.send_slot(q)
+        if mid:
+            t.update(message_id=mid, sent_at=now.isoformat(), silent=True)
+            t.pop("error", None)
+        else:
+            t["attempts"] = t.get("attempts", 0) + 1
+            t["error"] = (error or "")[:300]
+            if t["attempts"] >= SEND_ATTEMPTS:
+                alerts.append(f"{rec['id']} could not be sent to {where} after {t['attempts']} attempts: {error}")
+    log.append(f"sent {rec['id']} to {where}" if mid else f"{rec['id']}: {where} send failed ({error})")
+    if not mid:
+        return None
+    return Mirror(f"{title}, sent at {mirror.stamp(cfg, now)}", body, ("reflections", rec["id"], ledger.SEND_KEY))
 
 
 def _lateness(cfg: Config, rec: dict, now: datetime) -> timedelta | None:
