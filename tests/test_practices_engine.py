@@ -289,7 +289,9 @@ class UserPracticeTest(Base):
                                sent + timedelta(hours=8), "text", "77")
         body = Path(info["path"]).read_text()
         self.assertIn("# Daily gratitude — Wed 14 Oct 2026", body)
-        self.assertNotIn("[!question]", body)  # the bank is gone with the file; his words are not
+        # the file is gone, but the record kept the questions the prompt carried, so the entry still folds them
+        self.assertIn("> [!question]- Questions\n> 1. Three things today, and why each one mattered.\n"
+                      "> 2. Who made one of them possible?", body)
         self.assertIn("late", entries.raw_entry(body))
 
     def test_a_fork_of_a_built_in_is_what_is_sent(self):

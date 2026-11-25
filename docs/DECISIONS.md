@@ -4612,8 +4612,8 @@ to it (not this host's setup: the gateway runs as a service).
     review's tone is said in the question itself ("regret what deserves it, and leave out the guilt and the
     self-blame"), since a nightly review drifts toward self-prosecution unless the words stop it. One moment, not
     several: the source's own warning is that more becomes a burden.
-  - **Lineage** (structure and ideas adapted; every line is new wording; nothing is quoted): the feelings check from
-    Jonice Webb, *Running on Empty* (Identifying and Naming); the heart's desire from *The Book of Joy* (Morning
+  - **Lineage** (structure and ideas adapted, in new wording; the feelings check is the closest, a short attributed
+    paraphrase of its source's steps): the feelings check from Jonice Webb, *Running on Empty* (Identifying and Naming); the heart's desire from *The Book of Joy* (Morning
     Intention Setting); the rehearsal and the mentor from Donald Robertson, *How to Think Like a Roman Emperor*
     (ch. 3), with Marcus Aurelius 2.1 behind it; the one moment from *The Mind Illuminated*, Appendix E (Mindful
     Review: regret, resolve and recompense, no guilt); the close from Seneca, Letter 12 ("I have lived"); the story
@@ -4631,7 +4631,11 @@ to it (not this host's setup: the gateway runs as a service).
     ones. It now folds the send record's snapshot (`library.snapshot_sections`, as `serve/document.prompt_of` and
     `actions.view` already read it), and the practice's own questions only for a record with none (one sent before
     snapshots, or over `SNAPSHOT_MAX_CHARS`). `library.bank_lines(sections)` formats either; `Practice.bank_lines`
-    calls it, so the goldens are unchanged. Tests: `tests/test_sent_as_sent.py`, the entry-file cases. The change is
+    calls it, so the goldens are unchanged. Tests: `tests/test_sent_as_sent.py`, the entry-file cases. One test
+    changes what it pins, on purpose: a practice of his deleted after its prompt went out used to leave the late
+    reply's entry with no question list (`test_practices_engine`, "the bank is gone with the file"); the entry now
+    folds the questions the record kept, as the web page already showed them (SENT-AS-SENT, "a deleted practice
+    still shows what was asked"). The change is
     in modules the gateway imports, so this package's deploy restarts the gateway (DEPLOY.md, BOOKENDS).
   - **Goldens.** `tests/golden/morning.*` and `evening.*` are regenerated (`python3 tests/test_golden.py --write`, a
     switch this change adds beside `test_golden_engine.py --write`; midweek and weekly come out byte-identical, which
