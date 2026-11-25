@@ -226,15 +226,17 @@ def _label(cfg: Config, kind: str, end: date) -> tuple[str, str]:
     return f"{who}'s week review — {span}", f"the week of {span}"
 
 
-# Only the engine's callouts, by the key line before them; a callout he wrote himself stays his words.
-_HER_REPLY = re.compile(r"^%% journal her:[^%\n]* %%\n> \[!quote\][-+]? (.+?) · ([^\n]+)\n((?:>[^\n]*(?:\n|$))*)", re.M)
-_REPLY_CONTEXT = re.compile(r"^(%% journal his:[^%\n]* %%\n)> \[!info\][-+]? ↩[^\n]*\n(?:>[^\n]*(?:\n|$))*\n?", re.M)
+# Only the engine's callouts, by the key line before them (blank lines between them change nothing); a callout he
+# wrote himself stays his words.
+_HER_REPLY = re.compile(r"^%% journal her:[^%\n]* %%\n(?:[ \t]*\n)*> \[!quote\][-+]? (.+?) · ([^\n]+)\n((?:>[^\n]*(?:\n|$))*)",
+                        re.M)
+_REPLY_CONTEXT = re.compile(r"^(%% journal his:[^%\n]* %%\n)(?:[ \t]*\n)*> \[!info\][-+]? ↩[^\n]*\n(?:>[^\n]*(?:\n|$))*\n?",
+                            re.M)
 HER_REPLY_SHORT = 240  # characters kept of each of her chat replies when an entry is over INPUT_CAP
-# Her margin notes and her replies in their threads (``margin.py``): a ``[!note]`` callout under her ``note:`` or
-# ``her:`` key line. His replies there are keyed ``his:``; in the margin that line becomes a label, since they sit
-# under her annotations heading.
-_HER_NOTE = re.compile(r"^%% journal (note|her):[^%\n]* %%\n> \[!note\][-+]? (.+?) · ([^\n]+)\n((?:>[^\n]*(?:\n|$))*)", re.M)
-_HIS_IN_MARGIN = re.compile(r"^%% journal his:[^%\n]* %%[ \t]*$", re.M)
+# Her margin notes and her replies in their threads (``margin.py``): the ``[!note]`` callout at the top of a part
+# under her ``note:`` or ``her:`` key line (``entries.margin_parts``). In the margin only a part under a ``his:`` key
+# line is his; it is labelled so, since it sits under her annotations heading, and everything else there is hers.
+_NOTE_CALLOUT = re.compile(r"\A(?:[ \t]*\n)*> \[!note\][-+]? (.+?)(?: · ([^\n]+))?\n((?:>[^\n]*(?:\n|$))*)")
 
 
 def _her_replies_labelled(cfg: Config, text: str, keep: int | None = None) -> str:
@@ -254,13 +256,20 @@ def _her_replies_labelled(cfg: Config, text: str, keep: int | None = None) -> st
     def one(m: re.Match) -> str:
         return labelled(f"chat reply, {m.group(2).strip()}", m.group(3))
 
-    def note(m: re.Match) -> str:
-        what = "margin note" if m.group(1) == "note" else "reply in the margin"
-        return labelled(f"{what}, {m.group(3).strip()}", m.group(4))
+    def margin_part(kind: str | None, line: str, part: str) -> str:
+        if kind == "his":
+            return f"[{them}'s reply in the margin: his words]\n" + line + part
+        out, m = "", _NOTE_CALLOUT.match(part)
+        if m:
+            what = "margin note" if kind == "note" else "reply in the margin"
+            out, part = labelled(f"{what}, {(m.group(2) or m.group(1)).strip()}", m.group(3)), part[m.end():]
+        if part.strip():   # (the margin fails closed: text with no key line of his above it is hers)
+            out += labelled("words in the margin", "\n".join(" " + l for l in part.strip().splitlines()))
+        return out
     span = entries.margin_span(text)
-    if span:   # his replies in the margin are his words: said so, as they sit under her heading
-        inner = _HIS_IN_MARGIN.sub(f"[{them}'s reply in the margin: his words]", text[span[0]:span[1]])
-        text = text[:span[0]] + _HER_NOTE.sub(note, inner) + text[span[1]:]
+    if span:
+        inner = "".join(margin_part(*p) for p in entries.margin_parts(text[span[0]:span[1]]))
+        text = text[:span[0]] + inner + text[span[1]:]
     return entries.ENGINE_MARK.sub("", _REPLY_CONTEXT.sub(r"\1", _HER_REPLY.sub(one, text)))
 
 

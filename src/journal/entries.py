@@ -57,12 +57,19 @@ _ANSWER_KEY = re.compile(r"^%% journal (phase|interrupt):([0-9]+) %%[ \t]*$", re
 WORDS_END_MARK = "%% journal:end-of-words %%"
 _WORDS_END = re.compile(r"^" + re.escape(WORDS_END_MARK) + r"[ \t]*$", re.M)
 _ONLY_HERS_AFTER = re.compile(r"\s*(?:\Z|## [^\n]*['’]s (?:[Aa]nnotations|[Nn]otes)[ \t]*$)", re.M)
-# Every block of his the engine writes into the words section opens with a hidden key line, above its heading (and
-# above a program's ``phase:N`` / ``interrupt:N`` line): ``%% journal block:<id> %%``. The key never changes, so a
-# margin note anchors to it and finds the block again after later appends, a web edit of the words, an edit in a notes
-# app that keeps the line, and the lines other packages put under the heading (DECISIONS.md, MARGIN-FORMAT). A block
-# of his in ``## Conversation`` is keyed already (``his:<message id>``); a block written before keys has none.
+# Every block of his the engine writes into the words section carries a hidden key line, the first line under its
+# heading: ``%% journal block:<id> %%`` (a program's ``phase:N`` / ``interrupt:N`` line stays above the heading, as it
+# always was). Under the heading, so the key travels with its own section when he drags or cuts sections in a notes
+# app. The key never changes, so a margin note anchors to it and finds the block again after later appends, a web
+# edit of the words and an edit in a notes app that keeps the line (DECISIONS.md, MARGIN-FORMAT). A block of his in
+# ``## Conversation`` is keyed already (``his:<message id>``); a block written before keys has none.
 BLOCK_KEY = re.compile(r"^%% journal block:([A-Za-z0-9][A-Za-z0-9-]*) %%[ \t]*$", re.M)
+# The engine's lines right under a block's heading, in this order: the block's own key, then the paragraph times
+# (``%% journal times:… %%``, PARAGRAPH-TIMES, #74). Every reader takes them in either order and either alone
+# (``head_lines_end``, ``block_key_under``); his words start after them.
+_HEAD_LINE = r"%% journal (?:block|times):[^%\n]* %%[ \t]*"
+_HEAD_LINES = re.compile(rf"(?:\n{_HEAD_LINE}(?=\n|\Z))+")
+_HEAD_LINE_RE = re.compile(_HEAD_LINE)
 # The margin: the companion's notes on single blocks of his, each with its thread and its state, a sub-section at the
 # end of her annotations section, after her analysis of the entry (``margin.py`` has a note's own grammar). The hidden
 # line under the heading tells it from a ``### Margin notes`` line in her analysis, which can never carry one
@@ -107,6 +114,21 @@ def block_key_mark(key: str) -> str:
     return f"%% journal block:{key} %%"
 
 
+def head_lines_end(text: str, at: int) -> int:
+    """Where the engine's lines right under a block's heading end (``_HEAD_LINES``): ``at`` is the end of the heading
+    line; returns ``at`` itself when there are none."""
+    m = _HEAD_LINES.match(text, at)
+    return m.end() if m else at
+
+
+def block_key_under(text: str, at: int) -> str | None:
+    """The block's own key among the engine's lines right under the heading line ending at ``at``, else None (a block
+    written before keys)."""
+    m = _HEAD_LINES.match(text, at)
+    k = BLOCK_KEY.search(m.group(0)) if m else None
+    return k.group(1) if k else None
+
+
 def new_block_key(body: str, captured_at: datetime, source: str, text: str) -> str:
     """A key for a new block of his: ``b`` and eight hex digits of a hash of when it was captured, how and what it
     says, so one capture always gets the same key (the goldens stay byte for byte); ``-2``, ``-3`` … when the file
@@ -122,8 +144,11 @@ def new_block_key(body: str, captured_at: datetime, source: str, text: str) -> s
 # The engine's callouts in a conversation: her reply (opened by its ``journal her:`` key line) and the reply
 # context above one of his messages (right after his ``journal his:`` key line); in the margin, her note (opened by
 # its ``journal note:`` line) and her replies in its thread. A callout of his own is his text.
-_CALLOUT = re.compile(r"^%% journal (?:her|note):[^%\n]* %%\n> \[![a-z]+\][-+]? [^\n]*\n(?:>[^\n]*(?:\n|$))*", re.M)
-_REPLY_CONTEXT = re.compile(r"^(%% journal his:[^%\n]* %%\n)> \[!info\][-+]? ↩[^\n]*\n(?:>[^\n]*(?:\n|$))*\n?", re.M)
+# Blank lines between the key line and her callout (a formatter, a hand edit) keep it hers.
+_CALLOUT = re.compile(r"^%% journal (?:her|note):[^%\n]* %%\n(?:[ \t]*\n)*> \[![a-z]+\][-+]? [^\n]*\n(?:>[^\n]*(?:\n|$))*",
+                      re.M)
+_REPLY_CONTEXT = re.compile(r"^(%% journal his:[^%\n]* %%\n)(?:[ \t]*\n)*> \[!info\][-+]? ↩[^\n]*\n(?:>[^\n]*(?:\n|$))*\n?",
+                            re.M)
 
 
 def _practice(kind: str, practice=None):
@@ -426,10 +451,12 @@ def block_heading(at: datetime, source: str, meta: dict | None = None) -> str:
 
 
 def _raw_block(at: datetime, text: str, source: str, audio: str | None = None, meta: dict | None = None,
-               images: Sequence[str] = ()) -> str:
-    """One block of his words: heading, then the kept recording or pictures as Obsidian embeds, then his words."""
+               images: Sequence[str] = (), key: str | None = None) -> str:
+    """One block of his words: heading, its own key line (``key``), then the kept recording or pictures as Obsidian
+    embeds, then his words."""
     embed = f"![[{audio}]]\n\n" if audio else "".join(f"![[{name}]]\n\n" for name in images)
-    return f"{block_heading(at, source, meta)}\n\n{embed}{text.rstrip()}\n\n"
+    mark = block_key_mark(key) + "\n" if key else ""
+    return f"{block_heading(at, source, meta)}\n{mark}\n{embed}{text.rstrip()}\n\n"
 
 
 # The heading of a recording's block as the engine writes it: ``### HH:MM … · audio file …`` (or ``voice
@@ -440,8 +467,8 @@ _RECORDING_HEADING = re.compile(r"(?:### [0-9]{1,2}:[0-9]{2}\b[^\n]*?|\*\*[^*\n]
 
 def _recording_block(body: str, embed: str) -> tuple[int, int, int] | None:
     """Where the engine's block for this recording is: (its heading line's start and end, the embed's start). The
-    embed counts only as a whole line with nothing but blank lines between it and an engine heading of a recording
-    above it: his words can carry the same ``![[…]]`` (an edit from the web app, mid-line or on a line of
+    embed counts only as a whole line with nothing but blank lines (and the engine's lines under a heading:
+    ``_HEAD_LINES``) between it and an engine heading of a recording above it: his words can carry the same ``![[…]]`` (an edit from the web app, mid-line or on a line of
     its own under a text heading), and those are his, never the block to fill."""
     line = re.compile(r"^" + re.escape(embed) + r"[ \t]*$", re.M)
     for span in (words_span(body), conversation_span(body)):
@@ -451,6 +478,11 @@ def _recording_block(body: str, embed: str) -> tuple[int, int, int] | None:
             end = m.start()
             while end > span[0] and body[end - 1] == "\n":
                 end -= 1
+            while True:   # (over the block's own key line, and its times line, right under the heading)
+                line_start = max(body.rfind("\n", span[0], end) + 1, span[0])
+                if line_start <= span[0] or not _HEAD_LINE_RE.fullmatch(body, line_start, end):
+                    break
+                end = line_start - 1
             head_start = max(body.rfind("\n", span[0], end) + 1, span[0])
             if _RECORDING_HEADING.fullmatch(body, head_start, end):
                 return head_start, end, m.start()
@@ -492,10 +524,11 @@ def fill_audio_block(path: Path, audio: str, transcript: str | None, heading: st
 
 def record_reply(root: Path, prompt: dict, text: str, captured_at: datetime, source: str = "text",
                  audio: str | None = None, names: Names = DEFAULT_NAMES, meta: dict | None = None,
-                 practice=None, images: Sequence[str] = ()) -> Path:
+                 practice=None, images: Sequence[str] = (), written: dict | None = None) -> Path:
     """Write or append the user's verbatim words to this prompt's entry file. A new file is titled and carries
     the bank of ``practice`` (the one the prompt was sent for; by default the built-in of the prompt's kind).
-    ``images``: pictures he sent with the words, kept beside the entry (``images.keep``) and embedded above them."""
+    ``images``: pictures he sent with the words, kept beside the entry (``images.keep``) and embedded above them.
+    ``written``, when given, is filled with the new block's key (``block_key``: the capture record keeps it)."""
     path = entry_path(root, prompt["stem"])
     body = path.read_text(encoding="utf-8") if path.exists() else _new_file(prompt, names, practice)
     span = words_span(body)
@@ -513,11 +546,11 @@ def record_reply(root: Path, prompt: dict, text: str, captured_at: datetime, sou
     keyed = bool(prompt.get("program") and (prompt.get("phase") or prompt.get("interrupt")))
     key = (interrupt_mark(prompt["interrupt"]) if prompt.get("interrupt") else phase_mark(prompt["phase"])) + "\n" \
         if keyed else ""
-    # the block's own key first, then the answer key: the line right above the heading stays the phase's, as older
-    # readers expect it (``document._answer_key_before``)
-    key = block_key_mark(new_block_key(body, captured_at, source, text)) + "\n" + key
-    body = body[:s] + "\n" + words + key + _raw_block(captured_at, text, source, audio, meta, images) + body[e:]
+    own = new_block_key(body, captured_at, source, text)   # (under the heading; the answer key stays above it)
+    body = body[:s] + "\n" + words + key + _raw_block(captured_at, text, source, audio, meta, images, own) + body[e:]
     _atomic_write(path, body)
+    if written is not None:
+        written["block_key"] = own
     if keyed:
         add_phase_prompt(path, prompt)
     return path
@@ -536,7 +569,7 @@ def _answer_blocks(body: str, which: str, keep_empty: bool = False) -> dict[int,
     for i, m in enumerate(keys):
         if m.group(1) != which:
             continue
-        # (the next block's own key line sits above its answer key, so it ends this chunk: never words)
+        # (the block's own key line under its heading is the engine's, never words)
         chunk = ENGINE_MARK.sub("", text[m.end():keys[i + 1].start() if i + 1 < len(keys) else len(text)])
         lines = [l for l in chunk.strip("\n").splitlines()]
         if lines and lines[0].startswith("### "):
@@ -586,7 +619,7 @@ def summary_text(body: str) -> str:
 # those. A key line alone counts too (it is never summary text), and so does a conversation key line (``his:`` or
 # ``her:``: old code appends conversation lines below the summary when a conversation sits above it). The summary's
 # own copy is written so that nothing in it has any of these shapes (``_summary_copy``).
-_KEY_LINE = r"%% journal (?:(?:phase|interrupt):[0-9]+|block:[A-Za-z0-9-]+) %%[ \t]*"
+_KEY_LINE = r"%% journal (?:phase|interrupt):[0-9]+ %%[ \t]*"
 _CONV_KEY_LINE = r"%% journal (?:his|her):[^%\n]* %%[ \t]*"
 _TIME_HEADING = r"### [0-9]{1,2}:[0-9]{2}\b[^\n]*"
 _STRAY_START = re.compile(rf"^(?:{_KEY_LINE}|{_CONV_KEY_LINE}|{_TIME_HEADING})$", re.M)
@@ -613,16 +646,8 @@ def _stray_blocks(rest: str) -> tuple[str, list[str], str]:
     if not first:
         return rest[:end], [], rest[end:]
     end = _section_end(rest, first.start())  # the rule that ends his words: a typed "## Today's notes" doesn't
-    cuts = [first.start()] + [m.start() for m in _STRAY_CUT.finditer(rest, first.start() + 1, end)
-                              if not _after_block_key(rest, m.start())] + [end]
+    cuts = [first.start()] + [m.start() for m in _STRAY_CUT.finditer(rest, first.start() + 1, end)] + [end]
     return rest[:cuts[0]], [rest[a:b].strip("\n") for a, b in zip(cuts, cuts[1:])], rest[end:]
-
-
-def _after_block_key(text: str, at: int) -> bool:
-    """Whether the line before ``at`` is a block's own key line (``BLOCK_KEY``): the answer key under it belongs to
-    the same block."""
-    start = text.rfind("\n", 0, max(at - 1, 0)) + 1
-    return at > 0 and bool(BLOCK_KEY.fullmatch(text, start, at - 1))
 
 
 def _place_block(head: str, block: str) -> str:
@@ -631,12 +656,13 @@ def _place_block(head: str, block: str) -> str:
     same key; any other at the end of his words."""
     span = words_span(head)
     at = len(head) if _CONV_BLOCK.match(block) or not span else span[1]
-    key = _ANSWER_KEY.match(block) or _ANSWER_KEY.match(block, block.find("\n") + 1 if BLOCK_KEY.match(block) else 0)
+    key = _ANSWER_KEY.match(block)
     if key and span:
         mine = list(_ANSWER_KEY.finditer(head, span[0], span[1]))
         same = [i for i, m in enumerate(mine) if (m.group(1), m.group(2)) == (key.group(1), key.group(2))]
         if same:
             i = same[-1]
+            # (the next block's own lines start at its answer key: its block key is under its heading)
             at = mine[i + 1].start() if i + 1 < len(mine) else span[1]
     return head[:at].rstrip("\n") + "\n\n" + block + "\n\n" + head[at:].lstrip("\n")
 
@@ -823,12 +849,12 @@ def without_summary(body: str) -> str:
 
 
 def without_companion_replies(body: str) -> str:
-    """The whole entry with the companion's folded conversation replies removed, and her margin notes and her
-    replies in their threads (annotation input, quote checks): her words must never read as the user's."""
-    for span in (margin_span(body), conversation_span(body)):   # (the later one first: offsets stay true)
+    """The whole entry with the companion's folded conversation replies removed, and of the margin only his replies
+    (``his_margin``) (annotation input, quote checks): her words must never read as the user's."""
+    for span, his in ((margin_span(body), his_margin), (conversation_span(body), None)):   # (the later one first)
         if span:
             s, e = span
-            inner = strip_callouts(body[s:e])
+            inner = his(body) if his else strip_callouts(body[s:e])
             body = body[:s] + "\n" + (inner + "\n\n" if inner else "") + body[e:]
     # the engine's hidden key lines (``%% journal phase:2 %%`` in his words, the conversation mark) are not
     # his words either: the annotation model must not see them and the quote checker must not accept them
@@ -885,10 +911,26 @@ def margin(body: str) -> str:
     return body[span[0]:span[1]].strip() if span else ""
 
 
+# The margin's key lines: a note (hers), a reply of his, a reply of hers (``margin.py``).
+_MARGIN_KEY = re.compile(r"^%% journal (note|his|her):[^%\n]* %%[ \t]*$", re.M)
+
+
+def margin_parts(text: str) -> list[tuple[str | None, str, str]]:
+    """The margin's text cut at its key lines, in order: ``(kind, key line, text under it)``, ``kind`` ``note``,
+    ``his`` or ``her``, or None for text above the first key line (its key line "")."""
+    keys = list(_MARGIN_KEY.finditer(text or ""))
+    out = [(None, "", text[:keys[0].start()] if keys else (text or ""))]
+    for i, m in enumerate(keys):
+        out.append((m.group(1), m.group(0), text[m.end():keys[i + 1].start() if i + 1 < len(keys) else len(text)]))
+    return [p for p in out if p[0] or p[2].strip()]
+
+
 def his_margin(body: str) -> str:
-    """His replies in the margin's threads (time markers kept), never her notes or her replies in them: what is not
-    one of her keyed callouts there is his, as in the conversation (``strip_callouts``)."""
-    return strip_callouts(margin(body))
+    """His replies in the margin's threads (time markers kept), and nothing else: in the margin only what sits under
+    a ``his:`` key line is his. Everything else there (her notes, her replies, text with no key line of his above it)
+    is hers: the margin fails closed, as OWN-WORDS does (DECISIONS.md, MARGIN-FORMAT)."""
+    his = [strip_callouts(line + text) for kind, line, text in margin_parts(margin(body)) if kind == "his"]
+    return "\n\n".join(t for t in his if t)
 
 
 def annotations(body: str) -> str:

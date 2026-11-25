@@ -959,8 +959,7 @@ class SummaryRefreshTest(ProgramCase):
         def move(b):
             a, e = self.summary_end(b)
             sec, rest = b[a:e], b[:a] + b[e + 1:]
-            # (between his answers: above the second block's own key line, MARGIN-FORMAT)
-            k = re.search(r"(?m)^(?:%% journal block:\S+ %%\n)?%% journal phase:2 %%", rest).start()
+            k = rest.index("%% journal phase:2 %%")
             return rest[:k] + sec.rstrip("\n") + "\n\nMY NOTE between.\n\n" + rest[k:]
         before = self.hand_edit(move)
         blocks_before = entries.phase_answers(before)

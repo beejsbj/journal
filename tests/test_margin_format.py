@@ -1,12 +1,13 @@
 """MARGIN-FORMAT (issue #31, DECISIONS.md): the entry format margin notes stand on.
 
-* Every block of his the engine writes carries a stable key (``%% journal block:<id> %%`` above its heading, above a
-  program's answer key), which survives appends, a web edit of the words and lines under the heading; deleting the
-  block removes it.
+* Every block of his the engine writes carries a stable key (``%% journal block:<id> %%``, the first line under its
+  heading; a program's answer key stays above the heading), which survives appends, a web edit of the words and the
+  times line under it; deleting the block removes it.
 * A margin note is one record at the end of her annotations section: its key line (id, when, state, anchor), her words
   in a callout, the thread in the conversation's grammar. ``margin.parse`` reads back what ``margin.render`` writes.
 * Her words in the margin are hers and never his: every reader of his words leaves them out (search, the quote
-  check's corpus, packs, reflections, the annotation input, the document, MCP); his replies in a thread are his.
+  check's corpus, packs, reflections, the annotation input, the document, MCP); his replies in a thread are his, and
+  only those under a ``his:`` key line (the margin fails closed).
 * An entry without a margin reads exactly as before, and nothing in the engine writes a note yet.
 """
 import re
@@ -71,7 +72,7 @@ class Case(unittest.TestCase):
 class BlockKeyTest(Case):
     def test_a_block_opens_with_its_key_line(self):
         body = self.body()
-        self.assertRegex(body, r"\n%% journal block:b[0-9a-f]{8} %%\n### 09:12 IST · text\n\nThe sea was loud.")
+        self.assertRegex(body, r"\n### 09:12 IST · text\n%% journal block:b[0-9a-f]{8} %%\n\nThe sea was loud.")
         self.assertNotIn("%% journal", entries.his_words(body))    # the key is the engine's, never his words
 
     def test_one_capture_one_key_and_a_second_block_another(self):
@@ -95,14 +96,20 @@ class BlockKeyTest(Case):
     def test_his_edit_keeps_the_key(self):
         from journal.serve import blocks as web
         new = web.edit(self.body(), "words:0", "The sea was loud, then not.", cfg=self.cfg, stem=self.path.stem)
-        self.assertIn(f"%% journal block:{self.key()} %%\n### 09:12 IST · text\n\nThe sea was loud, then not.", new)
+        self.assertIn(f"### 09:12 IST · text\n%% journal block:{self.key()} %%\n\nThe sea was loud, then not.", new)
         self.assertEqual(document.blocks_of(new, self.path.stem)[0]["anchor"], f"block:{self.key()}")
 
-    def test_a_line_under_the_heading_leaves_the_anchor(self):
-        # (PARAGRAPH-TIMES, #74, puts its hidden line under the heading; the key above it is untouched)
-        body = self.body().replace("### 09:12 IST · text\n", "### 09:12 IST · text\n%% journal times:08:32 08:42 %%\n")
-        (block,) = document.blocks_of(body, self.path.stem)
-        self.assertEqual((block["anchor"], block["text"]), (f"block:{self.key()}", HIS))
+    def test_the_times_line_under_the_key_leaves_the_anchor_and_his_words(self):
+        # (PARAGRAPH-TIMES, #74, puts its hidden line under the heading: after the key, and read in either order)
+        key = f"%% journal block:{self.key()} %%\n"
+        times = "%% journal times:08:32 08:42 %%\n"
+        for body in (self.body().replace(key, key + times), self.body().replace(key, times + key)):
+            (block,) = document.blocks_of(body, self.path.stem)
+            self.assertEqual((block["anchor"], block["text"]), (f"block:{self.key()}", HIS))
+            from journal.serve import blocks as web
+            new = web.edit(body, "words:0", "Only the sea.", cfg=self.cfg, stem=self.path.stem)
+            self.assertIn("### 09:12 IST · text\n" + body.split("### 09:12 IST · text\n")[1].split("\n\n")[0]
+                          + "\n\nOnly the sea.", new)
 
     def test_deleting_the_block_takes_its_key(self):
         entries.record_reply(self.cfg.root, PROMPT, "A gull, late.", AT + timedelta(minutes=5), names=PERSON)
@@ -123,7 +130,7 @@ class BlockKeyTest(Case):
 
 
 class ProgramBlockTest(unittest.TestCase):
-    """A program's answer: the block's key above its ``phase:N`` line, which stays right above the heading."""
+    """A program's answer: its ``phase:N`` line right above the heading, as before; the block's key under it."""
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -139,7 +146,7 @@ class ProgramBlockTest(unittest.TestCase):
         path = entries.record_reply(self.cfg.root, self.prompt, "First answer.", AT, names=PERSON)
         entries.record_reply(self.cfg.root, self.prompt, "Second answer.", AT + timedelta(minutes=3), names=PERSON)
         body = path.read_text(encoding="utf-8")
-        self.assertRegex(body, r"%% journal block:b[0-9a-f]{8} %%\n%% journal phase:1 %%\n### 09:12 IST · text")
+        self.assertRegex(body, r"%% journal phase:1 %%\n### 09:12 IST · text\n%% journal block:b[0-9a-f]{8} %%\n\n")
         self.assertEqual(entries.phase_blocks(body), {1: ["First answer.", "Second answer."]})
         blocks = document.blocks_of(body, path.stem)
         self.assertEqual([(b["phase"], b["text"], bool(b["anchor"])) for b in blocks],
@@ -263,7 +270,7 @@ class HersNeverHisTest(Case):
         text = handlers.render_document(doc)
         she = f"**{PERSON.companion} (companion, not his words)**"
         he = f"**{PERSON.user} (his words)**"
-        self.assertIn(f"## Margin note — {she} · on his block block:{self.key()} · dismissed\n\n> Which part", text)
+        self.assertIn(f"## Margin note — {she} · on his 09:12 block · dismissed\n\n> Which part", text)
         self.assertIn(f"{he} · 09:20\n> {HIS_REPLY}", text)
         self.assertIn(f"{she} · 09:21\n> Late ones sound surprised. {HER_REPLY}", text)
 
@@ -272,6 +279,128 @@ class HersNeverHisTest(Case):
         from journal.serve import blocks as web
         new = web.edit(body, "words:0", "Only the sea.", cfg=self.cfg, stem=self.path.stem)
         self.assertEqual(entries.margin(new), entries.margin(body))
+
+
+class ReviewFixesTest(Case):
+    """The review of #92 and the owner's decisions of 2026-11-25 (D1: the key under the heading; D2: the margin fails
+    closed)."""
+
+    def blank_line_under(self, body: str, kind: str) -> str:
+        """``body`` with a blank line between each of her ``kind`` key lines and its callout (a formatter's)."""
+        return re.sub(rf"(?m)^(%% journal {kind}:[^%\n]* %%)\n(?=> \[!)", r"\1\n\n", body)
+
+    def assert_not_his(self, body: str, *words: str):
+        self.path.write_text(body, encoding="utf-8")
+        for name, text in (("his_words", entries.his_words(body)), ("his_text", entries.his_text(self.path)),
+                           ("annotation input", entries.without_companion_replies(body))):
+            for w in words:
+                with self.subTest(name, word=w):
+                    self.assertNotIn(w, text)
+        for w in words:
+            self.assertFalse(document.matches(self.path, w))
+
+    def test_a_blank_line_under_her_note_key_keeps_her_note_hers(self):
+        body = self.blank_line_under(self.blank_line_under(self.with_margin(), "note"), "her")
+        self.assertIn("state:open on:", body.split("\n\n> [!note]")[0])   # (the blank line is there)
+        self.assert_not_his(body, HER, HER_REPLY)
+        self.assertIn(HIS_REPLY, entries.his_words(body))
+
+    def test_a_blank_line_under_her_conversation_key_keeps_her_reply_hers(self):
+        entries.append_conversation(self.path, f"%% journal his:813 %%\n**23:44** — Later.\n\n%% journal her:814 %%\n"
+                                               f"> [!quote]- {PERSON.companion} · 23:45\n> {HER_REPLY} indeed.\n",
+                                    PERSON)
+        body = self.blank_line_under(self.body(), "her")
+        self.assertIn("%% journal her:814 %%\n\n> [!quote]", body)
+        self.assert_not_his(body, HER_REPLY)
+        self.assertIn("[" + PERSON.companion + "'s chat reply", reflect._entry_text(self.cfg, self.path))
+
+    def test_text_in_the_margin_without_his_key_line_is_hers(self):
+        body = self.with_margin()
+        stray = "UNKEYEDWORDS typed under her note"
+        after_reply = "AFTERHERREPLY typed under her reply"
+        body = body.replace("\n%% journal his:web-1 %%", f"\n{stray}\n\n%% journal his:web-1 %%")
+        body = body.rstrip("\n") + f"\n\n{after_reply}\n"
+        self.assert_not_his(body, "UNKEYEDWORDS", "AFTERHERREPLY", HER, HER_REPLY)
+        self.assertIn(HIS_REPLY, entries.his_words(body))
+        (n,) = document.margin_of(body, self.path.stem)
+        self.assertEqual([b["kind"] for b in n["thread"] if b["kind"] == "his"], ["his"])
+        self.assertTrue(any("UNKEYEDWORDS" in b["text"] and b["kind"] == "hers" for b in n["thread"]))
+        self.assertTrue(any("AFTERHERREPLY" in b["text"] and b["kind"] == "hers" for b in n["thread"]))
+        text = reflect._entry_text(self.cfg, self.path)
+        self.assertRegex(text, rf"\[{PERSON.companion}'s words in the margin: her words, not {PERSON.user}'s\] "
+                               rf"UNKEYEDWORDS")
+        self.assertRegex(text, rf"\[{PERSON.companion}'s words in the margin: her words, not {PERSON.user}'s\] "
+                               rf"AFTERHERREPLY")
+
+    def test_render_refuses_a_field_that_would_not_read_back(self):
+        ok = dict(id="n1", anchor="entry", at=AT.isoformat())
+        for bad in (dict(anchor="block:b1 %% x"), dict(anchor="block:b1\nmore"), dict(id="n 1"), dict(id="n%"),
+                    dict(at="09:12 %%"), dict(at="a b"), dict(at="x\ny"), dict(extra={"mode": "li%ve"}),
+                    dict(extra={"on": "x"}), dict(state="resolved", closed="a\nb")):
+            with self.subTest(bad):
+                with self.assertRaises(ValueError):
+                    margin.render(margin.Note(**{**ok, **bad}), PERSON.companion, "09:12")
+        for who, at_label in (("Ada\nAda", "09:12"), (PERSON.companion, "09:12 %%")):
+            with self.assertRaises(ValueError):
+                margin.render(margin.Note(**ok), who, at_label)
+
+    def test_a_note_on_a_deleted_block_is_on_the_entry(self):
+        body = self.with_margin()
+        from journal.serve import blocks as web
+        self.path.write_text(web.remove(body, "words:0", stem=self.path.stem), encoding="utf-8")
+        (n,) = document.document(self.cfg, self.path)["analysis"]["margin"]
+        self.assertEqual(n["anchor"], "entry")
+
+    def test_a_copied_block_key_names_the_first_block(self):
+        body = self.body()
+        key = self.key()
+        body = body.replace("The sea was loud.\n\nThen it went quiet.\n",
+                            f"The sea was loud.\n\nThen it went quiet.\n\n### 09:30 IST · text\n"
+                            f"%% journal block:{key} %%\n\nA copy.\n")
+        blocks = document.blocks_of(body, self.path.stem)
+        self.assertEqual([b["anchor"] for b in blocks], [f"block:{key}", None])
+
+    def test_the_capture_record_keeps_the_block_key(self):
+        from journal import capture
+        prompt = {"id": "2026-11-25-j", "stem": "2026-11-25-j", "kind": "j", "local_date": "2026-11-25"}
+        capture.record(self.cfg, prompt, "web", "A line.", AT, data={"prompts": [prompt]})
+        (c,) = prompt["captures"]
+        body = Path(prompt["entry_path"]).read_text(encoding="utf-8")
+        self.assertEqual(entries.BLOCK_KEY.findall(body), [c["block_key"]])
+
+    def test_a_recording_is_filled_under_its_key_line(self):
+        path = entries.record_reply(self.cfg.root, PROMPT, "", AT + timedelta(minutes=9), source="audio",
+                                    audio="rec.ogg", names=PERSON)
+        self.assertTrue(entries.fill_audio_block(path, "rec.ogg", "the transcript"))
+        self.assertRegex(path.read_text(encoding="utf-8"),
+                         r"### 09:21 IST · audio file[^\n]*\n%% journal block:b[0-9a-f]{8} %%\n\n!\[\[rec\.ogg\]\]"
+                         r"\n\nthe transcript")
+
+
+class StrayBlockTest(ProgramBlockTest):
+    """M3: a stray block found under the summary (old code appended it there) goes back after the last block of its
+    phase, before the next block's own lines; every block keeps its own key."""
+
+    def test_a_stray_phase_one_block_goes_between_the_phases_and_each_keeps_its_key(self):
+        path = entries.record_reply(self.cfg.root, self.prompt, "First answer.", AT, names=PERSON)
+        entries.record_reply(self.cfg.root, {**self.prompt, "phase": 2, "phase_text": "And now?"}, "Second answer.",
+                             AT + timedelta(minutes=3), names=PERSON)
+        entries.write_summary(path, "The summary.", PERSON)
+        before = {b["text"]: b["anchor"] for b in document.blocks_of(path.read_text(encoding="utf-8"), path.stem)}
+        body = path.read_text(encoding="utf-8")
+        stray = "%% journal phase:1 %%\n### 09:40 IST · text\n%% journal block:b0000aaaa %%\n\nLate answer.\n"
+        span = entries.annotations_span(body)
+        head = body[:span[0]]
+        cut = head.rstrip("\n").rfind("\n## ")   # (the annotations heading line starts there)
+        body = body[:cut + 1].rstrip("\n") + "\n\n" + stray + "\n" + body[cut + 1:]
+        path.write_text(body, encoding="utf-8")
+        entries.write_summary(path, "The summary, again.", PERSON)
+        body = path.read_text(encoding="utf-8")
+        self.assertEqual(entries.phase_blocks(body), {1: ["First answer.", "Late answer."], 2: ["Second answer."]})
+        got = [(b["phase"], b["text"], b["anchor"]) for b in document.blocks_of(body, path.stem)]
+        self.assertEqual(got, [(1, "First answer.", before["First answer."]), (1, "Late answer.", "block:b0000aaaa"),
+                               (2, "Second answer.", before["Second answer."])])
+        self.assertEqual(entries.summary_text(body), "The summary, again.")
 
 
 if __name__ == "__main__":

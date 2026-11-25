@@ -133,6 +133,14 @@ def make_cfg(tmp: Path, names: Names = PERSON, **kw) -> Config:
     return cfg
 
 
+def unkeyed(text: str) -> str:
+    """An entry's text without the blocks' own key lines (``%% journal block:<id> %%``, the first line under each
+    heading of his words, MARGIN-FORMAT): for the tests that pin a block's heading and words as one run of text, from
+    before the key; ``test_margin_format`` pins the key itself."""
+    import re
+    return re.sub(r"(?m)^%% journal block:[A-Za-z0-9-]+ %%[ \t]*\n", "", text)
+
+
 def add_prompt(cfg, kind="morning", local_date="2026-10-14", sent=None, message_id="100"):
     sent = sent or datetime(2026, 10, 14, 0, 30, tzinfo=timezone.utc)
     p = {"id": ledger.prompt_id(kind, local_date), "kind": kind, "local_date": local_date,

@@ -18,17 +18,16 @@ A note as the file holds it::
 
 * **The key line** is the engine's: the note's id, when it was written, its state (``open``, ``resolved``,
   ``dismissed``; ``closed:`` says when it stopped being open) and, last, what it is on: a block of his words
-  (``block:<id>``, the key above the block's heading), a message of his in the conversation (``his:<id>``), or the
-  entry as a whole (``entry``). A field this module does not know is kept and ignored, so a later field reads here.
+  (``block:<id>``, the key line under the block's heading), a message of his in the conversation (``his:<id>``),
+  or the entry as a whole (``entry``). A field this module does not know is kept and ignored, so a later field reads here.
 * **Her note** is the callout under it, every line ``> ``, as her replies in the conversation are: open notes stand
   open (``[!note]``), a resolved or dismissed one is folded (``[!note]-``) and says so at the end of its title.
-* **The thread** follows, in the conversation's own grammar: a message of his under ``%% journal his:<id> %%`` (and
-  anything else not in one of her keyed callouts: what he types under a note in his notes app is his), her reply in
-  a callout under ``%% journal her:<id> %%``. It runs to the next note's key line or the end of the margin.
+* **The thread** follows, in the conversation's own grammar: a message of his under ``%% journal his:<id> %%``, her
+  reply in a callout under ``%% journal her:<id> %%``. It runs to the next note's key line or the end of the margin.
 
-Her words in a note or a thread are hers and never his: every reader of his words leaves out what follows a
-``note:`` or ``her:`` key line in a callout (``entries.strip_callouts``). This module reads no chat, no model and no
-state: the faces read it through ``document``.
+The margin fails closed: only what sits under a ``his:`` key line is his (``entries.his_margin``); her notes, her
+replies and any text with no key line of his above it (what he types under a note by hand, too) read as hers.
+This module reads no chat, no model and no state: the faces read it through ``document``.
 """
 from __future__ import annotations
 
@@ -69,20 +68,42 @@ def key_line(note: Note) -> str:
     return f"%% journal {' '.join(fields)} %%"
 
 
+_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]*")
+_FIELD = re.compile(r"[^\s%]+")   # a key-line field's name or value: one token, never ``%`` (it would end the line)
+
+
 def render(note: Note, who: str, at_label: str, on_label: str | None = None) -> str:
     """The note as the file holds it: its key line, then her words in a callout titled ``<who> · <at_label>``, with
     `` · on <on_label>`` (the time of the block it answers) and, once it is not open, its state. Her words go in as
-    ``entries`` writes all of hers: model headings demoted, no engine line."""
+    ``entries`` writes all of hers: model headings demoted, no engine line. Raises ValueError for a field that would
+    not read back: ``%`` or a line break in any field of the key line or the title, an id or a field that is not one
+    token; and checks the result reads back as the same note, her words hers (``entries._CALLOUT``)."""
     if note.state not in STATES:
         raise ValueError(f"not a state of a margin note: {note.state!r}")
-    if not re.fullmatch(r"(?:block|his):\S.*|entry", note.anchor):
+    if not re.fullmatch(r"(?:block|his):[^\s%][^%\n\r]*|entry", note.anchor):
         raise ValueError(f"not an anchor: {note.anchor!r}")
+    if not _ID.fullmatch(note.id):
+        raise ValueError(f"not a note id: {note.id!r}")
+    fields = {"at": note.at, **({"closed": note.closed} if note.closed else {}), **note.extra}
+    for name, value in fields.items():
+        if not (_FIELD.fullmatch(str(name)) and _FIELD.fullmatch(str(value)) and ":" not in str(name)
+                and name not in ("note", "state", "on")):
+            raise ValueError(f"not a field of a margin note's key line: {name!r}: {value!r}")
+    for part in (who, at_label, on_label or ""):
+        if "%" in part or "\n" in part or "\r" in part:
+            raise ValueError(f"not a callout title part: {part!r}")
     title = " · ".join(x for x in (who, at_label, f"on {on_label}" if on_label else "",
                                   note.state if note.state != "open" else "") if x)
     fold = "" if note.state == "open" else "-"
     lines = [key_line(note), f"> [!note]{fold} {title}"]
     lines += [f"> {l}" if l.strip() else ">" for l in entries._hers(note.text).splitlines()]
-    return "\n".join(lines) + "\n"
+    out = "\n".join(lines) + "\n"
+    back = parse(out)
+    if (len(back) != 1 or (back[0].id, back[0].anchor) != (note.id, note.anchor)
+            or back[0].text != "\n".join(l if l.strip() else "" for l in entries._hers(note.text).splitlines()).strip("\n").rstrip()
+            or not entries._CALLOUT.match(out)):
+        raise ValueError(f"margin note {note.id!r} would not read back as written")
+    return out
 
 
 def new_id(body: str, at: datetime, anchor: str, text: str) -> str:

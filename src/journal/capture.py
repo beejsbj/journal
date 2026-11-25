@@ -170,7 +170,8 @@ def record(cfg: Config, prompt: dict, rule: str, text: str, now: datetime,
     # the practice titles a new entry and gives it its bank; for_prompt never raises, so a broken definition can
     # cost the bank in the file, never the capture
     practice = None if prompt["kind"] in entries.FREEFORM_IDS else library.for_prompt(cfg, prompt)
-    path = write_words(cfg, prompt, text, local_now, source, audio, meta, practice, images or ())
+    written: dict = {}
+    path = write_words(cfg, prompt, text, local_now, source, audio, meta, practice, images or (), written)
     prompt.setdefault("captures", []).append({
         "at": now.isoformat(),
         "rule": rule,
@@ -183,6 +184,8 @@ def record(cfg: Config, prompt: dict, rule: str, text: str, now: datetime,
         **({"via": via} if via else {}),
         **({"client_id": client_id} if client_id else {}),
         **({"transcript": transcript} if transcript else {}),
+        # the block's own key (MARGIN-FORMAT): what a later step maps this message to, for a note on its block
+        **({"block_key": written["block_key"]} if written.get("block_key") else {}),
     })
     prompt["entry_path"] = str(path)
     prompt["needs_edit"] = True
@@ -190,12 +193,15 @@ def record(cfg: Config, prompt: dict, rule: str, text: str, now: datetime,
 
 
 def write_words(cfg: Config, prompt: dict, text: str, at: datetime, source: str, audio: str | None = None,
-                meta: dict | None = None, practice=None, images: Sequence[str] = ()) -> Path:
+                meta: dict | None = None, practice=None, images: Sequence[str] = (),
+                written: dict | None = None) -> Path:
     """The one caller of ``entries.record_reply``, the function that writes his words into an entry
     (``test_off_record_floor`` holds that): ``refuse_off_record`` first, so the floor holds for ``record`` and for
-    ``add_web_block``'s block into an entry with no ledger prompt alike. ``at`` is local time."""
+    ``add_web_block``'s block into an entry with no ledger prompt alike. ``at`` is local time; ``written`` is filled
+    with the new block's key (``entries.record_reply``)."""
     refuse_off_record(cfg, text)
-    return entries.record_reply(cfg.root, prompt, text, at, source, audio, cfg.names, meta, practice, images)
+    return entries.record_reply(cfg.root, prompt, text, at, source, audio, cfg.names, meta, practice, images,
+                                written)
 
 
 def write_meta(cfg: Config, path: Path, changes: dict[str, str | None]) -> None:
