@@ -175,3 +175,47 @@ class PromptTest(ConversionCase):
         p = ledger.find(ledger.snapshot(self.cfg.ledger_path), "2026-10-14-evening")
         self.assertEqual((p["send_attempts"], p["send_error"]), (1, "Bad Gateway"))
         self.assertEqual(log[0], "2026-10-14-evening: send failed (can't parse entities); retrying with the plain opener")
+
+
+class AnnotationReplyTest(ConversionCase):
+    def annotated(self):
+        """A prompt answered an hour ago, its annotations written (the annotate step, with a model stand-in)."""
+        from datetime import datetime, timedelta, timezone
+        from helpers import add_prompt
+        from journal import agent, capture, tick
+        self.cfg.annotate_after_minutes = 0
+        sent = datetime.now(timezone.utc) - timedelta(hours=1)
+        add_prompt(self.cfg, sent=sent)
+        capture.capture(self.cfg, self.cfg.chat_id, "100", "slept badly, clear head", sent + timedelta(minutes=5),
+                        "text", "4242")
+        with mock.patch.object(agent, "ask", lambda *a, **k: "- He slept badly but felt clear."), \
+                mock.patch("journal.context.companion_reply_after", lambda *a, **k: None):
+            tick.annotate(self.cfg, datetime.now(timezone.utc), [])
+        return datetime.now(timezone.utc)
+
+    def test_an_annotation_reply_is_one_delivery(self):
+        from journal import ledger
+        from journal.chat import replies
+        now, spy, log = self.annotated(), self.spy(replies), []
+        replies.reply_annotations(self.cfg, now, log)
+        self.assertEqual(len(spy.calls), 1)
+        self.assertEqual(len(self.chat.sends), 1)
+        chat_id, html, kw = self.chat.sends[0]
+        self.assertEqual((chat_id, kw), (self.cfg.chat_id, {"reply_to": "4242"}))
+        self.assertIn("He slept badly but felt clear.", html)
+        self.assertEqual(self.events, ["send", "mirror"])
+        self.assertEqual(self.told[0][2], ("prompts", "2026-10-14-morning", "annotation_reply"))
+        self.assertEqual(log, ["replied to 2026-10-14-morning with its annotations"])
+        r = ledger.find(ledger.snapshot(self.cfg.ledger_path), "2026-10-14-morning")["annotation_reply"]
+        self.assertEqual((r["message_id"], r["reply_to"]), ("701", "4242"))
+
+    def test_a_failed_reply_counts_an_attempt_and_tells_nothing(self):
+        from journal import ledger
+        from journal.chat import replies
+        now, log = self.annotated(), []
+        self.chat.fail = [ValueError("chat id")]  # (a ValueError is a reply's own failure too, as before)
+        replies.reply_annotations(self.cfg, now, log)
+        self.assertEqual(self.told, [])
+        self.assertEqual(log, ["2026-10-14-morning: annotation reply failed (chat id)"])
+        r = ledger.find(ledger.snapshot(self.cfg.ledger_path), "2026-10-14-morning")["annotation_reply"]
+        self.assertEqual((r["attempts"], r["error"]), (1, "chat id"))
