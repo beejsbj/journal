@@ -4595,3 +4595,5 @@ to it (not this host's setup: the gateway runs as a service).
   `src` and this profile, and requires `<SRC>/journal/cli.py` to exist; the asking install's own path no longer
   matters. Not decided: whether doctor should also warn when the stub's `src` is a different *version* than the
   running CLI; the `same version as tick` row already does that.
+  Accepted trade: a stub whose `SRC` still exists with `journal/cli.py` reads ok even if it is no longer the install
+  the profile uses; version skew between the two is covered by the `same version as tick` row, not by this one.
