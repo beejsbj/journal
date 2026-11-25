@@ -453,7 +453,8 @@ def doctor(cfg: Config, deep: bool = False, token: bool = True, web: bool = Fals
         except Exception:  # noqa: BLE001 - the library row says why
             ends = None
         fall = f"fallback {when} the next day" if which == "day" else f"fallback {when} the day after the week"
-        timing = (f"after the {ends.id} entry is annotated, {fall}" if ends else
+        over = "once the day has ended, " if which == "day" else "once its last day has ended, "
+        timing = (f"{over}after the {ends.id} entry is annotated, {fall}" if ends else
                   f"no practice says closes: {which}, so only at the {fall}")
         rows.append((f"{which} {'reflection' if which == 'day' else 'review'}", "ok" if agent_on else "warn",
                      timing if agent_on else "on, but model steps are disabled: none will be written"))

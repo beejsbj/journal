@@ -198,6 +198,14 @@ def by_message_id(data: dict, chat_id: str, message_id: str, platform: str | Non
     )
 
 
+def analysis_by_message_id(data: dict, message_id: str | None) -> dict | None:
+    """The day reflection or week review sent to the chat as ``message_id`` (``reflections``, its send), or None."""
+    if not message_id:
+        return None
+    return next((r for r in data.get("reflections") or [] if isinstance(r, dict)
+                 and str(send_of(r).get("message_id") or "") == str(message_id)), None)
+
+
 def answers(prompt: dict | None) -> list[dict]:
     """His answers to a prompt: its captures without the conversation's. A recording or a picture he sent in the chat
     after it is filed on the prompt of the entry it landed in (``rule: conversation``) only so the tick transcribes

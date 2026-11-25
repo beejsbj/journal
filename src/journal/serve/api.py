@@ -130,8 +130,7 @@ def _int(req: Request, name: str, default: int, lo: int, hi: int) -> int:
 
 
 def _range(req: Request, default_days: int) -> tuple[date, date]:
-    today_local = req.now.astimezone(req.cfg.tz).date()
-    to = _date(req, "to", today_local)
+    to = _date(req, "to", slots.journal_day(req.cfg, req.now))  # (by default up to the journal day, as Today)
     start = _date(req, "from", to - timedelta(days=default_days - 1))
     if start > to:
         raise HTTPError(400, "bad-request", "from is after to")
@@ -197,8 +196,8 @@ def week_strip(cfg: Config, now: datetime, days_: int = 7) -> list[dict]:
     """The Today view's week strip: the last ``days_`` local days, oldest first, each with how many prompts were
     answered and missed (from the ledger, which keeps recent weeks only) and one ``state``: ``answered`` (all of the
     day's prompts, none waiting), ``partial`` (some answered, some missed or still waiting), ``missed`` (none answered)
-    or ``none`` (nothing sent, or only open prompts)."""
-    end = now.astimezone(cfg.tz).date()
+    or ``none`` (nothing sent, or only open prompts). It ends on the journal day, as Today does."""
+    end = slots.journal_day(cfg, now)
     found = _outcomes(cfg, now, end - timedelta(days=days_ - 1), end)
     out = []
     for back in range(days_ - 1, -1, -1):

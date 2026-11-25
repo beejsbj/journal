@@ -22,7 +22,7 @@ from pathlib import Path
 
 from . import audio as jaudio
 from . import channel, entries, ledger, library
-from .config import Config
+from .config import Config, journal_day
 
 
 def _aware(ts: str) -> datetime:
@@ -99,6 +99,11 @@ def match(data: dict, cfg: Config, chat_id: str, reply_to: str | None, now: date
         p = ledger.by_message_id(data, chat_id, reply_to, cfg.platform)
         if p:
             return p, "direct-reply"
+        if ledger.analysis_by_message_id(data, reply_to):
+            # a reply to her day reflection or week review answers no prompt, even one open now (the reflection
+            # lands at the end of the journal day, before the morning prompt): the conversation writer files it as a
+            # reply to that analysis (``conversations.analysis_answered``)
+            return None, ""
     # (an open program phase keeps taking his typed messages beneath an interrupt: it is open on purpose and takes
     # every message, which an interrupt, answered only by replying to it, does not change; a prompt sent in another
     # chat, before the channel moved, takes nothing typed here)
@@ -447,8 +452,9 @@ def strip_command(text: str) -> str | None:
 
 
 def new_note_prompt(data: dict, cfg: Config, now: datetime) -> dict:
-    """A fresh record for one /j note: each note is its own entry file (…-j.md, …-j-2.md)."""
-    local_date = now.astimezone(cfg.tz).date().isoformat()
+    """A fresh record for one /j note: each note is its own entry file (…-j.md, …-j-2.md), dated by the journal day
+    (``config.journal_day``: a note put down at 00:30 is last night's, as a prompt answered then is; issue #82)."""
+    local_date = journal_day(cfg, now).isoformat()
     taken = {p.get("stem") for p in data["prompts"]}
     n, stem = 1, entries.stem_for(local_date, "j")
     while stem in taken or entries.entry_path(cfg.root, stem).exists():
@@ -603,7 +609,8 @@ def add_companion_note(cfg: Config, text: str, now: datetime, local_date: str | 
     if not text or not text.strip():
         raise ValueError("note text is empty")
     local_now = now.astimezone(cfg.tz)
-    local_date = local_date or local_now.date().isoformat()
+    # (no date given: the journal day, as his notes are filed: her note at 00:30 joins last night's, issue #82)
+    local_date = local_date or journal_day(cfg, now).isoformat()
     datetime.strptime(local_date, "%Y-%m-%d")  # validate
     kind = kind.strip().lower() if kind else None
     ids = tuple(dict.fromkeys((*(known_ids() if known_ids else entries.known_ids()), *entries.FREEFORM_IDS)))

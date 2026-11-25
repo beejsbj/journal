@@ -283,10 +283,10 @@ class AnnotationAndReflectionMirrorTest(ReflectBase):
         sent = self.day()
         self.answer_prompt("evening", "2026-10-14", "rain all day, walked anyway. the soup was good. "
                                                     "the bus can wait", sent + timedelta(minutes=9), "11")
-        self.reflect(datetime(2026, 10, 15, 0, 30, tzinfo=IST))
+        self.reflect(datetime(2026, 10, 15, 4, 30, tzinfo=IST))
         call = self.rec.calls[-1]
         head, body = call["text"].split("\n", 1)
-        self.assertEqual(head, "[Journal: Iris's reflection — Wed 14 Oct 2026, sent at 00:30 IST]")
+        self.assertEqual(head, "[Journal: Iris's reflection — Wed 14 Oct 2026, sent at 04:30 IST]")
         self.assertIn("**What stood out**", body)
         self.assertNotIn("FOLLOW-UP", body)
         self.assertIs(self.rec_of()["telegram"]["mirrored"], True)
