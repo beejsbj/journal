@@ -106,9 +106,6 @@ class DeliverTest(unittest.TestCase):
         self.assertEqual(self.events, ["send"])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class Spy:
     """Wraps ``deliver`` where a sender calls it, recording each call, and lets the real one run."""
@@ -219,3 +216,63 @@ class AnnotationReplyTest(ConversionCase):
         self.assertEqual(log, ["2026-10-14-morning: annotation reply failed (chat id)"])
         r = ledger.find(ledger.snapshot(self.cfg.ledger_path), "2026-10-14-morning")["annotation_reply"]
         self.assertEqual((r["attempts"], r["error"]), (1, "chat id"))
+
+
+class ReflectionTest(ConversionCase):
+    def owed(self, trigger="schedule"):
+        """A day reflection written last night and not sent yet."""
+        from datetime import datetime, timezone
+        from journal import ledger
+        self.now = datetime(2026, 10, 14, 1, 0, tzinfo=timezone.utc)  # 06:30 in the helpers' zone, the morning after
+        path = Path(self.tmp.name) / "reflection.md"
+        path.write_text("A quiet day, mostly writing.\n", encoding="utf-8")
+        with ledger.locked(self.cfg.ledger_path) as data:
+            data.setdefault("reflections", []).append(
+                {"id": "reflection-2026-10-13", "kind": "reflection", "local_date": "2026-10-13", "path": str(path),
+                 "written_at": self.now.isoformat(), "trigger": trigger})
+
+    def test_a_reflection_is_one_delivery(self):
+        from journal import ledger, reflect
+        self.owed(trigger="fallback")
+        spy, log = self.spy(reflect), []
+        self.assertEqual(reflect.send(self.cfg, self.now, log), [])
+        self.assertEqual(len(spy.calls), 1)
+        self.assertEqual(len(self.chat.sends), 1)
+        self.assertEqual(self.chat.sends[0][2], {"silent": True})  # the overnight fallback goes silently, as before
+        self.assertIn("A quiet day, mostly writing.", self.chat.sends[0][1])
+        self.assertEqual(self.events, ["send", "mirror"])
+        self.assertEqual(self.told[0][1:], ("A quiet day, mostly writing.",
+                                            ("reflections", "reflection-2026-10-13", ledger.SEND_KEY)))
+        self.assertEqual(log, ["sent reflection-2026-10-13 to Telegram"])
+        sent = ledger.send_of(ledger.snapshot(self.cfg.ledger_path)["reflections"][0])
+        self.assertEqual((sent["message_id"], sent["silent"]), ("701", True))
+
+    def test_a_failed_reflection_counts_and_alerts_on_the_last_attempt(self):
+        from journal import ledger, reflect
+        self.owed()
+        for n in range(reflect.SEND_ATTEMPTS):
+            self.chat.fail = [ChannelError("Bad Gateway")]
+            log = []
+            alerts = reflect.send(self.cfg, self.now, log)
+            self.assertEqual(log, ["reflection-2026-10-13: Telegram send failed (Bad Gateway)"])
+        self.assertEqual(alerts, [f"reflection-2026-10-13 could not be sent to Telegram after "
+                                  f"{reflect.SEND_ATTEMPTS} attempts: Bad Gateway"])
+        self.assertEqual(self.chat.sends[0][2], {"silent": False})
+        self.assertEqual(self.told, [])
+        sent = ledger.send_of(ledger.snapshot(self.cfg.ledger_path)["reflections"][0])
+        self.assertEqual(sent["attempts"], reflect.SEND_ATTEMPTS)
+
+    def test_a_reflection_whose_file_is_gone_is_counted_without_a_send(self):
+        from journal import ledger, reflect
+        self.owed()
+        Path(self.tmp.name, "reflection.md").unlink()
+        spy, log = self.spy(reflect), []
+        reflect.send(self.cfg, self.now, log)
+        self.assertEqual((spy.calls, self.chat.sends, self.told), ([], [], []))
+        self.assertEqual(log, ["reflection-2026-10-13: Telegram send failed (the file is gone)"])
+        sent = ledger.send_of(ledger.snapshot(self.cfg.ledger_path)["reflections"][0])
+        self.assertEqual((sent["attempts"], sent["error"]), (1, "the file is gone"))
+
+
+if __name__ == "__main__":
+    unittest.main()
