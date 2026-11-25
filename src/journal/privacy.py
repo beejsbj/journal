@@ -19,7 +19,9 @@ For each row the pass decides whether it is private:
   ``[start, end)``: a message exactly at the end is public. A bare ``/x`` inside an open window keeps it; ``/j``
   is never private (an explicit note). A cron delivery does not end a window. A message queued while she was
   busy is stored after rows with later times and carries the time he sent it: that time is activity of the
-  window, and the row is private when it falls inside a window, the open one or one already closed.
+  window, and the row is private when it falls inside a window, the open one or one already closed. A bare ``/x``
+  stored as a row opens its window at its own time (known before the walk, as the hook's are) and again where the
+  walk reaches it, so a message he sent after it is inside the window whichever of the two was stored first.
 * **A tainted turn**: once a private row of his is taken in (a message, or a captionless photo inside a window),
   her rows are private until his next message after her turn ended (a text reply, a failed turn, an
   interruption): a public message steered into the same turn does not clear it, since her answer covers both.
@@ -44,6 +46,10 @@ view already began that far back. Only the hook's end state (the last ``RECOMPUT
 ``view`` itself; the sweep, the writer and the others ask ``covering``. A compaction copy of a row (the transcript
 finds it in the same session, with a new time, or in a rotation's child session: ``Row.copy``) is private when its
 original is; a copy of her reply with no original private is still private inside an open window or tainted turn.
+A view that holds a copy whose original it did not read, and that no saved answer names private, answers that
+original by a pass over a slice around it, from ``RECOMPUTE`` before it to ``RECOMPUTE`` after (saved answers age out,
+and are a floor, never proof that a row is public): ``_originals``. What a slice finds private is added to the view,
+never taken from it, and the cost is the slices', never a read back to the oldest original.
 
 The pass reads the chat as ``ports.Row``s from ``cfg.transcript()``; what a row is (his words, a notice, a frame,
 the end of her turn) the transcript decided, what is private is decided here and only here.
@@ -146,6 +152,7 @@ class View:
     closed: bool = False                           # the pass couldn't run: everything is private
     start: datetime | None = None                  # rows from here were recomputed; older ones: saved results only
     copies: dict = field(default_factory=dict)     # a compaction copy's row id → its original's
+    retake: dict | None = None                     # originals answered from older slices (#4): counts, for the log
 
     def row(self, row_id) -> bool:
         return self.closed or int(row_id) in self.private
@@ -190,7 +197,9 @@ def compute(cfg: Config, rows: list[Row], hook_starts: list[datetime], sends: li
     inside an off-the-record window or turn)."""
     from . import conversations
     v = View(quiet=conversations.quiet(cfg), sends=sorted(sends))
-    pending = sorted(hook_starts)
+    # a bare /x stored as a row opens its window at its own time too: one queued behind a message he sent after it
+    # is stored later, and that message is his private words (#5); the walk still opens one at the stored-order clock
+    pending = sorted([*hook_starts, *_busy_starts(cfg, rows)])
     seen = None  # the latest time handled: a queued row can carry an older one
     late = _late(rows)  # the own times of his queued rows, stored after rows with later times
 
@@ -287,7 +296,7 @@ def compute(cfg: Config, rows: list[Row], hook_starts: list[datetime], sends: li
         rest = capture.opt_out(cfg, said) if said is not None else None
         explicit = said is not None and capture.strip_command(said) is not None  # /j: never private
         if rest is not None and not rest.strip() and row.kind == "his":
-            start(now_t)  # a bare /x that came in on the busy path
+            start(now_t)  # a bare /x that came in on the busy path (its own time is in ``pending``: _busy_starts)
             hidden = True
         else:
             # in a window by its own time: a queued message he sent before the /x stays public, and one he sent
@@ -305,6 +314,20 @@ def compute(cfg: Config, rows: list[Row], hook_starts: list[datetime], sends: li
     if v.window:
         v.windows.append((v.window["since"], None))
     return v
+
+
+def _busy_bare(cfg: Config, row: Row) -> bool:
+    """A bare /x that came in on the busy path: a stored row of his words that is the opt-out command alone."""
+    if row.copy or row.role == "assistant" or row.kind != "his" or row.meta.get("notice"):
+        return False
+    rest = capture.opt_out(cfg, row.text)
+    return rest is not None and not rest.strip()
+
+
+def _busy_starts(cfg: Config, rows: list[Row]) -> list[datetime]:
+    """The own times of the bare /x rows (``_busy_bare``): a start known before the walk, as the hook's are, so a
+    message he sent after the /x is inside its window whatever order the two were stored in."""
+    return [row.at for row in rows if _busy_bare(cfg, row)]
 
 
 def _late(rows: list[Row]) -> list[datetime]:
@@ -363,11 +386,21 @@ def view(cfg: Config, now: datetime | None = None, since: datetime | None = None
         if hit and time.time() - hit[0] < CACHE_SECONDS:
             return hit[1]
         starts, off_ids = _inputs(cfg, state)
-        found = chat.rows(since=start) if chat.source is not None and chat.available() else []
-        v = compute(cfg, found, [h for h in starts if h >= start], send_times(cfg), off_ids)
-        read = {r.id: r.at for r in found}
+        sends = send_times(cfg)
+        saved = {}
         for rid, t in (frozen.get("private") or {}).items():
-            rid, t = int(rid), datetime.fromisoformat(t)
+            saved[int(rid)] = datetime.fromisoformat(t)
+        readable = chat.source is not None and chat.available()
+        found = chat.rows(since=start) if readable else []
+        v = compute(cfg, found, [h for h in starts if h >= start], sends, off_ids)
+        read = {r.id: r.at for r in found}
+        # a compaction copy whose original this view did not read (it is older than ``start``) is answered by the
+        # original, and a saved answer is only a floor that ages out (#4): answer those originals from a slice each
+        missing = sorted({o for o in v.copies.values() if o not in read and o not in saved})
+        uncertain: set[int] = set()
+        if missing:
+            v.retake = _originals(cfg, chat, missing, start, starts, sends, off_ids, frozen, v.private, uncertain)
+        for rid, t in saved.items():
             if rid in read and read[rid] != t:
                 continue  # another row under this id (a replaced database): the saved answer was not about it
             v.private.setdefault(rid, t)
@@ -378,6 +411,8 @@ def view(cfg: Config, now: datetime | None = None, since: datetime | None = None
         for c, o in v.copies.items():  # (an original private by a saved result only)
             if o in v.private:
                 v.private.setdefault(c, read.get(c, v.private[o]))
+            elif o in uncertain:  # a window begun before its slice may cover it: the copy, never the original
+                v.private.setdefault(c, read[c])
         v.start = start
         for old, (at, _v) in list(_CACHE.items()):  # (a copy: the gateway asks from several threads)
             if time.time() - at >= CACHE_SECONDS:
@@ -386,6 +421,69 @@ def view(cfg: Config, now: datetime | None = None, since: datetime | None = None
         return v
     except Exception as e:  # noqa: BLE001 - privacy fails closed
         return Closed(f"{type(e).__name__}: {e}"[:200])
+
+
+SAME_LOOKUP = 64  # two originals this few ids apart are looked up in one read (a compaction carries a run of rows)
+
+
+def _originals(cfg: Config, chat, missing: list[int], start: datetime, starts: list[datetime],
+               sends: list[datetime], off_ids: set[str], frozen: dict, into: dict, uncertain: set) -> dict:
+    """Answer the originals of compaction copies the view did not read (#4), adding every private row found to
+    ``into`` (a re-take only adds). Each original's time comes from a read of its id (originals a few ids apart
+    share one read); then the pass runs over a slice from ``RECOMPUTE`` before it (a window or turn begun in
+    those hours) to ``RECOMPUTE`` after it (a row he sent before it but queued is stored after it: ``_late``,
+    ``_busy_starts``), originals whose slices meet sharing one, a saved window still open at a slice's start
+    widening it back to that window's start. So the cost is bounded by the slices, never a read back to the oldest
+    original.
+
+    A slice cannot see a window begun before it and kept open into it (his messages less than ``quiet_minutes``
+    apart, no prompt send): so the pass runs over the slice a second time with a window opened at its start, the
+    widest one that could be open there. An original private in that run but public in the real one could be
+    covered by an earlier window, and goes into ``uncertain``: the view makes its copies private, never the
+    original's id (``update`` would save that old row as private). Raises (the view fails closed) when an
+    original can't be read, is read as newer than ``start`` (the view's own read should then have held it: two
+    reads that disagree answer nothing), or is missing from its slice."""
+    want, when, i = set(missing), {}, 0
+    while i < len(missing):
+        j = i
+        while j + 1 < len(missing) and missing[j + 1] - missing[j] <= SAME_LOOKUP:
+            j += 1
+        when.update((r.id, r.at) for r in chat.rows(after_id=missing[i] - 1, upto_id=missing[j]) if r.id in want)
+        i = j + 1
+    if len(when) < len(want):  # an original gone between two reads: its copies can't be answered
+        raise LookupError("a compaction copy's original could not be read")
+    if any(t >= start for t in when.values()):
+        raise LookupError("a compaction copy's original is newer than the view's start, but the view did not read it")
+    spans: list[list] = []  # [lo, hi, the originals in it]
+    for oid, t in sorted(when.items(), key=lambda kv: kv[1]):
+        lo, hi = t - RECOMPUTE, t + RECOMPUTE
+        for s, e in frozen.get("windows") or []:  # begin at a saved window still open then, as ``view`` does
+            if datetime.fromisoformat(s) < lo and (e is None or datetime.fromisoformat(e) > lo):
+                lo = datetime.fromisoformat(s)
+        if spans and lo <= spans[-1][1]:
+            # (a no-op as the starts come in order: a saved window that takes a later original's start back before an
+            # earlier one's covers that one too; kept so a merged span can never start later than a member's)
+            spans[-1][0] = min(spans[-1][0], lo)
+            spans[-1][1] = max(spans[-1][1], hi)
+            spans[-1][2].append(oid)
+        else:
+            spans.append([lo, hi, [oid]])
+    total = 0
+    for lo, hi, oids in spans:
+        first, past = chat.first_id(lo), chat.first_id(hi)
+        after = min(oids) - 1 if first is None else min(first - 1, min(oids) - 1)
+        upto = None if past is None else max(past - 1, max(oids))
+        rows = chat.rows(after_id=after, since=lo, upto_id=upto)
+        if not set(oids) <= {r.id for r in rows}:
+            raise LookupError("a compaction copy's original was not in its slice")
+        total += len(rows)
+        hooks = [h for h in starts if lo <= h < hi]
+        got = compute(cfg, rows, hooks, sends, off_ids).private
+        for rid, t in got.items():
+            into.setdefault(rid, t)
+        wide = compute(cfg, rows, [lo, *hooks], sends, off_ids).private
+        uncertain.update(o for o in oids if o in wide and o not in got)
+    return {"originals": len(want), "slices": len(spans), "rows": total, "uncertain": len(uncertain)}
 
 
 def covering(cfg: Config, oldest: datetime | None, now: datetime | None = None, db: Path | None = None) -> View:
@@ -458,6 +556,11 @@ def update(cfg: Config, now: datetime, log: list[str] | None = None) -> View:
         if log is not None:
             log.append(f"privacy pass not saved: no sessions database at {chat.source}")
         return v
+    if v.retake and log is not None:  # (counts only: never a row's words)
+        log.append("privacy: answered {originals} compaction-copy original(s) older than the view from {slices} "
+                   "slice(s) of {rows} rows".format(**v.retake)
+                   + ("; the copies of {uncertain} read private (a window begun before the slice may cover them)"
+                      .format(**v.retake) if v.retake.get("uncertain") else ""))
     keep = now - timedelta(days=KEEP_DAYS)
     with conversations.locked(cfg) as st:
         st["privacy"] = {
