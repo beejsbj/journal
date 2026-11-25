@@ -4916,3 +4916,29 @@ gate strips as deep as the floor and a doubled `/j` before `/x` keeps nothing, a
 writer's and the sweep's per-message catch of `OffRecord` is a backstop: it drops that message from their own output
 and moves on, but records nothing for the other readers (with the gate and floor agreeing it is not reached by any
 input found). A label the floor refuses answers 422 `off-the-record`, as the route's own refusal does.
+
+- **X-PHOTO-REPLY (2026-11-24) — her reply after an unanswered captionless photo is saved (#10; a deliberate
+  weakening, decided by the owner).** BACKLOG-PRIVACY made a captionless photo inside a bare-`/x` window private and
+  had it take her turn off the record, like any private message: her rows stay private until his next message after
+  her turn ends. When the window ended on such a photo and she wrote nothing after it (Hermes usually merges the
+  photo into her reply to his next message), that mark lasted past the window, and her reply to his next *public*
+  message was kept out of the journal too. It erred private; the cost was a public reply missing from the entry. The
+  owner decided, on the issue on 2026-11-24: **save that reply**, accepting that it may describe the off-the-record
+  photo. This is the one change to the pass that makes it less private, so it is held to exactly that case:
+  `privacy.compute` keeps `View.bare`, the time of the newest captionless photo taken in, set only while everything
+  her next turn would take in is such photos inside a window. The mark clears at his next public message when all of
+  these hold: no row of hers after the photos (a tool step, a reply, a failed turn: her turn took them in); nothing
+  else private waits (a `/x` message, a captioned photo, words in the window, before or after the photo); the
+  message was sent after the photos and is outside every window (a `/j` note inside the window, or a queued message
+  he sent before them, does not clear it); it was not steered into a running turn (that turn may be on the photo);
+  and the photo row is no opt-out cut off after a picture's placeholders (`_in_cut`: his words). A prompt send closes
+  the window as a silence does, so his answer to the prompt is that next message. The photo row itself, its picture
+  and its compaction copies stay private; the end state follows (`tainted()` is false once that message is read, so
+  the tool guard no longer refuses the journal's writes in her turn on it). The README *Guarantees* row for `/x`
+  names the exception. Tests: `tests/test_privacy_photo_reply.py`, first committed asserting the old behaviour, then
+  `DecidedTest` (native and text-mode photo, two photos, a prompt boundary, the end state) and `StillPrivateTest`
+  (a captioned photo; a photo she answered, whose answer stays private; her turn begun on the photo; a private
+  message before or after it; a second `/x` message; a second bare `/x`; a `/j` inside the window; a steered
+  message; a queued message sent before the photo; a queued photo she answered; compaction copies). Each guard was
+  removed in turn and a test failed (the steered, sent-after, inside-a-window, cut-off and her-row checks, and the
+  rule that a photo after a pending private message keeps no `bare`).

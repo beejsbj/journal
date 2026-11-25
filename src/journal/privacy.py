@@ -25,6 +25,10 @@ For each row the pass decides whether it is private:
 * **A tainted turn**: once a private row of his is taken in (a message, or a captionless photo inside a window),
   her rows are private until his next message after her turn ended (a text reply, a failed turn, an
   interruption): a public message steered into the same turn does not clear it, since her answer covers both.
+  One exception, decided by the owner (#10, DECISIONS X-PHOTO-REPLY): when all she took in is captionless photos
+  inside a window and she wrote no row after them, the mark clears at his next public message sent after them and
+  outside every window (not steered into a running turn), so her reply to that message is saved, though it may
+  describe the photo. The photos themselves stay private.
 
 ``View`` holds the result: private row ids (both roles), the windows, and the end state (an open window, a
 tainted turn), with ``row``, ``at``, ``open_at`` and ``tainted``. ``view(cfg)`` recomputes the last
@@ -147,6 +151,8 @@ class View:
     window: dict | None = None                     # the open window at the end: {"since", "last"}
     taint: bool = False                            # his last message taken in was private …
     answered: bool = False                         # … and her turn on it has ended
+    bare: datetime | None = None                   # … it is only captionless photos in a window, no row of hers
+                                                   #   after them: the newest one's time (#10)
     quiet: timedelta = timedelta(minutes=45)
     sends: list = field(default_factory=list)
     closed: bool = False                           # the pass couldn't run: everything is private
@@ -268,6 +274,7 @@ def compute(cfg: Config, rows: list[Row], hook_starts: list[datetime], sends: li
         seen = now_t
         lapse(now_t)
         if row.role == "assistant":
+            v.bare = None  # her turn took the photos in: her reply may describe them
             if v.window:
                 v.window["last"] = max(v.window["last"], now_t)  # her activity keeps the window going
             if v.taint or inside(t):
@@ -279,7 +286,8 @@ def compute(cfg: Config, rows: list[Row], hook_starts: list[datetime], sends: li
             continue  # notifications, process completions: not his words, no activity of his
         said = _said(row)
         if row.kind in ("mirror", "empty", "system", "boundary") and said is None:
-            if row.kind in ("empty", "system") and (inside(t) or _in_cut(cfg, row)):
+            cut = row.kind in ("empty", "system") and _in_cut(cfg, row)
+            if row.kind in ("empty", "system") and (inside(t) or cut):
                 # a captionless photo (Hermes' image placeholder, or an empty row in native image mode) inside a
                 # window: no words to mark, but the picture, its stash and the vision note are his private
                 # message, and it keeps the window going as any message of his does: else her reply to it, or his next
@@ -289,6 +297,14 @@ def compute(cfg: Config, rows: list[Row], hook_starts: list[datetime], sends: li
                 # photo was queued and stored after the window ended. (The same for a row with no words in front of
                 # a picture's placeholders and an opt-out in what was cut off after them: ``_in_cut``.)
                 private(rid, t)
+                # only a captionless photo in a window, with nothing else private waiting for her turn, may clear at
+                # his next public message (#10); an opt-out cut off after a picture is his private words
+                if not inside(t) or cut:
+                    v.bare = None
+                elif not v.taint or v.answered:
+                    v.bare = t  # the first private thing her next turn takes in
+                elif v.bare is not None:
+                    v.bare = max(v.bare, t)  # another photo of the same kind
                 v.taint, v.answered = True, False
                 if v.window:
                     v.window["last"] = max(v.window["last"], now_t)
@@ -306,9 +322,13 @@ def compute(cfg: Config, rows: list[Row], hook_starts: list[datetime], sends: li
             v.window["last"] = max(v.window["last"], now_t)
         if hidden:
             private(rid, t)
-            v.taint, v.answered = True, False
+            v.taint, v.answered, v.bare = True, False, None
         elif v.taint and v.answered:
-            v.taint, v.answered = False, False  # a new turn of his: her private one is over
+            v.taint, v.answered, v.bare = False, False, None  # a new turn of his: her private one is over
+        elif v.taint and v.bare is not None and t > v.bare and not inside(t) and not row.meta.get("steer"):
+            # the owner's decision (#10): captionless photos in a window she wrote nothing after are no turn of hers
+            # yet; his next public message after the window starts one, and her reply to it is saved
+            v.taint, v.answered, v.bare = False, False, None
     while pending:
         start(pending.pop(0))
     if v.window:

@@ -16,6 +16,23 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## X-PHOTO-REPLY — her reply after an unanswered captionless photo is saved (2026-11-24; tick and hook side; **gateway restart required**; no config or state change)
+
+**What changes.** The owner's decision on issue #10, a deliberate weakening recorded in DECISIONS.md (X-PHOTO-REPLY):
+when a captionless photo sent inside a bare-`/x` window got no row of hers, her reply to his next public message
+after the window is saved (before, it was kept off the record with the photo). Only `privacy.compute` changes; the
+photo, its picture and its copies stay private, and every other input stays as private as before.
+**Side and restart.** `privacy.py` is loaded by the gateway (CLAUDE.md's import check lists it), so the hook side
+(the tool guard's end state, the hook's own view) keeps the old answer until `hermes gateway restart`: until then the
+guard still refuses the journal's writes in her turn on that message, which errs private. The tick runs it from its
+next run: its saved pass and the conversation writer save the reply from then on. Ride the next gateway window with
+the pin move. Nothing serve side.
+**First checks.**
+- After the restart, the gateway's log has no `journal` hook exception, and a reply to a prompt is captured as before.
+- The next tick's log has no `privacy pass could not run` line.
+**Rollback.** The plugin and the CLI at the previous sha, and a gateway restart. A reply saved meanwhile stays in its
+entry: rolling back does not remove it (the engine never removes words it has written).
+
 ## X-FLOOR — `/x` refused at the bottom of the write path; `/j /x` off the record (2026-11-24; hook, tick and serve side; **gateway restart required**; no config or state change)
 
 **What changes.** Defence in depth (issue #46): the functions that put his words into an entry refuse off-the-record
