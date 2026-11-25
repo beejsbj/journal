@@ -27,7 +27,8 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 
 from . import capture, entries, ledger, library
-from .config import Config, day_ends_at
+from .config import Config
+from .config import journal_day as config_journal_day
 from .library import Practice
 
 UPCOMING, DUE, OPEN, ANSWERED, MISSED = "upcoming", "due", "open", "answered", "missed"
@@ -199,10 +200,9 @@ def history(cfg: Config, start: date, end: date, now: datetime, data: dict | Non
 
 def journal_day(cfg: Config, at: datetime) -> date:
     """The journal day of a moment: its local date, except that before ``windows.day_ends_at`` (default 04:00) it
-    is still the day before. An evening answered at 00:30 is that evening's."""
-    local = at.astimezone(cfg.tz)
-    hh, mm = day_ends_at(cfg)
-    return local.date() - timedelta(days=1) if (local.hour, local.minute) < (hh, mm) else local.date()
+    is still the day before. An evening answered at 00:30 is that evening's (``config.journal_day``, which notes and
+    Today read too)."""
+    return config_journal_day(cfg, at)
 
 
 def resolve(cfg: Config, practice: Practice | str, at: datetime, *, now: datetime | None = None,

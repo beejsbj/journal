@@ -51,7 +51,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from . import audio, capture, entries, images, ledger, sweep
-from .config import Config
+from .config import Config, journal_day
 from .ports import Row
 
 STATE = "conversations.json"
@@ -80,7 +80,7 @@ def journals_all_chat(cfg: Config) -> bool:
     return capture_mode(cfg) == "everything"
 
 
-QUOTE_WORDS = 6  # a quote must be at least this long to count as a reply to one of the journal's own messages
+QUOTE_WORDS = sweep.QUOTE_WORDS  # a quote must be at least this long to count as a reply to one of the journal's own messages
 
 
 def annotate_auto(cfg: Config) -> bool:
@@ -548,7 +548,7 @@ class _Writer:
         review, that analysis's id on its capture: ``answers``). Off-the-record words raise ``capture.OffRecord``
         before anything is kept or reserved."""
         capture.refuse_off_record(self.cfg, ev.text)
-        local_date = ev.at.astimezone(self.cfg.tz).date().isoformat()
+        local_date = journal_day(self.cfg, ev.at).isoformat()   # (as ``capture.new_note_prompt`` dates it)
         if not self.write:
             n, stem = 1, entries.stem_for(local_date, "j")
             taken = {p.get("stem") for p in ledger.snapshot(self.cfg.ledger_path)["prompts"]} | self.reserved
@@ -606,7 +606,7 @@ class _Writer:
         analysis): an annotation reply (the entry it annotates is its home) and a day reflection or week review (no
         home; its ledger record's id)."""
         if self._ours is None:
-            from . import compose, reflect
+            from . import compose
             names, out = self.cfg.names, []
             data = ledger.snapshot(self.cfg.ledger_path)
             for p in data["prompts"]:
@@ -617,16 +617,8 @@ class _Writer:
                     out.append((datetime.fromisoformat(r["sent_at"]),
                                 sweep.words(compose.annotation_html(p.get("kind") or "", text, names)),
                                 in_root(self.cfg, str(path)), None))
-            for r in data.get("reflections") or []:
-                tg, path = ledger.send_of(r), Path(in_root(self.cfg, r.get("path")) or "")
-                if tg.get("message_id") and tg.get("sent_at") and path.is_file():
-                    try:
-                        title, _ = reflect._label(self.cfg, r["kind"], date.fromisoformat(r["local_date"]))
-                    except (KeyError, ValueError):
-                        continue
-                    body = reflect.body_of(path.read_text(encoding="utf-8", errors="replace"))
-                    out.append((datetime.fromisoformat(tg["sent_at"]),
-                                sweep.words(compose.reflection_html(title, body, names)), None, r.get("id")))
+            out += [(sent, text, None, rid)
+                    for sent, text, rid in sweep.analysis_sends(self.cfg, data, lambda p: in_root(self.cfg, p))]
             self._ours = out
         return self._ours
 
@@ -891,6 +883,8 @@ class _Threads:
     def _prompt_for(self, ev: Event, data: dict) -> dict | None:
         """The prompt his message answers by the sweep's rules (a quote of it, else the one open then), read only."""
         prompt = sweep.by_quote(self.cfg, data, ev.quote, ev.at) if ev.quote else None
+        if prompt is None and sweep.quotes_analysis(self.cfg, data, ev.quote, ev.at):
+            return None  # a reply to her reflection answers no prompt (``capture.match``, ``sweep.reconcile``)
         if prompt is None:  # a typed message answers a prompt once; a direct reply to it, as often as it is sent
             prompt = sweep.visible_at(self.cfg, data, ev.at)
             if prompt is not None and prompt["id"] in self.w.planned:

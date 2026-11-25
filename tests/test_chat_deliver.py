@@ -253,7 +253,7 @@ class ReflectionTest(ConversionCase):
         self.assertEqual(reflect.send(self.cfg, self.now, log), [])
         self.assertEqual(len(spy.calls), 1)
         self.assertEqual(len(self.chat.sends), 1)
-        self.assertEqual(self.chat.sends[0][2], {"silent": True})  # the overnight fallback goes silently, as before
+        self.assertEqual(self.chat.sends[0][2], {"silent": True})  # every analysis goes silently since 2026-11-25
         self.assertIn("A quiet day, mostly writing.", self.chat.sends[0][1])
         self.assertEqual(self.events, ["send", "mirror"])
         self.assertEqual(self.told[0][1:], ("A quiet day, mostly writing.",
@@ -272,7 +272,7 @@ class ReflectionTest(ConversionCase):
             self.assertEqual(log, ["reflection-2026-10-13: Telegram send failed (Bad Gateway)"])
         self.assertEqual(alerts, [f"reflection-2026-10-13 could not be sent to Telegram after "
                                   f"{reflect.SEND_ATTEMPTS} attempts: Bad Gateway"])
-        self.assertEqual(self.chat.sends[0][2], {"silent": False})
+        self.assertEqual(self.chat.sends[0][2], {"silent": True})  # every analysis goes silently since 2026-11-25 (NOTES-JOURNAL-DAY)
         self.assertEqual(self.told, [])
         sent = ledger.send_of(ledger.snapshot(self.cfg.ledger_path)["reflections"][0])
         self.assertEqual(sent["attempts"], reflect.SEND_ATTEMPTS)

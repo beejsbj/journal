@@ -91,14 +91,14 @@ class DayReflectionTest(Base):
         sent = self.day()
         self.answer_prompt("evening", "2026-10-14", "rain all day, walked anyway. the soup was good. "
                            "But idk. the bus can wait", sent + timedelta(minutes=10), "11")
-        alerts, log = self.reflect(datetime(2026, 10, 14, 23, 45, tzinfo=IST))
+        alerts, log = self.reflect(datetime(2026, 10, 15, 4, 45, tzinfo=IST))
         self.assertEqual(alerts, [])
         self.assertIn("wrote 2026-10-14-reflection.md (annotated) (+1 notebook)", log)
         self.assertIn("sent 2026-10-14-reflection to Telegram", log)
         body = (self.cfg.root / "2026-10-14-reflection.md").read_text()
         self.assertTrue(body.startswith("---\ndate: 2026-10-14\nkind: reflection\ntype: journal\n"
                                         "source: iris-journal\nauthor: iris\n---\n\n# Iris's reflection — Wed 14 Oct 2026\n\n"
-                                        "_From [[2026-10-14-evening]] · written 14 Oct 23:45 IST_\n\n**What stood out**"))
+                                        "_From [[2026-10-14-evening]] · written 15 Oct 04:45 IST_\n\n**What stood out**"))
         self.assertNotIn("FOLLOW-UP", body)
         self.assertNotIn("[!note]", body)  # no folded list of the day's prompts: unanswered openers wash away
         self.assertNotIn("how was the night?", body)
@@ -113,10 +113,10 @@ class DayReflectionTest(Base):
         self.assertEqual(method, "sendMessage")
         self.assertTrue(payload["text"].startswith("<b>🌻 Iris's reflection — Wed 14 Oct 2026</b>\n\n"
                                                    "<blockquote expandable><b>What stood out</b>"))
-        self.assertNotIn("disable_notification", payload)
+        self.assertIs(payload.get("disable_notification"), True)  # silent: it comes in the night (owner, 2026-11-25)
         self.assertNotIn("Today's prompts", payload["text"])
         self.assertEqual(self.rec("2026-10-14-reflection")["telegram"]["message_id"], "701")
-        self.assertEqual(self.reflect(datetime(2026, 10, 15, 4, 30, tzinfo=IST)), ([], []))  # idempotent
+        self.assertEqual(self.reflect(datetime(2026, 10, 15, 5, 30, tzinfo=IST)), ([], []))  # idempotent
         self.assertEqual((len(self.asked), len(self.bot.calls)), (1, 1))
 
     def test_fallback_next_morning_when_the_evening_was_never_answered(self):
@@ -148,13 +148,13 @@ class DayReflectionTest(Base):
         self.answer_prompt("evening", "2026-10-14", "rain all day, walked anyway", sent + timedelta(minutes=10), "11")
         self.answer = '{"opener": "not a reflection at all, but JSON from a confused model, long enough to count"}'
         for n in (1, 2):
-            alerts, log = self.reflect(datetime(2026, 10, 14, 23, 45, tzinfo=IST))
+            alerts, log = self.reflect(datetime(2026, 10, 15, 4, 45, tzinfo=IST))
             self.assertEqual(alerts, [])
             self.assertIn(f"attempt {n}/3 failed (not prose)", log[0])
-        alerts, _ = self.reflect(datetime(2026, 10, 14, 23, 50, tzinfo=IST))
+        alerts, _ = self.reflect(datetime(2026, 10, 15, 4, 50, tzinfo=IST))
         self.assertEqual(len(alerts), 1)
         self.assertIn("2026-10-14-reflection was not written after 3 attempts", alerts[0])
-        self.assertEqual(self.reflect(datetime(2026, 10, 15, 4, 5, tzinfo=IST)), ([], []))  # alerted once, then quiet
+        self.assertEqual(self.reflect(datetime(2026, 10, 15, 5, 5, tzinfo=IST)), ([], []))  # alerted once, then quiet
         self.assertFalse(list(self.cfg.root.glob("*-reflection*.md")))
         self.assertEqual(self.bot.calls, [])
         # (any bad answer does this; an invented quote is one too: test_continuity, QuotesTest)
@@ -163,7 +163,7 @@ class DayReflectionTest(Base):
         sent = self.day()
         self.answer_prompt("evening", "2026-10-14", "rain all day, walked anyway", sent + timedelta(minutes=10), "11")
         self.answer = None
-        alerts, log = self.reflect(datetime(2026, 10, 14, 23, 45, tzinfo=IST))
+        alerts, log = self.reflect(datetime(2026, 10, 15, 4, 45, tzinfo=IST))
         self.assertIn("attempt 1/3 failed (agent failed)", log[0])
 
     def test_alert_reaches_the_tick_exit_code(self):
@@ -174,7 +174,7 @@ class DayReflectionTest(Base):
                                     "attempts": 2}]
             data["reflections_since"] = "2026-10-14"
         self.answer = "too short"
-        now = datetime(2026, 10, 14, 23, 45, tzinfo=IST)
+        now = datetime(2026, 10, 15, 4, 45, tzinfo=IST)
 
         class Clock(datetime):
             @classmethod
@@ -205,7 +205,7 @@ class StatusDoctorTest(Base):
         sent = self.day()
         self.answer_prompt("evening", "2026-10-14", "rain all day, walked anyway. the soup was good; "
                            "the bus can wait", sent + timedelta(minutes=10), "11")
-        self.reflect(datetime(2026, 10, 14, 23, 45, tzinfo=IST))
+        self.reflect(datetime(2026, 10, 15, 4, 45, tzinfo=IST))
         s = status.status(self.cfg)
         self.assertEqual(s["reflections"]["recent"][0]["id"], "2026-10-14-reflection")
         self.assertIn("Reflections: 2026-10-14-reflection (sent)", status.format_status(s))
@@ -227,10 +227,10 @@ class WeekReviewTest(Base):
         sent = self.prompt("evening", "2026-10-14", "23", "11", "Evening")
         self.answer_prompt("evening", "2026-10-14", "rain all day, walked anyway. the soup was good; "
                            "the bus can wait", sent + timedelta(minutes=10), "11")
-        self.reflect(datetime(2026, 10, 14, 23, 45, tzinfo=IST))  # the day reflection
+        self.reflect(datetime(2026, 10, 15, 4, 45, tzinfo=IST))  # the day reflection
         wk = self.prompt("weekly", "2026-10-18", "20", "20", "End of the week.")
         self.answer_prompt("weekly", "2026-10-18", "a soft week", wk + timedelta(minutes=10), "20")
-        alerts, log = self.reflect(datetime(2026, 10, 18, 20, 40, tzinfo=IST))
+        alerts, log = self.reflect(datetime(2026, 10, 19, 4, 40, tzinfo=IST))  # once the week's last day has ended
         # the day reflection's follow-up is the same words and still open: the week review adds nothing
         self.assertIn("wrote 2026-10-18-week.md (annotated)", log)
         self.assertNotIn("(+1 notebook)", " ".join(log))
@@ -265,7 +265,7 @@ class FilesAndContextTest(Base):
                            "the bus can wait", sent + timedelta(minutes=10), "11")
         mine = self.cfg.root / "2026-10-14-reflection.md"
         mine.write_text("my own reflection, by hand\n")
-        self.reflect(datetime(2026, 10, 14, 23, 45, tzinfo=IST))
+        self.reflect(datetime(2026, 10, 15, 4, 45, tzinfo=IST))
         self.assertEqual(mine.read_text(), "my own reflection, by hand\n")  # never overwritten
         made = self.cfg.root / "2026-10-14-reflection-2.md"
         self.assertTrue(entries.is_analysis(made))

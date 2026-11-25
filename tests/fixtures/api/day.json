@@ -1,0 +1,78 @@
+{
+  "date": "2026-10-14",
+  "weekday": "Wed",
+  "entries": [
+    {
+      "stem": "2026-10-14-evening",
+      "kind": "evening",
+      "practice": "evening",
+      "title": "Evening journal — Wed 14 Oct 2026",
+      "emoji": "",
+      "time": "23:12"
+    }
+  ],
+  "lines": [
+    {
+      "stem": "2026-10-14-evening",
+      "key": "words:0",
+      "kind": "his",
+      "date": "2026-10-14",
+      "time": "23:12",
+      "text": "First words, about the lighthouse.",
+      "source": "text",
+      "audio": null,
+      "reply_to": null
+    },
+    {
+      "stem": "2026-10-14-evening",
+      "key": "words:1",
+      "kind": "his",
+      "date": "2026-10-14",
+      "time": "23:40",
+      "text": "A spoken thought.",
+      "source": "voice",
+      "audio": "2026-10-14-evening.ogg",
+      "reply_to": null,
+      "meta": {
+        "duration": 151
+      }
+    },
+    {
+      "stem": "2026-10-14-evening",
+      "key": "his:813",
+      "kind": "his",
+      "date": "2026-10-14",
+      "time": "23:44",
+      "text": "Later I thought of the harbour.",
+      "source": "text",
+      "audio": null,
+      "reply_to": null
+    },
+    {
+      "stem": "2026-10-14-evening",
+      "key": "her:4815",
+      "kind": "hers",
+      "date": "2026-10-14",
+      "time": "23:45",
+      "text": "The harbour sounds like a SECRETHERS word.\nSecond line."
+    },
+    {
+      "stem": "2026-10-14-evening",
+      "key": "his:816",
+      "kind": "his",
+      "date": "2026-10-14",
+      "time": "23:50",
+      "text": "yes, and the gulls.",
+      "source": "text",
+      "audio": null,
+      "reply_to": "The harbour sounds like"
+    }
+  ],
+  "reflection": "2026-10-14-reflection",
+  "prev": null,
+  "next": "2026-10-15",
+  "voices": {
+    "his": "Sam",
+    "hers": "Ada"
+  }
+}

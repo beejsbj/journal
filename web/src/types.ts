@@ -51,6 +51,33 @@ export type Prompt = Infer<typeof Prompt>;
 export const Voices = obj({ his: str, hers: str });
 export type Voices = Infer<typeof Voices>;
 
+// ── A day as one log (GET /days/{date}; issue #82) ──────────────────────
+
+export const LogLineItem = obj({
+  stem: str,
+  key: str,   // the block in its entry: the hour links to /entries/{stem}#{key}
+  kind: oneOf("his", "hers"),
+  date: nullable(str),   // the calendar day it was written (after midnight, the day after); null with no time
+  time: nullable(str),
+  text: str,
+  source: opt(str),
+  audio: opt(nullable(str)),
+  images: opt(arr(str)),
+  reply_to: opt(nullable(str)),
+});
+export type LogLineItem = Infer<typeof LogLineItem>;
+export const DayLog = obj({
+  date: str,
+  weekday: str,
+  entries: arr(obj({ stem: str, kind: str, practice: nullable(str), title: str, emoji: str, time: nullable(str) })),
+  lines: arr(LogLineItem),
+  reflection: nullable(str),
+  prev: nullable(str),
+  next: nullable(str),
+  voices: Voices,
+});
+export type DayLog = Infer<typeof DayLog>;
+
 // ── Today ────────────────────────────────────────────────────────────────
 
 export const PracticeRow = obj({

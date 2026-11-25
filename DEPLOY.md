@@ -57,6 +57,65 @@ set its capture's `transcript` back to `pending` after rolling forward, or trans
 `phase_blocks` reads a keyed answer's key line as its first line, so a program's insights copy made then can carry
 it; a keyed photo block shows its picture embeds as text in the web app.
 
+## DAY-VIEW — a day as one log in the web app (2026-11-25; serve side only; **no gateway restart**; no config or state change)
+
+**What changes.** A new page, `/days/<date>`: every line of every entry filed under one day (chat notes, `/j` and web
+notes, a prompt entry's words and the conversation under it) in time order, her replies folded, each hour a link to
+the line in its entry (issue #82, part 1). A new route `GET /api/v1/days/{date}` (`daylog.day`, read-only over the
+entry files and the ledger, fenced like the other routes: `tests/test_serve_privacy.py` and the route-opens walk). The
+Entries list's day numerals link to it, Today's *Written today* ends with *The whole day, as one log*, and an entry
+opened from a line scrolls to that block. The service worker keeps the day's answer for offline reading. DECISIONS.md,
+DAY-VIEW.
+**Side and restart.** Serve side only: `src/journal/daylog.py` is new and imported by `serve/api.py` alone (the gateway
+does not load it: CLAUDE.md's import check lists neither), and the web build is in `serve/static/`. `uv tool install
+--force` at the merge sha and `systemctl --user restart journal-serve`. The gateway and the tick are untouched.
+**First checks.**
+- `curl` with the token: `GET /api/v1/days/<a day with entries>` answers 200 with `lines` in time order; `GET
+  /api/v1/days/2026-13-40` answers 400.
+- In the web app: the Entries list's day numeral opens the day; a line's hour opens its entry at that block; her
+  replies open in place; a phone shows it in one column with nothing scrolling sideways.
+- After an install the PWA shows "Update available": reload once.
+**Rollback.** `uv tool install --force` at the previous sha and `systemctl --user restart journal-serve`. Nothing to
+undo in state.
+
+## NOTES-JOURNAL-DAY — notes follow the journal day (2026-11-25; hook, tick and serve side; **gateway restart required**; no config or state change)
+
+**What changes.** A note (a chat `/j`, a chat thread that became a note, the web app's *A note*, `journal write`,
+MCP's `journal_save`) put down before `windows.day_ends_at` (default 04:00) is filed under the day before, as a
+prompt answered then already was: a 00:30 note is `<last night's date>-j.md` (issue #82). Today shows the journal
+day: the web app's Today and its week strip, and the chat's today block (its header, practices, *entries today*, the
+latest reflection) read last night's day until `day_ends_at`; the block's "a new day starts a new block" turns at
+`day_ends_at` instead of midnight, and `journal status`' block count is per journal day. The day reflection, `GET
+/days` and the Entries list key on the entry's date, so they read the new notes on the same day. **No file is moved**:
+a note filed by the calendar date before this change stays under that date. DECISIONS.md, NOTES-JOURNAL-DAY.
+**On review (the owner's decision, 2026-11-25): the day reflection waits for the journal day to end.** It is no
+longer written when the evening entry is annotated (~22:40) but once `day_ends_at` has passed (04:00 by default), so
+it reads the after-midnight notes; the week review likewise waits for its Sunday to end (Monday 04:00). Both are now
+sent **silently** (they come in the night). A reply to a reflection (a reply to its message) is never filed as the
+answer to the morning prompt that may be open by then (`capture.match`, the sweep and the conversation writer leave it
+to the writer, which files it as a reply to the reflection). Her own note with no date follows the journal day. The
+today block names both days between midnight and `day_ends_at` ("journal day Thu 15 Oct 2026 · now Fri 00:35"), and
+says which day the tasks (still the calendar date's) are due. `GET /today` gains `calendar_date`. The first night after
+the deploy: a reflection already written that evening is unaffected; the next one comes at 04:00.
+**Side and restart.** `config.py`, `capture.py`, `conversations.py`, `today.py`, `slots.py`, `reflect.py`, `sweep.py`,
+`ledger.py` and `status.py` are all
+loaded by the gateway at import (CLAUDE.md's import check lists them), so **the restart is required**: until it, a
+`/j` the hook saves and the today block keep the calendar date while the tick's auto notes and the faces use the
+journal day. Ride the next gateway window with the pin move. The tick runs it from its next run. Serve side
+(`serve/api.py` and the core it imports): `uv tool install --force` at the merge sha and `systemctl --user restart
+journal-serve`.
+**First checks.**
+- After the restart, the gateway's log has no `journal` hook exception, and a reply to a prompt is captured as before.
+- Between midnight and `day_ends_at` (or with `JOURNAL_CONFIG` pointing at a copy whose `windows.day_ends_at` is a
+  few minutes ahead, on a temporary root): a note from the web app lands as `<yesterday>-j…md`, and Today's date and
+  *Written today* show yesterday with that note in it. After `day_ends_at`, Today shows the new day.
+- `journal doctor`'s day reflection row reads "once the day has ended, after the evening entry is annotated, …".
+- The next morning: `journal status` shows the day reflection written after `day_ends_at` (not at ~22:40), sent
+  silent; the morning prompt goes out as before.
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
+previous sha), `hermes gateway restart`, and serve's `uv tool install --force` at the previous sha with its restart.
+Nothing to undo in state: notes filed under last night's date stay there, as any entry does.
+
 ## CHAT-2 — one send operation, `chat.deliver`, for the five kinds of send the engine makes on its own (2026-11-25; tick and hook side; **gateway restart**; no config or state change)
 
 **What changes.** Issue #43, its second step. `journal/chat/deliver.py`'s `deliver` sends one message to the
