@@ -323,7 +323,7 @@ Minimal config:
 | `adapter` | `auto` | The agent the journal runs beside. `auto` (and `hermes`): the steps that read the chat (sweep, conversation saving, `/x` windows, the outage catch-up, chat history in the pack, annotation alignment) read Hermes' sessions database when there is one (`hermes.state_db`, or the profile's), and model steps run `hermes chat --oneshot` unless `agent.command` is set. `none`: no chat transcript (those steps are off, as standalone) and model steps only through `agent.command` (without one they wait, like an outage). Any other value is a doctor warning and means `auto` (`plainchat` is not built yet). |
 | `hermes.mirror_to_chat` | `true` | Mirror everything the journal sends (prompts, annotation replies, reflections, catch-ups) into the companion's chat session, so she sees it when you reply (see *Mirror* below). |
 | `sources.weather.enabled` | `true` | Open-Meteo forecast at `coordinates` (no key). |
-| `sources.telegram_history` | on, 7 days, 25 messages | Your recent messages to the companion (Hermes only), interleaved in the pack with what the journal sent you. |
+| `sources.telegram_history` | on, 7 days, 25 messages | Your recent messages to the companion (Hermes only), interleaved in the pack with what the journal sent you. `sources.chat_history` is the same source under a neutral name and, when both are set, wins over it; keep the old key until every part of the install runs the release that reads the new one. |
 | `sources.tududi` | off | `{enabled, command}`: argv of a tududi MCP stdio server. |
 | `sources.scrobbler` | off | `{enabled, command}`: the chat-scrobbler CLI. |
 | `sources.listenbrainz` | off | `{enabled, user}`. |
