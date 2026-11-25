@@ -32,8 +32,8 @@ and a few chat messages a tick and an hour, and a message gone stale is recorded
 """
 from __future__ import annotations
 
+import contextlib
 import contextvars
-import fcntl
 import json
 import os
 import tempfile
@@ -42,7 +42,7 @@ from pathlib import Path
 
 from . import (agent, audio, capture, channel, compose, context, conversations, entries, images, ledger, library,
                mirror, notebook, ops, outage, privacy, programs, prompts, recovery, reflect, schedule, slots, standing, sweep,
-               today, validate, version)
+               ticklock, today, validate, version)
 from .config import Config
 from .library import Practice
 from .ports import ChannelError, Keyboard
@@ -533,7 +533,7 @@ def process_audio(cfg: Config, now: datetime, log: list[str]) -> None:
     A failing backend is an outage: the file waits (``outage``: retried at most every 30 minutes for up to
     7 days) without using an attempt. An empty transcript is a bad result and counts as one."""
     alerts: list[str] = []
-    down = False
+    down, ran = False, 0
     for p in ledger.snapshot(cfg.ledger_path)["prompts"]:
         if down:
             break
@@ -543,6 +543,9 @@ def process_audio(cfg: Config, now: datetime, log: list[str]) -> None:
                 continue
             if outage.waiting(c, now):
                 continue
+            if ran:  # between transcriptions (``ticklock``)
+                ticklock.pause()
+            ran += 1
             path = cfg.root / c["audio"]
             meta = dict(c.get("meta") or {})
             for k, v in audio.probe(cfg, str(path)).items() if path.is_file() else ():
@@ -644,6 +647,8 @@ def process_images(cfg: Config, now: datetime, log: list[str]) -> None:
                     log.append(f"image descriptions: {limit} asked for this tick; the rest wait for the next "
                                "(paced catch-up)")
                     break
+                if asked:  # between model calls (``ticklock``); the block is checked again before the note is written
+                    ticklock.pause()
                 asked += 1
                 try:
                     text = agent.ask(cfg, images.describe_request(name), 120, toolsets="none", image=str(path))
@@ -711,6 +716,8 @@ def annotate(cfg: Config, now: datetime, log: list[str]) -> None:
             continue  # he may still be writing: wait for quiet, so his later words are annotated with the rest
         if outage.waiting(p, now, cfg):
             continue
+        if asked:  # between model calls (``ticklock``); the entry is read after it
+            ticklock.pause()
         body = path.read_text(encoding="utf-8")
         if not entries.annotations_pending(body):
             continue
@@ -1011,17 +1018,13 @@ def run_backfill(cfg: Config, since, write: bool) -> tuple[int, list[str]]:
     reads: no lock, nothing created (not even the state dir)."""
     if not write:
         return 0, conversations.backfill(cfg, since, False)
-    cfg.state_dir.mkdir(parents=True, exist_ok=True)
-    with open(cfg.state_dir / "tick.lock", "a+") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+    with ticklock.waited(cfg):
         return 0, conversations.backfill(cfg, since, write)
 
 
 def run_sweep(cfg: Config) -> tuple[int, list[str]]:
     """``journal sweep``: one reconciliation pass now, waiting for a running tick."""
-    cfg.state_dir.mkdir(parents=True, exist_ok=True)
-    with open(cfg.state_dir / "tick.lock", "a+") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+    with ticklock.waited(cfg):
         log: list[str] = []
         n = sweep.run(cfg, datetime.now(timezone.utc), log)
         if not log:
@@ -1064,18 +1067,39 @@ def files_as_error(line: str) -> bool:
     return "failed" in line or line.startswith(sweep.WITHHELD)
 
 
+# The scheduled tick's safe points between steps (``ticklock.pause``): before each of these, a waiting ``journal send``
+# or ``journal program …`` (or sweep, or backfill) takes ``tick.lock`` and the tick takes it back after it, with the
+# same ``now``. A step reads the ledger, runs, entries and the chat afresh when it starts, so what the waiter did is
+# simply there. Every send stays under the lock and every ledger record of a send or an opening takes the real time
+# (``send_prompt``, ``programs._open``), so the ledger's order of sends is the chat's. Not before ``send``: the tick's
+# interrupts and its practices go out together, a ritual due in the same tick the newest message (as before). Not
+# before ``sweep`` or ``conversations``: they read the chat right after the privacy pass, and call no model, so a
+# yield there would gain a waiter nothing. A tick's ``now`` already lagged the clock by its model calls; a yield adds the
+# waiter's time, and every comparison with ``now`` in the later steps errs towards "not yet" (the next tick's).
+# Inside a step, the loops that call a model once per item yield between items too (``annotate``, ``process_images``,
+# ``process_audio``, ``reflect.run``): no lock held there, and what they carry across items is theirs alone.
+YIELDS_BEFORE = frozenset({"privacy", "programs", "fold", "audio", "images", "annotate", "reply", "reflect", "recover",
+                           "mirror", "cache", "prune", "notebook"})
+
+
+@contextlib.contextmanager
+def _waited(cfg: Config):
+    with ticklock.waited(cfg):
+        yield True
+
+
 def run(cfg: Config, only: str | None = None, dry_run: bool = False,
         hold_off_record: bool = False) -> tuple[int, list[str]]:
     """One tick (or a manual send of ``only``). Returns (exit code, log lines).
 
-    A scheduled tick skips this round when another tick holds the lock; a manual send waits for it. With
-    ``hold_off_record`` a manual send is not made while a bare ``/x`` window is open (``_held_off_record``).
+    A scheduled tick skips this round when another tick is running or the lock is held; a manual send waits for it.
+    A scheduled tick lets a waiting send or program step go first at its safe points (``YIELDS_BEFORE``,
+    ``ticklock``). With ``hold_off_record`` a manual send is not made while a bare ``/x`` window is open
+    (``_held_off_record``).
     """
-    cfg.state_dir.mkdir(parents=True, exist_ok=True)
-    with open(cfg.state_dir / "tick.lock", "a+") as lock:
-        try:
-            fcntl.flock(lock, fcntl.LOCK_EX if only else fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
+    hold = _waited(cfg) if only else ticklock.scheduled(cfg)
+    with hold as ours:
+        if not ours:
             return 0, []
         now = datetime.now(timezone.utc)
         now_local = now.astimezone(cfg.tz)
@@ -1106,6 +1130,8 @@ def run(cfg: Config, only: str | None = None, dry_run: bool = False,
                       ("notebook", lambda: notebook.sweep(cfg, now))]
         down = outage.known(cfg)  # (before and after: a line when this run found an outage, or saw one end)
         for name, step in steps:
+            if name in YIELDS_BEFORE:
+                ticklock.pause()  # (a send or program step waiting for tick.lock goes first: ``ticklock``)
             try:
                 step()
             except Alert as e:
