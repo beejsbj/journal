@@ -231,13 +231,18 @@ class InstallScanTest(unittest.TestCase):
         self.assertTrue(any(p.suffix == ".js" for p in files), "the built bundle should be among the files read")
         self.assertEqual(invisible_in(files), [], "a literal invisible character in the built web app: write it as an escape or build it from its code point")
 
-    def test_no_python_file_carries_an_invisible_character(self):
-        """The same finding on `.py` files (they are scanned too, tests included): a literal U+FEFF in a source file is
-        written `"\\ufeff"`, which is the same string and invisible to the scanner."""
-        files = [p for top in (ROOT / "src" / "journal", ROOT / "tests") for p in sorted(top.rglob("*.py"))
-                 if "__pycache__" not in p.parts]
-        self.assertTrue(any(p.name == "library.py" for p in files) and any(p.name == "test_library.py" for p in files))
-        self.assertEqual(invisible_in(files), [], "a literal invisible character in a Python file: write it as an escape, e.g. \"\\ufeff\"")
+    def test_no_scanned_file_carries_an_invisible_character(self):
+        """The same finding on every file the scanner reads (`SCANNABLE_EXTENSIONS`: Python, docs, JSON, shell ... the
+        root `__init__.py` and `tools/` included; test trees too, since the invisible-character check has no test
+        exemption). A literal U+FEFF in a source file is written `"\\ufeff"`, the same string and invisible to the scanner."""
+        files = [p for p in sorted(ROOT.rglob("*"))
+                 if p.is_file() and not p.is_symlink() and p.suffix.lower() in SCANNABLE_EXTENSIONS
+                 and not any(part in EXCLUDED_DIRS for part in p.relative_to(ROOT).parts)]
+        names = {p.relative_to(ROOT).as_posix() for p in files}
+        for must in ("__init__.py", "src/journal/library.py", "tests/test_library.py", "README.md"):
+            self.assertIn(must, names, f"{must} should be among the files read")
+        self.assertTrue(any(n.startswith("tools/") and n.endswith(".py") for n in names))
+        self.assertEqual(invisible_in(files), [], "a literal invisible character in a scanned file: write it as an escape, e.g. \"\\ufeff\"")
 
     def test_the_invisible_character_check_sees_one(self):
         import tempfile
