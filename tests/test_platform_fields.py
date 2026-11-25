@@ -208,10 +208,18 @@ class TheFenceTest(unittest.TestCase):
         self.assertEqual(found, [], "a ledger send record is read through ledger.send_of and changed through "
                                     "ledger.send_slot")
 
-    def test_the_mirror_reference_is_the_one_other_place(self):
+    def test_the_mirror_reference_follows_the_written_name(self):
         refs = [f"{p.relative_to(SRC)}" for p in sorted(SRC.rglob("*.py"))
                 if re.search(r'ref=\([^)]*"telegram"', p.read_text(encoding="utf-8"))]
-        self.assertEqual(refs, ["reflect.py"])
+        self.assertEqual(refs, [])  # (reflect.py writes ledger.SEND_KEY, so release 2 is one constant)
+
+    def test_a_flag_under_one_name_never_hides_a_send_under_the_other(self):
+        """Review of #83: a rolled-back tick can leave chat: {mirrored} beside telegram: {message_id}."""
+        rec = {"chat": {"mirrored": True}, "telegram": {"message_id": "7", "sent_at": "2026-11-24T10:00:00+00:00"}}
+        self.assertEqual(ledger.send_of(rec)["message_id"], "7")
+        rec = {"telegram": {"mirrored": True}, "chat": {"skipped": "stale"}}
+        self.assertEqual(ledger.send_of(rec)["skipped"], "stale")
+        self.assertEqual(ledger.send_of({"chat": {"attempts": 1}, "telegram": {}}), {"attempts": 1})
 
 
 class SourceAliasTest(CleanEnv):

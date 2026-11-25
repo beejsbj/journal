@@ -606,7 +606,7 @@ def send(cfg: Config, now: datetime, log: list[str]) -> list[str]:
         if mid:
             room -= 1
             mirror.to_chat(cfg, f"{title}, sent at {mirror.stamp(cfg, now)}", body, log,
-                           ref=("reflections", rec["id"], "telegram"))
+                           ref=("reflections", rec["id"], ledger.SEND_KEY))
     if waiting:
         log.append(outage.pace_note(cfg, waiting, "analys" + ("is" if waiting == 1 else "es")))
     return alerts

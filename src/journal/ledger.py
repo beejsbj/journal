@@ -149,13 +149,18 @@ SEND_KEYS = (SEND_KEY_NEW, SEND_KEY)  # a record's name for its send, in the ord
 
 
 def send_of(rec) -> dict:
-    """The record's send, read: under ``chat`` when it holds one, else under ``telegram``, else ``{}``. Not the
+    """The record's send, read: the one of ``chat`` / ``telegram`` that says it was sent or skipped, else the first that
+    holds anything (``chat`` before ``telegram``), else ``{}`` (review of #83: a rolled-back tick can leave
+    ``chat: {mirrored: True}`` beside ``telegram: {message_id: …}``, and the flag alone must not read as unsent). Not the
     record's own dict when it has none, so a reader never makes a key by looking."""
     if isinstance(rec, dict):
-        for key in SEND_KEYS:
-            found = rec.get(key)
-            if isinstance(found, dict) and found:
-                return found
+        held = [rec.get(key) for key in SEND_KEYS]
+        held = [d for d in held if isinstance(d, dict) and d]
+        for d in held:  # the one that says what happened (sent or skipped) wins over one holding only a flag
+            if d.get("message_id") or d.get("skipped"):
+                return d
+        if held:
+            return held[0]
     return {}
 
 

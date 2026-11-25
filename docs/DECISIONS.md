@@ -557,7 +557,12 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     (`test_reflect.py`, `test_mirror.py`, `test_outage.py`), and the golden engine tests only if they hold a ledger.
 
 ## Taken by packages (recorded here; later packages follow them)
-
+ **On review (2026-11-25):** the double-send guard is the tick's and the CLI's version, not the gateway's (the gateway
+  never sends a reflection; doctor's `same version as tick` row shows the tick's): release 2 ships only once the tick and
+  CLI run release 1 or later, and **its rollback goes to release 1 or later, never before it** (a tick from before
+  release 1 reads a `chat` send as unsent and sends it again). The gateway restart stays the condition for the
+  companion's context. `send_of` already prefers the name that says sent or skipped, and the mirror reference is
+  `ledger.SEND_KEY`, so release 2 is the one constant. Config: the new source name wins whatever layer it is set in.
 - **WP0 — an unknown entry id is recognised only with the engine's authorship marker.** The spec's fallback
   (`kind: <id>` or `practice: <id>` in the file's own front matter) alone would have turned a hand-written
   `2026-10-20-thoughts.md` with `kind: thoughts` into an engine entry, and `journal_add_note` (whose default
