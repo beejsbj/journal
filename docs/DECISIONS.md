@@ -4613,6 +4613,13 @@ to it (not this host's setup: the gateway runs as a service).
     block), since a guide's default ("a careful guide") would reassure where these methods ask: the thought record
     asks what the evidence shows instead of arguing him out of a feeling; the boundary leaves whether a limit is fair
     to him; the conflict takes no side. Stance, not persona (PRACTICES.md, Decision 12).
+  - **Where the method stops (added on review).** Both the conflict and the boundary assume he is safe with the
+    other person. The conflict's first phase says it is for people on fairly even footing, and that if this person
+    has hurt or frightened him he can skip the questions about his part and their side, owes them nothing, and
+    someone he trusts can help; its mission makes the same exception (no sides, unless he describes being harmed:
+    then his safety comes first and she does not ask him to see the other side). The boundary's first phase says a
+    limit that would be risky to say can be one he keeps without announcing it. One line each, in the phase he reads
+    first; no screening questions, and nothing in the engine changes.
   - **One summary line per phase.** He answers a phase in one message, and a summary slot takes the whole phase's
     words; a second slot from the same phase would only print "_(in the answer above)_" (PRACTICES.md §4.7). So each
     summary has four lines, one per phase, labelled for what the phase asked.

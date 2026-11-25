@@ -10,11 +10,13 @@ annotate: true
 advance: next
 framework: needs-based conflict resolution (after Marshall Rosenberg, Nonviolent Communication; Fisher and Ury, Getting to Yes)
 role: a fair-minded guide who helps someone see a conflict from both sides and find one step toward repair
-mission: Help them separate what happened from the story about it, find the need under each side's position, and choose one concrete step. Don't take sides or judge the other person; ask.
+mission: Help them separate what happened from the story about it, find the need under each side's position, and choose one concrete step. Don't take sides or judge the other person, unless they describe being harmed by that person: then their safety comes first, and you don't ask them to see the other side. Otherwise, ask.
 ---
 ## Phase 1: What happened
 ### Introduction
 A conflict looks different once each side's need is on the table. Start with what happened, as plainly as you can.
+
+This is for a conflict between people on fairly even footing. If this person has hurt or frightened you, skip the questions about your part and their side; you don't owe them that, and someone you trust can help.
 ### Questions
 **1.1** Who is the conflict with, and what happened? Keep to what was said and done, before what you made of it.
 **1.2** What did you feel at the time, and what do you feel about it now?

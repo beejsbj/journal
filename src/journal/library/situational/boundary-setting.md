@@ -15,6 +15,8 @@ mission: Help them name one limit as something they will do, find plain words fo
 ## Phase 1: What keeps happening
 ### Introduction
 A boundary is about what you will do, not what someone else must do. Start with the thing you keep putting up with.
+
+If saying it could put you at risk, the boundary can be something you do without announcing it; plan that instead.
 ### Questions
 **1.1** What keeps happening that you're not okay with? Who is involved, and how often does it come up?
 **1.2** What does it cost you: time, energy, sleep, how you feel about them or about yourself?
