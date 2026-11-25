@@ -55,13 +55,16 @@ mirror._mirror_to_session = _no_mirror  # tests that mirror patch journal.mirror
 
 import contextlib  # noqa: E402
 
+from journal import audio  # noqa: E402
+
 
 @contextlib.contextmanager
 def no_model():
     """README *Guarantees*, "the web app calls no model", held by behaviour (issue #3): while open, every way a model
     is reached records the attempt and fails. That is ``agent.ask`` (the facade every model step calls), every
     companion ``Config.companion()`` hands out (its ``ask``; the outage probe asks the same one), and the companion
-    classes' own ``ask`` (one built without ``Config.companion``). Yields the list of attempts: the caller asserts it
+    classes' own ``ask`` (one built without ``Config.companion``), and ``audio.transcribe`` (speech-to-text, a model
+    run by a command or Hermes' own STT). Yields the list of attempts: the caller asserts it
     is empty, so a failure a route catches and swallows still fails the test.
 
     The fence is at ``ask``, not at building a companion: ``journal doctor`` (``GET /api/v1/doctor``) builds the
@@ -89,7 +92,8 @@ def no_model():
     with mock.patch.object(Config, "companion", lambda self: Fenced(real(self))), \
             mock.patch.object(agent, "ask", refuse("agent.ask")), \
             mock.patch.object(agent.CommandCompanion, "ask", refuse("CommandCompanion.ask")), \
-            mock.patch.object(agent.NoCompanion, "ask", refuse("NoCompanion.ask")):
+            mock.patch.object(agent.NoCompanion, "ask", refuse("NoCompanion.ask")), \
+            mock.patch.object(audio, "transcribe", refuse("audio.transcribe")):
         yield calls
 
 PERSON = Names(user="Theo", companion="Iris", emoji="🌻", pronouns="he/him/his", frontmatter_source="iris-journal")

@@ -220,21 +220,22 @@ class PrivacyTest(ServeCase):
         ``agent.ask``, which ``helpers`` keeps as ``real_ask``), and a failure swallowed by its caller is still
         counted."""
         from helpers import real_ask
-        from journal import agent
+        from journal import agent, audio
         self.cfg.agent = {"command": ["true"]}   # a companion that would answer: the fence must stop it first
         with no_model() as asked:
             for where, run in (("Config.companion", lambda: self.cfg.companion().ask("q", 5)),
                                ("agent.ask", lambda: agent.ask(self.cfg, "q", 5)),
                                ("the facade", lambda: real_ask(self.cfg, "q", 5)),
                                ("CommandCompanion", lambda: agent.CommandCompanion(self.cfg).ask("q", 5)),
-                               ("NoCompanion", lambda: agent.NoCompanion(self.cfg).ask("q", 5))):
+                               ("NoCompanion", lambda: agent.NoCompanion(self.cfg).ask("q", 5)),
+                               ("audio.transcribe", lambda: audio.transcribe(self.cfg, "voice.ogg"))):
                 with self.subTest(where), self.assertRaises(AssertionError):
                     run()
             try:
                 self.cfg.companion().ask("q", 5)
             except Exception:  # noqa: BLE001 - a route that swallows the failure
                 pass
-        self.assertEqual(len(asked), 6)
+        self.assertEqual(len(asked), 7)
 
     def test_doctor_checks_the_companion_without_asking_it(self):
         """``GET /api/v1/doctor`` builds the configured companion for its ``one-shot tools`` row when the Hermes
