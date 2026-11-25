@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
+from helpers import unkeyed
 from serve_helpers import HERS, IST, NOW, ServeCase
 
 from journal import capture, cli, ledger, library
@@ -120,7 +121,7 @@ class NotesTest(WriteCase):
         got = self.ok("POST", "/api/v1/entries", {"practice": "morning", "text": "Slept well.\n\nTwo lines."}, want=201)
         self.assertEqual((got["stem"], got["rule"]), ("2026-10-15-morning", "web"))
         self.assertTrue(got["path"].endswith("2026-10-15-morning.md"))
-        self.assertIn("### 09:12 IST · text\n\nSlept well.\n\nTwo lines.\n", self.entry("2026-10-15-morning"))
+        self.assertIn("### 09:12 IST · text\n\nSlept well.\n\nTwo lines.\n", unkeyed(self.entry("2026-10-15-morning")))
         p = self.prompt("2026-10-15-morning")
         self.assertTrue(p["needs_edit"])
         self.assertEqual((p["captures"][0]["rule"], p["captures"][0]["source"]), ("web", "web"))
@@ -545,7 +546,7 @@ class BlocksTest(WriteCase):
         self.assertTrue(after[s:].startswith(words_before))                 # every word of his is still there, in place
         self.assertEqual(after[:s], before[:s])                             # the prompt and front matter: untouched
         self.assertEqual(after[after.index("## Conversation"):], before[e:])  # her side, the conversation, notes: untouched
-        self.assertIn("### 09:12 IST · text\n\nOne more thought.", after)
+        self.assertIn("### 09:12 IST · text\n\nOne more thought.", unkeyed(after))
         p = self.prompt("2026-10-14-evening")
         self.assertEqual(len(p["captures"]), 2)
         self.assertEqual((p["captures"][1]["rule"], p["captures"][1]["via"]), ("web", "web"))

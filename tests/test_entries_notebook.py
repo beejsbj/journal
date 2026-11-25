@@ -5,7 +5,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from helpers import add_prompt, make_cfg
+from helpers import add_prompt, make_cfg, unkeyed
 
 from journal import capture, entries, ledger, notebook, tools
 
@@ -73,7 +73,7 @@ class PerEntryTest(unittest.TestCase):
             info = capture.record(self.cfg, prompt, "direct-reply", "slept okay", self.base + timedelta(hours=1),
                                   "voice", "9", "2026-10-14-morning-063000.ogg")
         body = Path(info["path"]).read_text()
-        self.assertIn("· voice transcript\n\n![[2026-10-14-morning-063000.ogg]]\n\nslept okay", body)
+        self.assertIn("· voice transcript\n\n![[2026-10-14-morning-063000.ogg]]\n\nslept okay", unkeyed(body))
 
 
 class EntryKindsTest(unittest.TestCase):
