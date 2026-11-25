@@ -5214,11 +5214,14 @@ input found). A label the floor refuses answers 422 `off-the-record`, as the rou
     both forms.
   - **Only more private.** A random-order comparison of main's pass against this one (stored orders in the shapes the
     hook and Hermes write, text and native image modes, documents, videos, compaction copies, queued rows, prompt
-    sends) found no row public here that main made private, and no window changed; the rows it made private were
-    marked rows of his and her rows in the turns that took them in (the PR has the numbers). Nothing that holds no
+    sends; 3,000 orders, 30,615 rows) found no row public here that main made private, no window changed and no end
+    taint lost; the 7,791 rows it made private were marked rows of his (6,669) and her rows in the turns that took
+    them in. Nothing that holds no
     mark changed: an unmarked captionless photo, document or video outside a window, and her reply to it, are still
     public (`NotTightenedTest`).
   - **Cost and limit.** A compaction frame (a `system` user row) whose summary quotes the hook's marker is now private
     and taints her next turn: it errs private, and the frame can hold the private words it summarises. Tests:
-    `tests/test_privacy_x_photo.py`, each failing on main except the native-mode and not-tightened cases (main
-    already read a native row's marker as his words).
+    `tests/test_privacy_x_photo.py`: on main 30 of its cases fail (every text-mode, document and video shape, the
+    caption reader, a recorded id alone, and a window-marked text or document row read as outside the window); the
+    native-mode shapes and a description holding a blank line pass there too (main already read those rows' marker
+    as his words), as do the not-tightened cases.
