@@ -82,25 +82,21 @@ opener.limit: 1400
 opener.plain: {greet:Evening} Let the day land. Answer whatever pulls at you; you don't need to do them all.
 companion: closure — process the day, release, carry forward one thread
 ---
-## 1. Brain Dump & Letting Go
-- What's spinning in your mind?
-- What do you need to release before sleep?
+## 1. Arriving
+- What are you feeling right now? Find a word for it, or a few. What might be behind it?
+- What's spinning in your mind? What do you need to put down before sleep?
 
-## 2. Day Review
-- What went well today?
-- What challenged you?
-- What did you learn?
+## 2. The Day
+- What went well today? Where were you present, patient or kind? Let yourself be glad of it.
+- What's the moment from today you'd tell as a story, even a small one?
+- What gave you energy, and what drained it?
+- Who showed up for you, and who did you show up for?
 
-## 3. Story-Worthy Moments
-- What interesting moments happened, even if small?
-- What made you smile or laugh?
-- What surprised you?
-
-… sections 4–10 exactly as `questions.EVENING` …
+… sections 3–5 as in the file (one moment looked at again, the best part of you, closing) …
 ```
 
 Rules: `## N. Title` sections hold `- ` questions; a body with no `## ` lines is a flat list (morning: ids
-`1..11`). Numbering in the heading is optional and ignored (ids are positional). `emoji:` empty means "use
+`1..8`). Numbering in the heading is optional and ignored (ids are positional). `emoji:` empty means "use
 `companion.emoji`" (today's behaviour); a value overrides it for this practice. `{greet:Word}` in
 `opener.plain` renders as today's `compose.plain_opener` greeting (`Word, Sam 📓` / `Word.`); `{title}`,
 `{user}`, `{emoji}` are also available.

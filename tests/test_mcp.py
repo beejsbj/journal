@@ -181,7 +181,7 @@ class VoicesTest(Case):
         self.assertGreater(len(bank), 1)
         text = handlers.render_document(doc)
         sent = text.split("## Prompt (sent by the journal)")[1].split("\n## ")[0]
-        self.assertIn("- 1.1: What's spinning in your mind?", sent)
+        self.assertIn("- 1.1: What are you feeling right now? Find a word for it, or a few. What might be behind it?", sent)
         for q in bank[1:]:
             self.assertNotIn(q, sent, "a question that was not asked is listed as sent")
 
@@ -353,7 +353,7 @@ class StartTest(Case):
             got = handlers.start(self.cfg, "evening", NOW)
         self.assertEqual((got["practice"], got["slot"]["id"], got["slot"]["step"]), ("evening", "2026-10-15-evening", 3))
         self.assertTrue(got["prompt"]["opener"].startswith("Evening"))
-        self.assertIn("What's spinning in your mind?", [q["text"] for q in got["prompt"]["questions"]])
+        self.assertIn("What are you feeling right now? Find a word for it, or a few. What might be behind it?", [q["text"] for q in got["prompt"]["questions"]])
         self.assertIn("journal_save", got["next"])
         self.assertEqual((_digest(self.cfg.root), self.cfg.ledger_path.read_bytes()), (before, ledger_before))
         self.assertEqual(handlers.start(self.cfg, "evening-journal", NOW)["practice"], "evening")  # the legacy alias

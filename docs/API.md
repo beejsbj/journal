@@ -67,8 +67,8 @@ entry parser), never a second model.
   "title": "Evening journal — Wed 14 Oct 2026",
   "voices": {"his": "Sam", "hers": "Ada"},
   "prompt": {"sent_at_local": "23:00 IST", "opener": "…", "opener_source": "ada",
-             "asked": [{"id": "9.2", "question": "What simple joys touched you today?"}],
-             "questions": [{"id": "1.1", "text": "What's spinning in your mind?", "section": "Brain Dump & Letting Go"}],
+             "asked": [{"id": "5.1", "question": "What are you grateful for from today?"}],
+             "questions": [{"id": "1.1", "text": "What are you feeling right now? …", "section": "Arriving"}],
              "phases": []},
   "blocks": [
     {"kind": "his", "key": "words:0", "at": "23:12 IST", "source": "text", "text": "…", "audio": null, "phase": null},

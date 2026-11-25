@@ -4588,3 +4588,47 @@ line of his that copies the mark never leaves a bound on her later searches. An 
 that echoes it has the line dropped. Left as known: `journal_search` refuses in a finite turn the engine did not start
 (a kanban card, his own `hermes chat -q`); an engine one-shot that starts a gateway itself would pass its variables
 to it (not this host's setup: the gateway runs as a service).
+
+- **BOOKENDS (2026-11-24) — the built-in morning and evening fold in the questions of #58 §1 (the owner's choices,
+  2026-11-24).** The first deliberate change to the words of two built-ins since they became files. What he chose: the
+  mentor slot is "the best part of yourself", everywhere (no private variant); the morning intention ends with **no
+  reserve clause** ("fate permitting", "God willing"), in the built-in too; the change comes as a PR he reads.
+  - **Folded, not piled up.** The morning goes from 11 questions to 8 (still a flat list: ids `1`–`8`), the evening
+    from 10 sections and 23 questions to 5 sections and 10. Both are answered the same way as before (whatever pulls;
+    the plain opener already says so), so a shorter bank asks less of a tired morning or night. The companion's
+    lines (`companion:`), the opener shapes and limits, the times and every other key are unchanged.
+  - **Where each old question went** (morning): sleep kept (1); "how are you feeling" and "what's on your chest" are
+    now the feelings check (2); "what would make today deeply satisfying" became the heart's desire (3); gratitude
+    kept (4); top priority and the supporting goals are "what matters most today" (5); "any worries, what's the plan"
+    is the rehearsal of the hard moment with the mentor line (6); "who needs your support" kept (7); the values
+    experiment and the centering mantra are the one intention (8). (Evening): "what's spinning, what to release" is
+    1.2, after the feelings check (1.1); "what went well", the wins and "appreciate yourself" are 2.1; the
+    story-worthy, smile and surprise questions are 2.2; energy 2.3; "who showed up" 2.4; "what challenged you" is the
+    one moment of the Mindful Review (3.1, 3.2); values and alignment are the mentor line (4.1); gratitude 5.1; "what
+    to carry into sleep" 5.2 with the close. Dropped: "what did you learn", the insights section, "attention bids",
+    "which connections did you lean into" and "what brought you peace". The PR's body has the full before and after.
+  - **The order** follows the research brief behind #58: the feelings check opens both; the evening looks at what went
+    well before the one moment (the Mindful Review congratulates first), and ends looking forward, not at fault. The
+    review's tone is said in the question itself ("regret what deserves it, and leave out the guilt and the
+    self-blame"), since a nightly review drifts toward self-prosecution unless the words stop it. One moment, not
+    several: the source's own warning is that more becomes a burden.
+  - **Lineage** (structure and ideas adapted; every line is new wording; nothing is quoted): the feelings check from
+    Jonice Webb, *Running on Empty* (Identifying and Naming); the heart's desire from *The Book of Joy* (Morning
+    Intention Setting); the rehearsal and the mentor from Donald Robertson, *How to Think Like a Roman Emperor*
+    (ch. 3), with Marcus Aurelius 2.1 behind it; the one moment from *The Mind Illuminated*, Appendix E (Mindful
+    Review: regret, resolve and recompense, no guilt); the close from Seneca, Letter 12 ("I have lived"); the story
+    question from Matthew Dicks, *Storyworthy* (Homework for Life). A practice file has no place for a source line
+    (`library.render` keeps no comments), so the lineage lives here and in the PR.
+  - **Left out on purpose.** The reserve clause (his choice). The Golden Verses' "reprove yourself" (the Mindful
+    Review's no-guilt rule wins, as the brief recommends). Galen's two questions and the imaginal premeditation of
+    adversity (too long for a daily practice). The 3-2-1 insert (its own deck, #58 part 2).
+  - **History and edits.** Ids are positional, so `2.1` now names another question. Nothing already written moves:
+    an entry keeps the bank it was sent with, and a ledger record's `asked` keeps the text it wove in. If he has edited
+    either built-in, his version stays and the Library says the default has changed since (BUILTIN-EDIT).
+  - **Goldens.** `tests/golden/morning.*` and `evening.*` are regenerated (`python3 tests/test_golden.py --write`, a
+    switch this change adds beside `test_golden_engine.py --write`; midweek and weekly come out byte-identical, which
+    is the check that the writer reproduces the old goldens). The tests that pinned an old question (as a sample of
+    the evening's bank) now pin the new one at the same place.
+  - **Not changed, noted:** `prompts.OPENER_REQUEST`'s example ("what simple joys touched you today?" turned into
+    "what was cozy about today?") names a question the evening no longer has. It is an example of the move, not a
+    question to ask, and changing it would rewrite every opener request; left as it is.

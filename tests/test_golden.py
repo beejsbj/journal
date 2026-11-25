@@ -5,11 +5,14 @@
 ``asked:`` is checked against, the Telegram HTML and archived plain text for a fixed date and opener, and the
 plain (no-model) opener for four shapes of names. A change here is a change to what he receives, so it is
 never made by accident: regenerate the goldens only on purpose, with the reason in the commit.
+``python3 tests/test_golden.py --write`` rewrites them from the files as they are (BOOKENDS, 2026-11-24, the first
+deliberate change to the morning and evening).
 
 ``PracticeFilesTest`` holds the practice files themselves to the same goldens and to the code they replace
 in WP2 (opener shapes and limits, the times the rituals had as config defaults), so the engine can switch to reading them without
 anything he receives changing."""
 import json
+import sys
 import unittest
 from datetime import datetime
 from pathlib import Path
@@ -116,5 +119,22 @@ class PracticeFilesTest(unittest.TestCase):
         self.assertEqual(gen.main(["--check"]), 0)
 
 
+def write() -> None:
+    """The goldens from the files as they are: for a deliberate change to a built-in, never to make a test pass."""
+    for k in KINDS:
+        p = library.builtins()[k]
+        (GOLDEN / f"{k}.bank_lines.txt").write_text("\n".join(p.bank_lines()) + "\n", encoding="utf-8")
+        (GOLDEN / f"{k}.bank_with_ids.txt").write_text(p.bank_with_ids() + "\n", encoding="utf-8")
+        (GOLDEN / f"{k}.bank_items.json").write_text(
+            json.dumps(p.items(), ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        (GOLDEN / f"{k}.telegram.html").write_text(compose.telegram_html(k, FIXED, OPENER), encoding="utf-8")
+        (GOLDEN / f"{k}.plain.txt").write_text(compose.plain_text(k, FIXED, OPENER), encoding="utf-8")
+        (GOLDEN / f"{k}.plain_opener.txt").write_text(
+            "\n".join(compose.plain_opener(k, n) for n in OPENER_NAMES) + "\n", encoding="utf-8")
+
+
 if __name__ == "__main__":
-    unittest.main()
+    if "--write" in sys.argv:
+        write()
+    else:
+        unittest.main()

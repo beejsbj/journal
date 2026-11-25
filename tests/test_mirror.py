@@ -230,7 +230,7 @@ class SendMirrorTest(CleanEnv):
         self.assertEqual(call["role"], "user")
         self.assertEqual(body, self.prompt()["plain_text"])
         self.assertIn("Evening, Theo 🌻", body)  # the opener ...
-        self.assertIn("What's spinning in your mind?", body)  # ... and the question bank
+        self.assertIn("What are you feeling right now? Find a word for it, or a few. What might be behind it?", body)  # ... and the question bank
         self.assertIs(self.prompt()["mirrored"], True)
 
     def test_a_manual_resend_says_so(self):
@@ -298,7 +298,7 @@ class AnnotationAndReflectionMirrorTest(ReflectBase):
 
 
 MIRRORED = ("[Journal: Iris sent the evening prompt at 23:01 IST]\n🌻 Evening journal · Wed 14 Oct\n\n"
-            "Evening 🌻 the river was loud with rain and the lamps came on early.\n\n1. Brain Dump")
+            "Evening 🌻 the river was loud with rain and the lamps came on early.\n\n1. Arriving")
 
 
 class NeverHisWordsTest(unittest.TestCase):

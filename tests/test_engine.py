@@ -59,9 +59,9 @@ class ComposeTest(unittest.TestCase):
         html = compose.telegram_html("morning", datetime(2026, 10, 14, 6, 0, tzinfo=IST), "Tea & <toast>?")
         self.assertIn("<blockquote expandable>1. How did you sleep?", html)
         ev = compose.telegram_html("evening", datetime(2026, 10, 14, 23, 0, tzinfo=IST), "x")
-        self.assertIn("<b>1. Brain Dump &amp; Letting Go</b>\n- What's spinning in your mind?", ev)
+        self.assertIn("<b>1. Arriving</b>\n- What are you feeling right now? Find a word for it, or a few. What might be behind it?", ev)
         self.assertIn("Tea &amp; &lt;toast&gt;?", html)
-        self.assertIn("11. What would make today deeply satisfying?", html)
+        self.assertIn("8. One intention for today, in a sentence.", html)
 
     def test_folded_state_has_no_opener(self):
         html = compose.telegram_html("evening", datetime(2026, 10, 14, 23, 0, tzinfo=IST), None, "missed — reply anytime")
@@ -331,13 +331,13 @@ class TickSendTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as t:
             cfg = make_cfg(Path(t))
             raw = json.dumps({"opener": "Evening 🌻 how did the day land?", "citations": [],
-                              "asked": [{"id": "9.2", "as": "cozy?"}]})
+                              "asked": [{"id": "5.1", "as": "cozy?"}]})
             with mock.patch.object(context, "build", lambda c, n, *a: "pack"), \
                     mock.patch("journal.agent.ask", lambda *a, **k: raw):
                 opener, source, _c, asked = tick._opener(cfg, "evening", datetime(2026, 10, 14, 23, 0, tzinfo=IST),
                                                          "2026-10-14-evening")
             self.assertEqual(source, "iris")
-            self.assertEqual([a["id"] for a in asked], ["9.2"])
+            self.assertEqual([a["id"] for a in asked], ["5.1"])
 
 
 class VerifierTest(unittest.TestCase):
@@ -487,11 +487,11 @@ class FoldRetryTest(unittest.TestCase):
 
 class WovenQuestionsTest(unittest.TestCase):
     def test_ids_and_asked_filtering(self):
-        self.assertEqual(library.builtins()["evening"].items()["9.2"], "What simple joys touched you today?")
-        self.assertEqual(library.builtins()["morning"].items()["11"], "What would make today deeply satisfying?")
-        d = {"opener": "x", "asked": [{"id": "9.2", "as": "What was cozy today?"}, {"id": "99", "as": "bogus"}]}
+        self.assertEqual(library.builtins()["evening"].items()["5.1"], "What are you grateful for from today?")
+        self.assertEqual(library.builtins()["morning"].items()["8"], "One intention for today, in a sentence.")
+        d = {"opener": "x", "asked": [{"id": "5.1", "as": "What was cozy today?"}, {"id": "99", "as": "bogus"}]}
         got = validate.asked("evening", d)
-        self.assertEqual([a["id"] for a in got], ["9.2"])
+        self.assertEqual([a["id"] for a in got], ["5.1"])
         self.assertEqual(got[0]["as"], "What was cozy today?")
 
     def test_longer_woven_opener_allowed_but_not_a_pasted_list(self):

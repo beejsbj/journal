@@ -13,13 +13,10 @@ opener.plain: {greet:Morning} Start wherever something feels alive — one line 
 companion: orientation — where they are, what matters today
 ---
 - How did you sleep?
-- How are you feeling — physically, mentally, emotionally?
-- What's on your chest right now?
-- Which of your values will you experiment with today?
-- What's your centering mantra?
-- Two things you're grateful for — why?
-- Top priority today?
-- 2-3 supporting goals for a successful day?
-- Any worries about the day ahead? What's the plan?
-- Who needs your support today? How will you show up?
-- What would make today deeply satisfying?
+- What are you feeling right now? Find a word for it, or a few. What might be behind it?
+- What does your heart want today: for you, for the people you love, for the world?
+- Two things you're grateful for, and why.
+- What matters most today?
+- Where is today likely to get hard? What would the best part of yourself do there? Picture yourself meeting it a little better than usual.
+- Who needs you today, and how will you show up?
+- One intention for today, in a sentence.
