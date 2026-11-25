@@ -26,6 +26,16 @@ says the import fence is direct, not transitive. Found and pinned, not changed: 
 `hook-state.json` (for the today block's counts, which API.md documents) and `sweep.json` (its watermark); the owner's
 choice is open in DECISIONS.md, ROUTE-OPENS. DECISIONS.md, ROUTE-OPENS.
 **Side and restart.** None: no file under `src/` changes. Moving the pins to this sha is optional and needs no restart.
+
+## MODEL-WALK — the route walks fence every way to a model (2026-11-24; tests and docs only; **no deploy, no restart**)
+
+**What changes.** Tests only (issue #3): `tests/helpers.py` gains `no_model()`, which records and fails every way to a
+model (`agent.ask`, the companion `Config.companion()` hands out, the companion classes' own `ask`), and the serve
+route walks (`test_serve_privacy.py`: GET, write and push routes, the Write-now view) and the MCP tool walk
+(`test_mcp.PrivacyTest`) run inside it, so a route that reached a model through a module serve loads fails the suite
+even when the route swallows the failure. README *Guarantees* and AGENTS.md say so. DECISIONS.md, MODEL-WALK.
+**Side and restart.** None: no file under `src/` changes, so nothing an install runs changes. Moving the pins to this
+sha is optional and needs no restart.
 **First checks.** None on the host; CI's suite is the check.
 **Rollback.** Nothing to roll back on a host.
 

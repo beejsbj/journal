@@ -109,8 +109,9 @@ Read `docs/DECISIONS.md` before changing anything, and your package's section of
   the notebook (mcp no model either). The fence is direct, not transitive: loading serve still loads some of those
   modules through the engine (`tests/test_route_opens.py` pins which), so what holds is behaviour:
   `tests/test_route_opens.py` walks every route and tool recording every file opened, and fails on one under
-  `state_dir` outside its allowlist or on the chat transcript. `tests/test_serve_privacy.py` runs every route with `sqlite3.connect` failing; a new route gets a
-  sample there.
+  `state_dir` outside its allowlist or on the chat transcript. `tests/test_serve_privacy.py` runs every route with
+  `sqlite3.connect` failing and every way to a model fenced (`helpers.no_model`; `test_mcp.py` does the same for every
+  tool); a new route gets a sample there.
 - **The engine owns sending and capture.** Serve, MCP and the companion spawn `journal send` / `journal program`; an
   HTTP worker never holds `tick.lock`.
 - **The core is stdlib.** `dependencies = []`; PyYAML (`journal[hermes]`), the MCP SDK (`journal[mcp]`) and

@@ -4642,6 +4642,20 @@ to it (not this host's setup: the gateway runs as a service).
   `sweep.json`; pinned to that route as `STATUS_ONLY` (`test_only_status_reads_these`) and raised above (ROUTE-OPENS,
   open) rather than changed here, since API.md documents part of it.
 
+- **MODEL-WALK (2026-11-24) — "the web app calls no model" is fenced by behaviour at `ask`, not at building a
+  companion (issue #3).** The import fence (`test_serve_fence.py`) sees only what `serve/` imports itself; serve
+  loads `reflect`, which imports `agent`, so a route could reach a model by another module. `helpers.no_model()` now
+  records and fails `agent.ask`, the `ask` of every companion `Config.companion()` hands out (the outage probe asks the
+  same one) and the companion classes' own `ask`, and every serve route walk and the MCP tool walk run inside it and
+  assert nothing was recorded, so a route that catches the failure still fails the suite. **Why at `ask` and not
+  `Config.companion()` raising, as the issue first put it:** `journal doctor` (`GET /api/v1/doctor`) builds the
+  configured companion to read its `doctor_rows` (the `one-shot tools` row: a check of files, no model run) and
+  catches whatever that raises, so a raise there would be swallowed, and would wrongly fail the walk on any host
+  where the Hermes command is found. `test_doctor_checks_the_companion_without_asking_it` runs that branch through
+  the fence; `test_the_model_fence_is_not_vacuous` shows each watched way records. Verified by mutation: a swallowed
+  `reflect.agent.ask` call in the doctor route fails the GET walk. Not fenced here: a model reached by a process
+  serve spawns (`journal send`, `journal program`), which is the engine's own step with its usual fallback.
+
 - **AUDIT-LEFTOVERS (2026-11-24) — what issue #50 took, and what it left.** Taken: (1) the web's `/status` serves
   `sweep` as `{at}`: the doc listed `sweep.json` as unservable, and its database path and row id are chat-side, so the
   web gets the time alone (the CLI's status line is unchanged); (2) `/status` and the hook state: already so on main

@@ -22,7 +22,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from unittest import mock
 
-from helpers import CleanEnv, add_prompt, make_cfg
+from helpers import CleanEnv, add_prompt, make_cfg, no_model
 from serve_helpers import HERS, IST, NOW, build_journal
 
 from journal import cli, ledger
@@ -370,7 +370,8 @@ class StartTest(Case):
 
 class PrivacyTest(Case):
     """No tool opens the chat transcript: every handler runs with ``sqlite3.connect`` made to fail, and the journal
-    beside it has a sessions database holding a chat thread (``build_journal``)."""
+    beside it has a sessions database holding a chat thread (``build_journal``). Nor does any reach a model: every way
+    to one is fenced too (``helpers.no_model``)."""
 
     def test_no_tool_opens_a_database(self):
         add_prompt(self.cfg, kind="morning", local_date="2026-10-15", sent=NOW - timedelta(hours=2), message_id="900")
@@ -380,7 +381,7 @@ class PrivacyTest(Case):
             calls.append(a)
             raise AssertionError("a tool opened a database")
 
-        with mock.patch.object(sqlite3, "connect", refuse):
+        with mock.patch.object(sqlite3, "connect", refuse), no_model() as asked:
             runs = [lambda: handlers.today_text(self.cfg, NOW),
                     lambda: handlers.entry_list(self.cfg, NOW, query="harbour"),
                     lambda: handlers.entry_text(self.cfg, "2026-10-14-evening"),
@@ -397,6 +398,7 @@ class PrivacyTest(Case):
             with self.assertRaises(handlers.Refused):
                 handlers.save(self.cfg, NOW, "/x no")
         self.assertEqual(calls, [])
+        self.assertEqual(asked, [])
 
 
 EDITING = ("edit", "delete", "remove", "update", "replace", "rewrite", "patch", "set", "write", "overwrite", "amend",
