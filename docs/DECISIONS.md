@@ -4588,3 +4588,40 @@ line of his that copies the mark never leaves a bound on her later searches. An 
 that echoes it has the line dropped. Left as known: `journal_search` refuses in a finite turn the engine did not start
 (a kanban card, his own `hermes chat -q`); an engine one-shot that starts a gateway itself would pass its variables
 to it (not this host's setup: the gateway runs as a service).
+
+- **ONE-SESSION-PROGRAMS (2026-11-24) — a thought record, setting a boundary and working through a conflict ship as
+  one-file programs (issue #1; PROGRAM-KINDS, package 7, content only).** Three new built-in definitions in
+  `library/situational/`: `thought-record` (`/start thought`), `boundary-setting` (`/start boundary`) and
+  `conflict-resolution` (`/start conflict`). Each is four phases of two questions, `advance: next`, ends with a
+  summary filled from his words, and is written fresh: the structure of each method, none of any book's text.
+  - **Written in today's spelling, `kind: situational`.** PROGRAM-KINDS package 1 (the `kind: program` one-file
+    layout, `sources:` in it, `one_at_a_time`) is not built, so a one-file `kind: program` would be refused today.
+    The alias stays for good (PROGRAM-KINDS open point 7), and package 1 respells the built-ins with the rest. What
+    they get from it as built: never refused, never refusing (they start while fix-life is unfinished, as conversation
+    prep does), no insights by themselves, entries named `<date>-<id>.md`, and `expires_hours: 24` (a day to come back
+    to one before it closes).
+  - **The lineage is in `framework:`, not `sources:`.** `sources:` is an unknown key in a one-file definition until
+    package 1; `framework:` is a session key such a file already takes, it names the method a session follows (as
+    fix-life's sessions use it), and nothing sends it for a one-file run (`programs` passes it on for a session file
+    only). Package 1 can move each line to `sources:`. Thought record: the CBT thought record, after Aaron Beck, in
+    the columns Greenberger and Padesky's *Mind Over Mood* made common (situation, feelings rated 0–100, the hot
+    thought, evidence for and against, a balanced thought, the feelings re-rated). Boundary: boundary setting as
+    commonly practised (a limit said as one's own action, plainly, with a plan for its being crossed), pointing to
+    Nedra Glover Tawwab's *Set Boundaries, Find Peace*. Conflict: needs under positions, after Marshall Rosenberg's
+    *Nonviolent Communication* and Fisher and Ury's *Getting to Yes*.
+  - **Each carries `role:` and `mission:`,** the companion's stance on the turns that answer a phase (the program
+    block), since a guide's default ("a careful guide") would reassure where these methods ask: the thought record
+    asks what the evidence shows instead of arguing him out of a feeling; the boundary leaves whether a limit is fair
+    to him; the conflict takes no side. Stance, not persona (PRACTICES.md, Decision 12).
+  - **One summary line per phase.** He answers a phase in one message, and a summary slot takes the whole phase's
+    words; a second slot from the same phase would only print "_(in the answer above)_" (PRACTICES.md §4.7). So each
+    summary has four lines, one per phase, labelled for what the phase asked.
+  - **Kept apart from conversation prep, linked once.** Working through a conflict ends at a first step; its last
+    phase says that if the step is a conversation, `/start prep` readies it. Nothing starts one from the other.
+  - **Ids and words.** The ids are long and plain (`thought-record`), the `/start` words short (`thought`,
+    `boundary`, `conflict`); none is a reserved id or a Hermes command (an alias is a `/start` word, not a command).
+    No golden changes: no practice changed, and no golden covers a one-off's text.
+  - **Tests.** `tests/test_builtin_programs.py`: each loads with no problem, by its alias; every summary slot names a
+    question in its file; each has its lineage and stance; and each runs from `/start` to a completed run whose
+    summary holds his answer to every phase (nothing skipped, nothing "above"), beside a fix-life run left
+    mid-session; and no summary takes two slots from one phase.

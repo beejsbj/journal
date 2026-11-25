@@ -16,6 +16,26 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## ONE-SESSION-PROGRAMS — a thought record, a boundary and a conflict, as one-off programs (2026-11-24; content only; **no gateway restart needed**, one in the next window names them in the companion's skill; no config or state change)
+
+**What changes.** Three new built-in definitions in `src/journal/library/situational/`: `thought-record` (`/start
+thought`), `boundary-setting` (`/start boundary`), `conflict-resolution` (`/start conflict`). Each is four phases on
+`/next` and a summary from his words; none is scheduled, so nothing new arrives in the chat by itself: each starts
+only when he (or the web app's Library, or the companion's offer he accepts) starts it. DECISIONS.md,
+ONE-SESSION-PROGRAMS.
+**Side and restart.** Package data only. `library.load` re-reads the packaged definitions whenever they change, so
+after the plugin pin moves `/start thought` works in the chat (the command path reads the library when it runs), the
+tick runs their phases, and `journal_program` lists them, with no restart. The one thing that waits for a gateway
+restart is the companion's skill: its "Programs" list is rendered when the gateway loads the plugin
+(`hermes/__init__.py`, `programs_list`), so until then she does not see them named there (she still sees them in
+`journal_program status`). Let that ride the next restart window. Serve: `uv tool install --force` at the merge sha
+puts them in the Library; no unit restart needed.
+**First checks.** `journal program status` lists the three; `journal doctor` has no library problem. Optionally, against a temporary journal (never the live one): `journal program start thought-record` and
+`journal program next <run>` four times, then read the entry's `## Summary`.
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
+previous sha). A run of one of them still in progress then names a program the library no longer has: abandon it
+first (`/abandon thought`); its entry stays.
+
 ## HERMES-ONESHOT-ENV — the engine's one-shots are known in the gateway (2026-11-23; tick and hook side; **gateway restart required, with the pin move**; no config or state change; **urgent**: before the late day reflections run)
 
 **What changes.** On a Hermes whose gateway runs every one-shot, a run's environment never reaches the process its
