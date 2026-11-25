@@ -711,11 +711,11 @@ _Woven in: [9.2] What simple joys touched you today?_
 > **1. Brain Dump & Letting Go** …
 
 ## Sam
-%% journal block:b3f9a2c10 %%
 ### 23:12 IST · text
+%% journal block:b3f9a2c10 %%
 <verbatim words>
-%% journal block:b81d07e44 %%
 ### 23:40 IST · voice transcript · 2:31
+%% journal block:b81d07e44 %%
 ![[2026-10-14-evening.ogg]]
 <transcript>
 
@@ -747,7 +747,7 @@ _Woven in: [9.2] What simple joys touched you today?_
 <the companion's own note>
 ```
 
-**Block keys and margin notes.** Each block of your words opens with a hidden key line (`%% journal block:<id> %%`), written with the block and never changed, so a margin note can name the block it answers; don't edit it (deleting the block in the web app takes it along). A margin note is the companion's note on one block of yours, kept at the end of her annotations section under `### Margin notes`: a hidden line with its id, time, state (`open`, `resolved`, `dismissed`) and the block it is on, her words in a callout (folded once it is resolved or dismissed), then the thread under it, your replies as in `## Conversation` and hers in callouts. Her words there are hers and never read as yours; your replies there are yours. Entries from before carry neither and read as they always did (DECISIONS.md, MARGIN-FORMAT; nothing writes margin notes yet).
+**Block keys and margin notes.** Each block of your words carries a hidden key line (`%% journal block:<id> %%`) as the first line under its heading, written with the block and never changed, so a margin note can name the block it answers; it sits under the heading so it moves with the section when you drag or cut sections in your notes app. Don't edit it (deleting the block in the web app takes it along). If a block has paragraph times, their hidden line comes after the key. A margin note is the companion's note on one block of yours, kept at the end of her annotations section under `### Margin notes`: a hidden line with its id, time, state (`open`, `resolved`, `dismissed`) and the block it is on, her words in a callout (folded once it is resolved or dismissed), then the thread under it, each of your replies under its own hidden `his:` line and hers in callouts. Her words there are hers and never read as yours; your replies there are yours, and only those: anything else in the margin, a line typed under a note by hand included, counts as hers. Entries from before carry neither and read as they always did (DECISIONS.md, MARGIN-FORMAT; nothing writes margin notes yet).
 
 **Reflection file** (`2026-10-14-reflection.md`; a week review is the same with `kind: week`, dated the week's last day):
 

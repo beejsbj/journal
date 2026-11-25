@@ -94,12 +94,13 @@ entry parser), never a second model.
 ```
 
 Every `text` is the file's text with `ENGINE_MARK` lines removed; the server never reflows. Every block of his has
-`anchor`: the stable key a margin note names it by (`block:<id>` from the hidden line above a words block's heading,
-`his:<id>` for a conversation message, null for a block written before keys); `key` is the block's name for Edit and
-Delete, as before. `analysis.annotations` is her analysis alone; `analysis.margin` is her margin notes (DECISIONS.md,
-MARGIN-FORMAT): each with the block it is on (`anchor`, or `entry`), when she wrote it, its `state` (`open`,
-`resolved`, `dismissed`) and `closed` time, her words, and its `thread` as blocks (`kind` his or hers). Her note and
-her replies are hers; only his replies in a thread are his words. `reply_to` (his
+`anchor`: the stable key a margin note names it by (`block:<id>` from the hidden line under a words block's heading,
+`his:<id>` for a conversation message, null for a block written before keys and for a later copy of a key already
+used above it); `key` is the block's name for Edit and Delete, as before. `analysis.annotations` is her analysis
+alone; `analysis.margin` is her margin notes (DECISIONS.md, MARGIN-FORMAT): each with the block it is on (`anchor`, or
+`entry` for the entry as a whole and for a block that is gone), when she wrote it, its `state` (`open`, `resolved`,
+`dismissed`) and `closed` time, her words, and its `thread` as blocks (`kind` his or hers). Her note and her replies
+are hers; only his replies under a `his:` key line are his words, and any other text in the margin is hers. `reply_to` (his
 conversation messages) is the quoted line of hers his message answered, from the `↩ replying to` callout the
 conversation writer puts above his message. `prompt.opener`/`asked` come from the ledger record and are null once
 it is pruned. `voices` names the two voices for labels (`names.user`, else "You"; `names.companion`), so the client never guesses a name. Also present: `meta` (`mood`/`people`/`starred` when set) and the entry's `practice` as `{id, title,

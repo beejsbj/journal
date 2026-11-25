@@ -16,35 +16,46 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
-## MARGIN-FORMAT — a stable key on every block of his, and the margin-note record in the entry format (2026-11-25; tick, hook and serve side; **gateway restart**; no config or state change)
+## MARGIN-FORMAT — a stable key on every block of his, and the margin-note record in the entry format (2026-11-25; tick, hook and serve side; **gateway restart**; no config change)
 
-**What changes.** Issue #31, its first step: the entry format only. Every block of his the engine writes now opens
-with a hidden `%% journal block:<id> %%` line above its heading (and above a program's `phase:N` line); a margin note
-is a record at the end of her annotations section, under `### Margin notes` and `%% journal:margin %%`. Readers know
-the margin (her words in it are hers, his replies in a thread his); nothing writes a note yet. The web document gains
-`anchor` on his blocks and `analysis.margin` (always `[]` until notes are written); no web build changes. Old entries
-are not touched and read as before. DECISIONS.md, MARGIN-FORMAT.
+**What changes.** Issue #31, its first step: the entry format only. Every block of his the engine writes now carries
+a hidden `%% journal block:<id> %%` line, the first line under its heading (a program's `phase:N` line stays above
+the heading); a margin note is a record at the end of her annotations section, under `### Margin notes` and
+`%% journal:margin %%`. Readers know the margin (only his replies under a `his:` key line are his; everything else
+there is hers); nothing writes a note yet. The capture record in the ledger gains `block_key` (a new field on new
+captures; nothing reads it yet, older code ignores it). The web document gains `anchor` on his blocks and
+`analysis.margin` (always `[]` until notes are written); no web build changes. Old entries are not touched and read
+as before. DECISIONS.md, MARGIN-FORMAT.
 
-**Side and restart.** `entries.py` (the writer of his blocks) and `reflect.py` are loaded by the gateway at import, so
-a hook capture writes the key line only after `hermes gateway restart`; until then hook captures write blocks without
-it (harmless: such a block reads as one written before keys). The tick picks it up at its next run. Serve and MCP
-(`document.py`, `margin.py`, `mcp/handlers.py`, `serve/blocks.py`): `uv tool install --force` at the merge sha and
-`systemctl --user restart journal-serve`. Ride the next gateway window.
+**Side and order.** One release; deploy in this order:
+1. **CLI and serve first.** `uv tool install --force` at the merge sha (the tick runs the new code from its next run)
+   and `systemctl --user restart journal-serve` (`document.py`, `margin.py`, `mcp/handlers.py`, `serve/blocks.py`).
+   From here on, blocks the tick and the faces write carry the key, and every reader on this side reads it.
+2. **Then the gateway**, in the next window: the plugin at the merge sha and `hermes gateway restart`. The gateway
+   loads `entries.py`, `capture.py` and `reflect.py` at import, so until the restart hook captures write blocks
+   without the key (harmless: such a block reads as one written before keys), and nothing the gateway runs reads a
+   keyed block wrongly before then: an engine line is never his words to older code either. The other way round
+   (gateway first) would leave the old tick, serve and web app reading keyed blocks; see Rollback for what that does.
 
 **First checks.**
-- `journal doctor` green; the import check above lists `journal.entries` and `journal.reflect` (unchanged set, plus
-  nothing new: `journal.margin` loads with `journal.document`, outside the gateway's import).
+- `journal doctor` green; the import check above lists `journal.entries`, `journal.capture` and `journal.reflect`
+  (an unchanged set: `journal.margin` loads with `journal.document`, outside the gateway's import).
 - The next captured reply (any face, or the chat after the restart) has one `%% journal block:b… %%` line right
-  above its `### HH:MM` heading, and nothing else in the file changed: compare the entry before and after with
-  `diff` on a copy, not by printing it.
-- `GET /api/v1/entries/<that stem>`: its block has `"anchor": "block:b…"`, and `analysis.margin` is `[]`.
+  under its `### HH:MM` heading, and nothing else in the file changed: compare the entry before and after with
+  `diff` on a copy, not by printing it. Its capture record has `block_key` equal to that id (read the one field).
+- `GET /api/v1/entries/<that stem>`: its block has `"anchor": "block:b…"`, and `analysis.margin` is `[]`; an Edit of
+  that block from the web app keeps the key line.
+- A voice note after the restart is transcribed into its block (the fill steps over the key line).
 - Vault checksum before and after (only the new block's file differs).
 
 **Rollback.** The usual: the plugin and the CLI at the previous sha, a gateway restart. Files written in between keep
-their key lines; older code reads them as engine lines (never his words). Two known effects until the next forward
-deploy: in a program entry, the older `phase_blocks` carries the next block's key line into an answer's text (a
-summary or insights copy), and the older web app refuses an in-place Edit of the block above a keyed one
-(`not-editable`: edit it in the notes app) and leaves a keyed block's line behind on Delete.
+their key lines; older code reads them as engine lines (never his words). Known effects until the next forward
+deploy (DECISIONS.md, MARGIN-FORMAT, *Older code on a newer file*): the older web app refuses Edit and Delete on every
+block that carries a key line (`not-editable`; nothing is left behind, and they work again after rolling forward); a
+voice note captured after the deploy and transcribed after the rollback keeps its placeholder (the recording is kept;
+set its capture's `transcript` back to `pending` after rolling forward, or transcribe it by hand); the older
+`phase_blocks` reads a keyed answer's key line as its first line, so a program's insights copy made then can carry
+it; a keyed photo block shows its picture embeds as text in the web app.
 
 ## CHAT-2 — one send operation, `chat.deliver`, for the five kinds of send the engine makes on its own (2026-11-25; tick and hook side; **gateway restart**; no config or state change)
 
