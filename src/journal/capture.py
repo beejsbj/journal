@@ -159,7 +159,7 @@ def record(cfg: Config, prompt: dict, rule: str, text: str, now: datetime,
            source: str = "text", platform_message_id: str | None = None, audio: str | None = None,
            meta: dict | None = None, via: str | None = None, transcript: str | None = None,
            data: dict | None = None, client_id: str | None = None, images: list[str] | None = None,
-           describe: bool = False) -> dict:
+           describe: bool = False, times: Sequence[str] = ()) -> dict:
     """Write the reply into the journal and note it on the ledger prompt (caller holds the lock; ``data`` is
     the ledger it holds, so a first reply's entry never takes another prompt's file: ``entry_stem``).
 
@@ -168,6 +168,7 @@ def record(cfg: Config, prompt: dict, rule: str, text: str, now: datetime,
 
     ``images``: the pictures kept with the message (``images.keep``), embedded in the block above his caption (the
     ``text``); ``describe`` asks the tick for the companion's one-line description of each (``images.describe``).
+    ``times``: when each paragraph was begun, already checked (``actions.paragraph_times``): words from a face only.
     """
     refuse_off_record(cfg, text)  # (before anything changes: the record, the entry, the ledger)
     local_now = now.astimezone(cfg.tz)
@@ -176,7 +177,7 @@ def record(cfg: Config, prompt: dict, rule: str, text: str, now: datetime,
     # cost the bank in the file, never the capture
     practice = None if prompt["kind"] in entries.FREEFORM_IDS else library.for_prompt(cfg, prompt)
     written: dict = {}
-    path = write_words(cfg, prompt, text, local_now, source, audio, meta, practice, images or (), written)
+    path = write_words(cfg, prompt, text, local_now, source, audio, meta, practice, images or (), written, times)
     prompt.setdefault("captures", []).append({
         "at": now.isoformat(),
         "rule": rule,
@@ -199,14 +200,15 @@ def record(cfg: Config, prompt: dict, rule: str, text: str, now: datetime,
 
 def write_words(cfg: Config, prompt: dict, text: str, at: datetime, source: str, audio: str | None = None,
                 meta: dict | None = None, practice=None, images: Sequence[str] = (),
-                written: dict | None = None) -> Path:
+                written: dict | None = None, times: Sequence[str] = ()) -> Path:
     """The one caller of ``entries.record_reply``, the function that writes his words into an entry
     (``test_off_record_floor`` holds that): ``refuse_off_record`` first, so the floor holds for ``record`` and for
     ``add_web_block``'s block into an entry with no ledger prompt alike. ``at`` is local time; ``written`` is filled
-    with the new block's key (``entries.record_reply``)."""
+    with the new block's key (``entries.record_reply``); ``times``, already checked (``actions.paragraph_times``), go
+    on the line under that key in the same write."""
     refuse_off_record(cfg, text)
     return entries.record_reply(cfg.root, prompt, text, at, source, audio, cfg.names, meta, practice, images,
-                                written)
+                                written, times)
 
 
 def write_meta(cfg: Config, path: Path, changes: dict[str, str | None]) -> None:
@@ -291,7 +293,8 @@ def block_key(key_of: Callable[[Path], str | None] | None, path: Path) -> str | 
 
 def _web_record(cfg: Config, data: dict, prompt: dict, rule: str, text: str, now: datetime, client_id: str | None,
                 media: str | None, ext: str, meta: dict | None,
-                key_of: Callable[[Path], str | None] | None = None, via: str = WEB_VIA) -> dict:
+                key_of: Callable[[Path], str | None] | None = None, via: str = WEB_VIA,
+                times: Sequence[str] = ()) -> dict:
     """Write one web reply into ``prompt``'s entry (caller holds the ledger lock). An audio file is kept beside
     the entry exactly as the Telegram path keeps one, and waits for the tick's transcript when a backend exists; the
     caption, if any, stays as he wrote it. ``via`` names the face that wrote it (``web``, or ``mcp``): it is the
@@ -305,7 +308,8 @@ def _web_record(cfg: Config, data: dict, prompt: dict, rule: str, text: str, now
         # the client id is its own field, never ``platform_message_id``: that is a Telegram message id, and the
         # tick's annotation reply threads under it
         info = record(cfg, prompt, rule, words, now, "audio" if kept else via, None, kept, meta, via=via,
-                      transcript="pending" if pending else None, data=data, client_id=client_id)
+                      transcript="pending" if pending else None, data=data, client_id=client_id,
+                      times=() if kept else times)
     except BaseException:
         if kept:  # nothing references the copy
             Path(cfg.root, kept).unlink(missing_ok=True)
@@ -366,7 +370,7 @@ class PhaseClosed(Exception):
 def add_web_block(cfg: Config, stem: str, text: str, now: datetime, *, media: str | None = None, ext: str = ".ogg",
                   meta: dict | None = None, client_id: str | None = None, phase_prompt: str | None = None,
                   interrupt_prompt: str | None = None, key_of: Callable[[Path], str | None] | None = None,
-                  via: str = WEB_VIA) -> dict:
+                  via: str = WEB_VIA, times: Sequence[str] = ()) -> dict:
     """Append a block of his words to the engine entry ``stem`` (the caller has checked it is the engine's own
     file). Through the entry's ledger prompt when it still has one, so the tick sees the reply (annotations wait on
     the first one); otherwise straight into the file. Nothing already in the file is touched. A repeated
@@ -386,7 +390,10 @@ def add_web_block(cfg: Config, stem: str, text: str, now: datetime, *, media: st
     ``key_of(path)`` names the block just written (the web document's key for it); it is called under the lock and
     its answer kept with the capture, so a retry returns the first block's key even after others were added.
 
-    ``via``: the face writing (``web``; ``cli`` for ``journal write --entry``), the block's rule, source and via."""
+    ``via``: the face writing (``web``; ``cli`` for ``journal write --entry``), the block's rule, source and via.
+
+    ``times``: when each paragraph was begun (``actions.paragraph_times``), kept with the block; an answer to a
+    program's phase or interrupt keeps none (``entries.record_reply``)."""
     with ledger.locked(cfg.ledger_path) as data:
         done = ledger.capture_of_client(data, client_id)
         if done:
@@ -411,14 +418,16 @@ def add_web_block(cfg: Config, stem: str, text: str, now: datetime, *, media: st
             return _web_record(cfg, data, prompt, via, text, now, client_id, media, ext, meta, key_of, via=via)
         prompt = prompt_of_entry(data, stem)
         if prompt is not None:
-            return _web_record(cfg, data, prompt, via, text, now, client_id, media, ext, meta, key_of, via=via)
+            return _web_record(cfg, data, prompt, via, text, now, client_id, media, ext, meta, key_of, via=via,
+                               times=times)
         path = entries.entry_path(cfg.root, stem)
         refuse_off_record(cfg, text)  # (before the recording is kept)
         kept = jaudio.keep(cfg, media, str(path), ext) if media else None
         # no ledger prompt, so no capture for the tick to find: an audio file here is kept but not transcribed
         words = text.strip() or (jaudio.NOT_TRANSCRIBED if kept else "")
         try:
-            write_words(cfg, {"stem": stem}, words, now.astimezone(cfg.tz), "audio" if kept else via, kept, meta)
+            write_words(cfg, {"stem": stem}, words, now.astimezone(cfg.tz), "audio" if kept else via, kept, meta,
+                        times=() if kept else times)
         except BaseException:
             if kept:
                 Path(cfg.root, kept).unlink(missing_ok=True)

@@ -139,6 +139,8 @@ export interface Words {
   text?: string;
   upload?: string;
   client_id?: string;
+  /** When each paragraph of `text` was begun: one ISO time per line that is not blank (`paragraphTimes.ts`). */
+  times?: string[];
 }
 
 /** The block as the person last read it: its words and its time. */

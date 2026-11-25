@@ -4,7 +4,7 @@ import { BASE } from "../api";
 import { clip, duration } from "../format";
 import { Mic, Reply } from "../icons";
 import type { Block, EntryDoc } from "../types";
-import { AudioPlayer, MarginNote } from "../ui";
+import { AudioPlayer, HourLines, MarginNote } from "../ui";
 import { BlockButtons, BlockEditor, blockIdentity, type BlockTarget } from "./BlockActions";
 import { Markdown } from "./Markdown";
 import { PromptLetter } from "./Prompt";
@@ -129,6 +129,10 @@ function HisBlock({ block, name, target }: { block: Block; name: string; target?
   const [pressing, setPressing] = useState(false);
   const trimmed = block.text.trim();
   const pending = isPending(block.text);
+  // the hour each paragraph was begun (issue #40): the first beside the block, as its time was; the others beside
+  // their paragraphs where the hour changes. A block without them shows its one time, as it always has.
+  const times = block.times && block.times.length > 0 ? block.times : null;
+  const began = times ? `${times[0]}${(block.at ?? "").replace(/^\d{1,2}:\d{2}/, "")}` : block.at;
   const source = block.source && block.source !== "text" ? block.source : null;
   // a recording still being transcribed is the tick's to fill in; he can change it once the words are there
   const tools = !!target && !editing && trimmed !== PENDING;
@@ -160,9 +164,9 @@ function HisBlock({ block, name, target }: { block: Block; name: string; target?
 
   return (
     <article class={["block", "his", editing && "editing", pressing && "pressing"].filter(Boolean).join(" ")} id={block.key}
-      aria-label={`${name}${block.at ? `, ${block.at}` : ""}`}>
+      aria-label={`${name}${began ? `, ${began}` : ""}`}>
       <div class="margin">
-        {block.at && <Hour at={block.at} />}
+        {began && <Hour at={began} />}
         {source && (
           <span class="source">
             {source === "voice" && <Mic width={13} height={13} />} {source}
@@ -197,6 +201,8 @@ function HisBlock({ block, name, target }: { block: Block; name: string; target?
           <BlockEditor target={target} onClose={() => setEditing(false)} />
         ) : pending ? (
           <p class="transcript-pending">{trimmed === PENDING ? "transcript pending" : "not transcribed"}</p>
+        ) : times ? (
+          trimmed && <HourLines class="words read" text={block.text} times={times} shown={times[0]} />
         ) : (
           trimmed && <p class="words read">{block.text}</p>
         )}

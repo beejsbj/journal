@@ -58,8 +58,14 @@ WRITE_SAMPLES = {
     ("POST", r"/api/v1/entries"): [({"practice": "morning", "text": "a note"}, "/api/v1/entries", 201),
                                    ({"practice": "evening", "text": "early"}, "/api/v1/entries", 201),
                                    ({"text": "/x not saved"}, "/api/v1/entries", 422),
-                                   ({"practice": "evening", "text": "ok\n/x not saved"}, "/api/v1/entries", 422)],
+                                   ({"practice": "evening", "text": "ok\n/x not saved"}, "/api/v1/entries", 422),
+                                   ({"text": "begun\nthen more", "times": ["2026-10-15T09:00:00+05:30",
+                                                                             "2026-10-15T09:05:00+05:30"]},
+                                    "/api/v1/entries", 201)],
     ("POST", r"/api/v1/entries/(?P<stem>[^/]+)/blocks"): [({"text": "more"}, "/api/v1/entries/2026-10-14-evening/blocks", 201),
+                                                          ({"text": "more\nagain", "times": ["2026-10-15T09:00:00+05:30",
+                                                                                              "2026-10-15T09:01:00+05:30"]},
+                                                           "/api/v1/entries/2026-10-14-evening/blocks", 201),
                                                           ({"text": "x", "interrupt": 1},   # (no run holds it)
                                                            "/api/v1/entries/2026-10-15-fix-life-s01/blocks", 409)],
     ("PATCH", r"/api/v1/entries/(?P<stem>[^/]+)/blocks/(?P<key>[^/]+)"):

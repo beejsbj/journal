@@ -4641,6 +4641,83 @@ that echoes it has the line dropped. Left as known: `journal_search` refuses in 
 (a kanban card, his own `hermes chat -q`); an engine one-shot that starts a gateway itself would pass its variables
 to it (not this host's setup: the gateway runs as a service).
 
+- **PARAGRAPH-TIMES (2026-11-24; issue #40, the owner said yes) — a typed block keeps when each of its paragraphs was
+  begun, on one hidden line under its heading, after the block's key.** *A change to the entry format.* The accepted prototype hangs an hour
+  beside each paragraph of his; the engine kept one time per block. Now the web app's write room (and the entry's own
+  box: both are `useCompose`) notes when each paragraph was begun while he writes, the save sends those times, and
+  the block keeps them:
+
+  ```markdown
+  ### 09:12 IST · text
+  %% journal block:b1a2b3c4d %%
+  %% journal times:08:32 08:42 09:11 %%
+
+  The sea was loud.
+
+  Then it went quiet.
+  A gull, late.
+  ```
+
+  - **What a paragraph is.** A line he typed that is not blank: the write room starts a paragraph at every Enter, and
+    the entry shows his words line for line (`white-space: pre-wrap`), so the room, the file and the page count the
+    same units (`entries.paragraph_count`, `paragraphTimes.ts`). One `HH:MM` per paragraph, in their order, in the
+    journal's timezone (the heading's), the block's own time staying in the heading as before (it is the save's).
+  - **The line is the engine's, never his words.** It matches `ENGINE_MARK`, so every reader of his words already
+    leaves it out (`raw_entry`, `his_words`, `his_text`, `without_companion_replies`, the document's `_clean`), his
+    words can never hold one (`actions.refuse`: `reserved-line`), and a notes app that hides `%% … %%` comments
+    hides it. Written once, with the block, in the same write: append-only holds; nothing is added to a block later.
+  - **Its place: under the heading, after the block's key (MARGIN-FORMAT, 2026-11-25).** The engine's lines under a
+    heading are the block's key (`%% journal block:<id> %%`), then the times line; `entries.record_reply` writes both
+    with the block (`_raw_block`). Every reader takes the lines under a heading through MARGIN-FORMAT's helpers
+    (`entries.head_lines_end`, `entries.times_under` beside `entries.block_key_under`), so it takes them in either
+    order, either alone, and with blank lines (a formatter's) between the heading, the key and the times: a block
+    written by this package's first draft (times, no key), a block written before keys and times, and a keyed block
+    without times all read. The document's words, the edit cut (it starts after both lines, so Edit keeps both) and
+    Delete (the block's unit holds both) follow from that.
+  - **Where it is not kept.** A block with a recording or pictures (its words are a caption, or a transcript to come), an answer to a program's phase or interrupt
+    (`phase_blocks` reads those back line for line, and an older engine would read the line as part of the answer),
+    every chat capture (his chat words keep one time per message; nothing changes there), the CLI and MCP (no times
+    to give).
+  - **The server's check (`actions.paragraph_times`) drops, never refuses.** The times must be a list of ISO times with
+    offsets, one per paragraph, none after the block's time (a face's clock up to `FUTURE_SLACK` ahead is taken as
+    the block's time) and none before the start of the block's journal day (`slots.journal_day`, `windows.day_ends_at`: a piece begun at 23:50 and saved at 00:10 keeps its times; one begun the evening before a tab left open overnight does not, since its hour would read as later today). Anything else, and the whole list is
+    dropped: his words are saved with the block's one time, as before. **Times need not rise**: the brief asked for
+    "in order"; read as one per paragraph in the paragraphs' order, since a paragraph he goes back and adds above
+    others was begun later and the margin saying so is true. Requiring them to rise would drop every time of a
+    piece he revised that way.
+  - **The client is all or nothing.** A line keeps its stamp while he edits it (it keeps its first or last letter);
+    one replaced whole, or new, is stamped when its first letter arrives; one whose start the box never saw (a draft
+    kept before this, words another box wrote) has none, and then the save sends no times at all rather than a
+    guess. Stamps are kept beside the draft in `sessionStorage` (`journal-draft-times:<key>`) and go with words moved
+    from a note into an answer.
+  - **His edits.** The web app's Edit replaces his words and leaves the times line as it is; the document pairs the
+    times with the words only while the paragraphs number the same (`document.paired_times`), otherwise the block
+    shows its one time again. Delete removes the line with the block. An edit in his notes app works the same way,
+    and the pairing is by position: an edit there that keeps the paragraph count but rearranges or replaces
+    paragraphs keeps the old times on them, so a rewritten paragraph can show the hour of the one it replaced.
+    Accepted: the times are a note of when he wrote, not a claim the engine can re-check against a file he is free to
+    change. **The room's clock is the device's**: the room stamps each paragraph with the device's clock, while the
+    saved entry shows it in the configured time zone (`cfg.tz`); the two differ only when he travels.
+  - **Older readers.** An older engine reads a block with the line as before (the line is an engine line everywhere).
+    MARGIN-FORMAT's code (the release before this one) also edits and deletes such a block in the web app (its cut
+    starts after the lines under the heading); code from before MARGIN-FORMAT refuses that block's in-place Edit and
+    Delete (`not-editable`: "a line of the engine's own"; change it in your notes app). An older web app shows the
+    block's one time.
+  - **Rejected.** *A line before each paragraph* (`%% journal at:23:15 %%` between his paragraphs): machine lines
+    inside his text, which a notes-app edit would carry around and which split his words in plain viewers.
+    *Inline marks in his text* (`<span data-at>`, a trailing `^23:15`): change his words. *The ledger only*
+    (`captures[].times`): the ledger forgets after 120 days and a block on an entry with no ledger prompt has no
+    capture; the file is the record. *An HTML comment* (`<!-- journal times … -->`): invisible in more plain viewers,
+    but a second convention beside `%% journal … %%`, which every reader already strips and `actions.refuse` already
+    guards; one convention for engine lines is worth the comment showing in a viewer that does not hide `%%`. *The
+    line at the block's end*: an edit that adds lines at the end would then put his words below the engine's line,
+    and the heading is where a block's time already lives. *Full ISO times in the file*: the page shows `HH:MM` and
+    the heading carries the zone; the extra precision would be clutter.
+  - **Display.** `ui/Hours` (`HourLines`, `MarginHour`, `shownHours`; on `/design`): the entry's margin shows the first
+    paragraph's hour beside the block (when he began it, not when he saved it) and every later paragraph's hour
+    beside it where the hour changes; on a page too narrow for a margin those become small running heads. The write
+    room hangs each paragraph's hour beside its first line while he writes, and the hour of the day before a word.
+
 - **X-FLOOR (2026-11-24) — `/x` is refused at the bottom of the write path too (issue #46).** The callers refuse
   off-the-record words before they write and decide what to answer (`actions.refuse` on the faces, `inbound` and the
   privacy pass in the chat, `writes._his_words` for an edit); the functions under them did not, so the guarantee

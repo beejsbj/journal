@@ -11,7 +11,7 @@ import { INKS, chooseInk, savedInk, type Ink } from "../ink";
 import { withTransition } from "../shell/transition";
 import { useTitle } from "../title";
 import {
-  AudioPlayer, BackLink, Button, ButtonLink, Calendar, Clock, DayLog, DefaultHint, Disclosure, LogEntry, LogLine, LogReplies, Empty, ErrorLine, IconButton, Letter, MarginNote,
+  AudioPlayer, BackLink, Button, ButtonLink, Calendar, Clock, DayLog, DefaultHint, Disclosure, LogEntry, LogLine, LogReplies, Empty, ErrorLine, HourLines, IconButton, Letter, MarginNote,
   Mark, Menu, ProgressStrip, Ribbon, Segmented, Sheet, Skeleton, Stepper, Switch, TextArea, TextButton, TextField, ThemeChoice,
   PageBack, Toast, TypedStepper, clockTime,
 } from "../ui";
@@ -338,8 +338,12 @@ export function DesignRoute() {
         </Letter>
       </Section>
 
-      <Section id="ds-media" n="11" title="Voice and time" lede="His recording, the month he wrote in, a program's way through, when a practice comes, and the ribbon on a page he wrote.">
+      <Section id="ds-media" n="11" title="Voice and time" lede="His recording, the hours his paragraphs were begun, the month he wrote in, a program's way through, when a practice comes, and the ribbon on a page he wrote.">
         {audio && <AudioPlayer src={audio} duration={4} label="your voice" />}
+        <div class="ds-hours">
+          <HourLines class="read" text={"The tide came in while I was still deciding.\nA gull on the rail, then two.\n\nLater, the lamps along the harbour.\nAnd the long walk home."}
+            times={["23:12", "23:12", "23:20", "23:31"]} />
+        </div>
         <div class="ds-grid2">
           <Calendar month={month} onMonth={setMonth} marked={["2026-10-02", "2026-10-05", "2026-10-06", "2026-10-08", "2026-10-09", "2026-10-11", "2026-10-12", "2026-10-13", "2026-10-14", "2026-10-15"]}
             selected={day} today="2026-10-15" onSelect={setDay} legend />

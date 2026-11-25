@@ -42,14 +42,17 @@ export function onDraft(key: string, fn: Listener): () => void {
 }
 
 /** Keep (or, for nothing, forget) the draft, and tell the other boxes on this key. Says whether the store took it:
- *  the write room only says "Draft kept" when it was. */
+ *  the write room only says "Draft kept" when it was. A draft emptied takes its paragraph times with it. */
 export function saveDraft(key: string, text: string, from?: DraftOwner): boolean {
   let stored = false;
   try {
     const s = store();
     if (s) {
       if (text) s.setItem(PREFIX + key, text);
-      else s.removeItem(PREFIX + key);
+      else {
+        s.removeItem(PREFIX + key);
+        s.removeItem(TIMES + key);
+      }
       stored = true;
     }
   } catch {
@@ -57,6 +60,32 @@ export function saveDraft(key: string, text: string, from?: DraftOwner): boolean
   }
   for (const fn of [...(listeners.get(key) ?? [])]) fn(text, from);
   return stored;
+}
+
+const TIMES = "journal-draft-times:";
+
+/** When each line of the draft was begun (`paragraphTimes.ts`), as kept beside it; unchecked: `stampsFor` fits it to
+ *  the text. Null when nothing is kept. */
+export function loadStamps(key: string): unknown {
+  try {
+    const raw = store()?.getItem(TIMES + key);
+    return raw ? (JSON.parse(raw) as unknown) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Keep the draft's stamps beside it. Written before the draft itself, so a box that hears the draft change reads
+ *  the stamps that go with it. A store that refuses them only loses the times, never the words. */
+export function saveStamps(key: string, stamps: (number | null)[]): void {
+  try {
+    const s = store();
+    if (!s) return;
+    if (stamps.some((t) => t !== null)) s.setItem(TIMES + key, JSON.stringify(stamps));
+    else s.removeItem(TIMES + key);
+  } catch {
+    // (full or blocked: the words are kept on their own)
+  }
 }
 
 /** An id for one write, so that sending it twice (a retry after a lost answer) is one write. */

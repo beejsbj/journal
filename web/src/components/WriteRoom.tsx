@@ -6,6 +6,8 @@
  * What is in it: her letter at the top when he is answering (ui Letter, never fastened), or a quiet start when it is a
  * new note, which also offers the prompts still open and the programs he could start (the old "+" menu's other jobs);
  * his words large in the book's roman, with **focus** on by default: every paragraph but the one with the caret greys.
+ * The hour each paragraph was begun hangs in the left margin beside it, where the hour changes (ui/Hours; the save
+ * sends them, issue #40); before a word is written, the margin holds the hour of the day.
  * The page is a real textarea (IME, paste, undo and spellcheck stay the browser's own) with a mirror of its text drawn
  * underneath, which does the greying; the textarea's own letters are transparent over it.
  *
@@ -23,9 +25,10 @@ import { Close, Focus, Pen, Send, Wave } from "../icons";
 import { isProgramBacked } from "../labels";
 import { closeWrite, useNavigate, wrote, type WriteRequest } from "../shell";
 import type { Created, LibraryItem, PracticeRow, Prompt, Today } from "../types";
-import { AudioPlayer, Button, Disclosure, Empty, ErrorLine, IconButton, Letter, Skeleton, TextButton, reducedMotion } from "../ui";
+import { AudioPlayer, Button, Disclosure, Empty, ErrorLine, IconButton, Letter, MarginHour, Skeleton, TextButton, reducedMotion, shownHours } from "../ui";
 import { KeptWords, OfflineNote, useCompose } from "./Composer";
-import { loadDraft, saveDraft } from "../drafts";
+import { loadDraft, loadStamps, saveDraft, saveStamps } from "../drafts";
+import { hourOf, joinStamps, stampsFor } from "../paragraphTimes";
 import { Recorder, type RecorderControl } from "./Recorder";
 import "./WriteRoom.css";
 
@@ -66,10 +69,6 @@ export function wordCount(text: string): string {
   return `${n} ${n === 1 ? "word" : "words"} · ${Math.max(1, Math.round(n / 200))} min`;
 }
 
-const hhmm = (t: number) => {
-  const d = new Date(t);
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-};
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
 /** Focus is on by default; turning it off is kept on this device (`localStorage`, like the ink, the theme and the
@@ -357,6 +356,8 @@ export function WriteRoom({ req }: { req: WriteRequest }) {
             if (note.trim()) {
               const key = `reply:${practice}:${slot}`;
               const had = loadDraft(key);
+              // (the hours his paragraphs were begun go with them)
+              saveStamps(key, joinStamps(had, stampsFor(had, loadStamps(key)), note, stampsFor(note, loadStamps("quick-note"))));
               saveDraft(key, had.trim() ? `${had.replace(/\s+$/, "")}\n\n${note}` : note);
               saveDraft("quick-note", "");
             }
@@ -482,11 +483,33 @@ function Desk({ page, hour, voice, onVoiceUsed, guard, onClose, onMade }: {
   });
 
   const paras = useMemo(() => paragraphs(c.text), [c.text]);
+  // the hour each paragraph was begun, where it changes, level with the paragraph's first line in the mirror
+  const marks = useMemo(() => shownHours(paras.map((p, i) => {
+    const t = c.stamps[i];
+    return p.text.trim() && t !== null && t !== undefined ? hourOf(t) : null;
+  })), [paras, c.stamps]);
+  const mirror = useRef<HTMLDivElement>(null);
+  const [tops, setTops] = useState<number[]>([]);
+  const measure = useRef(() => {});
+  measure.current = () => {
+    const spans = [...(mirror.current?.querySelectorAll<HTMLElement>(".room-p") ?? [])];
+    const base = spans[0]?.offsetTop ?? 0;
+    const next = spans.map((el) => el.offsetTop - base);
+    setTops((was) => (was.length === next.length && was.every((v, i) => v === next[i]) ? was : next));
+  };
+  useLayoutEffect(() => measure.current(), [c.text]);
+  useEffect(() => {
+    const el = mirror.current;
+    if (!el || typeof ResizeObserver !== "function") return;
+    const ro = new ResizeObserver(() => measure.current());   // (a wider or narrower page wraps the lines again)
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   // (a caret past the end, after the box took another draft, is at its end: the last paragraph is lit)
   const lit = useMemo(() => new Set(litParagraphs(paras, Math.min(sel[0], c.text.length), Math.min(sel[1], c.text.length))), [paras, sel]);
 
   const status = c.keptAt
-    ? (c.keptAt.stored ? `Draft kept · ${hhmm(c.keptAt.at)}` : "This browser keeps no draft")
+    ? (c.keptAt.stored ? `Draft kept · ${hourOf(c.keptAt.at)}` : "This browser keeps no draft")
     : c.text.trim() ? "Draft kept" : "Nothing written yet";
   const count = rec.on ? `${clock(rec.s)} · tap to stop` : wordCount(c.text);
 
@@ -521,8 +544,12 @@ function Desk({ page, hour, voice, onVoiceUsed, guard, onClose, onMade }: {
             <p class="composer-closed">{page.closed}</p>
           ) : (
             <div class={["room-page", focus && "focus", c.busy && "busy"].filter(Boolean).join(" ")}>
-              {hour && <time class="room-hour" aria-hidden="true">{hour}</time>}
-              <div class="room-mirror" aria-hidden="true">
+              {marks.some(Boolean)
+                ? marks.map((m, i) => m && (
+                  <MarginHour key={`h${i}`} class="room-hour" at={m} aria-hidden="true" style={{ top: `calc(${tops[i] ?? 0}px + 0.62em)` }} />
+                ))
+                : hour && <MarginHour class="room-hour" at={hour} aria-hidden="true" />}
+              <div class="room-mirror" ref={mirror} aria-hidden="true">
                 {paras.map((p, i) => (
                   <span key={i}>
                     {i > 0 && "\n"}

@@ -140,11 +140,13 @@ def _client_seen(cfg: jconfig.Config, client_id: str, blocks: bool) -> bool:
 
 
 class _Words:
-    """What a POST brings: text, an upload, or both."""
+    """What a POST brings: text, an upload, or both; and ``times``, when each paragraph of the text was begun, taken as
+    sent and checked by ``actions.paragraph_times`` (what does not hold is dropped there: never a failed save)."""
 
     def __init__(self, req: Request, body: dict, client_id: str | None = None, blocks: bool = False):
         self.client_id, self.blocks = client_id, blocks   # blocks: the route also dedupes against ``web_blocks``
         self.text = _his_words(req, _text(body))
+        self.times = body.get("times")
         self.upload_id = body.get("upload")
         if self.upload_id is not None and not isinstance(self.upload_id, str):
             raise HTTPError(400, "bad-request", "upload must be an upload id")
@@ -174,6 +176,11 @@ class _Words:
         up = self.up
         meta = {"file_name": up.name} if up and up.name else None
         return {"media": str(up.path) if up else None, "ext": up.ext if up else ".ogg", "meta": meta}
+
+    def times_at(self, when: datetime) -> list[str]:
+        """The paragraph times the block keeps (``actions.paragraph_times``), for words stamped ``when``."""
+        return actions.paragraph_times(self.cfg, self.times, self.text or "", when,
+                                       media=self.upload_id)
 
 
 # ── notes, entries, blocks, meta ─────────────────────────────────────────────
@@ -222,10 +229,10 @@ def entry_create(req: Request):
         try:
             if practice is None:
                 info = actions.note(req.cfg, words.text or "", when, via=capture.WEB_VIA, now=req.now, client_id=cid,
-                                    **words.args)
+                                    times=words.times, **words.args)
             else:
                 info = actions.answer(req.cfg, practice, words.text or "", when, via=capture.WEB_VIA, now=req.now,
-                                      client_id=cid, **words.args)
+                                      client_id=cid, times=words.times, **words.args)
         except actions.Refused as e:
             raise _refused(e) from None
     path = Path(info["path"])
@@ -335,7 +342,8 @@ def block_add(req: Request):
             info = capture.add_web_block(req.cfg, stem, words.text or "", when, client_id=cid,
                                          phase_prompt=target[1] if target and not interrupt else None,
                                          interrupt_prompt=target[1] if interrupt else None,
-                                         key_of=lambda p: _last_words_key(req, p), **words.args)
+                                         key_of=lambda p: _last_words_key(req, p),
+                                         times=() if of_program else words.times_at(when), **words.args)
         except capture.PhaseClosed:
             if interrupt:
                 raise HTTPError(409, "interrupt-not-open", "that interrupt has not opened; reload it") from None

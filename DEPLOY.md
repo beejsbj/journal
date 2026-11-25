@@ -16,6 +16,45 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## PARAGRAPH-TIMES — the write room keeps the hour each paragraph was begun (2026-11-25; serve side and the PWA; **no gateway restart of its own**, but it rides on MARGIN-FORMAT's; no config or state change)
+
+**What changes.** The web app notes when each paragraph (each line that is not blank) of his words was begun while he
+writes, in the write room and the entry's own box, and a save sends those times. The server checks them
+(`actions.paragraph_times`: one per paragraph, none after the block's time, none before the start of the block's
+journal day) and the block keeps them on one hidden line under its heading, after the block's own key
+(`%% journal block:<id> %%`, MARGIN-FORMAT), written in the same write (`%% journal times:08:32 08:42 %%`); anything
+that does not hold is dropped and the words are saved with the block's one time, as before. The entry shows the first
+paragraph's hour beside the block and each later one beside its paragraph where the hour changes; the room does the
+same while he writes. Chat words, recordings, pictures, program answers, the CLI and MCP keep one time per block. A
+format change: DECISIONS.md, PARAGRAPH-TIMES; README *Entry file*.
+
+**Order.** Deploy after MARGIN-FORMAT (above), or together with it in its window: it builds on that release's block
+writer and readers. Deployed alone after it, it needs no gateway restart.
+
+**Side and restart.** Serve side: `serve/writes.py`, `serve/blocks.py`, `document.py` and the committed web build
+(`uv tool install --force` at the merge sha, then `systemctl --user restart journal-serve`). The engine modules it
+writes through change too (`entries.py`, `capture.py`, `actions.py`); the gateway imports `entries` and `capture`, but
+no gateway path passes times, and a block written without them is byte for byte what MARGIN-FORMAT writes, so the
+gateway needs no restart for this change (its next one picks it up), and the MARGIN-FORMAT code it has loaded reads a
+times line as one of the engine's lines under a heading (`entries.head_lines_end`: left out of his words everywhere).
+The tick and `journal write` are fresh processes and pass no times.
+
+**The PWA.** An installed app offers "Update available"; Reload takes the new build. Until then the old build sends
+no times and shows each block's one time; nothing breaks.
+
+**First checks.** `journal doctor` as usual. In the web app, write a note of two paragraphs a minute or more apart and
+save: the entry shows an hour beside each paragraph whose hour differs, and the file has, straight under the block's
+heading, the `%% journal block:b… %%` line and then the `%% journal times:… %%` line, his words below them as typed
+(check the two engine lines with `grep -n '%% journal'` on a copy, not by printing the entry). Edit one word of that
+block in the web app: it saves, both lines stay, and the hours stay. Delete it: both lines go with it.
+
+**Rollback.** Reinstall serve (and the CLI) at the previous sha and restart serve; nothing in state to undo. Entries
+written meanwhile keep their times lines. MARGIN-FORMAT's code reads them as engine lines under the heading (never his
+words, never shown) and its web app's Edit and Delete work on those blocks (the edit starts after the key and times
+lines; Delete takes both). Code from before MARGIN-FORMAT refuses those blocks' Edit and Delete in the web app ("a
+line of the engine's own"; change them in the notes app, where the times line can also be deleted by hand without
+harm).
+
 ## MARGIN-FORMAT — a stable key on every block of his, and the margin-note record in the entry format (2026-11-25; tick, hook and serve side; **gateway restart**; no config change)
 
 **What changes.** Issue #31, its first step: the entry format only. Every block of his the engine writes now carries

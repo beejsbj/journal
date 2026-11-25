@@ -141,7 +141,7 @@ drawing it on the same grid and stroke; show it on `/design`.
   is `.display` at `--t-h1` (only Settings and Insights' week take `--t-display`; Today and an entry, the numeral).
   Lists, forms and settings keep a reading width (about 1000–1060 px max for a whole page).
 - **The margins.** Wherever he writes, the **hours hang in the left margin** (`--margin-l`, 72 px: the time in italic,
-  its source under it), and **her notes stand in the right margin** (`--margin-r`, 200 px) beside the passage they
+  its source under it; beside each paragraph the hour it was begun, where it changes, when the block kept them), and **her notes stand in the right margin** (`--margin-r`, 200 px) beside the passage they
   belong to. The entry grid is a **container query** on its pane: under 840 px of pane the notes move under their
   passage and the hours fold into a running head above it.
 - **The spread** is those three columns: hours, his column, her margin, 28 px apart.
@@ -225,6 +225,7 @@ All in `web/src/ui/` (TSX plus a CSS file each), exported from `web/src/ui/index
 | `Toast` | message, up to two actions, on the lamp | "The passage is gone from the entry." (no Undo); "Copied your words."; "Update available · Later · Reload" | foot of a wide screen, top on a phone; `role=status` |
 | `Letter` | From line with her dot and the time; opener; the asked question in italic; questions folded by part (44 px on touch), "asked" marked; actions on a crease | her prompt anywhere: entry head, Today, the room, her week review, a run's phase | **no fastening**; read-only; her Markdown inside goes through `components/Markdown` (paragraphs, lists, quotes, bold, italic) |
 | `MarginNote` | "Ada · 08:02" with her dot; her words behind a hairline of her ink | her note beside a passage | the entry's grid places it |
+| `HourLines`, `MarginHour` | his words line for line, each paragraph's begun hour in the margin's italic where it changes (`--hour-gap` across); one hour alone | his passages with paragraph times (the entry), the write room's margin | `shownHours` says which hours show; on a page with no margin the entry turns them into small running heads |
 | `DayLog` (`LogEntry`, `LogLine`, `LogReplies`) | an ordered list: the entry's name where the entry changes (a link); his line with the hour in the left margin (a link to the line in its entry, the weekday above it after midnight, "voice" or "photo" under it); a run of her replies folded under one head ("Ada · 2 replies", a peek in her ink), each a `MarginNote` when open | a day as one log (`/days/<date>`) | read-only; the hour is the 44 px way into the entry |
 | `AudioPlayer` | lamp play disc, 54 bars (34 on a phone), time, speed (hidden on a phone) | his recording | a real `<audio>` underneath; the bars are a slider |
 | `Calendar` | month in the roman, arrows, M–S, written days bold with a dot (buttons), today ringed, chosen day on the lamp | filtering by day | one tab stop, arrows walk written days |

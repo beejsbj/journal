@@ -38,6 +38,7 @@ from .config import Config
 FACES = tuple(entries.FACES)  # web, cli, mcp
 TEXT_LIMIT = 50_000       # characters of any text field a face sends (API.md Decision 7; serve and MCP)
 FUTURE_SLACK = timedelta(minutes=5)  # a face's clock a little ahead of the server's (as ``serve/writes`` allows)
+TIMES_MAX = 2000                     # paragraph times one write may bring (more than a 50,000-character piece has)
 
 
 class Refused(ValueError):
@@ -96,6 +97,38 @@ def when(cfg: Config, at: datetime | None, now: datetime) -> datetime:
     return at
 
 
+def paragraph_times(cfg: Config, raw, text: str, at: datetime, *, media: str | None = None) -> list[str]:
+    """When each paragraph of a typed piece was begun, as the block keeps them (``entries.TIMES_LINE``: local
+    ``HH:MM``), from what a face sent: one ISO time with its offset per paragraph (``entries.paragraph_count``), in
+    the paragraphs' order. ``at`` is the time the block carries (its heading).
+
+    Anything that does not hold is dropped whole, never a refusal: his words are saved with the block's one time, as
+    before. That is: not a list, a count other than the paragraphs', a time that does not parse or has no offset, one
+    after the block's own time (a face's clock a little ahead, ``FUTURE_SLACK``, is taken as the block's time), or one
+    before the start of the block's journal day (``slots.journal_day``: a piece begun at 23:50 and saved at 00:10 is
+    one day's and keeps its times; one begun yesterday would show as an hour that reads as later today); and any piece with a recording (its words are a caption, or a transcript to
+    come). Times need not rise: a paragraph he went back and added above others was begun later, and says so."""
+    if media or not isinstance(raw, list) or not raw or len(raw) > TIMES_MAX:
+        return []
+    if len(raw) != entries.paragraph_count((text or "").strip()):
+        return []
+    out = []
+    try:
+        day = slots.journal_day(cfg, at)
+        for value in raw:
+            if not isinstance(value, str) or len(value) > 64:
+                return []
+            t = datetime.fromisoformat(value)
+            if t.tzinfo is None or t.utcoffset() is None:
+                return []
+            if t > at + FUTURE_SLACK or slots.journal_day(cfg, t) < day:
+                return []
+            out.append(min(t, at).astimezone(cfg.tz).strftime("%H:%M"))
+    except (ValueError, OverflowError, OSError):   # (a year-1 time cannot be moved to another offset)
+        return []
+    return out
+
+
 def _via(via: str) -> str:
     if via not in FACES:
         raise ValueError(f"via must be one of {', '.join(FACES)} (got {via!r})")
@@ -140,15 +173,17 @@ def _record_for(cfg: Config, data: dict, slot: slots.Slot, p: library.Practice, 
 
 def answer(cfg: Config, practice, text: str | None, at: datetime | None = None, *, via: str,
            now: datetime | None = None, client_id: str | None = None, media: str | None = None, ext: str = ".ogg",
-           meta: dict | None = None, key_of: Callable[[Path], str | None] | None = None) -> dict:
+           meta: dict | None = None, key_of: Callable[[Path], str | None] | None = None, times=None) -> dict:
     """His words for ``practice``, written at ``at`` (default now; a face may let him backdate them), into the slot
     ``slots.resolve`` gives, read at ``now`` (the server's clock). ``via``: the face (``web``, ``cli``, ``mcp``),
     which is the capture's rule, source and via. ``media``: an audio file kept beside the entry and transcribed by
-    the tick, as the web app's upload is. Raises ``Refused`` (nothing written)."""
+    the tick, as the web app's upload is. ``times``: when each paragraph was begun, as a face sent them
+    (``paragraph_times``: kept when they hold, dropped when not). Raises ``Refused`` (nothing written)."""
     via = _via(via)
     words = _words(cfg, text)
     now = now or datetime.now(timezone.utc)
     at = when(cfg, at, now)
+    kept = paragraph_times(cfg, times, words, at, media=media)
     p = _practice(cfg, practice)
     with ledger.locked(cfg.ledger_path) as data:
         done = ledger.capture_of_client(data, client_id)
@@ -158,35 +193,37 @@ def answer(cfg: Config, practice, text: str | None, at: datetime | None = None, 
         _not_empty(words, media)
         slot = slots.resolve(cfg, p, at, now=now, data=data)
         rec = _record_for(cfg, data, slot, p, at, via)
-        info = capture._web_record(cfg, data, rec, via, words, at, client_id, media, ext, meta, key_of, via=via)
+        info = capture._web_record(cfg, data, rec, via, words, at, client_id, media, ext, meta, key_of, via=via,
+                                   times=kept)
         return {**info, "slot": slot.id, "step": slot.step}
 
 
 def note(cfg: Config, text: str | None, at: datetime | None = None, *, via: str, now: datetime | None = None,
          client_id: str | None = None, media: str | None = None, ext: str = ".ogg",
-         meta: dict | None = None) -> dict:
-    """His words as a note of their own (a /j note: ``<date>-j``, ``-j-2`` …), stamped ``at`` (default now). Raises
-    ``Refused`` (nothing written)."""
+         meta: dict | None = None, times=None) -> dict:
+    """His words as a note of their own (a /j note: ``<date>-j``, ``-j-2`` …), stamped ``at`` (default now), with
+    ``times`` as for ``answer``. Raises ``Refused`` (nothing written)."""
     via = _via(via)
     words = _words(cfg, text)
     now = now or datetime.now(timezone.utc)
     at = when(cfg, at, now)
+    kept = paragraph_times(cfg, times, words, at, media=media)
     with ledger.locked(cfg.ledger_path) as data:
         done = ledger.capture_of_client(data, client_id)
         if done:
             return {**capture.planned_info(cfg, done[0]), "rule": done[1].get("rule", ""), "duplicate": True}
         _not_empty(words, media)
         rec = capture.new_note_prompt(data, cfg, at)
-        return capture._web_record(cfg, data, rec, "/j", words, at, client_id, media, ext, meta, via=via)
+        return capture._web_record(cfg, data, rec, "/j", words, at, client_id, media, ext, meta, via=via, times=kept)
 
 
 def add(cfg: Config, stem: str, text: str | None, at: datetime | None = None, *, via: str,
         now: datetime | None = None, client_id: str | None = None, media: str | None = None, ext: str = ".ogg",
-        meta: dict | None = None, key_of: Callable[[Path], str | None] | None = None) -> dict:
+        meta: dict | None = None, key_of: Callable[[Path], str | None] | None = None, times=None) -> dict:
     """More of his words for the entry ``stem``, appended as a block of their own (``capture.add_web_block``, the web
-    app's *Add*), stamped ``at`` (default now; not before the entry's day). Only an entry the engine wrote, and not a
-    program session's (its answers belong to a phase, which the chat and the web app keep). Raises ``Refused``
-    (nothing written)."""
+    app's *Add*), stamped ``at`` (default now; not before the entry's day), with ``times`` as for ``answer``. Only an
+    entry the engine wrote, and not a program session's (its answers belong to a phase, which the chat and the web
+    app keep). Raises ``Refused`` (nothing written)."""
     via = _via(via)
     words = _words(cfg, text)
     _not_empty(words, media)   # (a retry of a block is answered by ``add_web_block``; only the CLI adds this way)
@@ -194,7 +231,7 @@ def add(cfg: Config, stem: str, text: str | None, at: datetime | None = None, *,
     at = when(cfg, at, now)
     entry_for(cfg, stem, at)
     info = capture.add_web_block(cfg, stem, words, at, media=media, ext=ext, meta=meta, client_id=client_id,
-                                 key_of=key_of, via=via)
+                                 key_of=key_of, via=via, times=paragraph_times(cfg, times, words, at, media=media))
     return {**info, "stem": stem}
 
 

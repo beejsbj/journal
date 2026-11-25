@@ -109,6 +109,27 @@ def block_mark(kind: str, key: str) -> str:
     return f"%% journal {kind}:{key} %%"
 
 
+# The time each paragraph of a block of his was begun (issue #40; DECISIONS.md, PARAGRAPH-TIMES): a hidden line right
+# under the block's heading, one local ``HH:MM`` per paragraph (a line of his that is not blank), in the paragraphs'
+# order: ``%% journal times:23:12 23:15 23:31 %%``. Only the web app's typed blocks carry one; the heading keeps the
+# block's own time. It is an engine line like the others (``ENGINE_MARK``): every reader of his words already leaves it
+# out, his words can never hold one (``actions.refuse``), and a notes app hides it as a comment.
+TIMES_PREFIX = "%% journal times:"
+TIMES_LINE = re.compile(r"^%% journal times:([0-9]{2}:[0-9]{2}(?: [0-9]{2}:[0-9]{2})*) %%[ \t]*$")
+_TIMES_IN = re.compile(TIMES_LINE.pattern, re.M)
+
+
+def times_mark(times: Sequence[str]) -> str:
+    """The hidden line that keeps a block's paragraph times (``HH:MM`` each)."""
+    return f"{TIMES_PREFIX}{' '.join(times)} %%"
+
+
+def paragraph_count(text: str) -> int:
+    """How many paragraphs ``text`` has as the web app counts them: its lines that are not blank (the write room
+    starts a paragraph at every Enter, and the entry shows his words line for line)."""
+    return sum(1 for line in (text or "").split("\n") if line.strip())
+
+
 def block_key_mark(key: str) -> str:
     """The hidden key line that opens a block of his words (``BLOCK_KEY``)."""
     return f"%% journal block:{key} %%"
@@ -127,6 +148,15 @@ def block_key_under(text: str, at: int) -> str | None:
     m = _HEAD_LINES.match(text, at)
     k = BLOCK_KEY.search(m.group(0)) if m else None
     return k.group(1) if k else None
+
+
+def times_under(text: str, at: int) -> tuple[str, ...]:
+    """The block's paragraph times (``TIMES_LINE``) among the engine's lines right under the heading line ending at
+    ``at``: in either order with the block's key, blank lines between them tolerated (``_HEAD_LINES``); ``()`` when
+    the block keeps none."""
+    m = _HEAD_LINES.match(text, at)
+    t = _TIMES_IN.search(m.group(0)) if m else None
+    return tuple(t.group(1).split(" ")) if t else ()
 
 
 def new_block_key(body: str, captured_at: datetime, source: str, text: str) -> str:
@@ -451,11 +481,15 @@ def block_heading(at: datetime, source: str, meta: dict | None = None) -> str:
 
 
 def _raw_block(at: datetime, text: str, source: str, audio: str | None = None, meta: dict | None = None,
-               images: Sequence[str] = (), key: str | None = None) -> str:
+               images: Sequence[str] = (), key: str | None = None, times: Sequence[str] = ()) -> str:
     """One block of his words: heading, its own key line (``key``), then the kept recording or pictures as Obsidian
-    embeds, then his words."""
+    embeds, then his words. ``times``: one ``HH:MM`` per paragraph of a typed block (``TIMES_LINE``), kept on the line
+    under the key (MARGIN-FORMAT: key first, then times); a block with a recording or pictures, or with a count that
+    does not match its paragraphs, carries none."""
     embed = f"![[{audio}]]\n\n" if audio else "".join(f"![[{name}]]\n\n" for name in images)
-    mark = block_key_mark(key) + "\n" if key else ""
+    keep = bool(times) and not embed and len(times) == paragraph_count(text) and all(
+        re.fullmatch(r"[0-9]{2}:[0-9]{2}", t) for t in times)
+    mark = (block_key_mark(key) + "\n" if key else "") + (f"{times_mark(times)}\n" if keep else "")
     return f"{block_heading(at, source, meta)}\n{mark}\n{embed}{text.rstrip()}\n\n"
 
 
@@ -533,11 +567,14 @@ def fill_audio_block(path: Path, audio: str, transcript: str | None, heading: st
 
 def record_reply(root: Path, prompt: dict, text: str, captured_at: datetime, source: str = "text",
                  audio: str | None = None, names: Names = DEFAULT_NAMES, meta: dict | None = None,
-                 practice=None, images: Sequence[str] = (), written: dict | None = None) -> Path:
+                 practice=None, images: Sequence[str] = (), written: dict | None = None,
+                 times: Sequence[str] = ()) -> Path:
     """Write or append the user's verbatim words to this prompt's entry file. A new file is titled and carries
     the bank of ``practice`` (the one the prompt was sent for; by default the built-in of the prompt's kind).
     ``images``: pictures he sent with the words, kept beside the entry (``images.keep``) and embedded above them.
-    ``written``, when given, is filled with the new block's key (``block_key``: the capture record keeps it)."""
+    ``written``, when given, is filled with the new block's key (``block_key``: the capture record keeps it).
+    ``times``: when each paragraph was begun (``_raw_block``, under the block's key, in the same write); never on a
+    program's answer, whose blocks the run reads back line for line (``phase_blocks``)."""
     path = entry_path(root, prompt["stem"])
     body = path.read_text(encoding="utf-8") if path.exists() else _new_file(prompt, names, practice)
     span = words_span(body)
@@ -556,7 +593,8 @@ def record_reply(root: Path, prompt: dict, text: str, captured_at: datetime, sou
     key = (interrupt_mark(prompt["interrupt"]) if prompt.get("interrupt") else phase_mark(prompt["phase"])) + "\n" \
         if keyed else ""
     own = new_block_key(body, captured_at, source, text)   # (under the heading; the answer key stays above it)
-    body = body[:s] + "\n" + words + key + _raw_block(captured_at, text, source, audio, meta, images, own) + body[e:]
+    body = body[:s] + "\n" + words + key + _raw_block(captured_at, text, source, audio, meta, images, own,
+                                                       () if keyed else times) + body[e:]
     _atomic_write(path, body)
     if written is not None:
         written["block_key"] = own
