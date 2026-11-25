@@ -19,9 +19,8 @@ import os
 import time
 from pathlib import Path
 
-from .. import entries, ledger
+from .. import document, entries, ledger
 from ..config import Config
-from . import document
 
 
 def _mtimes(directory: Path, pattern: str) -> dict[str, int]:

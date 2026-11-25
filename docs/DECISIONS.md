@@ -4613,6 +4613,18 @@ that echoes it has the line dropped. Left as known: `journal_search` refuses in 
 (a kanban card, his own `hermes chat -q`); an engine one-shot that starts a gateway itself would pass its variables
 to it (not this host's setup: the gateway runs as a service).
 
+- **SHARED-READERS (2026-11-24) — the readers the web app and MCP share live in the core (issue #47).** `mcp/` read
+  entries through `serve/` (`serve.api.filter_entries`, `serve.document`, `serve.writes.TEXT_LIMIT`), so the MCP face
+  depended on the web server's package. Moved, with no behaviour change: `serve/document.py` → `document.py` (core);
+  `filter_entries`, its `_order` and `LIST_LIMIT` from `serve/api.py` into it; `TEXT_LIMIT` into `actions.py`, the
+  words-writing module of every face. The old names stay: `serve.api.filter_entries` / `LIST_LIMIT` and
+  `serve.writes.TEXT_LIMIT` are the same objects, and `journal.serve.document` is an alias of the moved module (the
+  same module object, set in `sys.modules`), so an import or a test's patch through either name reaches the same code.
+  **Fences tightened:** `test_mcp_fence.py` now forbids `mcp/` to import `serve` at all (importing `journal.mcp.handlers`
+  loads no `journal.serve` module), and `test_serve_fence.py` checks the moved reader (`SHARED`) with serve's forbidden
+  list plus `serve`, `mcp` and `tools`. `today.collect`, the third reader the issue named, was already in the core.
+  The serve modules now import `document` from the core (`from .. import document`); tests import it from there too.
+
 - **ROUTE-OPENS (2026-11-24) — the faces' fence is held by what they open, and the import fence says it is direct
   (issue #44).** `test_serve_fence` / `test_mcp_fence` check what `serve/` and `mcp/` import themselves; loading them
   also loads `agent`, `mirror`, `notebook`, `ports` and `sqlite3` through the engine (at import; `conversations`,

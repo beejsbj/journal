@@ -17,7 +17,7 @@ from test_programs import Base as ProgramBase
 
 from journal import agent, capture, conversations, entries, hookstate, images, inbound, ledger, privacy, tick
 from journal.hermes import hooks, transcript
-from journal.serve import document
+from journal import document
 
 PNG = b"\x89PNG\r\n\x1a\n-pixels"
 

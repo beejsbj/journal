@@ -36,6 +36,7 @@ from . import audio, capture, channel, compose, entries, ledger, library, slots
 from .config import Config
 
 FACES = tuple(entries.FACES)  # web, cli, mcp
+TEXT_LIMIT = 50_000       # characters of any text field a face sends (API.md Decision 7; serve and MCP)
 FUTURE_SLACK = timedelta(minutes=5)  # a face's clock a little ahead of the server's (as ``serve/writes`` allows)
 
 
