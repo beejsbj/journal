@@ -4588,3 +4588,21 @@ line of his that copies the mark never leaves a bound on her later searches. An 
 that echoes it has the line dropped. Left as known: `journal_search` refuses in a finite turn the engine did not start
 (a kanban card, his own `hermes chat -q`); an engine one-shot that starts a gateway itself would pass its variables
 to it (not this host's setup: the gateway runs as a service).
+
+- **X-FLOOR (2026-11-24) — `/x` is refused at the bottom of the write path too (issue #46).** The callers refuse
+  off-the-record words before they write and decide what to answer (`actions.refuse` on the faces, `inbound` and the
+  privacy pass in the chat, `writes._his_words` for an edit); the functions under them did not, so the guarantee
+  rested on every new caller remembering. Now `capture.refuse_off_record(cfg, text)` (the text starts with the
+  configured command or has a line that does: `opt_out`, `opt_out_inside`) raises `capture.OffRecord` (a
+  `ValueError`), before anything changes, in `capture.record`, in `capture.write_words` (new: the one caller of
+  `entries.record_reply`, which takes no config and so cannot read the command itself), in `conversations.his_block`,
+  and in `serve/blocks.edit`, which now requires `cfg` (keyword-only, no default, so a caller cannot leave it out) and
+  answers with its own `Refused(422, "off-the-record")`. `test_off_record_floor.py` calls each directly as a forgetful
+  caller would (and `capture`, `capture_to`, `capture_note`, `capture_web`, `add_web_block`, which leave the check to
+  their callers) and shows nothing is written, no ledger change and no recording kept; it pins that
+  `entries.record_reply` and `entries.append_conversation` have one caller each. **Raise, not a quiet skip:** a
+  forgotten check is a bug, and a refusal that returned nothing could pass for a capture; the ledger is written only on
+  a clean exit (`ledger.locked`), so a raise leaves it as it was. **Only the command in the text:** whether a message
+  falls in a `/x` window stays the privacy pass's. **Not covered:** `entries.fill_audio_block` (a transcript of his
+  voice, never typed) and `capture.add_companion_note` (her words; a note in a `/x` turn is refused by the turn's mark,
+  `tools.call`).

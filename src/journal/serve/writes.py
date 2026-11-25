@@ -420,7 +420,7 @@ def block_edit(req: Request):
     if not text.strip():
         raise HTTPError(400, "bad-request", "a block cannot be left empty: remove it instead")
     text = _his_words(req, text)
-    new, mtime = _changed(lambda old: blocks.edit(old, key, text, was=was, at=at, stem=path.stem), req, path, seen)
+    new, mtime = _changed(lambda old: blocks.edit(old, key, text, cfg=req.cfg, was=was, at=at, stem=path.stem), req, path, seen)
     block = next((b for b in document.blocks_of(new, path.stem) if b["key"] == key), None)
     out = {"block": block, "mtime": mtime}
     refresh, why = _summary_refresh(req, new, path.stem, block)

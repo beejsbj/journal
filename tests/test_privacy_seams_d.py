@@ -199,7 +199,7 @@ class FillAudioTest(unittest.TestCase):
     def edit_first(self, words):
         body = self.path.read_text()
         b = next(x for x in document.blocks_of(body, self.STEM) if x["key"] == "words:0")
-        self.path.write_text(blocks.edit(body, "words:0", words, was=b["text"], at=b["at"], stem=self.STEM))
+        self.path.write_text(blocks.edit(body, "words:0", words, cfg=self.cfg, was=b["text"], at=b["at"], stem=self.STEM))
 
     def fill(self):
         return entries.fill_audio_block(self.path, f"{self.STEM}.ogg", "the transcript",

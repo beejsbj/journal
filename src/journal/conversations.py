@@ -427,7 +427,9 @@ def his_block(cfg: Config, at: datetime, text: str, source: str = "text", kept: 
               meta: dict | None = None, entry_date: str | None = None, quote: str | None = None,
               key: str | None = None, pictures: list[str] | None = None) -> str:
     """One of the user's messages, verbatim, as a paragraph with a small time marker (and, with ``key``, the
-    hidden line that keys it)."""
+    hidden line that keys it). Off-the-record words raise ``capture.OffRecord`` (the pass and ``Writer`` drop them
+    first: this is the floor, issue #46)."""
+    capture.refuse_off_record(cfg, text)
     out = entries.block_mark("his", key) + "\n" if key else ""
     if quote:
         q = " ".join(quote.split())

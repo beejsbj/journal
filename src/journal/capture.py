@@ -16,7 +16,7 @@ Rules:
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -164,13 +164,13 @@ def record(cfg: Config, prompt: dict, rule: str, text: str, now: datetime,
     ``images``: the pictures kept with the message (``images.keep``), embedded in the block above his caption (the
     ``text``); ``describe`` asks the tick for the companion's one-line description of each (``images.describe``).
     """
+    refuse_off_record(cfg, text)  # (before anything changes: the record, the entry, the ledger)
     local_now = now.astimezone(cfg.tz)
     prompt["stem"] = entry_stem(cfg, prompt, data)
     # the practice titles a new entry and gives it its bank; for_prompt never raises, so a broken definition can
     # cost the bank in the file, never the capture
     practice = None if prompt["kind"] in entries.FREEFORM_IDS else library.for_prompt(cfg, prompt)
-    path = entries.record_reply(cfg.root, prompt, text, local_now, source, audio, cfg.names, meta, practice,
-                                images or ())
+    path = write_words(cfg, prompt, text, local_now, source, audio, meta, practice, images or ())
     prompt.setdefault("captures", []).append({
         "at": now.isoformat(),
         "rule": rule,
@@ -187,6 +187,15 @@ def record(cfg: Config, prompt: dict, rule: str, text: str, now: datetime,
     prompt["entry_path"] = str(path)
     prompt["needs_edit"] = True
     return {"prompt": dict(prompt), "path": str(path), "rule": rule}
+
+
+def write_words(cfg: Config, prompt: dict, text: str, at: datetime, source: str, audio: str | None = None,
+                meta: dict | None = None, practice=None, images: Sequence[str] = ()) -> Path:
+    """The one caller of ``entries.record_reply``, the function that writes his words into an entry
+    (``test_off_record_floor`` holds that): ``refuse_off_record`` first, so the floor holds for ``record`` and for
+    ``add_web_block``'s block into an entry with no ledger prompt alike. ``at`` is local time."""
+    refuse_off_record(cfg, text)
+    return entries.record_reply(cfg.root, prompt, text, at, source, audio, cfg.names, meta, practice, images)
 
 
 def capture(cfg: Config, chat_id: str, reply_to: str | None, text: str, now: datetime,
@@ -371,12 +380,12 @@ def add_web_block(cfg: Config, stem: str, text: str, now: datetime, *, media: st
         if prompt is not None:
             return _web_record(cfg, data, prompt, via, text, now, client_id, media, ext, meta, key_of, via=via)
         path = entries.entry_path(cfg.root, stem)
+        refuse_off_record(cfg, text)  # (before the recording is kept)
         kept = jaudio.keep(cfg, media, str(path), ext) if media else None
         # no ledger prompt, so no capture for the tick to find: an audio file here is kept but not transcribed
         words = text.strip() or (jaudio.NOT_TRANSCRIBED if kept else "")
         try:
-            entries.record_reply(cfg.root, {"stem": stem}, words, now.astimezone(cfg.tz), "audio" if kept else via,
-                                 kept, cfg.names, meta)
+            write_words(cfg, {"stem": stem}, words, now.astimezone(cfg.tz), "audio" if kept else via, kept, meta)
         except BaseException:
             if kept:
                 Path(cfg.root, kept).unlink(missing_ok=True)
@@ -486,6 +495,21 @@ def opt_out_inside(cfg: Config, text: str) -> bool:
     if opt_out(cfg, text) is not None:
         return False
     return any(opt_out(cfg, line) is not None for line in (text or "").splitlines()[1:])
+
+
+class OffRecord(ValueError):
+    """Off-the-record words reached a function that writes his words; nothing was written. Every caller refuses
+    them first and decides what to answer (``actions.refuse`` on the faces, ``inbound`` and the privacy pass in the
+    chat); this is the floor under them, so a caller that forgot cannot write them (issue #46)."""
+
+
+def refuse_off_record(cfg: Config, text: str | None) -> None:
+    """Raise ``OffRecord`` when ``text`` starts with the opt-out command or has a line that does (``opt_out``,
+    ``opt_out_inside``). Only the command in the text itself: whether a message falls in a ``/x`` window is the
+    privacy pass's (``privacy.py``), decided by the callers."""
+    if opt_out(cfg, text or "") is not None or opt_out_inside(cfg, text or ""):
+        raise OffRecord("these words start with the off-the-record command, or have a line that does: "
+                        "nothing was written")
 
 
 OFF_RECORD_END = "it stays out of the journal.]"
