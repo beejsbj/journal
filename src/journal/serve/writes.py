@@ -34,12 +34,12 @@ from functools import wraps
 from pathlib import Path
 from typing import Callable
 
-from .. import actions, audio, capture, entries, ledger, library, settings
+from .. import actions, audio, capture, document, entries, ledger, library, settings
 from .. import config as jconfig
-from . import api, blocks, document, uploads
+from . import api, blocks, uploads
 from .api import HTTPError, Reply, Request
 
-TEXT_LIMIT = 50_000       # characters of any text field (API.md Decision 7)
+TEXT_LIMIT = actions.TEXT_LIMIT   # characters of any text field (API.md Decision 7)
 LOCK_WAIT = 5.0           # seconds a request waits for a lock before 423
 FUTURE_SLACK = timedelta(minutes=5)
 PAST_LIMIT = timedelta(days=31)   # how far back ``at`` may stamp a block: a late note, not a rewritten calendar

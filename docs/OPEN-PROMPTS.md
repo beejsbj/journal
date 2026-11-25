@@ -181,8 +181,8 @@ The writes sit in one engine module (`journal/actions.py`): `answer` and `note`,
 `deliver`, which is the spawn. Serve, the CLI and MCP call it instead of `capture.capture_web`. `/start` and
 `journal send` take their slot from `slots.resolve` too, which changes two things in the chat. `/start water` at 15:00
 delivers the 12:00 slot rather than always slot 1. And `/start morning` after the morning is answered starts an
-extra entry, where today it re-sends and appends to the same one. MCP keeps importing `serve.api` and `serve.document` for its reads
-until a reading module exists; that is a later package.
+extra entry, where today it re-sends and appends to the same one. MCP read through `serve.api` and `serve.document`
+until the shared readers moved into the core (`document.py`, issue #47); it imports nothing from `serve/` now.
 
 ## Decided (the owner, 2026-11-09)
 

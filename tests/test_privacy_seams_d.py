@@ -18,7 +18,8 @@ from helpers import make_cfg
 
 from journal import agent, audio, context, conversations, entries, privacy, sweep, tick
 from journal.mcp import handlers as mcp_handlers
-from journal.serve import blocks, document
+from journal import document
+from journal.serve import blocks
 from serve_helpers import IST, NEUTRAL, NOW as SERVE_NOW
 from test_conversations import Base, m, near_t0, _NearT0
 from test_images import NOW as IMAGES_NOW, ReceiveBase, note as image_note

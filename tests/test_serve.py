@@ -20,7 +20,8 @@ from serve_helpers import EVENING_NOW, HERS, IST, NEUTRAL, NOW, SESSION, ServeCa
 
 from journal import cli, entries, ledger, status, today, version
 from journal import config as jconfig
-from journal.serve import api, auth, document, sse, unit
+from journal import document
+from journal.serve import api, auth, sse, unit
 from journal.serve import app as serve_app
 
 
@@ -650,7 +651,7 @@ class ReadRoutesTest(ServeCase):
         self.assertEqual(rows[0]["stem"], "2026-10-15-morning-2")
 
     def test_a_picture_embed_is_no_audio(self):
-        from journal.serve import document
+        from journal import document
         from serve_helpers import NOTE
         path = self.cfg.root / "2026-10-15-j.md"
         path.write_text(NOTE + "\n![[diagram.png]]\n", encoding="utf-8")
@@ -729,7 +730,10 @@ class ReadRoutesTest(ServeCase):
         self.assertIn("today", s)
         (self.cfg.state_dir / "sweep.json").write_text(json.dumps(
             {"db": "/somewhere/state.db", "last_id": 41, "at": "2026-11-20T10:00:00+00:00"}), encoding="utf-8")
-        self.assertEqual(self.get_json("/api/v1/status")["sweep"], {"at": "2026-11-20T10:00:00+00:00"})  # (#50)
+        s = self.get_json("/api/v1/status")   # neither the sweep nor the hook's injection count (ROUTE-OPENS)
+        self.assertNotIn("sweep", s)
+        self.assertNotIn("count", s["today"])
+        self.assertNotIn("last", s["today"])
         checks = [r["check"] for r in self.get_json("/api/v1/doctor")]
         self.assertNotIn("hook state", checks)
         self.assertNotIn("telegram token", checks)

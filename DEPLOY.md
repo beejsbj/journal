@@ -41,6 +41,39 @@ guard keep the old pass, which is the less private one. Serve does not import it
 **Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
 previous sha), then `hermes gateway restart`. Nothing to undo in state.
 
+## SHARED-READERS — MCP's readers move out of `serve/` into the core (2026-11-24; serve side and `journal mcp`; **no gateway restart**; no config or state change)
+
+**What changes.** A move, no behaviour change (issue #47): `serve/document.py` is now `document.py` in the core
+(`journal.serve.document` stays an alias of the same module), `filter_entries` and `LIST_LIMIT` moved there from
+`serve/api.py` (which keeps both names), and `TEXT_LIMIT` moved to `actions.py` (`serve/writes.py` keeps the name).
+`mcp/handlers.py` imports nothing from `serve/` now; `test_mcp_fence.py` forbids it, and `test_serve_fence.py` fences
+the moved reader like a module of `serve/`. DECISIONS.md, SHARED-READERS.
+**Side and restart.** Serve side: `uv tool install --force` at the merge sha, then `systemctl --user restart
+journal-serve`. `journal mcp` is a process an MCP client starts, so it runs the new code from its next start (restart
+the client's server entry if one is running). **No gateway restart:** CLAUDE.md's import check lists neither
+`journal.document` nor `journal.actions` among what `journal.hermes` loads, and no gateway path imports them at run
+time (only `cli.py`'s `write`/`open` commands import `actions`, in their own process; `actions.py` gains one constant).
+The tick is untouched.
+**First checks.**
+- `journal doctor` is as before; the web app's History lists entries and an entry opens (the moved reader).
+- An MCP client's `journal_entries` and `journal_entry` answer as before.
+**Rollback.** `uv tool install --force` at the previous sha and restart `journal-serve`; nothing to undo in state.
+
+## ROUTE-OPENS — the faces' walks record every file they open; the web status opens neither the hook's state nor the sweep's (2026-11-24; **serve side only, no gateway restart**)
+
+**What changes.** Issue #44: `tests/test_route_opens.py` runs the serve route walks (every GET, write and push route,
+the Write-now view) and the MCP tool walk again with every file open, directory listing and SQLite connection recorded
+(`sys.addaudithook`, every thread), and fails on anything under `state_dir` outside an allowlist, or on the chat
+transcript; it also pins which forbidden modules loading `serve` and `mcp` brings in through the engine. AGENTS.md now
+says the import fence is direct, not transitive. `status.status(web=True)` (the web's `GET /api/v1/status`) no longer
+returns `sweep` or the today block's injection count, so it opens neither `sweep.json` nor `hook-state.json`; the CLI's
+`journal status` is unchanged. DECISIONS.md, ROUTE-OPENS.
+**Side and restart.** Serve: `uv tool install --force` at the merge sha, then `systemctl --user restart journal-serve`.
+No gateway restart: `status.py` is not loaded by `journal.hermes` (checked with the import probe in AGENTS.md), and the
+change is inside `web=True` branches only, which no gateway path takes; the tick runs it from its next run unchanged.
+**First checks.** `curl` the signed-in `/api/v1/status`: no `sweep` key, and `today` has no `count`.
+**Rollback.** The CLI at the previous sha and a serve restart.
+
 ## MODEL-WALK — the route walks fence every way to a model (2026-11-24; tests and docs only; **no deploy, no restart**)
 
 **What changes.** Tests only (issue #3): `tests/helpers.py` gains `no_model()`, which records and fails every way to a
