@@ -16,6 +16,37 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## MARGIN-NOTES — the annotation step writes margin notes into the entry (2026-11-25; tick side; **no gateway restart needed**; no config or state change)
+
+**What changes.** Issue #31, its second step. When an entry is annotated (the same timing, attempts and outage
+deferral as before), the request may also ask for a few margin notes, one line each, on blocks of his the entry
+labels; code keeps at most one a block and three an entry, only on keyed blocks of ten words or more without an open
+or dismissed note, and only notes whose quotes of his are his; it writes her analysis and the notes in one checked
+write, under `### Margin notes` at the end of her annotations section. Nothing is sent: the annotation reply still
+carries her analysis alone. Old entries (blocks without keys) are annotated exactly as before. The `annotated …` log
+line gains `(+N margin notes; dropped …)` with counts and reasons only. DECISIONS.md, MARGIN-NOTES.
+
+**Side and restart.** New module `margin_notes.py`, loaded by the tick (a fresh process: new code from the next tick
+once the plugin pin moves). Changed modules the gateway also loads: `prompts.py` (`annotation_request` gains two
+keyword arguments with defaults that give today's text) and `entries.py` (`write_annotations` now goes through the new
+`with_annotations`, same output). Both are called only by `tick.annotate`; the gateway never annotates, and the
+import check above lists the same modules before and after this change (`journal.margin_notes`, `journal.tick` and
+`journal.document` are not among them). So **no gateway restart is needed**; the next window's restart picks the
+rest up. Serve does not change (it already reads notes, MARGIN-FORMAT); `uv tool install --force` at the merge sha
+keeps the CLI on the same code. MARGIN-FORMAT must be deployed first (it is the format these notes are written in).
+
+**First checks.**
+- `journal doctor`: no new failure.
+- The next annotation's line in `last-tick.json`: `annotated <id>`, perhaps with `(+N margin notes…)`; no attempt
+  failure where there was none.
+- When a note was written: that entry has one `### Margin notes` heading, `%% journal:margin %%`, and per note a
+  `%% journal note:n… state:open on:block:b… %%` line naming a block key that is in the same file (check with `grep -c`
+  and the key, not by printing the entry); `GET /api/v1/entries/<stem>` lists it in `analysis.margin` with that
+  anchor. Vault checksum before and after: only annotated entries differ.
+
+**Rollback.** The plugin and the CLI at the previous sha. Notes written stay in their entries; older code (with
+MARGIN-FORMAT) reads them as it was built to. Before MARGIN-FORMAT, they read as part of her annotations.
+
 ## MARGIN-FORMAT — a stable key on every block of his, and the margin-note record in the entry format (2026-11-25; tick, hook and serve side; **gateway restart**; no config change)
 
 **What changes.** Issue #31, its first step: the entry format only. Every block of his the engine writes now carries

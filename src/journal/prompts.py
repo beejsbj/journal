@@ -162,7 +162,11 @@ def _transcript_note(cfg: Config) -> str:
             "  bullet of its own (the entry is the place for that); never build a reading on a guess.")
 
 
-def annotation_request(cfg: Config, entry_body: str, companion_reply: str | None) -> str:
+def annotation_request(cfg: Config, entry_body: str, companion_reply: str | None, margin: str = "",
+                       notes: bool = False) -> str:
+    """Her analysis of one entry (``tick.annotate``). ``margin``: her margin notes so far on it, labelled
+    (``margin_notes.margin_digest``); ``notes``: she may also write margin notes on the blocks the entry labels
+    ``[block <key>]`` (``margin_notes``: code keeps at most ``MAX_NOTES``, one a block, and checks each)."""
     n = cfg.names
     reply = companion_reply.strip() if companion_reply else "(no chat reply was found)"
     return f"""You are {n.companion}. Write the analytical annotations for this journal entry, for {n.user_possessive} later review.
@@ -180,13 +184,38 @@ def annotation_request(cfg: Config, entry_body: str, companion_reply: str | None
 - Ignore the orientation prompt's opener text; it may be outdated.
 - Optionally, after the bullets, add up to two lines starting `FOLLOW-UP:` for threads worth picking up with
   {n.object} later (they go to your private notebook, not the journal). Only when genuinely worth it.
-- Reply with ONLY the bullets (and any FOLLOW-UP lines).
+{_notes_ask(cfg) if notes else ""}- Reply with ONLY the bullets (and any FOLLOW-UP{" and NOTE" if notes else ""} lines).
 
 ## Your chat reply to {n.object} (for alignment only)
 {reply}
 
 ## The entry
 {entry_body}
+{_margin_part(cfg, margin)}"""
+
+
+def _notes_ask(cfg: Config) -> str:
+    """The annotation request's part that asks for margin notes (``margin_notes`` parses and checks them)."""
+    n = cfg.names
+    from .margin_notes import MAX_NOTES, NOTE_LIMIT
+    return f"""- Margin notes, only where one is worth it: a short note to {n.object} beside one block of {n.possessive}, which {n.subject}
+  {n.verb("read")} next to that block. Speak to {n.object} directly ("you"): a question the block opens, a connection, a thing
+  you notice in it. Only blocks marked [block <key>] in the entry can take one; at most one note a block and
+  {MAX_NOTES} in all. Most blocks need none, and no note at all is a fine answer. One line each, after the bullets:
+  `NOTE <key>: <your note>`, under {NOTE_LIMIT} characters. Quote {n.object} rarely, and then exactly, in straight
+  double quotes. Don't make a point again that a note of yours below already made, least of all one {n.subject}
+  dismissed.
+"""
+
+
+def _margin_part(cfg: Config, margin: str) -> str:
+    """Her margin notes so far on the entry, set apart from it and labelled (``margin_notes.margin_digest``)."""
+    if not margin.strip():
+        return ""
+    n = cfg.names
+    return f"""
+## Your margin notes on this entry so far (yours; only lines marked as {n.possessive} own words are {n.possessive})
+{margin.strip()}
 """
 
 

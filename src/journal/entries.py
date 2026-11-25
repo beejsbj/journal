@@ -954,9 +954,10 @@ def annotations_pending(body: str) -> bool:
     return bool(span) and body[span[0]:span[1]].strip() in ("", PENDING) and bool(raw_entry(body))
 
 
-def write_annotations(path: Path, text: str, names: Names = DEFAULT_NAMES) -> None:
-    """Replace only her analysis; the user's words, the margin notes and the companion's notes are untouched."""
-    body = path.read_text(encoding="utf-8")
+def with_annotations(body: str, text: str, names: Names = DEFAULT_NAMES, notes: list[str] | tuple = ()) -> str:
+    """``body`` with her analysis replaced by ``text`` and ``notes`` (margin notes as ``margin.render`` wrote them)
+    added at the end of the margin, which opens under her analysis (``MARGIN_HEADING`` and its hidden line) when the
+    entry has none. The user's words, the notes already there and the companion's notes are untouched."""
     span = _analysis_span(body)
     if span is None:
         body = body.rstrip() + f"\n\n{names.annotations_heading}\n\n"
@@ -964,7 +965,23 @@ def write_annotations(path: Path, text: str, names: Names = DEFAULT_NAMES) -> No
     s, e = span
     rest = body[e:].lstrip("\n")
     body = body[:s] + "\n" + _hers(text) + "\n" + ("\n" + rest if rest else "")
-    _atomic_write(path, body)
+    added = "\n".join(n.rstrip() + "\n" for n in notes if n.strip())
+    if not added:
+        return body
+    span = margin_span(body)
+    if span is None:
+        at = _analysis_span(body)[1]
+        rest = body[at:].lstrip("\n")
+        return (body[:at].rstrip("\n") + f"\n\n{MARGIN_HEADING}\n\n{MARGIN_MARK}\n\n" + added
+                + ("\n" + rest if rest else ""))
+    s, e = span
+    current, rest = body[s:e].strip(), body[e:].lstrip("\n")
+    return body[:s] + "\n" + (current + "\n\n" if current else "") + added + ("\n" + rest if rest else "")
+
+
+def write_annotations(path: Path, text: str, names: Names = DEFAULT_NAMES) -> None:
+    """Replace only her analysis; the user's words, the margin notes and the companion's notes are untouched."""
+    _atomic_write(path, with_annotations(path.read_text(encoding="utf-8"), text, names))
 
 
 def add_companion_note(path: Path, text: str, at: datetime, prompt: dict | None = None,
