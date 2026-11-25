@@ -4612,3 +4612,34 @@ line of his that copies the mark never leaves a bound on her later searches. An 
 that echoes it has the line dropped. Left as known: `journal_search` refuses in a finite turn the engine did not start
 (a kanban card, his own `hermes chat -q`); an engine one-shot that starts a gateway itself would pass its variables
 to it (not this host's setup: the gateway runs as a service).
+- **AUDIT-LEFTOVERS (2026-11-24) — what issue #50 took, and what it left.** Taken: (1) the web's `/status` serves
+  `sweep` as `{at}`: the doc listed `sweep.json` as unservable, and its database path and row id are chat-side, so the
+  web gets the time alone (the CLI's status line is unchanged); (2) `/status` and the hook state: already so on main
+  (`hook_state` is not read in web mode, `tests/test_serve.py` pins it); (3) the thin tuple readers WP7 kept
+  (`sweep.parse/rows/read`, `conversations.rows`) are called by no `src/` code, so they moved to
+  `tests/legacy_readers.py` and the suites that pin the row semantics call them there (WP13 had left this for exactly
+  that rewrite; `context.clean_user_text`, `agent.is_failure_text` and `mirror.turn_running` are not in the issue and
+  stay). **Not taken, needs the owner:** the platform-named fields. The ledger's `telegram` record (a prompt's send,
+  a reflection's send, an annotation reply; read at about twenty sites and by `standing`, `context`, `status`,
+  `reflect`) and the `telegram_history` source (a key in deployments' config and in `plugin.yaml`) would each need
+  read-old/write-new. The ledger is shared by a gateway that runs old code until it restarts and by a tick that runs
+  new code at once: a record written under the new name is invisible to the old reader, so a prompt could look unsent
+  and be sent twice. Options: (a) leave the names (cosmetic; recommended while in maintenance); (b) rename in two
+  releases, the first reading both names and writing the old, the second writing the new once every gateway has
+  restarted; (c) add `chat_history` as an alias for the source only, which is config-side and safe.
+- **INVISIBLE-PY (2026-11-24) — the invisible-character guard covers the Python source.** #63 guarded the built web
+  app; three literal U+FEFF in `library.py`, `programdefs.py` and `tests/test_library.py` still tripped Hermes'
+  scanner (it reads `.py`, tests included). Rule: a Python file writes such a character as an escape (`"\ufeff"`), and
+  `tests/test_install_scan.py` fails on a literal in any file under the repo root with an extension the scanner reads
+  (`SCANNABLE_EXTENSIONS`: Python including the root `__init__.py` and `tools/`, docs, JSON, shell, fixtures), minus
+  the scanner's excluded directories. A file that must hold one on purpose (a fixture) would be named as an exception
+  in that test, with its reason.
+- **DOCTOR-STUB (2026-11-24) — the doctor judges the cron stub by what it runs, not by the install that asks (issue
+  #7).** `cron.checks` compared the stub with `stub_text(src, home)` for the caller's `src`; from a `uv tool` CLI that
+  is site-packages, so a correct stub (naming the plugin's `src`) read "out of date" on one face and ok on the other.
+  Rule: `cron.stub_problem` reads the `SRC` out of the stub, requires the file to equal what setup writes for that
+  `src` and this profile, and requires `<SRC>/journal/cli.py` to exist; the asking install's own path no longer
+  matters. Not decided: whether doctor should also warn when the stub's `src` is a different *version* than the
+  running CLI; the `same version as tick` row already does that.
+  Accepted trade: a stub whose `SRC` still exists with `journal/cli.py` reads ok even if it is no longer the install
+  the profile uses; version skew between the two is covered by the `same version as tick` row, not by this one.

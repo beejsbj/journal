@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 from helpers import CHAT, CleanEnv, make_cfg
+import legacy_readers
 
 from journal import (agent, capture, cli, compose, config, context, entries, ledger, library, programdefs, programs,
                      sweep, telegram, tick, today)
@@ -597,7 +598,7 @@ class SurfaceTest(Base):
         self.assertIn("phase 1/6 “Current Reality Excavation”", note)
         self.assertTrue(note.rstrip().endswith("annotations are written automatically.]"))
         self.assertEqual(context.clean_user_text(out["text"]), "my answer")
-        self.assertEqual(sweep.read(out["text"], "88")["kind"], "handled")
+        self.assertEqual(legacy_readers.read(out["text"], "88")["kind"], "handled")
         self.assertEqual(spawned, [("program", "settle", rid)])
 
     def test_start_resolves_programs_aliases_sessions_and_insights(self):

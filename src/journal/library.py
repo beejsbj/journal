@@ -235,7 +235,7 @@ def _split(text: str) -> tuple[str | None, str]:
 
     A leading byte-order mark is dropped (some editors write one) and a closing fence on the last line gets
     the newline ``entries.front_matter`` needs, so neither turns a correct header into "kind is required"."""
-    text = text.replace("\r\n", "\n").removeprefix("﻿")
+    text = text.replace("\r\n", "\n").removeprefix("\ufeff")
     if not text.startswith("---\n"):
         return None, text
     end = text.find("\n---\n", 3)
