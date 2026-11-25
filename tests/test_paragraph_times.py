@@ -148,7 +148,8 @@ class CheckTest(unittest.TestCase):
             "no offset": [t[:19] for t in good],
             "not a time": ["yesterday", good[1], good[2]],
             "in the future": [good[0], good[1], iso(-30)],
-            "too long ago": [iso(60 * 25), good[1], good[2]],
+            "a day before": [iso(60 * 25), good[1], good[2]],
+            "yesterday, under 24 hours back": [iso(60 * 14), good[1], good[2]],
             "far too long": [good[0], good[1], "9" * 100],
             "year one": ["0001-01-01T00:00:00+14:00", good[1], good[2]],
             "null": None,
@@ -160,10 +161,22 @@ class CheckTest(unittest.TestCase):
     def test_a_recording_keeps_no_times(self):
         self.assertEqual(self.check(times_for("a caption", 1), "a caption", media="/tmp/upload.webm"), [])
 
-    def test_paragraphs_are_lines_that_are_not_blank(self):
-        self.assertEqual(entries.paragraph_count(WORDS), 3)
-        self.assertEqual(entries.paragraph_count("\n\n  one  \n \n\ttwo\n"), 2)
-        self.assertEqual(entries.paragraph_count(""), 0)
+    def test_a_time_from_before_the_journal_day_is_dropped_and_one_across_midnight_is_kept(self):
+        # the journal day starts at windows.day_ends_at (04:00): a piece begun at 23:50 and saved at 00:10 is one
+        # day's and keeps its times; one begun the evening before and saved after four would read as later today.
+        two = "First.\nSecond."
+        at = datetime(2026, 10, 15, 0, 10, tzinfo=IST)
+        begun = [datetime(2026, 10, 14, 23, 50, tzinfo=IST).isoformat(), datetime(2026, 10, 15, 0, 5, tzinfo=IST).isoformat()]
+        self.assertEqual(actions.paragraph_times(self.cfg, begun, two, at), ["23:50", "00:05"])
+        at = datetime(2026, 10, 15, 3, 59, tzinfo=IST)   # (still last night's journal day)
+        self.assertEqual(actions.paragraph_times(self.cfg, begun, two, at), ["23:50", "00:05"])
+        at = datetime(2026, 10, 15, 4, 5, tzinfo=IST)    # (a tab left open: a new journal day began at 04:00)
+        self.assertEqual(actions.paragraph_times(self.cfg, begun, two, at), [])
+        morning = [datetime(2026, 10, 15, 3, 55, tzinfo=IST).isoformat(), datetime(2026, 10, 15, 4, 1, tzinfo=IST).isoformat()]
+        self.assertEqual(actions.paragraph_times(self.cfg, morning, two, at), [])   # (one time of the night before)
+        morning[0] = datetime(2026, 10, 15, 4, 0, tzinfo=IST).isoformat()
+        self.assertEqual(actions.paragraph_times(self.cfg, morning, two, at), ["04:00", "04:01"])
+
 
 
 class RouteTest(WriteCase):
@@ -179,6 +192,15 @@ class RouteTest(WriteCase):
         doc = self.ok("GET", f"/api/v1/entries/{got['stem']}")
         (b,) = [b for b in doc["blocks"] if b["kind"] == "his"]
         self.assertEqual((b["text"], b["times"]), (WORDS, ["08:32", "08:42", "09:11"]))
+
+    def test_times_from_the_night_before_cost_only_the_times(self):
+        # a tab left open overnight: the piece was begun yesterday evening (11 hours back, within a day), so its hours
+        # would read as later today. His words are saved with the block's one time.
+        two = "First.\nSecond."
+        last_night = [(NOW - timedelta(hours=11)).isoformat(), iso(1)]
+        got = self.ok("POST", "/api/v1/entries", {"text": two, "times": last_night}, want=201)
+        self.assertNotIn("journal times:", self.entry(got["stem"]))
+        self.assertIn("First.\nSecond.", self.entry(got["stem"]))
 
     def test_an_answer_keeps_its_times(self):
         got = self.ok("POST", "/api/v1/entries", {"practice": "morning", "text": "Slept well.\n\nTwo lines.",

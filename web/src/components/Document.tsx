@@ -164,7 +164,7 @@ function HisBlock({ block, name, target }: { block: Block; name: string; target?
 
   return (
     <article class={["block", "his", editing && "editing", pressing && "pressing"].filter(Boolean).join(" ")} id={block.key}
-      aria-label={`${name}${block.at ? `, ${block.at}` : ""}`}>
+      aria-label={`${name}${began ? `, ${began}` : ""}`}>
       <div class="margin">
         {began && <Hour at={began} />}
         {source && (

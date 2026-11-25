@@ -1,7 +1,8 @@
 /* Hours (ui/Hours.tsx): the hour each paragraph was begun, hung in the left margin. The italic of the book, lining
    tabular figures, in the quiet text colour. */
 .margin-hour {
-  font: italic 400 15px / 1 var(--f-his); font-variant-numeric: tabular-nums lining-nums; color: var(--text-3);
+  font: italic 400 var(--t-ui) / 1 var(--f-his); font-variant-numeric: tabular-nums lining-nums; color: var(--text-3);
+  user-select: none; -webkit-user-select: none;   /* copying his words does not pick up the margin's hours */
 }
 .hour-lines { white-space: pre-wrap; }
 .hour-line { position: relative; }

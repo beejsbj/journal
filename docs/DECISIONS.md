@@ -4620,7 +4620,7 @@ to it (not this host's setup: the gateway runs as a service).
     to give).
   - **The server's check (`actions.paragraph_times`) drops, never refuses.** The times must be a list of ISO times with
     offsets, one per paragraph, none after the block's time (a face's clock up to `FUTURE_SLACK` ahead is taken as
-    the block's time) and none more than `TIMES_SPAN` (24 hours) before it. Anything else, and the whole list is
+    the block's time) and none before the start of the block's journal day (`slots.journal_day`, `windows.day_ends_at`: a piece begun at 23:50 and saved at 00:10 keeps its times; one begun the evening before a tab left open overnight does not, since its hour would read as later today). Anything else, and the whole list is
     dropped: his words are saved with the block's one time, as before. **Times need not rise**: the brief asked for
     "in order"; read as one per paragraph in the paragraphs' order, since a paragraph he goes back and adds above
     others was begun later and the margin saying so is true. Requiring them to rise would drop every time of a
@@ -4632,7 +4632,12 @@ to it (not this host's setup: the gateway runs as a service).
     from a note into an answer.
   - **His edits.** The web app's Edit replaces his words and leaves the times line as it is; the document pairs the
     times with the words only while the paragraphs number the same (`document.paired_times`), otherwise the block
-    shows its one time again. Delete removes the line with the block. An edit in his notes app works the same way.
+    shows its one time again. Delete removes the line with the block. An edit in his notes app works the same way,
+    and the pairing is by position: an edit there that keeps the paragraph count but rearranges or replaces
+    paragraphs keeps the old times on them, so a rewritten paragraph can show the hour of the one it replaced.
+    Accepted: the times are a note of when he wrote, not a claim the engine can re-check against a file he is free to
+    change. **The room's clock is the device's**: the room stamps each paragraph with the device's clock, while the
+    saved entry shows it in the configured time zone (`cfg.tz`); the two differ only when he travels.
   - **Older readers.** An older engine reads a block with the line as before (the line is an engine line everywhere),
     except the web app's in-place Edit and Delete of that block, which refuse it (`not-editable`: "a line of the
     engine's own"; change it in your notes app). An older web app shows the block's one time.

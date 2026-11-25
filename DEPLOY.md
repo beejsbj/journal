@@ -20,7 +20,7 @@ The gateway restarts in **windows**, at least an hour from a ritual (the built-i
 
 **What changes.** The web app notes when each paragraph (each line that is not blank) of his words was begun while he
 writes, in the write room and the entry's own box, and a save sends those times. The server checks them
-(`actions.paragraph_times`: one per paragraph, none after the block's time, none more than 24 hours before it) and the
+(`actions.paragraph_times`: one per paragraph, none after the block's time, none before the start of the block's journal day) and the
 block keeps them on one hidden line under its heading (`%% journal times:08:32 08:42 %%`); anything that does not hold
 is dropped and the words are saved with the block's one time, as before. The entry shows the first paragraph's hour
 beside the block and each later one beside its paragraph where the hour changes; the room does the same while he

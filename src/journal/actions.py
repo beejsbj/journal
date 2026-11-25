@@ -37,7 +37,6 @@ from .config import Config
 
 FACES = tuple(entries.FACES)  # web, cli, mcp
 FUTURE_SLACK = timedelta(minutes=5)  # a face's clock a little ahead of the server's (as ``serve/writes`` allows)
-TIMES_SPAN = timedelta(hours=24)     # how long before its save a paragraph of one piece may have been begun
 TIMES_MAX = 2000                     # paragraph times one write may bring (more than a 50,000-character piece has)
 
 
@@ -105,7 +104,8 @@ def paragraph_times(cfg: Config, raw, text: str, at: datetime, *, media: str | N
     Anything that does not hold is dropped whole, never a refusal: his words are saved with the block's one time, as
     before. That is: not a list, a count other than the paragraphs', a time that does not parse or has no offset, one
     after the block's own time (a face's clock a little ahead, ``FUTURE_SLACK``, is taken as the block's time), or one
-    more than ``TIMES_SPAN`` before it; and any piece with a recording (its words are a caption, or a transcript to
+    before the start of the block's journal day (``slots.journal_day``: a piece begun at 23:50 and saved at 00:10 is
+    one day's and keeps its times; one begun yesterday would show as an hour that reads as later today); and any piece with a recording (its words are a caption, or a transcript to
     come). Times need not rise: a paragraph he went back and added above others was begun later, and says so."""
     if media or not isinstance(raw, list) or not raw or len(raw) > TIMES_MAX:
         return []
@@ -113,13 +113,14 @@ def paragraph_times(cfg: Config, raw, text: str, at: datetime, *, media: str | N
         return []
     out = []
     try:
+        day = slots.journal_day(cfg, at)
         for value in raw:
             if not isinstance(value, str) or len(value) > 64:
                 return []
             t = datetime.fromisoformat(value)
             if t.tzinfo is None or t.utcoffset() is None:
                 return []
-            if t > at + FUTURE_SLACK or t < at - TIMES_SPAN:
+            if t > at + FUTURE_SLACK or slots.journal_day(cfg, t) < day:
                 return []
             out.append(min(t, at).astimezone(cfg.tz).strftime("%H:%M"))
     except (ValueError, OverflowError, OSError):   # (a year-1 time cannot be moved to another offset)
