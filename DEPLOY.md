@@ -53,6 +53,18 @@ skips it ("answered live since") once the chat has a real reply in its window, o
 chat catch-up (tested against the older module, `RollbackTest`). The replies it held go as before from the first tick
 on the older code.
 
+## MODEL-WALK — the route walks fence every way to a model (2026-11-24; tests and docs only; **no deploy, no restart**)
+
+**What changes.** Tests only (issue #3): `tests/helpers.py` gains `no_model()`, which records and fails every way to a
+model (`agent.ask`, the companion `Config.companion()` hands out, the companion classes' own `ask`), and the serve
+route walks (`test_serve_privacy.py`: GET, write and push routes, the Write-now view) and the MCP tool walk
+(`test_mcp.PrivacyTest`) run inside it, so a route that reached a model through a module serve loads fails the suite
+even when the route swallows the failure. README *Guarantees* and AGENTS.md say so. DECISIONS.md, MODEL-WALK.
+**Side and restart.** None: no file under `src/` changes, so nothing an install runs changes. Moving the pins to this
+sha is optional and needs no restart.
+**First checks.** None on the host; CI's suite is the check.
+**Rollback.** Nothing to roll back on a host.
+
 ## TICK-LOCK-MEASURE — `tools/measure_tick_lock.py` and the measured wait on `tick.lock` (2026-11-24; tooling and docs only; **nothing to deploy**)
 
 A timing harness under a temporary root (no live state, no model, no chat) and the DECISIONS.md entry TICK-LOCK-WAIT
