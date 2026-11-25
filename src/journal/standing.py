@@ -245,7 +245,7 @@ def without_chat(data: dict, now: datetime | None = None) -> dict:
             marks.append(("annotations", _parse(r.get("skipped_at")), _parse(p.get("annotated_at"))))
     found = data.get("reflections") if isinstance(data, dict) else None
     for rec in (found if isinstance(found, list) else []):
-        t = rec.get("telegram") if isinstance(rec, dict) else None
+        t = ledger.send_of(rec) if isinstance(rec, dict) else None
         if isinstance(t, dict) and t.get("skipped") == "no chat":
             marks.append(("reflections", _parse(t.get("skipped_at")), _parse(rec.get("written_at"))))
     out = {"annotations": 0, "reflections": 0}
@@ -276,7 +276,7 @@ def too_late(data: dict, now: datetime) -> dict:
     out = {"annotations": 0, "reflections": 0}
     marks = [("annotations", p.get("annotation_reply")) for p in _prompts(data)]
     found = data.get("reflections") if isinstance(data, dict) else None
-    marks += [("reflections", rec.get("telegram")) for rec in (found if isinstance(found, list) else [])
+    marks += [("reflections", ledger.send_of(rec)) for rec in (found if isinstance(found, list) else [])
               if isinstance(rec, dict)]
     for kind, mark in marks:
         if not isinstance(mark, dict) or mark.get("skipped") != "stale":

@@ -618,7 +618,7 @@ class _Writer:
                                 sweep.words(compose.annotation_html(p.get("kind") or "", text, names)),
                                 in_root(self.cfg, str(path)), None))
             for r in data.get("reflections") or []:
-                tg, path = r.get("telegram") or {}, Path(in_root(self.cfg, r.get("path")) or "")
+                tg, path = ledger.send_of(r), Path(in_root(self.cfg, r.get("path")) or "")
                 if tg.get("message_id") and tg.get("sent_at") and path.is_file():
                     try:
                         title, _ = reflect._label(self.cfg, r["kind"], date.fromisoformat(r["local_date"]))
