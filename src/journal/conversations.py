@@ -51,7 +51,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from . import audio, capture, entries, images, ledger, sweep
-from .config import Config
+from .config import Config, journal_day
 from .ports import Row
 
 STATE = "conversations.json"
@@ -548,7 +548,7 @@ class _Writer:
         review, that analysis's id on its capture: ``answers``). Off-the-record words raise ``capture.OffRecord``
         before anything is kept or reserved."""
         capture.refuse_off_record(self.cfg, ev.text)
-        local_date = ev.at.astimezone(self.cfg.tz).date().isoformat()
+        local_date = journal_day(self.cfg, ev.at).isoformat()   # (as ``capture.new_note_prompt`` dates it)
         if not self.write:
             n, stem = 1, entries.stem_for(local_date, "j")
             taken = {p.get("stem") for p in ledger.snapshot(self.cfg.ledger_path)["prompts"]} | self.reserved

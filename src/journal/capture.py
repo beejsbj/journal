@@ -22,7 +22,7 @@ from pathlib import Path
 
 from . import audio as jaudio
 from . import channel, entries, ledger, library
-from .config import Config
+from .config import Config, journal_day
 
 
 def _aware(ts: str) -> datetime:
@@ -447,8 +447,9 @@ def strip_command(text: str) -> str | None:
 
 
 def new_note_prompt(data: dict, cfg: Config, now: datetime) -> dict:
-    """A fresh record for one /j note: each note is its own entry file (…-j.md, …-j-2.md)."""
-    local_date = now.astimezone(cfg.tz).date().isoformat()
+    """A fresh record for one /j note: each note is its own entry file (…-j.md, …-j-2.md), dated by the journal day
+    (``config.journal_day``: a note put down at 00:30 is last night's, as a prompt answered then is; issue #82)."""
+    local_date = journal_day(cfg, now).isoformat()
     taken = {p.get("stem") for p in data["prompts"]}
     n, stem = 1, entries.stem_for(local_date, "j")
     while stem in taken or entries.entry_path(cfg.root, stem).exists():

@@ -49,7 +49,7 @@ from pathlib import Path
 from . import agent, channel, compose, entries, ledger, library, mirror, notebook, outage, prompts, schedule, search, \
     validate
 from .ports import ChannelError
-from .config import Config
+from .config import Config, journal_day
 
 ATTEMPTS = 3
 SEND_ATTEMPTS = 6
@@ -331,7 +331,7 @@ def _replies_to(cfg: Config, rec: dict | None, path: Path, upto: date, data: dic
         if at is None or not note.is_file():
             continue
         try:
-            day = datetime.fromisoformat(at).astimezone(cfg.tz).date()
+            day = journal_day(cfg, datetime.fromisoformat(at))   # (the day its note is filed under)
         except ValueError:
             continue
         if first <= day <= upto:  # (a reply written after the period being reflected on belongs to a later one)

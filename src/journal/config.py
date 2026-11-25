@@ -29,8 +29,11 @@ import re
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import TYPE_CHECKING, Any, Callable, Mapping
 from zoneinfo import ZoneInfo
+
+if TYPE_CHECKING:
+    from datetime import date
 
 PLUGIN_ID = "journal"
 NO_CHANNEL = "none"  # ``channel.platform: none``: a journal with no chat (OPEN-PROMPTS rule 6)
@@ -888,6 +891,17 @@ def day_ends_at(cfg: "Config") -> tuple[int, int]:
         value = "04:00"
     hh, mm = value.split(":")
     return int(hh), int(mm)
+
+
+def journal_day(cfg: "Config", at) -> "date":
+    """The journal day of a moment (``at``, timezone-aware): its local date, except that before
+    ``windows.day_ends_at`` (default 04:00) it is still the day before. An evening answered at 00:30 is that evening's,
+    and a note put down at 00:30 is last night's (issue #82). Every reader of "which day" asks this: slot resolution
+    (``slots.journal_day``), the note a /j or a chat thread starts (``capture.new_note_prompt``), and Today."""
+    from datetime import timedelta
+    local = at.astimezone(cfg.tz)
+    hh, mm = day_ends_at(cfg)
+    return local.date() - timedelta(days=1) if (local.hour, local.minute) < (hh, mm) else local.date()
 
 
 def today_max_chars(cfg: "Config") -> int:

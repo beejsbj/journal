@@ -4916,3 +4916,27 @@ gate strips as deep as the floor and a doubled `/j` before `/x` keeps nothing, a
 writer's and the sweep's per-message catch of `OffRecord` is a backstop: it drops that message from their own output
 and moves on, but records nothing for the other readers (with the gate and floor agreeing it is not reached by any
 input found). A label the floor refuses answers 422 `off-the-record`, as the route's own refusal does.
+
+- **NOTES-JOURNAL-DAY (2026-11-25) — notes are filed by the journal day, and Today shows it (issue #82, part 2).**
+  The owner's call (issue #82): a 00:30 line belongs to last night, as a prompt answered then already did
+  (`slots.resolve`). One helper decides "which day" for every writer and reader: `config.journal_day(cfg, at)` (moved
+  from `slots.journal_day`, which now calls it, so `capture` can ask it without importing `slots`). It dates every
+  note: `capture.new_note_prompt` (the chat `/j`, the sweep's and the conversation writer's notes, `actions.note` for
+  the web app, the CLI and MCP) and the conversation writer's dry-run plan. The readers that key on the entry's date
+  (the day reflection's `entries_on`, `GET /days`, the Entries list, Insights) follow without change. Today followed
+  by decision, since otherwise the note just put down at 00:30 would not be in *Written today*: `today.collect`'s
+  `date`, `weekday`, practices, entries and reflection are the journal day's (`time` stays the clock's, so the block
+  reads "Thu 15 Oct 2026, 00:35"), the web's week strip ends on it, and the today block's day boundary
+  (`thread_started`) and its per-day count turn at `day_ends_at`. This changed one pinned behaviour on purpose:
+  `test_today.DayChangeTest` held that a chat running past midnight gets a new block naming the new date; it now holds
+  that this happens at `day_ends_at` (the block at 00:10 would have repeated Thursday). A week review's count of his
+  replies to a reflection reads the reply's journal day too (`reflect`, the day its note is filed under). **Not
+  changed:** the companion's own notes (`capture.add_companion_note` keeps its caller's date), program sessions and
+  their dates, `journal status`' slot list (`slots.day` on the calendar date, a CLI view), the tasks cache (due
+  today by the calendar), the conversation writer's time markers (a 00:30 line in last night's note is labelled
+  "Fri 16 Oct 00:30", as a late evening reply always was), the chat-thread boundaries (`conversations.quiet_minutes`
+  and prompt sends), and the stamps window check of `actions.entry_for` and serve's `at` (a block may not predate its
+  entry's date: a journal day is never earlier than the calendar date, so nothing new is refused). **Existing files
+  are not moved**: a note filed by the calendar date before this stays there (the owner: nothing merged or
+  rewritten). Tests: `tests/test_note_journal_day.py` (the boundary at 23:59, 00:00, 00:30, 03:59, 04:00, every way a
+  note is made, the readers agreeing at 00:30, Today turning at 04:00, an existing note left alone).

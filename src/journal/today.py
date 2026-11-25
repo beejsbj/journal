@@ -29,7 +29,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from . import audio, entries, hookstate, reflect, slots, sources, standing
-from .config import Config, pack_lookback_days, quiet_minutes, today_cache_minutes, today_max_chars
+from .config import Config, journal_day, pack_lookback_days, quiet_minutes, today_cache_minutes, today_max_chars
 
 log = logging.getLogger("journal.today")
 
@@ -170,8 +170,9 @@ def _heard_now(cfg: Config, now: datetime) -> datetime | None:
 
 def thread_started(cfg: Config, now: datetime, stamps: dict) -> bool:
     """Whether the message arriving at ``now`` opens a thread: the first the hook has seen, or his previous one was
-    more than ``conversations.quiet_minutes`` ago, or it falls on a later local day than his previous one (a chat
-    that runs past midnight meets the new day), or a journal prompt went out since it, or the last start found
+    more than ``conversations.quiet_minutes`` ago, or it falls on a later journal day than his previous one (a chat
+    that runs past ``windows.day_ends_at`` meets the new day: the block names the journal day, issue #82), or a
+    journal prompt went out since it, or the last start found
     nothing to say (``today_owed``). ``stamps`` are the hook-state thread stamps (``last_his``, ``last_send``:
     epoch seconds), read before this message is stamped."""
     last = _num(stamps.get("last_his"))
@@ -180,7 +181,7 @@ def thread_started(cfg: Config, now: datetime, stamps: dict) -> bool:
     t = now.timestamp()
     if t - last > quiet_minutes(cfg) * 60:
         return True
-    if datetime.fromtimestamp(last, timezone.utc).astimezone(cfg.tz).date() != now.astimezone(cfg.tz).date():
+    if journal_day(cfg, datetime.fromtimestamp(last, timezone.utc)) != journal_day(cfg, now):
         return True
     sent = _num(stamps.get("last_send"))
     return sent is not None and sent > last
@@ -224,7 +225,7 @@ def note_empty(cfg: Config) -> None:
 
 def note_injected(cfg: Config, now: datetime) -> None:
     """Count one block shown (``today_injected_at``, and ``today_count`` for the day, for ``journal status``)."""
-    day = now.astimezone(cfg.tz).date().isoformat()
+    day = journal_day(cfg, now).isoformat()
     with hookstate.locked(cfg) as state:
         stamps = state["stamps"]
         count = stamps.get("today_count") if isinstance(stamps.get("today_count"), dict) else {}
@@ -237,7 +238,7 @@ def injections(cfg: Config, now: datetime) -> dict:
     """``{"count": n, "last": "09:12"}`` for the local day of ``now`` (count 0, last None when none)."""
     stamps = hookstate.stamps(cfg)
     count = stamps.get("today_count") if isinstance(stamps.get("today_count"), dict) else {}
-    day = now.astimezone(cfg.tz).date().isoformat()
+    day = journal_day(cfg, now).isoformat()
     n = count.get("n") if count.get("date") == day and isinstance(count.get("n"), int) else 0
     at = _num(stamps.get("today_injected_at"))
     last = None
@@ -259,7 +260,7 @@ def _hhmm(iso: str, cfg: Config) -> str:
     return datetime.fromisoformat(iso).astimezone(cfg.tz).strftime("%H:%M")
 
 
-def _practices(cfg: Config, now_local: datetime, stems: bool = False) -> dict:
+def _practices(cfg: Config, now_local: datetime, day: str, stems: bool = False) -> dict:
     """How today's practices went: every slot of the day in its state (``slots.day``: upcoming, due, open, answered,
     missed), then what was done off the schedule. ``stems``: each row that has a record names its entry's stem
     (``journal serve`` links rows to entries by it; a practice with two slots has two rows with one id, and a prefix
@@ -269,7 +270,7 @@ def _practices(cfg: Config, now_local: datetime, stems: bool = False) -> dict:
     a face (the web app, the CLI, MCP), ``at`` for the slot's time when nothing was delivered. Only a delivered prompt
     is ``open``, and only open rows are listed as awaiting a reply in the chat (``open``)."""
     rows = []
-    for s in slots.day(cfg, now_local.date().isoformat(), now_local):
+    for s in slots.day(cfg, day, now_local):
         p = s.record
         if s.n is None and not (slots.delivered(p) or (p or {}).get("captures")):
             continue  # off the schedule with nothing done (a deliberate send that failed): no row, as before
@@ -312,10 +313,10 @@ def first_line(words: str, cap: int = ENTRY_CHARS) -> str:
     return _clip(first, cap) if first.strip() else ""
 
 
-def _entries(cfg: Config, now_local: datetime) -> list[dict]:
+def _entries(cfg: Config, day: str) -> list[dict]:
     out = []
     # by name, not by mtime (entries_on's order): the same state gives the same block, and the fixture holds
-    for path in sorted(entries.entries_on(cfg.root, now_local.date().isoformat())):
+    for path in sorted(entries.entries_on(cfg.root, day)):
         try:
             words = entries.his_words(path.read_text(encoding="utf-8"))
         except OSError:
@@ -326,10 +327,10 @@ def _entries(cfg: Config, now_local: datetime) -> list[dict]:
     return out
 
 
-def _reflection(cfg: Config, now_local: datetime, stems: bool = False) -> dict | None:
+def _reflection(cfg: Config, day: date, stems: bool = False) -> dict | None:
     """The question the latest day reflection (today's or the last two days') closed with. ``stems``: also the
     reflection's own stem (``<date>-reflection-2`` when a hand-written file held the first name)."""
-    path = reflect.latest(cfg, "reflection", now_local.date(), 2)
+    path = reflect.latest(cfg, "reflection", day, 2)
     if path is None:
         return None
     body = reflect.body_of(path.read_text(encoding="utf-8"))
@@ -373,6 +374,10 @@ def _weather(cfg: Config, now: datetime) -> str | None:
 def collect(cfg: Config, now: datetime, stems: bool = False, with_standing: bool = False) -> dict:
     """Everything the block (and ``GET /today``) says, as a plain dict. ``now`` is a timezone-aware moment.
 
+    ``date`` and ``weekday`` are the journal day (``config.journal_day``: before ``windows.day_ends_at`` it is still
+    last night's), and the practices, entries and reflection are that day's, so a note put down at 00:30 is among
+    *Written today* (issue #82); ``time`` is the clock's.
+
     Keys always present: ``date``, ``weekday``, ``time``, ``timezone``, ``location``, then one per source
     (``practices`` as ``{rows, open}``, ``program``, ``entries``, ``reflection``, ``tasks``, ``weather``), each
     ``None``/empty when the source is off, has nothing, or failed. Reads state only: no source is called.
@@ -381,15 +386,16 @@ def collect(cfg: Config, now: datetime, stems: bool = False, with_standing: bool
     things stand as the pack has it (``standing.today_lines``), from state and the time of his last public chat
     message the tick cached; ``GET /today`` and MCP's today text don't ask for it, so their shape is unchanged."""
     now_local = now.astimezone(cfg.tz)
+    jday = journal_day(cfg, now)   # (issue #82: until ``windows.day_ends_at`` Today is still last night's day)
     wants = wanted(cfg)
-    out = {"date": now_local.date().isoformat(), "weekday": now_local.strftime("%a"),
+    out = {"date": jday.isoformat(), "weekday": jday.strftime("%a"),
            "time": now_local.strftime("%H:%M"), "timezone": now_local.strftime("%Z"), "location": cfg.location or None,
            "practices": {"rows": [], "open": []}, "program": None, "entries": [], "reflection": None,
            "tasks": None, "weather": None}
     for key, name, fetch in (
-            ("practices", "practices", lambda: _practices(cfg, now_local, stems)),
-            ("entries", "entries", lambda: _entries(cfg, now_local)),
-            ("reflection", "reflection", lambda: _reflection(cfg, now_local, stems)),
+            ("practices", "practices", lambda: _practices(cfg, now_local, jday.isoformat(), stems)),
+            ("entries", "entries", lambda: _entries(cfg, jday.isoformat())),
+            ("reflection", "reflection", lambda: _reflection(cfg, jday, stems)),
             ("tasks", "tasks", lambda: _tasks(cfg, now, now_local)),
             ("weather", "weather", lambda: _weather(cfg, now))):
         if name not in wants:
