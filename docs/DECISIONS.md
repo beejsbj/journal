@@ -5214,14 +5214,17 @@ input found). A label the floor refuses answers 422 `off-the-record`, as the rou
     both forms.
   - **Only more private.** A random-order comparison of main's pass against this one (stored orders in the shapes the
     hook and Hermes write, text and native image modes, documents, videos, compaction copies, queued rows, prompt
-    sends) found no row public here that main made private, and no window changed; the rows it made private were
-    marked rows of his and her rows in the turns that took them in (the PR has the numbers). Nothing that holds no
+    sends; 3,000 orders, 30,615 rows) found no row public here that main made private, no window changed and no end
+    taint lost; the 7,791 rows it made private were marked rows of his (6,669) and her rows in the turns that took
+    them in. Nothing that holds no
     mark changed: an unmarked captionless photo, document or video outside a window, and her reply to it, are still
     public (`NotTightenedTest`).
   - **Cost and limit.** A compaction frame (a `system` user row) whose summary quotes the hook's marker is now private
     and taints her next turn: it errs private, and the frame can hold the private words it summarises. Tests:
-    `tests/test_privacy_x_photo.py`, each failing on main except the native-mode and not-tightened cases (main
-    already read a native row's marker as his words).
+    `tests/test_privacy_x_photo.py`: on main 30 of its cases fail (every text-mode, document and video shape, the
+    caption reader, a recorded id alone, and a window-marked text or document row read as outside the window); the
+    native-mode shapes and a description holding a blank line pass there too (main already read those rows' marker
+    as his words), as do the not-tightened cases.
 
 - **X-PHOTO-REPLY (2026-11-24, reworked 2026-11-25 after review) — her reply after an unanswered captionless photo is
   saved (#10; a deliberate weakening, decided by the owner; builds on X-PHOTO-MARK, #93).** BACKLOG-PRIVACY made a
@@ -5249,7 +5252,9 @@ input found). A label the floor refuses answers 422 `off-the-record`, as the rou
     private before or after the photos resets `bare`); the message was sent after the photos and outside every window
     (a `/j` inside the window, or a queued message he sent before them, does not clear it); and it was not steered into
     a running turn. A prompt send closes the window as a silence does. The photo rows, their pictures and their
-    compaction copies stay private.
+    compaction copies stay private. Only her reply to that message is saved: a row of hers after her turn on it has
+    ended (a failed turn, then a tool step, with no new message of his) stays private until he writes again, as
+    before (the random-order comparison found the first rework saving such rows).
   - **The tool guard stays refusing in that turn (the orchestrator's reading of the decision: "save that reply", not
     "loosen the guard").** Clearing `bare` sets `View.held`: `tainted()` (the guard's second signal, `tools.py`
     `_off_record_turn`) stays true through her turn on that message and until his next message after it ends, exactly
@@ -5275,6 +5280,7 @@ input found). A label the floor refuses answers 422 `off-the-record`, as the rou
     line; a document, a video, a picture and a document; a gateway note; an id the hook recorded with no marker; words
     after the marker; a photo she answered; her turn begun on it; a private message before or after it; a second `/x`;
     a second bare `/x`; a `/j` inside the window; an opt-out cut off after the placeholders; a steered message; a
-    queued message sent before the photo; a queued photo she answered). The comparison against X-PHOTO-MARK's pass
-    (the PR has its numbers) finds no row made private, no window changed, the guard's state unchanged at every prefix,
-    and every row made public is her reply (or its copy) in the decided case.
+    queued message sent before the photo; a queued photo she answered); `GuardTest` also holds her rows after that
+    turn private. The comparison against X-PHOTO-MARK's pass (3,000 random stored orders in the stored shapes, 30,786
+    rows) finds no row made private, no window changed, the guard's state unchanged after each of 33,786 prefixes, and
+    70 rows made public: 64 replies of hers in the decided case and 6 compaction copies of them.
