@@ -4,6 +4,7 @@ import { afterEach, vi } from "vitest";
 import { setAuthLost } from "../src/auth";
 import { closeEvents } from "../src/events";
 
+import day from "../../tests/fixtures/api/day.json";
 import days from "../../tests/fixtures/api/days.json";
 import entries from "../../tests/fixtures/api/entries.json";
 import entryEvening from "../../tests/fixtures/api/entry-evening.json";
@@ -54,7 +55,7 @@ export function storedText(s: Storage): string {
 
 /** The server's answers, as pinned by tests/test_web_fixtures.py. */
 export const fixtures = {
-  days, entries, entryEvening, entryNote, entrySession, insightsWeeks, library, libraryFixLife, libraryGratitude, libraryMidweekDefault,
+  day, days, entries, entryEvening, entryNote, entrySession, insightsWeeks, library, libraryFixLife, libraryGratitude, libraryMidweekDefault,
   libraryMidweekEdited, libraryValidate, reflections, runOne, runs, session, settings, today, todayPrompts,
 } as const;
 

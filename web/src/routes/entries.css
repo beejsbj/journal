@@ -44,7 +44,13 @@
 .entries-page .entries-list .week > .week-head { margin: 0 0 6px; }
 .entries-page .entries-list .day { display: grid; grid-template-columns: 68px minmax(0, 1fr); border-top: 1px solid var(--hair); }
 .entries-page .entries-list .week > .week-head + .day { border-top: 0; }
-.entries-page .day-tab { display: grid; align-content: start; gap: 3px; margin: 0; padding: 16px 0 0 2px; font-weight: 400; }
+.entries-page .day-tab { display: grid; align-content: start; margin: 0; padding: 12px 0 0 2px; font-weight: 400; }
+/* the day's numeral is the way into the day as one log (routes/day.tsx) */
+.entries-page .day-tab > a {
+  display: grid; align-content: start; gap: 3px; min-width: var(--tap); min-height: var(--tap); padding: 4px 4px 4px 0;
+  border-radius: var(--r-m); color: inherit; text-decoration: none;
+}
+.entries-page .day-tab > a:hover .day-n { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
 .entries-page .day-n { font: 300 34px / 0.95 var(--f-his); font-variant-numeric: lining-nums; letter-spacing: -0.02em; color: var(--text); }
 .entries-page .day-w { font: 500 12px / 1 var(--f-ui); color: var(--text-3); }
 .entries-page .entries-list .rows { display: grid; padding: 8px 0; }
