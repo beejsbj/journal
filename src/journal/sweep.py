@@ -399,7 +399,12 @@ def run(cfg: Config, now: datetime, log: list[str], db: Path | None = None) -> i
                 if conversations.row_is_off(cfg, pv, row, off) or (at != row.at and pv.at(at)):
                     last = max(last, row.id)
                     continue  # off the record (/x), also by when it arrived: never captured
-                info = reconcile(cfg, msg, at, log, caches)
+                try:
+                    info = reconcile(cfg, msg, at, log, caches)
+                except capture.OffRecord:  # the floor refused his words: off the record, this message alone
+                    log.append(f"sweep: message {msg['message_id']} is off the record (the opt-out command in its "
+                               "words): not captured")
+                    info = None
                 if info:
                     captured += 1
                     log.append(f"swept message {msg['message_id']} into {Path(info['path']).name} ({info['rule']})")

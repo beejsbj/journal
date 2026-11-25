@@ -420,7 +420,7 @@ def block_edit(req: Request):
     if not text.strip():
         raise HTTPError(400, "bad-request", "a block cannot be left empty: remove it instead")
     text = _his_words(req, text)
-    new, mtime = _changed(lambda old: blocks.edit(old, key, text, was=was, at=at, stem=path.stem), req, path, seen)
+    new, mtime = _changed(lambda old: blocks.edit(old, key, text, cfg=req.cfg, was=was, at=at, stem=path.stem), req, path, seen)
     block = next((b for b in document.blocks_of(new, path.stem) if b["key"] == key), None)
     out = {"block": block, "mtime": mtime}
     refresh, why = _summary_refresh(req, new, path.stem, block)
@@ -510,6 +510,9 @@ def _meta_values(body: dict) -> dict[str, str | None]:
 def meta_patch(req: Request):
     body = req.json()
     changes = _meta_values(body)
+    for key in ("mood", "people"):   # his labels: the refusals every face has (a /x one is 422 off-the-record)
+        for item in body.get(key) or ():
+            _his_words(req, item)
     seen = body.get("mtime")
     if seen is not None and (isinstance(seen, bool) or not isinstance(seen, (int, float))):
         raise HTTPError(400, "bad-request", "mtime must be the number the entry was read with")
@@ -518,7 +521,9 @@ def meta_patch(req: Request):
         if seen is not None and abs(path.stat().st_mtime - float(seen)) > 1e-6:
             raise HTTPError(409, "mtime", "the entry changed since you read it; reload it")
         try:
-            entries.set_meta(path, changes)
+            capture.write_meta(req.cfg, path, changes)
+        except capture.OffRecord as e:  # (the route refuses first; the floor's own refusal answers the same)
+            raise HTTPError(422, "off-the-record", str(e)) from None
         except ValueError as e:
             raise HTTPError(409, "not-writable", str(e)) from None
         mtime = path.stat().st_mtime

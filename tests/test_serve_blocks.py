@@ -9,6 +9,7 @@ import threading
 import time
 import unittest
 from datetime import timedelta
+from pathlib import Path
 from unittest import mock
 
 from serve_helpers import EVENING, NOW, NOTE, SESSION
@@ -16,6 +17,7 @@ from test_serve_writes import WriteCase, checksum
 
 from journal import conversations, entries, ledger
 from journal import document
+from journal.config import Config
 from journal.serve import blocks, writes
 
 EVENING_STEM = "2026-10-14-evening"
@@ -99,11 +101,11 @@ class EditTest(EditCase):
                 if b["kind"] != "his":
                     continue
                 with self.subTest(name, key=b["key"]):
-                    other = blocks.edit(body, b["key"], "Z marks the spot")
+                    other = blocks.edit(body, b["key"], "Z marks the spot", cfg=self.cfg)
                     self.assertNotEqual(other, body)
                     self.assertEqual(document.blocks_of(other)[[x["key"] for x in document.blocks_of(body)].index(b["key"])]["text"],
                                      "Z marks the spot")
-                    self.assertEqual(blocks.edit(other, b["key"], b["text"]), body)
+                    self.assertEqual(blocks.edit(other, b["key"], b["text"], cfg=self.cfg), body)
 
     def test_the_edit_keeps_every_engine_line_the_companions_words_the_front_matter_and_the_other_blocks(self):
         before = self.entry(EVENING_STEM)
@@ -151,12 +153,12 @@ class EditTest(EditCase):
 
     def test_a_heading_he_types_in_the_engines_shape_is_read_as_the_engine_reads_it_or_refused(self):
         # in an entry that has the companion's sections, the engine takes the *last* such heading, so a typed one is words
-        words = blocks.edit(EVENING, "words:0", "one\n\n## Ada's annotations\n\nnot hers")
+        words = blocks.edit(EVENING, "words:0", "one\n\n## Ada's annotations\n\nnot hers", cfg=self.cfg)
         self.assertEqual(document.blocks_of(words)[0]["text"], "one\n\n## Ada's annotations\n\nnot hers")
         self.assertEqual(entries.annotations(words), "- a theme.")
         # in a note with none yet, the same line would become the annotations heading and swallow what follows: refused
         with self.assertRaises(blocks.Refused) as raised:
-            blocks.edit(NOTE, "words:0", "call\n\n## Ada's annotations\n\nnot hers")
+            blocks.edit(NOTE, "words:0", "call\n\n## Ada's annotations\n\nnot hers", cfg=self.cfg)
         self.assertEqual(raised.exception.slug, "ambiguous-text")
 
     def test_a_block_cannot_be_left_empty_and_the_text_is_required(self):
@@ -174,7 +176,7 @@ class EditTest(EditCase):
 
     def test_a_block_with_no_words_yet_can_be_given_some(self):
         body = EVENING.replace("A spoken thought.", "")
-        new = blocks.edit(body, "words:1", "now with words")
+        new = blocks.edit(body, "words:1", "now with words", cfg=self.cfg)
         self.assertIn("![[2026-10-14-evening.ogg]]\n\nnow with words\n\n## Conversation", new)
         self.assertEqual(document.blocks_of(new)[1]["text"], "now with words")
 
@@ -183,7 +185,7 @@ class EditTest(EditCase):
                                  "First words, with no heading.\n\n")
         self.assertEqual(document.blocks_of(legacy)[0]["key"], "words:0")
         self.assertIsNone(document.blocks_of(legacy)[0]["at"])
-        edited = blocks.edit(legacy, "words:0", "Rewritten, still no heading.")
+        edited = blocks.edit(legacy, "words:0", "Rewritten, still no heading.", cfg=self.cfg)
         self.assertEqual(edited, legacy.replace("First words, with no heading.", "Rewritten, still no heading."))
         gone = blocks.remove(legacy, "words:0")
         self.assertEqual(gone, legacy.replace("First words, with no heading.\n\n", "", 1))
@@ -192,14 +194,15 @@ class EditTest(EditCase):
     def test_a_block_with_one_of_the_engines_lines_inside_it_is_left_to_the_notes_app(self):
         odd = EVENING.replace("First words, about the lighthouse.", "First words\n%% journal phase:9 %%\nmore")
         with self.assertRaises(blocks.Refused) as raised:
-            blocks.edit(odd, "words:0", "x")
+            blocks.edit(odd, "words:0", "x", cfg=self.cfg)
         self.assertEqual((raised.exception.status, raised.exception.slug), (409, "not-editable"))
         with self.assertRaises(blocks.Refused):
             blocks.remove(odd, "words:0")
 
     def test_a_recording_still_being_transcribed_is_left_alone(self):
         waiting = EVENING.replace("A spoken thought.", "_(audio file — transcript pending)_")
-        for fn in (lambda: blocks.edit(waiting, "words:1", "x"), lambda: blocks.remove(waiting, "words:1")):
+        for fn in (lambda: blocks.edit(waiting, "words:1", "x", cfg=self.cfg),
+                   lambda: blocks.remove(waiting, "words:1")):
             with self.assertRaises(blocks.Refused) as raised:
                 fn()
             self.assertEqual(raised.exception.slug, "transcribing")
@@ -214,6 +217,7 @@ class PhotoTest(unittest.TestCase):
     """A photo block is the engine's pictures and then his caption: an edit changes the caption and never a picture."""
 
     def setUp(self):
+        self.cfg = Config(root=Path("/nonexistent/journal"))   # (only its off-the-record command is read)
         self.parts = [b for b in document.blocks_of(PHOTO, PHOTO_STEM) if b["source"] == "photo"]
         self.key = self.parts[0]["key"]
 
@@ -223,8 +227,8 @@ class PhotoTest(unittest.TestCase):
         self.assertEqual(self.parts[0]["images"], ["2026-10-14-evening.jpg", "2026-10-14-evening-2.jpg"])
 
     def test_an_edit_changes_the_caption_and_keeps_every_picture_line(self):
-        new = blocks.edit(PHOTO, self.key, "the lake, at dawn", was="the lake at six", at=self.parts[0]["at"],
-                          stem=PHOTO_STEM)
+        new = blocks.edit(PHOTO, self.key, "the lake, at dawn", cfg=self.cfg, was="the lake at six",
+                          at=self.parts[0]["at"], stem=PHOTO_STEM)
         self.assertEqual(new, PHOTO.replace("the lake at six", "the lake, at dawn"))
         again = [b for b in document.blocks_of(new, PHOTO_STEM) if b["source"] == "photo"][0]
         self.assertEqual((again["text"], again["images"]), ("the lake, at dawn", self.parts[0]["images"]))
@@ -232,12 +236,12 @@ class PhotoTest(unittest.TestCase):
     def test_a_photo_with_no_caption_takes_one_without_losing_its_picture(self):
         bare = PHOTO.replace("\nthe lake at six\n", "")
         key = [b for b in document.blocks_of(bare, PHOTO_STEM) if b["source"] == "photo"][0]["key"]
-        new = blocks.edit(bare, key, "a caption at last", stem=PHOTO_STEM)
+        new = blocks.edit(bare, key, "a caption at last", cfg=self.cfg, stem=PHOTO_STEM)
         self.assertIn("![[2026-10-14-evening.jpg]]\n![[2026-10-14-evening-2.jpg]]\n\na caption at last\n", new)
 
     def test_a_caption_that_would_read_as_a_picture_is_refused_and_nothing_changes(self):
         with self.assertRaises(blocks.Refused) as got:
-            blocks.edit(PHOTO, self.key, "![[2026-10-14-evening-3.jpg]]\nwords", stem=PHOTO_STEM)
+            blocks.edit(PHOTO, self.key, "![[2026-10-14-evening-3.jpg]]\nwords", cfg=self.cfg, stem=PHOTO_STEM)
         self.assertEqual(got.exception.slug, "ambiguous-text")
 
     def test_delete_removes_the_heading_pictures_and_caption_together(self):
@@ -245,7 +249,7 @@ class PhotoTest(unittest.TestCase):
         self.assertNotIn("photo", new)
         self.assertNotIn("the lake at six", new)
         self.assertNotIn("2026-10-14-evening.jpg", new)
-        self.assertEqual(blocks.edit(new, "words:1", "x", stem=PHOTO_STEM).count("23:40 IST"), 1)
+        self.assertEqual(blocks.edit(new, "words:1", "x", cfg=self.cfg, stem=PHOTO_STEM).count("23:40 IST"), 1)
 
 
 class DeleteTest(EditCase):

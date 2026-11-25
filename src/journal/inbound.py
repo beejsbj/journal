@@ -160,6 +160,8 @@ def receive(cfg: Config, msg: Inbound, *, spawn: Spawn | None = None) -> Outcome
             # (a bare /x with a file attached is one off-the-record message too: its audio must not be kept)
             marked = rest is not None and (rest.strip() or msg.has_media or msg.kind in ATTACHMENTS)
             off = Outcome.rewrite(capture.off_record_note(cfg) + rest.lstrip()) if marked else None
+            if off is None and rest is not None and after_j is not None:
+                off = _as_opt_out(cfg)  # a bare /j /x: the /x command records the window itself
             if off is None and capture.opt_out_inside(cfg, msg.text):
                 off = Outcome.rewrite(capture.off_record_note(cfg) + msg.text)
         if off is not None:
@@ -268,14 +270,18 @@ def _off_record(cfg: Config, msg: Inbound, after_j) -> Outcome | None:
 
     ``/x <text>``: the message reaches the companion without the command, marked off the record, and nothing is
     captured. A bare ``/x`` starts off-the-record mode for the rest of the thread and is left to the slash command
-    (which answers it). Inside that mode every message is marked the same way, except an explicit ``/j``."""
+    (which answers it). Inside that mode every message is marked the same way, except an explicit ``/j``.
+
+    ``/j /x …`` is ``/x …`` (``capture.opt_out`` reads through the ``/j``): off the record, never a note. A bare
+    ``/j /x`` starts the mode as a bare ``/x`` does, and goes on as the ``/x`` command, which answers it (as ``/j``
+    it would get the note command's usage)."""
     rest = capture.opt_out(cfg, msg.text)
     if rest is not None:
         attached = msg.has_media or msg.kind in ATTACHMENTS
         if not rest.strip() and not attached:  # a bare /x with nothing attached: the rest of the thread
             conversations.note_off(cfg, msg.message_id, msg.at, thread_start=True)
             log.info("journal: the rest of this thread is off the record")
-            return PASS  # the registered command replies
+            return PASS if after_j is None else _as_opt_out(cfg)  # the registered command replies
         conversations.note_off(cfg, msg.message_id, msg.at)
         return Outcome.rewrite(capture.off_record_note(cfg) + rest.lstrip())
     if capture.opt_out_inside(cfg, msg.text):  # a /x on a later item of a merged album or burst: all of it is private
@@ -288,6 +294,13 @@ def _off_record(cfg: Config, msg: Inbound, after_j) -> Outcome | None:
             log.exception("journal: could not record a message inside an off-the-record window")
         return Outcome.rewrite(capture.off_record_note(cfg, thread=True) + msg.text)
     return None
+
+
+def _as_opt_out(cfg: Config) -> Outcome:
+    """A bare ``/j /x``, rewritten to the bare opt-out command, so the platform runs ``/x`` (its answer, and its
+    own record of the window when arrival could not write one)."""
+    from .config import opt_out_prefix
+    return Outcome.rewrite(opt_out_prefix(cfg))
 
 
 def _remember_pack(cfg: Config, note: str, prompt: dict | None, now) -> None:

@@ -4607,6 +4607,44 @@ that echoes it has the line dropped. Left as known: `journal_search` refuses in 
 (a kanban card, his own `hermes chat -q`); an engine one-shot that starts a gateway itself would pass its variables
 to it (not this host's setup: the gateway runs as a service).
 
+- **X-FLOOR (2026-11-24) — `/x` is refused at the bottom of the write path too (issue #46).** The callers refuse
+  off-the-record words before they write and decide what to answer (`actions.refuse` on the faces, `inbound` and the
+  privacy pass in the chat, `writes._his_words` for an edit); the functions under them did not, so the guarantee
+  rested on every new caller remembering. Now `capture.refuse_off_record(cfg, text)` (the text starts with the
+  configured command or has a line that does: `opt_out`, `opt_out_inside`) raises `capture.OffRecord` (a
+  `ValueError`), before anything changes, in `capture.record`, in `capture.write_words` (new: the one caller of
+  `entries.record_reply`, which takes no config and so cannot read the command itself), in `conversations.his_block`,
+  and in `serve/blocks.edit`, which now requires `cfg` (keyword-only, no default, so a caller cannot leave it out) and
+  answers with its own `Refused(422, "off-the-record")`. `test_off_record_floor.py` calls each directly as a forgetful
+  caller would (and `capture`, `capture_to`, `capture_note`, `capture_web`, `add_web_block`, which leave the check to
+  their callers) and shows nothing is written, no ledger change and no recording kept; it pins that
+  `entries.record_reply` and `entries.append_conversation` have one caller each. **Raise, not a quiet skip:** a
+  forgotten check is a bug, and a refusal that returned nothing could pass for a capture; the ledger is written only on
+  a clean exit (`ledger.locked`), so a raise leaves it as it was. **Only the command in the text:** whether a message
+  falls in a `/x` window stays the privacy pass's. **Not covered:** `entries.fill_audio_block` (a transcript of his
+  voice, never typed) and `capture.add_companion_note` (her words; a note in a `/x` turn is refused by the turn's mark,
+  `tools.call`).
+  **Review of #78 (Claude Opus 5.5, high): `/j /x` is off the record, everywhere.** Found: a chat message `/j /x
+  secret` was, on main, a `/j` note whose words were `/x secret` (a live privacy bug: the hook, the conversation
+  writer, the privacy pass and the sweep read `/x` only at the start of the whole message, then stripped `/j`); and
+  with the floor alone, the floor raised on it inside the conversation writer's and the sweep's batch, every tick, so
+  nothing after it was ever written. Decided: (a) `capture.opt_out` reads through a leading `/j` (`/j /x …` is `/x
+  …`; a later line `/j /x …` counts for `opt_out_inside`), so every reader agrees with the floor by construction:
+  `inbound`, the privacy pass (`row_marked`; and a bare `/j /x` on the busy path starts a window), the writer's
+  `classify`, the sweep, `actions.refuse` on the faces and `stored_opener`. **A bare `/j /x` opens the window as a
+  bare `/x` does** (consistency: `/j` means keep, `/x` means don't, and the more private reading wins): the hook
+  records the window and rewrites the message to the bare opt-out command, so the platform runs `/x` and its answer,
+  not `/j`'s usage. (b) The writer (`_Threads._place`, with the check before any copy is kept in `_Writer.his` and
+  `new_note`) and the sweep (`run`, around `reconcile`) catch `capture.OffRecord` per message: that message is dropped
+  as off the record (its hook copies go, her answer to it stays out; the sweep logs its id, never its words) and the
+  batch, the cursor and the watermark go on. (c) Regression tests in `test_conversations.OffRecordTest` (run on the
+  Hermes adapter and on the fake transcript by `test_fake_transcript`): through the hook, on the busy path, a bare `/j
+  /x`, and the backstop with the floor made stricter than its callers. Also traced: `entries.set_meta` writes his
+  `mood` and `people` labels (typed on the web app), so it is under the floor now through `capture.write_meta` (its
+  one caller; each value and each list item refused), and the route answers a `/x` label with 422 `off-the-record`;
+  the program reply note (`inbound._program_note` → `programs.reply_note`) writes nothing: it is the companion's note
+  in front of his words, which `capture.capture` has already recorded through `record`, under the floor.
+
 - **SHARED-READERS (2026-11-24) — the readers the web app and MCP share live in the core (issue #47).** `mcp/` read
   entries through `serve/` (`serve.api.filter_entries`, `serve.document`, `serve.writes.TEXT_LIMIT`), so the MCP face
   depended on the web server's package. Moved, with no behaviour change: `serve/document.py` → `document.py` (core);
@@ -4872,3 +4910,9 @@ to it (not this host's setup: the gateway runs as a service).
     open question): the fix holds either way and costs nothing when it cannot.
   - Not done here: #10 (a captionless photo that ends a window takes her next public reply off the record) and #11
     (compacting and dropping the `/x` records) trade privacy for something else and wait for the owner.
+
+**X-FLOOR, on re-review (2026-11-25).** `capture.opt_out` reads past every leading `/j` (`/j /j /x …` too), so the
+gate strips as deep as the floor and a doubled `/j` before `/x` keeps nothing, a photo or voice note included. The
+writer's and the sweep's per-message catch of `OffRecord` is a backstop: it drops that message from their own output
+and moves on, but records nothing for the other readers (with the gate and floor agreeing it is not reached by any
+input found). A label the floor refuses answers 422 `off-the-record`, as the route's own refusal does.

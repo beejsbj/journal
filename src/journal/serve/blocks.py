@@ -22,7 +22,8 @@ from __future__ import annotations
 
 import re
 
-from .. import audio, document, entries
+from .. import audio, capture, document, entries
+from ..config import Config
 
 # How the engine opens a conversation message whose words would read as Markdown at the start of a line
 # (``conversations._BLOCK_START``; ``tests/test_serve_blocks.py`` pins that the two agree): its words then go under
@@ -82,11 +83,18 @@ def dash_lead(text: str) -> str:
     return "\n\n" if _BLOCK_START.match(text) else " "
 
 
-def edit(body: str, key: str, text: str, *, was: str | None = None, at: str | None = None,
+def edit(body: str, key: str, text: str, *, cfg: Config, was: str | None = None, at: str | None = None,
          stem: str | None = None) -> str:
     """``body`` with the words of block ``key`` replaced by ``text`` (already normalised: ``clean``). ``was`` and
     ``at`` are the words and the time the person was looking at: a block that reads differently now is ``changed``.
-    ``stem`` is the entry's (which pictures a photo block opens with are the engine's own)."""
+    ``stem`` is the entry's (which pictures a photo block opens with are the engine's own). Words that start with
+    the off-the-record command of ``cfg``, or have a line that does, are refused here too (``off-the-record``, 422),
+    under the route's own refusal: the floor of issue #46."""
+    try:
+        capture.refuse_off_record(cfg, text)
+    except capture.OffRecord:
+        raise Refused(422, "off-the-record", "these words start with the off-the-record command, or have a line "
+                                             "that does, so they stay out of the journal: nothing was saved") from None
     i, parts, block, cut = _find(body, key, was, at, stem)
     lead = dash_lead(text) if cut.dash else cut.lead
     new = body[:cut.text[0]] + lead + text + cut.tail + body[cut.text[1]:]

@@ -417,7 +417,9 @@ def his_block(cfg: Config, at: datetime, text: str, source: str = "text", kept: 
               meta: dict | None = None, entry_date: str | None = None, quote: str | None = None,
               key: str | None = None, pictures: list[str] | None = None) -> str:
     """One of the user's messages, verbatim, as a paragraph with a small time marker (and, with ``key``, the
-    hidden line that keys it)."""
+    hidden line that keys it). Off-the-record words raise ``capture.OffRecord`` (the pass and ``Writer`` drop them
+    first: this is the floor, issue #46)."""
+    capture.refuse_off_record(cfg, text)
     out = entries.block_mark("his", key) + "\n" if key else ""
     if quote:
         q = " ".join(quote.split())
@@ -543,7 +545,9 @@ class _Writer:
 
     def new_note(self, ev: Event) -> str:
         """Start an auto note entry with this message as its words (and, when it replies to a day reflection or week
-        review, that analysis's id on its capture: ``answers``)."""
+        review, that analysis's id on its capture: ``answers``). Off-the-record words raise ``capture.OffRecord``
+        before anything is kept or reserved."""
+        capture.refuse_off_record(self.cfg, ev.text)
         local_date = ev.at.astimezone(self.cfg.tz).date().isoformat()
         if not self.write:
             n, stem = 1, entries.stem_for(local_date, "j")
@@ -678,9 +682,11 @@ class _Writer:
         return "written"
 
     def his(self, ev: Event, path: str, quote: str | None) -> str:
-        """Append one of his messages; returns what ``_append`` did ("written" in a dry run)."""
+        """Append one of his messages; returns what ``_append`` did ("written" in a dry run). Off-the-record words
+        raise ``capture.OffRecord`` before anything is kept."""
         if not self.present(path):
             return "missing"
+        capture.refuse_off_record(self.cfg, ev.text)
         kept, meta = self._keep(ev, path) if (ev.source in ("voice", "audio") or ev.audio_path) else (None, {})
         pics = self._keep_images(ev, path) if ev.source == "photo" else []
         source = ev.source if ev.source != "photo" or pics else "text"  # (a picture that could not be kept is text)
@@ -1023,6 +1029,24 @@ class _Threads:
             th["home"] = None  # the entry was moved or deleted: this message starts a note of its own
         if th["home"] and self._ordinary_home():
             th["home"] = None  # arm: the chat-started note it joined (before the switch) is not a journal thread
+        try:
+            placed = self._place(ev, th)
+        except capture.OffRecord:
+            # the floor refused his words (the opt-out command in them): off the record, this message alone. Its
+            # copies go, her answer to it stays out, and the batch and the cursor go on past it (review of #78)
+            self.w.drop(ev)
+            th["reply"] = "out"
+            return self._skip("off")
+        if placed is None:
+            return
+        if placed == "missing":
+            th["reply"] = "out"
+            return self._skip("not placed")
+        th.update(reply="in", her_last="", owed=True)
+
+    def _place(self, ev: Event, th: dict) -> str | None:
+        """Write one of his messages into the thread's entry, or start a note with it: "written", "missing", or None
+        when ``_admit`` took it elsewhere or dropped it."""
         placed = "written"
         if not th["home"]:
             verdict, home = self._admit(ev)
@@ -1045,10 +1069,7 @@ class _Threads:
                     return
                 th["home"] = home or self.w.new_note(ev)
                 placed = "written" if th["home"] else "missing"
-        if placed == "missing":
-            th["reply"] = "out"
-            return self._skip("not placed")
-        th.update(reply="in", her_last="", owed=True)
+        return placed
 
 
 def _pseudo(cfg: Config, after: datetime | None, upto: datetime) -> list[Event]:
