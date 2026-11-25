@@ -189,13 +189,7 @@ class Practice:
 
     def bank_lines(self) -> list[str]:
         """The bank as numbered plain-text lines, formatted as the original skills were."""
-        if self.flat:
-            return [f"{i}. {q.text}" for i, q in enumerate(self.questions, 1)]
-        lines: list[str] = []
-        for i, (title, qs) in enumerate(self.sections, 1):
-            lines.append(f"{i}. {title or ''}")
-            lines.extend(f"   • {q.text}" for q in qs)
-        return lines
+        return bank_lines(self.sections)
 
     def bank_text(self) -> str:
         return "\n".join(self.bank_lines())
@@ -1078,6 +1072,18 @@ def snapshot_sections(record: Mapping | None) -> tuple[tuple[str | None, tuple[Q
             sections.append((title, []))
         sections[-1][1].append(Question(id=qid, text=text, section=title))
     return tuple((title, tuple(qs)) for title, qs in sections)
+
+
+def bank_lines(sections) -> list[str]:
+    """``Practice.bank_lines`` for any sections (a practice's own, or a send record's ``snapshot_sections``): a flat
+    set (one section with no title) as a numbered list, else each section's title numbered with its questions."""
+    if len(sections) == 1 and sections[0][0] is None:
+        return [f"{i}. {q.text}" for i, q in enumerate(sections[0][1], 1)]
+    lines: list[str] = []
+    for i, (title, qs) in enumerate(sections, 1):
+        lines.append(f"{i}. {title or ''}")
+        lines.extend(f"   • {q.text}" for q in qs)
+    return lines
 
 
 def scheduled(cfg: Config) -> list[Practice]:

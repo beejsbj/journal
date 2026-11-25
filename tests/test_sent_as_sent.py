@@ -280,6 +280,40 @@ class SnapshotTest(Base):
                          ["Three things today, and why each one mattered.", "Who made one of them possible?"])
         self.assertEqual(doc["prompt"]["opener"], "Daily gratitude. A sentence or two is enough.")
 
+    def entry_file(self, pid, text="grateful for tea"):
+        from helpers import CHAT
+        from journal import capture
+        info = capture.capture(self.cfg, CHAT, self.prompt(pid)["message_id"], text, at(23, 40), "text", "9")
+        return Path(info["path"]).read_text(encoding="utf-8")
+
+    def test_a_practice_edited_after_the_send_keeps_its_old_questions_in_the_entry_file(self):
+        path = self.write("gratitude.md", GRATITUDE)
+        self.send(at(21, 31))
+        path.write_text(GRATITUDE.replace("Who made one of them possible?", "What did you let go of?"), encoding="utf-8")
+        body = self.entry_file("2026-10-14-gratitude")
+        self.assertIn("> [!question]- Questions\n> 1. Three things today, and why each one mattered.\n"
+                      "> 2. Who made one of them possible?", body)
+        self.assertNotIn("What did you let go of?", body)
+
+    def test_a_built_in_sent_before_a_deploy_writes_the_questions_it_carried(self):
+        # the evening went out with an older question set, and he answers after a deploy changed the built-in
+        self.send(at(23, 1), only="evening")
+        old = [{"id": "1.1", "text": "An old arriving question?", "section": "Arriving"},
+               {"id": "2.1", "text": "An old closing question?", "section": "Closing"}]
+        with ledger.locked(self.cfg.ledger_path) as data:
+            ledger.find(data, "2026-10-14-evening")["questions"] = old
+        body = self.entry_file("2026-10-14-evening", "a long day")
+        self.assertIn("> [!question]- Questions\n> **1. Arriving**\n> - An old arriving question?\n"
+                      "> **2. Closing**\n> - An old closing question?\n", body)
+        self.assertNotIn(library.builtins()["evening"].questions[0].text, body)
+
+    def test_a_record_with_no_snapshot_writes_the_practice_s_questions(self):
+        self.write("gratitude.md", GRATITUDE)
+        self.send(at(21, 31))
+        with ledger.locked(self.cfg.ledger_path) as data:
+            del ledger.find(data, "2026-10-14-gratitude")["questions"]  # sent before snapshots
+        self.assertIn("> 2. Who made one of them possible?", self.entry_file("2026-10-14-gratitude"))
+
     def test_a_deleted_practice_still_shows_what_was_asked(self):
         path = self.write("gratitude.md", GRATITUDE)
         self.send(at(21, 31))

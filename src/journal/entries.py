@@ -170,7 +170,8 @@ def _atomic_write(path: Path, text: str) -> None:
 
 def _prompt_md(prompt: dict, names: Names, practice=None) -> str:
     """The ``## Prompt`` section: when it was sent and by whom, the woven-in questions, the opener, and the bank
-    folded under it, as numbered lines (a flat bank) or bold section headings with their questions."""
+    folded under it, as numbered lines (a flat bank) or bold section headings with their questions. The bank is the
+    record's snapshot (``library.snapshot_sections``), else the practice's questions as the library has them now."""
     kind = prompt["kind"]
     if kind == "j":
         if prompt.get("capture") == "auto":
@@ -186,14 +187,18 @@ def _prompt_md(prompt: dict, names: Names, practice=None) -> str:
     if prompt.get("asked"):
         meta += "_Woven in: " + "; ".join(f"[{a['id']}] {a['question']}" for a in prompt["asked"]) + "_\n\n"
 
+    from . import library  # library reads front matter from here
+    # The questions the prompt carried (the record's snapshot), so a practice file changed between the send and his
+    # reply does not put questions he was never asked into his entry; a record with none uses the practice's own.
     p = _practice(kind, practice)
-    flat = p is not None and p.flat
+    sections = library.snapshot_sections(prompt) or (p.sections if p is not None else ())
+    flat = len(sections) == 1 and sections[0][0] is None
 
     def fmt(line: str) -> str:
         if line.startswith("   "):
             return f"> - {line.strip(' •')}"
         return f"> {line}" if flat else f"> **{line}**"
-    lines = "\n".join(fmt(l) for l in (p.bank_lines() if p is not None else []))
+    lines = "\n".join(fmt(l) for l in library.bank_lines(sections))
     opener = demote_headings((prompt.get("opener") or "").strip())
     bank = f"\n\n> [!question]- Questions\n{lines}" if lines else ""
     return f"{meta}{opener}{bank}".strip()
