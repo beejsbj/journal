@@ -5029,6 +5029,76 @@ input found). A label the floor refuses answers 422 `off-the-record`, as the rou
   `flock` does not favour a waiting exclusive request), so the tick stays yielded for as long as that lasts. Bounded in
   practice by human-paced waiters (a `/next` or a Send each takes seconds).
 
+- **NOTES-JOURNAL-DAY (2026-11-25) — notes are filed by the journal day, and Today shows it (issue #82, part 2).**
+  The owner's call (issue #82): a 00:30 line belongs to last night, as a prompt answered then already did
+  (`slots.resolve`). One helper decides "which day" for every writer and reader: `config.journal_day(cfg, at)` (moved
+  from `slots.journal_day`, which now calls it, so `capture` can ask it without importing `slots`). It dates every
+  note: `capture.new_note_prompt` (the chat `/j`, the sweep's and the conversation writer's notes, `actions.note` for
+  the web app, the CLI and MCP) and the conversation writer's dry-run plan. The readers that key on the entry's date
+  (the day reflection's `entries_on`, `GET /days`, the Entries list, Insights) follow without change. Today followed
+  by decision, since otherwise the note just put down at 00:30 would not be in *Written today*: `today.collect`'s
+  `date`, `weekday`, practices, entries and reflection are the journal day's (`time` stays the clock's; on review the
+  block names both days then, below), the web's week strip ends on it, and the today block's day boundary
+  (`thread_started`) and its per-day count turn at `day_ends_at`. This changed one pinned behaviour on purpose:
+  `test_today.DayChangeTest` held that a chat running past midnight gets a new block naming the new date; it now holds
+  that this happens at `day_ends_at` (the block at 00:10 would have repeated Thursday). A week review's count of his
+  replies to a reflection reads the reply's journal day too (`reflect`, the day its note is filed under). **Not
+  changed:** the companion's own notes given a date (`capture.add_companion_note` keeps its caller's date; with none it
+  takes the journal day, on review below), program sessions and
+  their dates, `journal status`' slot list (`slots.day` on the calendar date, a CLI view), the tasks cache (due
+  today by the calendar), the conversation writer's time markers (a 00:30 line in last night's note is labelled
+  "Fri 16 Oct 00:30", as a late evening reply always was), the chat-thread boundaries (`conversations.quiet_minutes`
+  and prompt sends), and the stamps window check of `actions.entry_for` and serve's `at` (a block may not predate its
+  entry's date: a journal day is never earlier than the calendar date, so nothing new is refused). **Existing files
+  are not moved**: a note filed by the calendar date before this stays there (the owner: nothing merged or
+  rewritten). Tests: `tests/test_note_journal_day.py` (the boundary at 23:59, 00:00, 00:30, 03:59, 04:00, every way a
+  note is made, the readers agreeing at 00:30, Today turning at 04:00, an existing note left alone).
+  - **On review (2026-11-25, an independent Opus pass on b603ed0).** Changed:
+    - **The day reflection waits for the journal day to end (the owner's decision, 2026-11-25).** It fired as soon as
+      the evening entry was annotated (usually ~22:40), so a note put down at 00:30, filed under that day, reached no
+      day reflection. Now `reflect.due` writes no analysis of a period before its last journal day has ended
+      (`reflect.day_over`: `windows.day_ends_at` the next morning, 04:00 by default); from then the triggers are as
+      before (the closing entry annotated, else `fallback_time`, never an hour before the closing prompt), and the
+      fallback is never before the day's end (`reflect._fallback`), so with `day_ends_at` 05:00 and the fallback
+      04:00 it comes at 05:00. It reads all of the day's files, the after-midnight notes included; the candidates are
+      the journal day and the one before (so a day stays due for a full day after it ends). **The week review
+      follows** (its last day must end too: Monday 04:00 for a Sunday week), our call on the same reasoning: the week's
+      Sunday notes after midnight and Sunday's own day reflection are then in it (both are written in the same tick
+      at 04:00, the day first, `recovery.catchup_per_tick` 2). **Sent silently**, both, whichever way they were
+      triggered: they now come at night, and a loud message at 04:00 would wake him (before, only the fallback's was
+      silent). Checked against the rules that read the reflection's time: the **stale rule** (OUTAGES/STALE-COUNT:
+      not sent more than `recovery.stale_hours` after its time) counts from `_fallback`, so it moves with the day's
+      end; **OPS-NOTICE `model_floor`** counts a reflection's `written_at` as a model success: it now comes at ~04:00
+      instead of ~22:40, which only moves when the evening's floors are reset (no new incident, none lost); the
+      **catch-up letter** never folds analyses in and is unchanged; the **morning ritual** (06:00) comes after the
+      reflection: its opener's pack and the today block read that reflection as they did (it was written the night
+      before then too), the mirror puts the reflection into her session before the morning prompt, and a thread's
+      boundaries are prompt sends, so nothing is folded into the morning's thread. **One collision, fixed:** with the
+      morning prompt open, his reply to the reflection (a reply to its message) went to the open prompt by the
+      next-message rule and became his morning answer. Now a direct reply to a day reflection or week review answers
+      no prompt on any path: the hook (`capture.match`, by the message it replies to:
+      `ledger.analysis_by_message_id`), the sweep and the conversation writer's sweep-place filing (by the quote:
+      `sweep.quotes_analysis`, the writer's `answers_ours` test, now one helper `sweep.analysis_sends`); the writer
+      files it as a reply to the reflection (an auto note carrying its id, which the next reflection reads). A typed
+      message, not a reply, still answers the open morning prompt. A reply to an annotation reply while another prompt
+      is open is the same shape and is **not changed here** (pre-existing; it is not made more common by this).
+    - **Her note with no date follows the journal day** (`capture.add_companion_note`: `journal_day`, not the
+      calendar date): at 00:30 it joins his note of last night instead of starting `<today>-note.md`.
+    - **The today block names both days** between midnight and `day_ends_at`: "journal day Thu 15 Oct 2026 · now Fri
+      00:35 IST", not "today — Thu 15 Oct 2026, 00:35" on a Friday (`today.header_of`; `collect` adds
+      `calendar_date`, the clock's date, so `GET /today` gains it). **The tasks stay keyed to the calendar date**: a
+      task is due by the calendar, the tick caches the list by it, and at 00:35 Friday Friday's tasks are the ones due;
+      the line then says so ("tasks due Fri"). The web app's Today is unchanged by this (no web change in this PR):
+      its *Due today* shows the calendar date's tasks under the journal day's date for those hours.
+    - **serve's date ranges default to the journal day** (`api._range`'s `to`), as Today and the week strip do.
+    Tests: `tests/test_day_end_reflection.py` (an annotated evening waits for 04:00 and reads a 00:30 note; silent;
+    a later `day_ends_at`; a fallback earlier than the day's end; the stale rule from the day's end; the week review
+    waiting for Monday; a reply to the reflection not taken by the open morning prompt on the hook and the sweep);
+    `tests/test_note_journal_day.py` (her note at 00:30 and 04:00, the header and tasks line after midnight, the
+    range default). **Tests changed on purpose:** the reflection tests that wrote the day reflection or week review
+    the evening its closing entry was annotated now run at or after 04:00 the next day, and those asserting a loud
+    send now assert a silent one; `test_practices_engine`'s doctor row reads "once the day has ended, …"; the pinned
+    `today.json` fixtures gain `calendar_date`.
 - **DAY-VIEW (2026-11-25) — a day as one log, read from the files as they are (issue #82, part 1).** The owner's
   call: storage stays (separate files, no format change, nothing merged); the web app shows a day as one log instead.
   `daylog.day(cfg, date)` reads every entry the Entries list shows under that date (`document.all_entries`, so a hand
@@ -5066,3 +5136,54 @@ input found). A label the floor refuses answers 422 `off-the-record`, as the rou
   engine line, the placeholder) kept in the box with no Retry. The button is a quiet secondary (*Put down*), not the
   lamp: Today's lamp is *Write now* on her prompts. Not a new `ui/` part: it is a `TextField`-styled ruled line and a
   `Button`, both drawn on `/design`; it lives in `components/` as `Composer` does.
+
+- **CHAT-1 (2026-11-25) — the chat face's first step: the tick's send, fold and annotation replies move into
+  `journal/chat/` (issue #43, step 1 of its order).** A pure move. `journal/chat/send.py`: `send_prompt`,
+  `count_send_failure`, `_attach` / `ATTACHED`, `_archive_sent` / `SENT_FIELDS`, `prune_sent`, `SEND_ATTEMPTS`,
+  `EARLIER_OPENERS`, `SendFailed`. `journal/chat/fold.py`: `fold`, `_fold_edit`, `_fold_owed_again`,
+  `_folds_due_again`, `FOLD_*`. `journal/chat/replies.py`: `reply_annotations` and its helpers, `REPLY_ATTEMPTS`, and
+  `_newest_words` (which the tick's `annotate` also reads, through its import). `Alert` moves to `journal/alert.py`
+  so the chat face raises it without importing the tick (`SendFailed` is still an `Alert`, and `tick.Alert` is the same
+  class). **Proven unchanged:** an AST comparison of every top-level definition of the old `tick.py` with its new home
+  finds each one byte for byte; the full suite collects the same 2716 tests as main and passes; the goldens and
+  `gen_builtins.py --check` are untouched; the fences (`test_purity`, the serve and MCP fences, `test_route_opens`'
+  pinned module set) pass unchanged; the gateway loads the same modules at import.
+  - **The old names stay.** `tick` imports every moved name (the same objects), and the callers (`programs`, `ops`,
+    `cli`) still reach them through `tick`, so a test's patch of `tick.send_prompt` or `tick.fold` still reaches every
+    caller, and the tick's `run` still calls its steps through its own names (`tick.fold` patched still skips the
+    fold). Moving the callers to `chat` is left for when the operation they call changes (CHAT-2).
+  - **One test edit beyond imports, named here:** ten places in seven test files patched `tick.datetime` with a clock,
+    which `send_prompt` read for `sent_at` and `sent_at_local`. `send_prompt` now reads `chat.send`'s `datetime`, so
+    each of them patches that module with the same clock too (`test_tick_lock` binds one stepping clock to both, so
+    the order of `sent_at` across the two modules is the one clock's, as before). No assertion changed. The other
+    choice, `send_prompt` reading the tick's clock, would have tied the chat face back to the tick.
+  - **Kept as is:** the steps of `tick.run`, their order, `YIELDS_BEFORE` and every lock; `mirror.py` and
+    `recovery.py`, already modules of their own, stay where they are (moving them into `chat/` changes no seam), and
+    the readers (`sweep`, `conversations`) move last, as #43 orders.
+
+- **CHAT-2 (2026-11-25) — `chat.deliver`: one send operation for every message the engine sends on its own (issue
+  #43, step 2 of its order).** `deliver(cfg, html, log, *, record, to=None, chat=None, catch=(ChannelError,),
+  fallback=None, **keywords)` sends, hands the outcome (`Delivery`: `message_id`, `error`, the channel) to the
+  caller's `record`, and mirrors the `Mirror` that `record` returns (none: nothing is told). Converted, one commit
+  each: prompts (`send_prompt`, whose plain-opener retry is `deliver`'s `fallback` and which still catches every
+  exception), annotation replies (still catching `ValueError` too), reflections and week reviews, the catch-up letter,
+  and program session summaries.
+  - **Behaviour kept exactly, and how it was checked.** Each caller's account moved, unchanged in order and content,
+    into a `record` function beside it (`send._account`, `replies._reply_account`, `reflect._sent_account`,
+    `recovery._sent_account`, `programs._summary_account`). The full suite passes with no existing test edited;
+    `tests/test_chat_deliver.py` adds `deliver`'s own contract and, per kind, one test that the send is one `deliver`
+    call with the keywords it always sent, the ledger fields, log lines and mirror row as before, and its failure
+    path. Goldens and fences unchanged.
+  - **What stays with the callers, on purpose:** whether anything is owed (`channel.platform: none`, `/x` and the
+    privacy pass, `outage.chat_room` pacing, staleness, the catch-up letter's hold, TICK-LOCK-YIELD's yield points),
+    and each kind's texts and ledger shape. `deliver` decides none of them, so moving a send onto it changes no rule;
+    a kind's account is still its own (a prompt record, `annotation_reply`, a reflection's send slot through
+    `ledger.send_slot`, a `recovery` record, a run's session).
+  - **Nothing sent, still counted:** a reflection whose file is gone and an entry with no annotations count an
+    attempt through the same `record` with no send (`Delivery(error=...)`), as before.
+  - **A summary counts as sent when the send raised nothing,** whatever id came back, as before (its `record` reads
+    `error`, not `message_id`); the others read `message_id`, as they did.
+  - **Not converted here:** a program's short notes (`programs._say_about`) and the earlier parts of a phase split
+    over the platform's length limit (`programs._deliver`) send directly as before; they are outside this step's five
+    kinds. They can move onto `deliver` when margin notes (#31) shape what a chat message is. "What a reply answers"
+    is left for #31.

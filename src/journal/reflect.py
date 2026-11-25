@@ -1,13 +1,15 @@
 """The companion's day reflections and week reviews: written into the journal, sent to the chat.
 
-Day reflection (``YYYY-MM-DD-reflection.md``): once per local day that has at least one captured
-entry. Due when that day's entry of the practice that closes the day (``closes: day``; the evening
-ritual) has been annotated, or at ``reflections.day.fallback_time`` the next morning (default 04:00)
-if it never was; never before that practice's prompt has been out for an hour. Week review
+Day reflection (``YYYY-MM-DD-reflection.md``): once per journal day that has at least one captured
+entry. **Never before that journal day has ended** (``windows.day_ends_at`` the next morning, default 04:00;
+``day_over``): a note put down at 00:30 is filed under the night before (``config.journal_day``), and the reflection
+reads it (the owner, 2026-11-25). From then, due when that day's entry of the practice that closes the day
+(``closes: day``; the evening ritual) has been annotated, or at ``reflections.day.fallback_time`` the next morning
+(default 04:00) if it never was; never before that practice's prompt has been out for an hour. Week review
 (``YYYY-MM-DD-week.md``, dated the week's last day, the weekday of the practice that says ``closes:
-week``; the weekly ritual's Sunday): due when that entry is annotated, or at
-``reflections.week.fallback_time`` the day after. Both wait while an entry of theirs is still being
-annotated or transcribed. Which practice closes a period is ``library.closer``: a fork that renames the
+week``; the weekly ritual's Sunday): likewise never before its last journal day has ended, then due when that entry
+is annotated, or at ``reflections.week.fallback_time`` the day after. Both wait while an entry of theirs is still
+being annotated or transcribed. Both are sent silently: they come at the end of the night. Which practice closes a period is ``library.closer``: a fork that renames the
 evening ritual keeps the reflection as long as it says ``closes: day``.
 
 The model (a one-shot) is given the period's entry files (the user's words, annotations, the companion's notes),
@@ -48,8 +50,8 @@ from pathlib import Path
 
 from . import agent, channel, compose, entries, ledger, library, mirror, notebook, outage, prompts, schedule, search, \
     ticklock, validate
-from .ports import ChannelError
-from .config import Config
+from .chat.deliver import Delivery, Mirror, deliver
+from .config import Config, day_ends_at, journal_day
 
 ATTEMPTS = 3
 SEND_ATTEMPTS = 6
@@ -81,6 +83,19 @@ def _fallback_time(cfg: Config, kind: str) -> time:
 
 def _at(cfg: Config, day: date, t: time) -> datetime:
     return datetime.combine(day, t, tzinfo=cfg.tz)
+
+
+def day_over(cfg: Config, d: date) -> datetime:
+    """When journal day ``d`` ends: ``windows.day_ends_at`` (default 04:00) on the next calendar day. No analysis of a
+    period is written before its last day has ended, so words put down after midnight (filed under that day) are in it."""
+    hh, mm = day_ends_at(cfg)
+    return _at(cfg, d + timedelta(days=1), time(hh, mm))
+
+
+def _fallback(cfg: Config, kind: str, end: date) -> datetime:
+    """When a period's analysis is written at the latest on a normal night (no annotated closing entry): its
+    ``fallback_time`` the day after ``end``, and never before that day has ended (``day_over``)."""
+    return max(_at(cfg, end + timedelta(days=1), _fallback_time(cfg, kind)), day_over(cfg, end))
 
 
 def week_end_day(cfg: Config) -> int:
@@ -162,10 +177,11 @@ def _period(kind: str, end: date) -> list[date]:
 def due(cfg: Config, data: dict, now_local: datetime) -> list[tuple[str, date, str]]:
     """(kind, period end date, trigger "annotated" | "fallback") for analyses due now.
 
-    Today's and yesterday's day, and this week, are always candidates; so is any period whose attempt
-    was deferred by an outage (until it is written or the outage outlasts the retry window)."""
+    Today's and yesterday's journal day, and this week, are always candidates; so is any period whose attempt
+    was deferred by an outage (until it is written or the outage outlasts the retry window). None is due before its
+    last journal day has ended (``day_over``)."""
     out = []
-    today = now_local.date()
+    today = journal_day(cfg, now_local)  # (until ``windows.day_ends_at`` it is still last night's day)
     waiting = [r for r in data.get("reflections") or [] if outage.deferred(r) and not r.get("written_at")]
 
     def pending(kind: str) -> set[date]:
@@ -173,7 +189,9 @@ def due(cfg: Config, data: dict, now_local: datetime) -> list[tuple[str, date, s
 
     if enabled(cfg, "reflection"):
         for d in sorted({today - timedelta(days=1), today} | pending("reflection")):
-            fallback = _at(cfg, d + timedelta(days=1), _fallback_time(cfg, "reflection"))
+            if now_local < day_over(cfg, d):
+                continue  # the day is not over: an after-midnight note of it may still come
+            fallback = _fallback(cfg, "reflection", d)
             closing_id, sent = _day_close(cfg, d)
             if sent is not None:
                 fallback = max(fallback, sent + timedelta(hours=1))
@@ -183,7 +201,9 @@ def due(cfg: Config, data: dict, now_local: datetime) -> list[tuple[str, date, s
     if enabled(cfg, "week"):
         this_week = today - timedelta(days=(today.weekday() - week_end_day(cfg)) % 7)
         for end in sorted({this_week} | pending("week")):
-            fallback = _at(cfg, end + timedelta(days=1), _fallback_time(cfg, "week"))
+            if now_local < day_over(cfg, end):
+                continue  # (as the day: its last day's after-midnight notes, and that day's reflection, come first)
+            fallback = _fallback(cfg, "week", end)
             trigger = _trigger(cfg, data, "week", end, _week_close(cfg, end), fallback, now_local)
             if trigger:
                 out.append(("week", end, trigger))
@@ -331,7 +351,7 @@ def _replies_to(cfg: Config, rec: dict | None, path: Path, upto: date, data: dic
         if at is None or not note.is_file():
             continue
         try:
-            day = datetime.fromisoformat(at).astimezone(cfg.tz).date()
+            day = journal_day(cfg, datetime.fromisoformat(at))   # (the day its note is filed under)
         except ValueError:
             continue
         if first <= day <= upto:  # (a reply written after the period being reflected on belongs to a later one)
@@ -560,8 +580,10 @@ def _skip(cfg: Config, now: datetime, log: list[str]) -> None:
 
 
 def send(cfg: Config, now: datetime, log: list[str]) -> list[str]:
-    """Send each written analysis to the chat once (silently when the overnight fallback wrote it)."""
-    alerts, where = [], channel.label(cfg)
+    """Send each written analysis to the chat once, silently: a day reflection or week review is written once its last
+    journal day has ended (``day_over``, 04:00 by default), so it comes in the night whichever way it was triggered (an
+    annotated closing entry or the fallback). Before the owner's 2026-11-25 decision only the fallback's was silent."""
+    alerts: list[str] = []
     if not cfg.has_channel:
         _skip(cfg, now, log)
         return alerts  # no chat: the analysis is in its file, and nothing is attempted (OPEN-PROMPTS rule 6)
@@ -578,46 +600,54 @@ def send(cfg: Config, now: datetime, log: list[str]) -> list[str]:
             waiting += 1
             continue
         path = Path(rec.get("path") or "")
-        error, mid, title, body = None, None, "", ""
-        if not path.is_file():
-            error = "the file is gone"
+        if not path.is_file():  # nothing to send: the attempt is counted all the same
+            told = _sent_account(cfg, rec, now, "", "", Delivery(error="the file is gone"), alerts, log)
         else:
             title, _ = _label(cfg, rec["kind"], date.fromisoformat(rec["local_date"]))
             body = body_of(path.read_text(encoding="utf-8"))
-            try:
-                mid = cfg.channel().send(cfg.chat_id, compose.reflection_html(title, body, cfg.names),
-                                         silent=rec.get("trigger") == "fallback")
-            except ChannelError as e:
-                error = str(e)
-        with ledger.locked(cfg.ledger_path) as data:
-            q = find(data, rec["id"])
-            if q is None:
-                continue
-            t = ledger.send_slot(q)
-            if mid:
-                t.update(message_id=mid, sent_at=now.isoformat(), silent=rec.get("trigger") == "fallback")
-                t.pop("error", None)
-            else:
-                t["attempts"] = t.get("attempts", 0) + 1
-                t["error"] = (error or "")[:300]
-                if t["attempts"] >= SEND_ATTEMPTS:
-                    alerts.append(f"{rec['id']} could not be sent to {where} after {t['attempts']} attempts: {error}")
-        log.append(f"sent {rec['id']} to {where}" if mid else f"{rec['id']}: {where} send failed ({error})")
-        if mid:
+            told = deliver(cfg, compose.reflection_html(title, body, cfg.names), log,
+                           silent=True,
+                           record=lambda d, rec=rec, title=title, body=body: _sent_account(
+                               cfg, rec, now, title, body, d, alerts, log)).told
+        if told is not None:
             room -= 1
-            mirror.to_chat(cfg, f"{title}, sent at {mirror.stamp(cfg, now)}", body, log,
-                           ref=("reflections", rec["id"], ledger.SEND_KEY))
     if waiting:
         log.append(outage.pace_note(cfg, waiting, "analys" + ("is" if waiting == 1 else "es")))
     return alerts
 
 
+def _sent_account(cfg: Config, rec: dict, now: datetime, title: str, body: str, d: Delivery, alerts: list[str],
+                  log: list[str]) -> Mirror | None:
+    """One analysis's send, accounted (``deliver``'s ``record``): sent, its send slot gets the message; not, an
+    attempt, the error, and an alert on the ``SEND_ATTEMPTS``-th. What the companion is told when it was sent; nothing
+    when the record is gone."""
+    mid, error, where = d.message_id, None if d.error is None else str(d.error), channel.label(cfg)
+    with ledger.locked(cfg.ledger_path) as data:
+        q = find(data, rec["id"])
+        if q is None:
+            return None
+        t = ledger.send_slot(q)
+        if mid:
+            t.update(message_id=mid, sent_at=now.isoformat(), silent=True)
+            t.pop("error", None)
+        else:
+            t["attempts"] = t.get("attempts", 0) + 1
+            t["error"] = (error or "")[:300]
+            if t["attempts"] >= SEND_ATTEMPTS:
+                alerts.append(f"{rec['id']} could not be sent to {where} after {t['attempts']} attempts: {error}")
+    log.append(f"sent {rec['id']} to {where}" if mid else f"{rec['id']}: {where} send failed ({error})")
+    if not mid:
+        return None
+    return Mirror(f"{title}, sent at {mirror.stamp(cfg, now)}", body, ("reflections", rec["id"], ledger.SEND_KEY))
+
+
 def _lateness(cfg: Config, rec: dict, now: datetime) -> timedelta | None:
-    """How long after its fallback time (the latest it is written on a normal night) an analysis would be sent."""
+    """How long after its fallback time (the latest it is written on a normal night, ``_fallback``) an analysis would
+    be sent."""
     try:
         end = date.fromisoformat(rec["local_date"])
         kind = rec.get("kind") or "reflection"
-        return now - _at(cfg, end + timedelta(days=1), _fallback_time(cfg, kind))
+        return now - _fallback(cfg, kind, end)
     except (KeyError, TypeError, ValueError):
         return None
 

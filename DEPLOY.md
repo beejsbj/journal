@@ -37,6 +37,91 @@ does not load it: CLAUDE.md's import check lists neither), and the web build is 
 **Rollback.** `uv tool install --force` at the previous sha and `systemctl --user restart journal-serve`. Nothing to
 undo in state.
 
+## NOTES-JOURNAL-DAY — notes follow the journal day (2026-11-25; hook, tick and serve side; **gateway restart required**; no config or state change)
+
+**What changes.** A note (a chat `/j`, a chat thread that became a note, the web app's *A note*, `journal write`,
+MCP's `journal_save`) put down before `windows.day_ends_at` (default 04:00) is filed under the day before, as a
+prompt answered then already was: a 00:30 note is `<last night's date>-j.md` (issue #82). Today shows the journal
+day: the web app's Today and its week strip, and the chat's today block (its header, practices, *entries today*, the
+latest reflection) read last night's day until `day_ends_at`; the block's "a new day starts a new block" turns at
+`day_ends_at` instead of midnight, and `journal status`' block count is per journal day. The day reflection, `GET
+/days` and the Entries list key on the entry's date, so they read the new notes on the same day. **No file is moved**:
+a note filed by the calendar date before this change stays under that date. DECISIONS.md, NOTES-JOURNAL-DAY.
+**On review (the owner's decision, 2026-11-25): the day reflection waits for the journal day to end.** It is no
+longer written when the evening entry is annotated (~22:40) but once `day_ends_at` has passed (04:00 by default), so
+it reads the after-midnight notes; the week review likewise waits for its Sunday to end (Monday 04:00). Both are now
+sent **silently** (they come in the night). A reply to a reflection (a reply to its message) is never filed as the
+answer to the morning prompt that may be open by then (`capture.match`, the sweep and the conversation writer leave it
+to the writer, which files it as a reply to the reflection). Her own note with no date follows the journal day. The
+today block names both days between midnight and `day_ends_at` ("journal day Thu 15 Oct 2026 · now Fri 00:35"), and
+says which day the tasks (still the calendar date's) are due. `GET /today` gains `calendar_date`. The first night after
+the deploy: a reflection already written that evening is unaffected; the next one comes at 04:00.
+**Side and restart.** `config.py`, `capture.py`, `conversations.py`, `today.py`, `slots.py`, `reflect.py`, `sweep.py`,
+`ledger.py` and `status.py` are all
+loaded by the gateway at import (CLAUDE.md's import check lists them), so **the restart is required**: until it, a
+`/j` the hook saves and the today block keep the calendar date while the tick's auto notes and the faces use the
+journal day. Ride the next gateway window with the pin move. The tick runs it from its next run. Serve side
+(`serve/api.py` and the core it imports): `uv tool install --force` at the merge sha and `systemctl --user restart
+journal-serve`.
+**First checks.**
+- After the restart, the gateway's log has no `journal` hook exception, and a reply to a prompt is captured as before.
+- Between midnight and `day_ends_at` (or with `JOURNAL_CONFIG` pointing at a copy whose `windows.day_ends_at` is a
+  few minutes ahead, on a temporary root): a note from the web app lands as `<yesterday>-j…md`, and Today's date and
+  *Written today* show yesterday with that note in it. After `day_ends_at`, Today shows the new day.
+- `journal doctor`'s day reflection row reads "once the day has ended, after the evening entry is annotated, …".
+- The next morning: `journal status` shows the day reflection written after `day_ends_at` (not at ~22:40), sent
+  silent; the morning prompt goes out as before.
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
+previous sha), `hermes gateway restart`, and serve's `uv tool install --force` at the previous sha with its restart.
+Nothing to undo in state: notes filed under last night's date stay there, as any entry does.
+
+## CHAT-2 — one send operation, `chat.deliver`, for the five kinds of send the engine makes on its own (2026-11-25; tick and hook side; **gateway restart**; no config or state change)
+
+**What changes.** Issue #43, its second step. `journal/chat/deliver.py`'s `deliver` sends one message to the
+journal's chat, lets its caller record the outcome, and mirrors what the caller says into the companion's session.
+The five kinds of send now go through it, each keeping its own rules and its own ledger account exactly: prompts,
+program phases and interrupts (`chat.send.send_prompt`), annotation replies (`chat.replies`), reflections and week
+reviews (`reflect.send`), the catch-up letter (`recovery._send`) and a program session's summary
+(`programs._send_summary`). No ledger field, message text, keyword, log line, mirror row or alert changes; the rules
+about whether anything is owed (no chat, `/x`, pacing, staleness, the letter's hold) stay where they were.
+DECISIONS.md, CHAT-2.
+**Side and restart.** `programs.py`, `recovery.py` and `reflect.py` change, and the gateway loads them at import; it
+now loads `journal.chat` and `journal.chat.deliver` too (the import check above: those two are added, nothing is
+removed). So this rides a **gateway restart** (`hermes gateway restart`, in a window). The tick and the spawned
+one-shots run it from the next tick once the plugin pin moves. Serve loads `programs` through the engine but never
+sends in-process (it spawns `journal send` / `journal program`); `uv tool install --force` at the merge sha keeps what
+it spawns on the same code.
+**First checks.**
+- `journal doctor`: no new failure.
+- The next ticks' `last-tick.json` lines read as before: `sent <id> (opener: …)`, `replied to <id> with its
+  annotations`, `sent reflection-<date> to <platform>`, `sent the catch-up for <id> (…)`; a session summary logs
+  nothing on success, as before.
+- The companion's session gets the same mirror rows after each send (`mirror-queue.json` empties as before).
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>`, the CLI at the
+previous sha, and a gateway restart. Nothing on disk changed, so nothing else.
+
+## CHAT-1 — the tick's send, fold and annotation replies move into `journal/chat/` (2026-11-25; tick side; **no gateway restart needed**; no config or state change)
+
+**What changes.** Issue #43, its first step: a pure move, no behaviour change. `send_prompt` and its ledger account
+(`count_send_failure`, `_attach`, `sent.jsonl`'s `_archive_sent` and `prune_sent`) move to `journal/chat/send.py`,
+`fold` to `journal/chat/fold.py`, `reply_annotations` to `journal/chat/replies.py`, and `Alert` to `journal/alert.py`.
+Every definition is byte for byte what it was in `tick.py`, and `tick` still exports every moved name (the same
+objects), so `programs`, `ops`, `cli` and anything else that reaches them through `tick` is unchanged. The tick's steps,
+their order, its yield points and its locks are untouched. DECISIONS.md, CHAT-1.
+**Side and restart.** The code that moves runs in the tick and in what the tick's names are called from (`journal
+send`, `journal program …`), all fresh processes, which run it from the next tick once the plugin pin moves. The
+gateway does not load `tick` or `journal/chat/` at import (the import check above lists the same modules before and
+after this change), and the modules it does load (`capture.py`, `programs.py`, `slots.py`, `sweep.py`) change in
+docstrings and comments only; it never sends a prompt or folds in-process (it spawns `journal send` / `journal
+program`). So **no gateway restart is needed**; the next window's restart picks the docstrings up. Serve does not load
+any of this; `uv tool install --force` at the merge sha keeps what serve spawns on the same code.
+**First checks.**
+- `journal doctor`: no new failure.
+- The next ticks' `last-tick.json` lines read as before (a sent prompt: `sent <id> (opener: …)`; a fold: `folded <id>
+  (…)`; an annotation reply: `replied to <id> with its annotations`).
+**Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` and the CLI at the
+previous sha. Nothing on disk changed, so nothing else.
+
 ## TODAY-QUICK-J — a line put down from Today (2026-11-25; serve side only; **no gateway restart**; no config or state change)
 
 **What changes.** Today has a one-line box under the week strip: Enter (or *Put down*) saves the line as a note,
