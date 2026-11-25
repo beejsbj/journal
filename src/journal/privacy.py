@@ -22,6 +22,9 @@ For each row the pass decides whether it is private:
   window, and the row is private when it falls inside a window, the open one or one already closed. A bare ``/x``
   stored as a row opens its window at its own time (known before the walk, as the hook's are) and again where the
   walk reaches it, so a message he sent after it is inside the window whichever of the two was stored first.
+* **A row's own mark, whatever its kind**: a photo, document or video row that holds the hook's marker (a ``/x``
+  with no words, or its caption after the marker: ``caption`` in the transcript reads past it) or an id the hook
+  recorded is private, inside a window or not (#93).
 * **A tainted turn**: once a private row of his is taken in (a message, or a captionless photo inside a window),
   her rows are private until his next message after her turn ended (a text reply, a failed turn, an
   interruption): a public message steered into the same turn does not clear it, since her answer covers both.
@@ -279,15 +282,18 @@ def compute(cfg: Config, rows: list[Row], hook_starts: list[datetime], sends: li
             continue  # notifications, process completions: not his words, no activity of his
         said = _said(row)
         if row.kind in ("mirror", "empty", "system", "boundary") and said is None:
-            if row.kind in ("empty", "system") and (inside(t) or _in_cut(cfg, row)):
+            if row.kind in ("empty", "system") and (inside(t) or row_marked(cfg, row, off_ids)):
                 # a captionless photo (Hermes' image placeholder, or an empty row in native image mode) inside a
                 # window: no words to mark, but the picture, its stash and the vision note are his private
                 # message, and it keeps the window going as any message of his does: else her reply to it, or his next
                 # message, more than ``quiet_minutes`` after the activity before it, would read as outside the window
                 # and be saved. (A gateway row of these kinds extends it too: that errs toward more privacy.) Her
                 # turn took it in, as any private message of his: her reply describing it is private, also when the
-                # photo was queued and stored after the window ended. (The same for a row with no words in front of
-                # a picture's placeholders and an opt-out in what was cut off after them: ``_in_cut``.)
+                # photo was queued and stored after the window ended. The same, inside a window or not, for a row
+                # that holds its own mark (``row_marked``, #93): a /x photo, document or video with no words (the
+                # hook's marker after Hermes' notes, or an id the hook recorded), or a row with no words in front of a
+                # picture's placeholders and an opt-out in what was cut off after them (``_in_cut``). What a row
+                # holds decides, not its kind or where it falls.
                 private(rid, t)
                 v.taint, v.answered = True, False
                 if v.window:
