@@ -4681,8 +4681,10 @@ to it (not this host's setup: the gateway runs as a service).
     `update` never saves the old row as private on a guess). No read is added. The limit, and its price: a public
     copy reads private when the `RECOMPUTE` before its original had no quiet gap and no prompt send, and no saved
     window answers for it: the readers of raw rows (the catch-up, the pack, alignment) then leave that copy out.
-    Measured on the cost benchmark below, the second run costs no read and little time. The tick's log counts those
-    originals.
+    The second run costs no read, only the pass again over rows already in memory: re-run on the benchmark below
+    (single runs on a loaded host, so noisy), a view holding copies took 167 / 706 ms on main, 335 / 676 ms before
+    the second run and 168 / 599 ms with it (60 days and 20,000 rows / 180 days and 60,000). The tick's log counts
+    those originals.
     Cost: a view that holds such a copy reads, besides its own hours, each original by id and one slice of about
     four days per group of originals, on each uncached call (the gateway's on each of his messages and each
     journal-writing tool call included) until the copy is older than the view. That is the common case, a copy of a

@@ -461,7 +461,9 @@ def _originals(cfg: Config, chat, missing: list[int], start: datetime, starts: l
             if datetime.fromisoformat(s) < lo and (e is None or datetime.fromisoformat(e) > lo):
                 lo = datetime.fromisoformat(s)
         if spans and lo <= spans[-1][1]:
-            spans[-1][0] = min(spans[-1][0], lo)  # (a saved window can take a later original's start back further)
+            # (a no-op as the starts come in order: a saved window that takes a later original's start back before an
+            # earlier one's covers that one too; kept so a merged span can never start later than a member's)
+            spans[-1][0] = min(spans[-1][0], lo)
             spans[-1][1] = max(spans[-1][1], hi)
             spans[-1][2].append(oid)
         else:

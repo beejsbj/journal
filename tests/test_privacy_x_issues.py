@@ -369,8 +369,8 @@ class SliceReadsTest(unittest.TestCase):
         self.assertEqual(v.retake["uncertain"], 0)
 
     def test_a_slice_shared_with_an_earlier_original_keeps_the_saved_windows_start(self):
-        """An earlier original (half a day before) whose slice meets this one's: the shared slice still begins at
-        the saved window's start, not at the earlier original's own lookback."""
+        """An earlier original (half a day before), in the same saved window: the shared slice begins at that
+        window's start, and both are answered for sure."""
         early = next(r for r in self.rows if r.at >= self.now - timedelta(days=10, hours=12))
         self.rows.append(Row(self.copy + 1, self.now - timedelta(minutes=20), "user", "his", early.text,
                              early.platform_message_id, copy=early.id))
