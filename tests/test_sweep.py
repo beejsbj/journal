@@ -12,6 +12,7 @@ from helpers import CHAT, add_prompt, make_cfg
 import legacy_readers
 
 from journal import capture, compose, entries, ledger, sweep, tick
+from journal.chat import send as chat_send  # (send_prompt's clock, moved from tick: issue #43)
 
 SENT = datetime(2026, 10, 15, 0, 31, tzinfo=timezone.utc)  # 06:01 IST
 NOW = SENT + timedelta(hours=10)
@@ -252,7 +253,7 @@ class SweepTest(unittest.TestCase):
             @classmethod
             def now(cls, tz=None):
                 return NOW if tz is None else NOW.astimezone(tz)
-        with mock.patch.object(tick, "datetime", FixedNow), \
+        with mock.patch.object(tick, "datetime", FixedNow), mock.patch.object(chat_send, "datetime", FixedNow), \
                 mock.patch("journal.agent.ask", lambda *a, **k: "- He slept badly."), \
                 mock.patch("journal.context.companion_reply_after", lambda *a, **k: None), \
                 mock.patch.object(tick, "send_due", lambda *a, **k: None), \

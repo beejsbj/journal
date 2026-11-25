@@ -16,6 +16,7 @@ from unittest import mock
 from helpers import add_prompt, make_cfg
 
 from journal import agent, capture, ledger, programs, telegram, tick, ticklock
+from journal.chat import send as chat_send  # (send_prompt's clock, moved from tick: issue #43)
 
 DEADLINE = 10  # seconds: far above anything here, so only a deadlock reaches it
 # A Tuesday, 14:00 Asia/Kolkata (the helpers' zone): no ritual due, so a tick sends nothing of its own
@@ -101,7 +102,7 @@ class YieldTest(TickLockCase):
     def test_a_waiter_gets_the_lock_between_steps(self):
         """A ``/next`` that arrives during a step runs when that step ends, before the next one: not after the tick."""
         ready = threading.Event()
-        with mock.patch.object(tick, "datetime", _clock(QUIET)), \
+        with mock.patch.object(tick, "datetime", clock := _clock(QUIET)), mock.patch.object(chat_send, "datetime", clock), \
                 mock.patch.object(tick, "fold", self.blocks_until_waited("fold", ready)), \
                 mock.patch.object(tick, "process_audio", lambda *a: self.events.append("audio")), \
                 mock.patch.object(tick, "annotate", lambda *a: self.events.append("annotate")):
@@ -130,7 +131,7 @@ class YieldTest(TickLockCase):
             else:
                 first()
             return "- a note\n"
-        with mock.patch.object(tick, "datetime", _clock(QUIET)), mock.patch.object(agent, "ask", ask), \
+        with mock.patch.object(tick, "datetime", clock := _clock(QUIET)), mock.patch.object(chat_send, "datetime", clock), mock.patch.object(agent, "ask", ask), \
                 mock.patch.object(telegram, "_call", lambda *a, **k: {"message_id": 1}):
             ticker = self.thread(tick.run, self.cfg)
             other = self.thread(self.waiter, ready)
@@ -165,7 +166,7 @@ class YieldTest(TickLockCase):
                     yielded.set()
 
         ran: list = []
-        with mock.patch.object(tick, "datetime", _clock(QUIET)), \
+        with mock.patch.object(tick, "datetime", clock := _clock(QUIET)), mock.patch.object(chat_send, "datetime", clock), \
                 mock.patch.object(tick, "fold", lambda *a: self.events.append("fold")), \
                 mock.patch.object(tick, "process_audio", lambda *a: self.events.append("audio")), \
                 mock.patch.object(ticklock, "fcntl", Spy()):
@@ -248,7 +249,7 @@ class OrderTest(TickLockCase):
             code, _log = tick.run(self.cfg, only="evening")
             self.assertEqual(code, 0)
 
-        with mock.patch.object(tick, "datetime", _clock(MORNING, timedelta(seconds=1))), \
+        with mock.patch.object(tick, "datetime", clock := _clock(MORNING, timedelta(seconds=1))), mock.patch.object(chat_send, "datetime", clock), \
                 mock.patch.object(tick, "_opener", opener), mock.patch.object(telegram, "send_html", send_html), \
                 mock.patch("journal.privacy.update", lambda *a, **k: self.events.append("privacy")):
             ticker = self.thread(lambda: self.events.append(("tick", tick.run(self.cfg)[0])))

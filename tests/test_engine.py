@@ -17,6 +17,7 @@ from journal import (capture, compose, context, entries, guard, ledger, library,
 from journal import inbound
 from journal.config import Config, load
 from journal.hermes import commands, hooks
+from journal.chat import send as chat_send  # (send_prompt's clock, moved from tick: issue #43)
 
 IST = ZoneInfo("Asia/Kolkata")
 
@@ -285,7 +286,7 @@ class TickSendTest(unittest.TestCase):
                 @classmethod
                 def now(cls, tz=None):
                     return now.astimezone(tz) if tz else now
-            with mock.patch.object(telegram, "send_html", boom), mock.patch.object(tick, "datetime", Clock), \
+            with mock.patch.object(telegram, "send_html", boom), mock.patch.object(tick, "datetime", Clock), mock.patch.object(chat_send, "datetime", Clock), \
                     mock.patch.object(tick, "_opener", lambda *a: ("Morning 🌻", "plain:test", [], [])):
                 codes = [tick.run(cfg)[0] for _ in range(4)]
             self.assertEqual(codes, [0, 0, 1, 0])  # alert once, then stop trying
