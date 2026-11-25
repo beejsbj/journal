@@ -4607,6 +4607,31 @@ that echoes it has the line dropped. Left as known: `journal_search` refuses in 
 (a kanban card, his own `hermes chat -q`); an engine one-shot that starts a gateway itself would pass its variables
 to it (not this host's setup: the gateway runs as a service).
 
+- **ROUTE-OPENS (2026-11-24) — the faces' fence is held by what they open, and the import fence says it is direct
+  (issue #44).** `test_serve_fence` / `test_mcp_fence` check what `serve/` and `mcp/` import themselves; loading them
+  also loads `agent`, `mirror`, `notebook`, `ports` and `sqlite3` through the engine (at import; `conversations`,
+  `context` and `sweep`, which the audit listed, no longer load then). **Chosen:** reword AGENTS.md to say the fence is
+  direct, not make it transitive (a transitive fence fails today on modules serve loads and never calls), and pin that
+  set exactly (`ModuleLoadTest`) so it changes only by a decision. **The behavioural half:** `test_route_opens.py`
+  installs an audit hook (`open`, which `os.open` raises too, `os.listdir`, `os.scandir`; every thread, so the server's
+  handler threads are seen) and re-runs the existing walks (`test_serve_privacy`'s GET, write, Write-now and push
+  walks; `test_mcp.PrivacyTest`'s tool walk) unchanged, failing on any path under `state_dir` outside `ALLOWED` (a file
+  brings its lock and an atomic write's temporary file) and on the sessions database wherever it is. `NEVER` names
+  what must stay out (the notebook and its archive, `packs/`, `conversations.json`, the mirror queue, `sent.jsonl`,
+  `send-times.json`, `audio-stash/`, `tick.lock`, `hook-state.json`, `sweep.json`). A path test, not a content test: a
+  file's existence check (`stat`) is not recorded. **Found and settled (the orchestrator's call for the owner,
+  2026-11-24, option (a) of the open point the first draft raised):** `GET /api/v1/status` opened `hook-state.json`
+  (through `today.injections`, parsing the whole file, which also holds queued packs, voice notes awaiting transcripts
+  and off-record turn marks, for the today block's count and last time) and `sweep.json` (its watermark, served as
+  `{at}` since AUDIT-LEFTOVERS). Nothing of his or hers reached the client, but `status`'s docstring and API.md
+  Decision 2 said no web route reads the hook's records while API.md's `/status` row listed the injections. Now the web
+  status has no `sweep` and its `today` no `count`/`last` (`{enabled, cache_age_minutes}`), so no web route opens
+  either file; both are in `NEVER` with no exception, and API.md says so. The PWA calls `/status` only as a sign-in
+  probe and reads neither field; the CLI's `journal status` is unchanged. **Review of #77 (Claude Opus 5.5):** the hook
+  also records `sqlite3.connect` (SQLite opens its file in C, raising no `open` event), and a path opened relative to a
+  directory handle (`os.open(name, dir_fd=…)`, `os.scandir(fd)`) is kept as given, not resolved against the cwd, and
+  fails when its name is in `NEVER`.
+
 - **MODEL-WALK (2026-11-24) — "the web app calls no model" is fenced by behaviour at `ask`, not at building a
   companion (issue #3).** The import fence (`test_serve_fence.py`) sees only what `serve/` imports itself; serve
   loads `reflect`, which imports `agent`, so a route could reach a model by another module. `helpers.no_model()` now

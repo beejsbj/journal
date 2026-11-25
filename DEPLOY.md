@@ -53,6 +53,21 @@ skips it ("answered live since") once the chat has a real reply in its window, o
 chat catch-up (tested against the older module, `RollbackTest`). The replies it held go as before from the first tick
 on the older code.
 
+## ROUTE-OPENS — the faces' walks record every file they open; the web status opens neither the hook's state nor the sweep's (2026-11-24; **serve side only, no gateway restart**)
+
+**What changes.** Issue #44: `tests/test_route_opens.py` runs the serve route walks (every GET, write and push route,
+the Write-now view) and the MCP tool walk again with every file open, directory listing and SQLite connection recorded
+(`sys.addaudithook`, every thread), and fails on anything under `state_dir` outside an allowlist, or on the chat
+transcript; it also pins which forbidden modules loading `serve` and `mcp` brings in through the engine. AGENTS.md now
+says the import fence is direct, not transitive. `status.status(web=True)` (the web's `GET /api/v1/status`) no longer
+returns `sweep` or the today block's injection count, so it opens neither `sweep.json` nor `hook-state.json`; the CLI's
+`journal status` is unchanged. DECISIONS.md, ROUTE-OPENS.
+**Side and restart.** Serve: `uv tool install --force` at the merge sha, then `systemctl --user restart journal-serve`.
+No gateway restart: `status.py` is not loaded by `journal.hermes` (checked with the import probe in AGENTS.md), and the
+change is inside `web=True` branches only, which no gateway path takes; the tick runs it from its next run unchanged.
+**First checks.** `curl` the signed-in `/api/v1/status`: no `sweep` key, and `today` has no `count`.
+**Rollback.** The CLI at the previous sha and a serve restart.
+
 ## MODEL-WALK — the route walks fence every way to a model (2026-11-24; tests and docs only; **no deploy, no restart**)
 
 **What changes.** Tests only (issue #3): `tests/helpers.py` gains `no_model()`, which records and fails every way to a
