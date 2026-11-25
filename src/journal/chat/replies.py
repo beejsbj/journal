@@ -11,6 +11,7 @@ from pathlib import Path
 from .. import channel, compose, entries, ledger, mirror, outage, recovery
 from ..config import Config
 from ..ports import ChannelError
+from .deliver import Delivery, Mirror, deliver
 
 REPLY_ATTEMPTS = 6
 
@@ -70,6 +71,30 @@ def _skip_stale_reply(cfg: Config, p: dict, now: datetime, newest: datetime, log
                "the annotations are in the entry)")
 
 
+def _reply_account(cfg: Config, p: dict, now: datetime, text: str, d: Delivery, log: list[str]) -> Mirror | None:
+    """One annotation reply's account (``deliver``'s ``record``): sent, its ``annotation_reply`` gets the message;
+    not, an attempt and the error. What the companion is told when it was sent; nothing when the prompt is gone."""
+    mid, error = d.message_id, None if d.error is None else str(d.error)
+    with ledger.locked(cfg.ledger_path) as data:
+        q = ledger.find(data, p["id"])
+        if q is None:
+            return None
+        r = q.setdefault("annotation_reply", {})
+        if mid:
+            r.update(message_id=mid, sent_at=now.isoformat(), reply_to=_reply_target(q))
+            r.pop("error", None)
+        else:
+            r["attempts"] = r.get("attempts", 0) + 1
+            r["error"] = (error or "")[:300]
+    if not mid:
+        log.append(f"{p['id']}: annotation reply failed ({error})")
+        return None
+    log.append(f"replied to {p['id']} with its annotations")
+    what = (f"{cfg.names.companion}'s annotations on {Path(p.get('entry_path') or p['id']).stem}, sent at "
+            f"{mirror.stamp(cfg, now)} as a reply to {cfg.names.possessive} entry")
+    return Mirror(what, text, ("prompts", p["id"], "annotation_reply"))
+
+
 def reply_annotations(cfg: Config, now: datetime, log: list[str]) -> None:
     """Send each new annotation to the chat as a reply to the message it annotates (as a message of its own where the
     platform has no replies, or the prompt was made on another platform); exactly once.
@@ -102,36 +127,17 @@ def reply_annotations(cfg: Config, now: datetime, log: list[str]) -> None:
             continue
         path = Path(p.get("entry_path") or "")
         text = entries.annotations(path.read_text(encoding="utf-8")) if path.is_file() else ""
-        error, mid = None, None
-        if not text:
-            error = "no annotations in the entry"
+        if not text:  # nothing to send: the attempt is counted all the same
+            told = _reply_account(cfg, p, now, text, Delivery(error="no annotations in the entry"), log)
         else:
-            try:
-                chat = chat or cfg.channel()
-                here = channel.same_chat(cfg, p)  # (a prompt made before the channel moved: no reply into the old chat)
-                mid = chat.send((p.get("chat_id") or cfg.chat_id) if here else cfg.chat_id,
-                                compose.annotation_html(p["kind"], text, cfg.names),
-                                reply_to=_reply_target(p) if here else None)
-            except (ChannelError, ValueError) as e:  # one prompt's bad reply never stops the others'
-                error = str(e)
-        with ledger.locked(cfg.ledger_path) as data:
-            q = ledger.find(data, p["id"])
-            if q is None:
-                continue
-            r = q.setdefault("annotation_reply", {})
-            if mid:
-                r.update(message_id=mid, sent_at=now.isoformat(), reply_to=_reply_target(q))
-                r.pop("error", None)
-            else:
-                r["attempts"] = r.get("attempts", 0) + 1
-                r["error"] = (error or "")[:300]
-        if mid:
+            here = channel.same_chat(cfg, p)  # (a prompt made before the channel moved: no reply into the old chat)
+            d = deliver(cfg, compose.annotation_html(p["kind"], text, cfg.names), log, chat=chat,
+                        to=(p.get("chat_id") or cfg.chat_id) if here else cfg.chat_id,
+                        reply_to=_reply_target(p) if here else None,
+                        catch=(ChannelError, ValueError),  # one prompt's bad reply never stops the others'
+                        record=lambda d, p=p, text=text: _reply_account(cfg, p, now, text, d, log))
+            chat, told = (d.chat if d.chat is not None else chat), d.told
+        if told is not None:
             room -= 1
-            log.append(f"replied to {p['id']} with its annotations")
-            what = (f"{cfg.names.companion}'s annotations on {Path(p.get('entry_path') or p['id']).stem}, sent at "
-                    f"{mirror.stamp(cfg, now)} as a reply to {cfg.names.possessive} entry")
-            mirror.to_chat(cfg, what, text, log, ref=("prompts", p["id"], "annotation_reply"))
-        else:
-            log.append(f"{p['id']}: annotation reply failed ({error})")
     if waiting:
         log.append(outage.pace_note(cfg, waiting, "annotation repl" + ("y" if waiting == 1 else "ies")))

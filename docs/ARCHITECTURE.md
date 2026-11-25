@@ -106,8 +106,10 @@ src/journal/
   agent.py            ask() facade + CommandCompanion (argv template); raises AgentUnavailable
   telegram.py         the Bot API; `TelegramChannel`, the `Channel` adapter for Telegram (+ reply_markup on send_html)
   ledger.py, notebook.py, outage.py, guard.py, status.py, tick.py, cli.py, migrate.py, location.py, audio.py, sources.py
-  chat/               the chat face (issue #43): send.py (`send_prompt`: one prompt record to the chat, its ledger
-                      account, `sent.jsonl`, re-sends, the mirror), fold.py (`fold`: a sent prompt's message edited once
+  chat/               the chat face (issue #43): deliver.py (`deliver`: send one message, the caller records it, the
+                      mirror; every engine send: prompts, annotation replies, reflections, the catch-up letter, program
+                      summaries), send.py (`send_prompt`: one prompt record to the chat, its ledger
+                      account, `sent.jsonl`, re-sends), fold.py (`fold`: a sent prompt's message edited once
                       answered or expired), replies.py (`reply_annotations`); the tick runs them as its steps and still
                       exports their names; alert.py (`Alert`, raised by both) sits beside it in the core
   library/            built-in definitions (package data)

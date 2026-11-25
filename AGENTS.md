@@ -33,7 +33,8 @@ the transcript placeholder live there, `actions.refuse`), which takes its slot f
    `slots.resolve` says which slot words, or a deliberate send (`/start`, `journal send`), go to.
 2. **Opener.** `context.build` makes a dated, sourced pack (`standing.py`, `sources.py`); `agent.ask` asks the
    companion; `validate.check` rejects uncited claims and quotes not in the record. Any failure gives the plain opener.
-3. **Send.** `compose.py` → `cfg.channel()` (the `Channel` port: the Bot API on Telegram, Hermes' senders elsewhere); the record goes into the ledger (`ledger.py`) and `sent.jsonl`; `mirror.py`
+3. **Send.** `compose.py` → `chat.deliver` (`journal/chat/`: the one send for every message the engine sends on its
+   own) → `cfg.channel()` (the `Channel` port: the Bot API on Telegram, Hermes' senders elsewhere); the record goes into the ledger (`ledger.py`) and `sent.jsonl`; `mirror.py`
    copies it into the companion's chat session. Just before a scheduled send the tick reads the record again under the
    ledger lock: answered on a face meanwhile, nothing goes (the pack is saved only after that check). A send that
    loses the race attaches to the face's record (`sent_opener`, `sent_html`, `sent_plain_text`, `needs_edit`) and

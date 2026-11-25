@@ -5066,3 +5066,30 @@ input found). A label the floor refuses answers 422 `off-the-record`, as the rou
   - **Kept as is:** the steps of `tick.run`, their order, `YIELDS_BEFORE` and every lock; `mirror.py` and
     `recovery.py`, already modules of their own, stay where they are (moving them into `chat/` changes no seam), and
     the readers (`sweep`, `conversations`) move last, as #43 orders.
+
+- **CHAT-2 (2026-11-25) — `chat.deliver`: one send operation for every message the engine sends on its own (issue
+  #43, step 2 of its order).** `deliver(cfg, html, log, *, record, to=None, chat=None, catch=(ChannelError,),
+  fallback=None, **keywords)` sends, hands the outcome (`Delivery`: `message_id`, `error`, the channel) to the
+  caller's `record`, and mirrors the `Mirror` that `record` returns (none: nothing is told). Converted, one commit
+  each: prompts (`send_prompt`, whose plain-opener retry is `deliver`'s `fallback` and which still catches every
+  exception), annotation replies (still catching `ValueError` too), reflections and week reviews, the catch-up letter,
+  and program session summaries.
+  - **Behaviour kept exactly, and how it was checked.** Each caller's account moved, unchanged in order and content,
+    into a `record` function beside it (`send._account`, `replies._reply_account`, `reflect._sent_account`,
+    `recovery._sent_account`, `programs._summary_account`). The full suite passes with no existing test edited;
+    `tests/test_chat_deliver.py` adds `deliver`'s own contract and, per kind, one test that the send is one `deliver`
+    call with the keywords it always sent, the ledger fields, log lines and mirror row as before, and its failure
+    path. Goldens and fences unchanged.
+  - **What stays with the callers, on purpose:** whether anything is owed (`channel.platform: none`, `/x` and the
+    privacy pass, `outage.chat_room` pacing, staleness, the catch-up letter's hold, TICK-LOCK-YIELD's yield points),
+    and each kind's texts and ledger shape. `deliver` decides none of them, so moving a send onto it changes no rule;
+    a kind's account is still its own (a prompt record, `annotation_reply`, a reflection's send slot through
+    `ledger.send_slot`, a `recovery` record, a run's session).
+  - **Nothing sent, still counted:** a reflection whose file is gone and an entry with no annotations count an
+    attempt through the same `record` with no send (`Delivery(error=...)`), as before.
+  - **A summary counts as sent when the send raised nothing,** whatever id came back, as before (its `record` reads
+    `error`, not `message_id`); the others read `message_id`, as they did.
+  - **Not converted here:** a program's short notes (`programs._say_about`) and the earlier parts of a phase split
+    over the platform's length limit (`programs._deliver`) send directly as before; they are outside this step's five
+    kinds. They can move onto `deliver` when margin notes (#31) shape what a chat message is. "What a reply answers"
+    is left for #31.

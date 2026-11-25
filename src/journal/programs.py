@@ -54,6 +54,7 @@ from pathlib import Path
 
 from . import (agent, audio, capture, compose, entries, ledger, library, mirror, notebook, outage, programdefs, prompts,
                ticklock, validate)
+from .chat.deliver import Delivery, Mirror, deliver
 from .config import Config, settle_minutes
 from .ports import ChannelError
 from .programdefs import Program
@@ -1799,23 +1800,29 @@ def _send_summary(cfg: Config, prog: Program, run: dict, s: int, now: datetime, 
         # the tick's step sends it once the window has closed, ``_retry_summary``)
         log.append(f"{run['id']}: session {s} summary held back: off the record (or the privacy pass cannot say)")
         return False
-    try:
-        mid = cfg.channel().send(cfg.chat_id, html, keyboard=compose.REMOVE_KEYBOARD)
-    except ChannelError as e:
+    plain = "\n\n".join(t for t in (completion, summary, document, next_line) if t)
+    return deliver(cfg, html, log, keyboard=compose.REMOVE_KEYBOARD,
+                   record=lambda d: _summary_account(cfg, prog, run, s, now, log, plain, d)).told is not None
+
+
+def _summary_account(cfg: Config, prog: Program, run: dict, s: int, now: datetime, log: list[str], plain: str,
+                     d: Delivery) -> Mirror | None:
+    """A session summary's send, accounted on the run (``deliver``'s ``record``): a send that raised nothing is sent
+    (whatever the chat gave back); one that failed is an attempt and its error. What the companion is told when sent."""
+    sess = _session(run, s)
+    if d.error is not None:
         sess["summary_attempts"] = sess.get("summary_attempts", 0) + 1
-        sess["summary_error"] = str(e)[:300]
+        sess["summary_error"] = str(d.error)[:300]
         _save(cfg, run)
-        log.append(f"{run['id']}: session {s} summary not sent ({e}); attempt {sess['summary_attempts']}/"
+        log.append(f"{run['id']}: session {s} summary not sent ({d.error}); attempt {sess['summary_attempts']}/"
                    f"{SUMMARY_ATTEMPTS}")
-        return False
-    sess.update(summary_sent_at=_iso(now), summary_message_id=mid)
+        return None
+    sess.update(summary_sent_at=_iso(now), summary_message_id=d.message_id)
     sess.pop("summary_error", None)
     _save(cfg, run)
-    plain = "\n\n".join(t for t in (completion, summary, document, next_line) if t)
     what = (f"{cfg.names.companion} sent the summary of {prog.id} " +
             (f"session {s} " if not prog.situational else "") + f"at {mirror.stamp(cfg, now)}")
-    mirror.to_chat(cfg, what, plain, log)
-    return True
+    return Mirror(what, plain)
 
 
 def step(cfg: Config, now: datetime, log: list[str], *, tried: set[str] | None = None) -> None:

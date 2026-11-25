@@ -66,7 +66,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from . import agent, channel, compose, context, entries, ledger, mirror, outage, prompts, validate
-from .ports import ChannelError
+from .chat.deliver import Delivery, Mirror, deliver
 from .config import Config
 from .ports import ChatUnreadable, Row
 
@@ -692,20 +692,25 @@ def run(cfg: Config, now: datetime, log: list[str], db: Path | None = None) -> N
 
 
 def _send(cfg: Config, rec: dict, now: datetime, log: list[str]) -> None:
-    error, mid = None, None
-    try:
-        mid = cfg.channel().send(cfg.chat_id, compose.md_to_html(rec["text"]), reply_to=rec.get("reply_to"))
-    except ChannelError as e:
-        error = str(e)
-    with ledger.locked(cfg.ledger_path) as d:
-        r = find(d, rec["id"])
+    """Send the written letter (``chat.deliver``), in reply to his newest message when there is one."""
+    deliver(cfg, compose.md_to_html(rec["text"]), log, reply_to=rec.get("reply_to"),
+            record=lambda d: _sent_account(cfg, rec, now, d, log))
+
+
+def _sent_account(cfg: Config, rec: dict, now: datetime, d: Delivery, log: list[str]) -> Mirror | None:
+    """The letter's send, accounted (``deliver``'s ``record``): sent, the record is ``sent`` and each prompt it covers
+    has its annotation reply skipped for it; not, a send attempt and the error, and on the ``SEND_ATTEMPTS``-th a note
+    in place of the letter. What the companion is told when it was sent; nothing when the record is gone."""
+    mid, error = d.message_id, None if d.error is None else str(d.error)
+    with ledger.locked(cfg.ledger_path) as data:
+        r = find(data, rec["id"])
         if r is None:
-            return
+            return None
         if mid:
             r.update(status="sent", message_id=mid, sent_at=now.isoformat())
             r.pop("send_error", None)
             for pid in r.get("prompts") or []:  # the letter is in place of their replies: none goes on its own
-                q = ledger.find(d, pid)
+                q = ledger.find(data, pid)
                 reply = (q or {}).get("annotation_reply") or {}
                 if q is not None and not reply.get("message_id") and not reply.get("skipped"):
                     q.setdefault("annotation_reply", {}).update(skipped="letter", skipped_at=now.isoformat(),
@@ -718,7 +723,7 @@ def _send(cfg: Config, rec: dict, now: datetime, log: list[str]) -> None:
         log.append(f"{rec['id']}: catch-up send attempt {tries}/{SEND_ATTEMPTS} failed ({error})")
         if tries >= SEND_ATTEMPTS:
             _note(cfg, rec, now, f"{channel.label(cfg)} refused it {tries} times", log)
-        return
+        return None
     log.append(f"sent the catch-up for {rec['id']} ({_summary(rec)})")
     n, ents = cfg.names, rec.get("entries") or []
     when = rec.get("window") or window(cfg, rec, now)
@@ -730,4 +735,4 @@ def _send(cfg: Config, rec: dict, now: datetime, log: list[str]) -> None:
             + f"{_entries(len(ents))} {n.subject} wrote in that time"
         what = (f"{n.companion} was offline from {when}; this message was sent after reconnecting, about {about} (the "
                 "notes on them are in the entries; their replies were not sent one by one)")
-    mirror.to_chat(cfg, what, rec["text"], log, ref=("recovery", rec["id"], None))
+    return Mirror(what, rec["text"], ("recovery", rec["id"], None))
