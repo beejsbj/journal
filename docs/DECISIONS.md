@@ -4630,6 +4630,26 @@ to it (not this host's setup: the gateway runs as a service).
   falls in a `/x` window stays the privacy pass's. **Not covered:** `entries.fill_audio_block` (a transcript of his
   voice, never typed) and `capture.add_companion_note` (her words; a note in a `/x` turn is refused by the turn's mark,
   `tools.call`).
+  **Review of #78 (Claude Opus 5.5, high): `/j /x` is off the record, everywhere.** Found: a chat message `/j /x
+  secret` was, on main, a `/j` note whose words were `/x secret` (a live privacy bug: the hook, the conversation
+  writer, the privacy pass and the sweep read `/x` only at the start of the whole message, then stripped `/j`); and
+  with the floor alone, the floor raised on it inside the conversation writer's and the sweep's batch, every tick, so
+  nothing after it was ever written. Decided: (a) `capture.opt_out` reads through a leading `/j` (`/j /x …` is `/x
+  …`; a later line `/j /x …` counts for `opt_out_inside`), so every reader agrees with the floor by construction:
+  `inbound`, the privacy pass (`row_marked`; and a bare `/j /x` on the busy path starts a window), the writer's
+  `classify`, the sweep, `actions.refuse` on the faces and `stored_opener`. **A bare `/j /x` opens the window as a
+  bare `/x` does** (consistency: `/j` means keep, `/x` means don't, and the more private reading wins): the hook
+  records the window and rewrites the message to the bare opt-out command, so the platform runs `/x` and its answer,
+  not `/j`'s usage. (b) The writer (`_Threads._place`, with the check before any copy is kept in `_Writer.his` and
+  `new_note`) and the sweep (`run`, around `reconcile`) catch `capture.OffRecord` per message: that message is dropped
+  as off the record (its hook copies go, her answer to it stays out; the sweep logs its id, never its words) and the
+  batch, the cursor and the watermark go on. (c) Regression tests in `test_conversations.OffRecordTest` (run on the
+  Hermes adapter and on the fake transcript by `test_fake_transcript`): through the hook, on the busy path, a bare `/j
+  /x`, and the backstop with the floor made stricter than its callers. Also traced: `entries.set_meta` writes his
+  `mood` and `people` labels (typed on the web app), so it is under the floor now through `capture.write_meta` (its
+  one caller; each value and each list item refused), and the route answers a `/x` label with 422 `off-the-record`;
+  the program reply note (`inbound._program_note` → `programs.reply_note`) writes nothing: it is the companion's note
+  in front of his words, which `capture.capture` has already recorded through `record`, under the floor.
 
 - **SHARED-READERS (2026-11-24) — the readers the web app and MCP share live in the core (issue #47).** `mcp/` read
   entries through `serve/` (`serve.api.filter_entries`, `serve.document`, `serve.writes.TEXT_LIMIT`), so the MCP face

@@ -510,6 +510,9 @@ def _meta_values(body: dict) -> dict[str, str | None]:
 def meta_patch(req: Request):
     body = req.json()
     changes = _meta_values(body)
+    for key in ("mood", "people"):   # his labels: the refusals every face has (a /x one is 422 off-the-record)
+        for item in body.get(key) or ():
+            _his_words(req, item)
     seen = body.get("mtime")
     if seen is not None and (isinstance(seen, bool) or not isinstance(seen, (int, float))):
         raise HTTPError(400, "bad-request", "mtime must be the number the entry was read with")
@@ -518,7 +521,7 @@ def meta_patch(req: Request):
         if seen is not None and abs(path.stat().st_mtime - float(seen)) > 1e-6:
             raise HTTPError(409, "mtime", "the entry changed since you read it; reload it")
         try:
-            entries.set_meta(path, changes)
+            capture.write_meta(req.cfg, path, changes)
         except ValueError as e:
             raise HTTPError(409, "not-writable", str(e)) from None
         mtime = path.stat().st_mtime

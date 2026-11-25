@@ -4,7 +4,8 @@ Every caller refuses off-the-record words before it writes and decides what to a
 faces, ``inbound`` and the privacy pass in the chat, ``writes._his_words`` for an edit. Under them, the functions that
 put his words into an entry refuse too, so a caller that forgot writes nothing: ``capture.record`` (every capture,
 chat or face), ``capture.write_words`` (the one caller of ``entries.record_reply``), ``conversations.his_block`` (his
-lines of a conversation) and ``serve.blocks.edit`` (an edit of a block of his). Each is called here directly, as a
+lines of a conversation), ``serve.blocks.edit`` (an edit of a block of his) and ``capture.write_meta`` (his mood and
+people labels: the one caller of ``entries.set_meta``). Each is called here directly, as a
 forgetful caller would. Only the command in the text is the floor's: what falls in a ``/x`` window stays the pass's."""
 import ast
 import hashlib
@@ -110,6 +111,17 @@ class CaptureFloorTest(FloorCase):
 
 
 class ConversationFloorTest(FloorCase):
+    def test_his_meta_labels_refuse(self):
+        """``capture.write_meta`` (the one caller of ``entries.set_meta``): a value, or an item of a ``[a, b]`` list,
+        that starts with the command is refused and the file is left as it was; other labels are written."""
+        path = entries.record_reply(self.cfg.root, {"stem": "2026-10-15-j", "kind": "j", "local_date": "2026-10-15"},
+                                    "a note", NOW, "text", names=NEUTRAL)
+        self.unchanged(lambda text: capture.write_meta(self.cfg, path, {"mood": entries.flow_list(["calm", text])}),
+                       texts=[t for t in OFF if "\n" not in t])
+        self.unchanged(lambda text: capture.write_meta(self.cfg, path, {"people": text}), texts=("/x someone",))
+        capture.write_meta(self.cfg, path, {"mood": entries.flow_list(["calm", "a/x is fine"])})
+        self.assertIn("mood: [calm, a/x is fine]", path.read_text(encoding="utf-8"))
+
     def test_his_block_refuses(self):
         for text in OFF:
             with self.subTest(text=text), self.assertRaises(capture.OffRecord):
@@ -153,6 +165,9 @@ class OneWriterTest(unittest.TestCase):
 
     def test_record_reply_has_one_caller(self):
         self.assertEqual(self.callers("record_reply"), ["capture.py:write_words"])
+
+    def test_his_meta_labels_have_one_writer(self):
+        self.assertEqual(self.callers("set_meta"), ["capture.py:write_meta"])
 
     def test_his_words_in_a_conversation_go_through_his_block(self):
         self.assertEqual(self.callers("append_conversation"), ["conversations.py:_append"])

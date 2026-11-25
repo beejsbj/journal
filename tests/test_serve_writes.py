@@ -514,6 +514,15 @@ class InjectionTest(WriteCase):
                 self.refused("PATCH", "/api/v1/entries/2026-10-14-evening/meta", {"people": [f"a{sep}b"]})
         self.assertEqual(self.entry("2026-10-14-evening"), before)
 
+    def test_a_mood_or_person_label_that_starts_with_x_is_off_the_record(self):
+        """His labels are his words: a /x one is refused as on every surface (422 off-the-record), nothing saved."""
+        before = self.entry("2026-10-14-evening")
+        for body in ({"mood": ["calm", "/x tired of it"]}, {"people": ["/x someone"]}, {"mood": ["/x"]}):
+            with self.subTest(body=body):
+                got = self.refused("PATCH", "/api/v1/entries/2026-10-14-evening/meta", body, want=422)
+                self.assertEqual(got["error"], "off-the-record")
+        self.assertEqual(self.entry("2026-10-14-evening"), before)
+
     def test_set_meta_itself_refuses_every_line_separator(self):
         from journal import entries
         path = self.cfg.root / "2026-10-14-evening.md"

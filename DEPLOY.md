@@ -16,7 +16,7 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
-## X-FLOOR — `/x` refused at the bottom of the write path (2026-11-24; hook, tick and serve side; **gateway restart required**; no config or state change; not urgent)
+## X-FLOOR — `/x` refused at the bottom of the write path; `/j /x` off the record (2026-11-24; hook, tick and serve side; **gateway restart required**; no config or state change)
 
 **What changes.** Defence in depth (issue #46): the functions that put his words into an entry refuse off-the-record
 words themselves, under every caller's own refusal: `capture.record` (every capture, chat or face),
@@ -25,16 +25,23 @@ into an entry with no ledger record), `conversations.his_block` (his lines of a 
 (an edit of his block, which now takes `cfg`). Words that start with the opt-out command, or have a line that does,
 raise `capture.OffRecord` (`blocks.Refused` 422 `off-the-record` for an edit) before anything is written. No caller
 reaches it today: the privacy pass, `inbound`, `actions.refuse` and `writes._his_words` refuse first and still say
-why. DECISIONS.md, X-FLOOR.
-**Side and restart.** `capture.py` and `conversations.py` are loaded by the gateway (CLAUDE.md's import check lists
-both), so the hook side keeps the old code until `hermes gateway restart`; ride the next gateway window with the pin
-move (nothing breaks meanwhile: the callers' own refusals are unchanged). The tick runs it from its next run. Serve
+why. **And `/j /x` is off the record** (review of #78): on the code before this, a chat message `/j /x …` was saved
+as a `/j` note holding `/x …`; now every reader takes it as `/x …` (`capture.opt_out` reads through a leading `/j`),
+a bare `/j /x` opens a window as a bare `/x` does, his mood and people labels are refused with `/x` too
+(`capture.write_meta`), and the conversation writer and the sweep drop a message the floor refuses alone, never
+stalling their batch. DECISIONS.md, X-FLOOR.
+**Side and restart.** `capture.py`, `conversations.py`, `inbound.py` and `sweep.py` are loaded by the gateway (CLAUDE.md's
+import check lists them; the privacy pass reads `capture.opt_out`), so the hook side keeps the old code until
+`hermes gateway restart`, and **the restart is required**: until then the hook still saves `/j /x …` as a note. Ride
+the next gateway window with the pin move, or an earlier one. The tick runs it from its next run. Serve
 side (`serve/blocks.py`, `serve/writes.py`): `uv tool install --force` at the merge sha and `systemctl --user restart
 journal-serve`.
 **First checks.**
 - After the restart, the gateway's log has no `journal` hook exception, and a reply to a prompt is captured as before.
 - `journal doctor` is as before; the next tick's log has no `OffRecord` line.
-- In the web app, editing one of his blocks saves; an edit to `/x …` is refused, as before.
+- In the web app, editing one of his blocks saves; an edit to `/x …` is refused, as before; a mood label `/x …` is
+  refused (422) and a plain one saves.
+- `journal status` after a tick: the sweep's and the conversation cursor's times move on as before.
 **Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
 previous sha), `hermes gateway restart`, and serve's `uv tool install --force` at the previous sha with its restart.
 Nothing to undo in state.

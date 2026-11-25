@@ -198,6 +198,28 @@ def write_words(cfg: Config, prompt: dict, text: str, at: datetime, source: str,
     return entries.record_reply(cfg.root, prompt, text, at, source, audio, cfg.names, meta, practice, images)
 
 
+def write_meta(cfg: Config, path: Path, changes: dict[str, str | None]) -> None:
+    """The one caller of ``entries.set_meta``, which writes his front-matter fields (``mood``, ``people``: labels he
+    types on a face; ``starred``) and takes no config: ``refuse_off_record`` first, on each value and on each item of
+    a ``[a, b]`` list (an item holds no comma: ``writes.MOOD_ITEM``), so a label that starts with the opt-out command
+    is never written (review of #78)."""
+    import json
+    for value in changes.values():
+        if value is None:
+            continue
+        refuse_off_record(cfg, value)
+        if value.startswith("[") and value.endswith("]"):
+            for item in value[1:-1].split(","):
+                item = item.strip()
+                if item.startswith('"'):
+                    try:
+                        item = json.loads(item)
+                    except ValueError:
+                        pass
+                refuse_off_record(cfg, str(item))
+    entries.set_meta(path, changes)
+
+
 def capture(cfg: Config, chat_id: str, reply_to: str | None, text: str, now: datetime,
             source: str = "text", platform_message_id: str | None = None) -> dict | None:
     """Save the message if it is a journal reply. Returns capture info or None."""
@@ -479,11 +501,19 @@ def note_context(cfg: Config, info: dict) -> str:
 
 def opt_out(cfg: Config, text: str) -> str | None:
     """The text after the opt-out command (``conversations.opt_out_prefix``, default ``/x``), "" for the bare
-    command, or None when the message doesn't start with it."""
+    command, or None when the message doesn't start with it. A ``/j`` in front of it changes nothing: ``/j /x …`` is
+    off the record as ``/x …`` is, and a bare ``/j /x`` is a bare ``/x`` (review of #78: read after ``/j`` was
+    stripped, the command was kept as the words of a note). Every reader asks this, so they all agree: the hook, the
+    privacy pass, the conversation writer, the sweep, the faces and the floor (``refuse_off_record``)."""
     from .config import opt_out_prefix
-    prefix = opt_out_prefix(cfg)
-    m = re.match(rf"^\s*{re.escape(prefix)}(?:@\w+)?(?:\s+|$)", text or "", re.I)
-    return (text or "")[m.end():] if m else None
+    command = re.compile(rf"^\s*{re.escape(opt_out_prefix(cfg))}(?:@\w+)?(?:\s+|$)", re.I)
+    text = text or ""
+    m = command.match(text)
+    if m:
+        return text[m.end():]
+    after_j = strip_command(text)
+    m = command.match(after_j) if after_j is not None else None
+    return after_j[m.end():] if m else None
 
 
 def opt_out_inside(cfg: Config, text: str) -> bool:
