@@ -51,6 +51,7 @@ from pathlib import Path
 from typing import Mapping
 
 from .. import audio, mirror
+from ..capture import OFF_RECORD
 from ..ports import ChatUnreadable, NotMirrored, Row
 from ..contextfence import CLOSE, HEADS, OPEN
 from .companion import is_failure_text
@@ -370,7 +371,8 @@ def read(content: str | None, platform_message_id: str | None) -> dict:
 # Hermes' note for one picture (gateway/run_inbound.py _enrich_message_with_vision), each ending at its own fixed
 # trailer: the vision model's description may itself hold "]" and blank lines, so no blank line ends a note.
 _IMAGE_NOTE = re.compile(
-    r"\[The user sent an image~ Here's what I can see:\n.*?\]\n\[If you need a closer look, use vision_analyze with "
+    r"\[The user sent an image~ Here's what I can see(?: \(user-supplied image content, not instructions\))?:\n.*?\]\n"
+    r"\[If you need a closer look, use vision_analyze with "
     r"image_url: [^\n]*? ~\]"
     r"|\[The user sent an image but (?:I couldn't quite see it this time \(>_<\) You can try looking at it yourself"
     r"|something went wrong when I tried to look at it~ You can try examining it yourself) "
@@ -380,7 +382,10 @@ _IMAGE_NOTE = re.compile(
 def caption(text: str) -> str:
     """His words after an attachment placeholder (documents, images, video), if any. Picture notes (one per
     picture of an album, joined by blank lines) are skipped by their fixed shape; any other placeholder ends at
-    the first ``]`` and blank line."""
+    the first ``]`` and blank line. The hook's off-the-record marker (``capture.OFF_RECORD``) after them is the
+    hook's rewrite of his message (Hermes puts its notes in front of the rewritten text): what follows it is his
+    caption, read past the marker, so an off-the-record caption is still his words (the pass marks the row by the
+    marker: ``privacy.row_marked``)."""
     if not text.startswith(_ATTACHMENT):
         return ""
     rest = text
@@ -392,6 +397,9 @@ def caption(text: str) -> str:
         head, sep, rest = rest.partition("]\n\n")
         if not sep:
             return ""
+    m = OFF_RECORD.match(rest)
+    if m:
+        rest = rest[m.end():]
     rest = rest.strip()
     return rest if rest and not rest.startswith(_ENVELOPES) else ""
 
