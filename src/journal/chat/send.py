@@ -14,6 +14,7 @@ from .. import channel, ledger, mirror, today
 from ..alert import Alert
 from ..config import Config
 from ..ports import ChannelError, Keyboard
+from .deliver import Delivery, Mirror, deliver
 from .fold import FOLD_STATE
 
 SEND_ATTEMPTS = 3
@@ -84,21 +85,29 @@ def send_prompt(cfg: Config, record: dict, log: list[str], *, retry=None, refold
     that, ``refold_bare(old)``'s; a platform that cannot edit leaves it as sent), appended to
     ``sent.jsonl`` and mirrored into the companion's chat (``label``: what was sent, default "the <kind> prompt").
     Practices use it through ``send_due``; program phases and one-off interrupts will too."""
-    pid, kind, names = record["id"], record["kind"], cfg.names
+    pid = record["id"]
     channel.stamp(cfg, record)
     chat = cfg.channel()
-    try:
-        try:
-            record["message_id"] = chat.send(cfg.chat_id, record["html"], keyboard=keyboard)
-        except ChannelError as e:
-            if retry is None:
-                raise
-            log.append(f"{pid}: send failed ({e}); retrying with the plain opener")
-            record.update(retry())
-            record["message_id"] = chat.send(cfg.chat_id, record["html"], keyboard=keyboard)
-    except Exception as e:
-        count_send_failure(cfg, record, e, log)
-        return False
+
+    def plain(e: ChannelError) -> str:  # the send failed: once more at once, with the plain opener
+        log.append(f"{pid}: send failed ({e}); retrying with the plain opener")
+        record.update(retry())
+        return record["html"]
+    d = deliver(cfg, record["html"], log, chat=chat, catch=(Exception,), fallback=None if retry is None else plain,
+                keyboard=keyboard, record=lambda d: _account(cfg, record, d, log, refold, refold_bare, label))
+    return d.error is None
+
+
+def _account(cfg: Config, record: dict, d: Delivery, log: list[str], refold, refold_bare,
+             label: str | None) -> Mirror | None:
+    """``send_prompt``'s account of one delivery (``deliver``'s ``record``): a failure counted on the record
+    (``count_send_failure``); a delivery stored in the ledger (a re-send, an attach), stamped for the today block,
+    appended to ``sent.jsonl``, the replaced message refolded; and what the companion is told."""
+    pid, kind, names, chat = record["id"], record["kind"], cfg.names, d.chat
+    if d.error is not None:
+        count_send_failure(cfg, record, d.error, log)
+        return None
+    record["message_id"] = d.message_id
     record["sent_at"] = datetime.now(timezone.utc).isoformat()
     record["sent_at_local"] = datetime.now(timezone.utc).astimezone(cfg.tz).strftime("%H:%M %Z")
     replaced = None
@@ -146,8 +155,7 @@ def send_prompt(cfg: Config, record: dict, log: list[str], *, retry=None, refold
     log.append(f"sent {pid} (opener: {record.get('opener_source')}, wove {len(record.get('asked') or [])} questions)")
     what = (f"{names.companion} sent {label or f'the {kind} prompt'}{' again' if replaced else ''} at "
             f"{mirror.stamp(cfg, datetime.fromisoformat(record['sent_at']))}")
-    mirror.to_chat(cfg, what, record["plain_text"], log, ref=("prompts", pid, None))
-    return True
+    return Mirror(what, record["plain_text"], ("prompts", pid, None))
 
 
 ATTACHED = ("message_id", "sent_at", "sent_at_local", "chat_id", "platform")  # what a delivery gives a face's record

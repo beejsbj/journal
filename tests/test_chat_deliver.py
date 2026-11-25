@@ -108,3 +108,70 @@ class DeliverTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Spy:
+    """Wraps ``deliver`` where a sender calls it, recording each call, and lets the real one run."""
+
+    def __init__(self):
+        self.calls = []
+
+    def __call__(self, cfg, html, log, **kw):
+        self.calls.append((html, kw))
+        return deliver(cfg, html, log, **kw)
+
+
+class ConversionCase(unittest.TestCase):
+    """Each kind of send goes through ``deliver``: one call per message, with the keywords it always sent."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.cfg = make_cfg(Path(self.tmp.name))
+        self.events: list = []
+        self.chat = FakeChat(self.events)
+        self.told: list = []
+        for p in (mock.patch.object(type(self.cfg), "channel", lambda cfg: self.chat),
+                  mock.patch.object(mirror, "to_chat", lambda cfg, what, body, log, **k: (
+                      self.events.append("mirror"), self.told.append((what, body, k.get("ref"))))[-1] and None)):
+            p.start()
+            self.addCleanup(p.stop)
+
+    def spy(self, module):
+        s = Spy()
+        p = mock.patch.object(module, "deliver", s)
+        p.start()
+        self.addCleanup(p.stop)
+        return s
+
+
+class PromptTest(ConversionCase):
+    def record(self):
+        return {"id": "2026-10-14-evening", "kind": "evening", "local_date": "2026-10-14",
+                "scheduled": "2026-10-14T17:00:00+00:00", "chat_id": self.cfg.chat_id, "html": "<b>Evening</b>",
+                "plain_text": "Evening"}
+
+    def test_a_prompt_is_one_delivery(self):
+        from journal.chat import send
+        from journal import compose, ledger
+        spy, log = self.spy(send), []
+        self.assertTrue(send.send_prompt(self.cfg, self.record(), log, keyboard=compose.KEYBOARD))
+        self.assertEqual(len(spy.calls), 1)
+        self.assertEqual(self.chat.sends, [(self.cfg.chat_id, "<b>Evening</b>", {"keyboard": compose.KEYBOARD})])
+        self.assertEqual(self.events, ["send", "mirror"])
+        self.assertEqual(self.told[0][1:], ("Evening", ("prompts", "2026-10-14-evening", None)))
+        p = ledger.find(ledger.snapshot(self.cfg.ledger_path), "2026-10-14-evening")
+        self.assertEqual(p["message_id"], "701")
+
+    def test_a_failed_prompt_falls_back_once_then_is_counted(self):
+        from journal.chat import send
+        from journal import ledger
+        self.chat.fail = [ChannelError("can't parse entities"), ChannelError("Bad Gateway")]
+        log = []
+        plain = {"html": "<b>plain</b>", "opener": "plain", "opener_source": "plain:send-retry"}
+        self.assertFalse(send.send_prompt(self.cfg, self.record(), log, retry=lambda: plain))
+        self.assertEqual([s[1] for s in self.chat.sends], ["<b>Evening</b>", "<b>plain</b>"])
+        self.assertEqual(self.told, [])  # nothing delivered, nothing told
+        p = ledger.find(ledger.snapshot(self.cfg.ledger_path), "2026-10-14-evening")
+        self.assertEqual((p["send_attempts"], p["send_error"]), (1, "Bad Gateway"))
+        self.assertEqual(log[0], "2026-10-14-evening: send failed (can't parse entities); retrying with the plain opener")
