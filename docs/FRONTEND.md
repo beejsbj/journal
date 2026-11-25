@@ -87,6 +87,11 @@ composer's own (`useCompose`). `/design` (linked from Settings) draws every part
   left out when `/today` says `chat: false` (a journal with no chat).
 - Program card for each active run: "Session 3/10 · The Identity Construction Tracer · Phase 2/5 open since
   Sunday", buttons *Continue* (opens the Run screen), *Pause*.
+- **A line for today** (issue #82): under the week strip, one ruled line in his roman, Enter (or *Put down*) to put it
+  down. It does exactly what `/j` does in the chat: POST `/entries` with the text and no practice (`actions.note`), a
+  note of its own stamped now; "Saved as a note. Open it" for a few seconds after. The composer's rules hold
+  (`useCompose`: the draft kept in the tab, a retry the same write, the offline line); words the server refuses (`/x`,
+  an engine line) stay in the box with its reason and no Retry. The write room stays the place for longer pieces.
 - Scheduled one-offs today (session-10 interrupts) as a quiet list with times.
 - "Carry forward" quote from the latest reflection, linking to it.
 - Tasks due today (plain lines from the tick cache; read-only; absent when the source is off).
