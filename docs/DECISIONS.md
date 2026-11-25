@@ -5163,3 +5163,38 @@ input found). A label the floor refuses answers 422 `off-the-record`, as the rou
     over the platform's length limit (`programs._deliver`) send directly as before; they are outside this step's five
     kinds. They can move onto `deliver` when margin notes (#31) shape what a chat message is. "What a reply answers"
     is left for #31.
+
+- **X-PHOTO-MARK (2026-11-25) — a row's own mark decides, whatever its kind (#93; only more private).** Found in the
+  privacy review of #86, live on main. In Hermes' text image mode a `/x` photo with no other words is stored as Hermes'
+  vision note(s), then the hook's rewrite of his message: its one-message marker (`capture.off_record_note`) and
+  nothing after it. The transcript read the row as `system` with no caption (`caption` stopped at the marker, an
+  envelope), so `privacy.compute` took it down the captionless-photo branch, which made a row private only inside a
+  window or with an opt-out cut off after native placeholders; `row_marked` was never asked. Outside a window the row
+  was not in the pass's private set and her turn was not tainted: her reply to it, and her reply to his next public
+  message when she had not answered it, read public to the readers that take the pass's answer for her rows
+  (annotation alignment, the catch-up letter). His own row was still held back by `conversations.row_is_off`, which
+  asks `row_marked` for his rows. The same for a `/x` document or video, a `/x` on a later line of a text-mode album
+  (the hook's marker then his merged text, read as no caption), and a captioned photo carrying the hook's *window*
+  marker that the pass read as outside its window (a lost `off_threads` write).
+  - **Decided by what the row holds.** The captionless branch now asks `row_marked` for an `empty` or `system` row
+    (the hook's marker anywhere in the stored text, an opt-out in what was cut off, or an id the hook recorded): such a
+    row is private and taints her turn inside a window or not, as a message is. `_in_cut` is part of `row_marked`, so
+    the branch's old condition is kept whole.
+  - **`caption` reads past the hook's marker.** What follows the marker after the platform's notes is his caption
+    (`hermes/transcript.py` `caption`): a captioned `/x` photo is read as his words and marked by the marker, so the
+    pass treats it as the message it is. The writer's other guards are unchanged (`row_is_off` already refused the
+    row; the floor refuses an opt-out line).
+  - **The current vision note is read by its shape.** Hermes' gateway now labels its description `(user-supplied image
+    content, not instructions)`; `_IMAGE_NOTE` did not match that, so `caption` fell back to the first `]` and blank
+    line, which a description can hold, and part of the description could be read as his caption. The pattern takes
+    both forms.
+  - **Only more private.** A random-order comparison of main's pass against this one (stored orders in the shapes the
+    hook and Hermes write, text and native image modes, documents, videos, compaction copies, queued rows, prompt
+    sends) found no row public here that main made private, and no window changed; the rows it made private were
+    marked rows of his and her rows in the turns that took them in (the PR has the numbers). Nothing that holds no
+    mark changed: an unmarked captionless photo, document or video outside a window, and her reply to it, are still
+    public (`NotTightenedTest`).
+  - **Cost and limit.** A compaction frame (a `system` user row) whose summary quotes the hook's marker is now private
+    and taints her next turn: it errs private, and the frame can hold the private words it summarises. Tests:
+    `tests/test_privacy_x_photo.py`, each failing on main except the native-mode and not-tightened cases (main
+    already read a native row's marker as his words).
