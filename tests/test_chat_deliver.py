@@ -323,5 +323,42 @@ class CatchUpTest(ConversionCase):
                          ("waiting", recovery.SEND_ATTEMPTS, "Bad Gateway"))
 
 
+class ProgramSummaryTest(ConversionCase):
+    def send_summary(self, log):
+        from datetime import datetime, timezone
+        from journal import compose, programs
+        prog = mock.MagicMock(id="fix-life", situational=False)
+        self.run_ = {"id": "r1", "program": "fix-life", "sessions": {"1": {"status": "completed"}}}
+        with mock.patch.object(compose, "summary_html", lambda *a: "<b>summary</b>"):
+            return programs._send_summary(self.cfg, prog, self.run_, 1, datetime(2026, 10, 14, 9, 0, tzinfo=timezone.utc),
+                                          log, "Done.", "You named three things.", "", "Next: session 2.")
+
+    def test_a_summary_is_one_delivery(self):
+        from journal import compose, programs
+        spy, log = self.spy(programs), []
+        self.assertTrue(self.send_summary(log))
+        self.assertEqual(len(spy.calls), 1)
+        self.assertEqual(self.chat.sends, [(self.cfg.chat_id, "<b>summary</b>", {"keyboard": compose.REMOVE_KEYBOARD})])
+        self.assertEqual(self.events, ["send", "mirror"])
+        self.assertEqual(self.told[0][1:], ("Done.\n\nYou named three things.\n\nNext: session 2.", None))
+        self.assertIn("sent the summary of fix-life session 1 at", self.told[0][0])
+        self.assertEqual(log, [])
+        import json
+        sess = json.loads(programs.run_path(self.cfg, "fix-life", "r1").read_text())["sessions"]["1"]  # (saved)
+        self.assertEqual(sess["summary_message_id"], "701")
+
+    def test_a_failed_summary_counts_an_attempt_and_tells_nothing(self):
+        from journal import programs
+        self.chat.fail = [ChannelError("Bad Gateway")]
+        log = []
+        self.assertFalse(self.send_summary(log))
+        self.assertEqual(self.told, [])
+        self.assertEqual(log, [f"r1: session 1 summary not sent (Bad Gateway); attempt 1/{programs.SUMMARY_ATTEMPTS}"])
+        sess = self.run_["sessions"]["1"]
+        self.assertEqual((sess["summary_attempts"], sess["summary_error"]), (1, "Bad Gateway"))
+        self.assertNotIn("summary_sent_at", sess)
+
+
+
 if __name__ == "__main__":
     unittest.main()
