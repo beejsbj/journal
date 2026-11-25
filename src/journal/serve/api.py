@@ -130,8 +130,7 @@ def _int(req: Request, name: str, default: int, lo: int, hi: int) -> int:
 
 
 def _range(req: Request, default_days: int) -> tuple[date, date]:
-    today_local = req.now.astimezone(req.cfg.tz).date()
-    to = _date(req, "to", today_local)
+    to = _date(req, "to", slots.journal_day(req.cfg, req.now))  # (by default up to the journal day, as Today)
     start = _date(req, "from", to - timedelta(days=default_days - 1))
     if start > to:
         raise HTTPError(400, "bad-request", "from is after to")

@@ -593,7 +593,7 @@ class ClosesTest(Base):
         due = reflect.due(self.cfg, ledger.snapshot(self.cfg.ledger_path), at(23, 45))
         self.assertIn(("reflection", WED.date(), "annotated"), due)
         rows = {n: d for n, s, d in status.doctor(self.cfg, token=False)}
-        self.assertEqual(rows["day reflection"], "after the pages entry is annotated, fallback 04:00 the next day")
+        self.assertEqual(rows["day reflection"], "once the day has ended, after the pages entry is annotated, fallback 04:00 the next day")
 
     def test_with_nothing_closing_the_day_only_the_fallback_writes_it(self):
         fork = library.fork(self.cfg, "evening")

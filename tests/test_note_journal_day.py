@@ -106,6 +106,85 @@ class NoteDayTest(unittest.TestCase):
         self.assertIn("Fri 16 Oct 2026, 04:00", today.render(self.cfg, ist(16, 4, 0)))
 
 
+class HerNoteDayTest(unittest.TestCase):
+    """Her own note with no date given (``capture.add_companion_note``) follows the journal day as his do."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.cfg = make_cfg(Path(self.tmp.name))
+
+    def test_her_note_at_0030_joins_his_note_of_last_night(self):
+        capture.capture_note(self.cfg, "before midnight", ist(15, 23, 50), "text", "580")
+        path = capture.add_companion_note(self.cfg, "a thought for him", ist(16, 0, 30))
+        self.assertEqual(Path(path).name, "2026-10-15-j.md")
+        self.assertEqual(sorted(p.name for p in self.cfg.root.glob("*.md")), ["2026-10-15-j.md"])
+        self.assertIn("a thought for him", Path(path).read_text())
+
+    def test_her_note_at_0400_is_the_new_days(self):
+        capture.capture_note(self.cfg, "before midnight", ist(15, 23, 50), "text", "581")
+        path = capture.add_companion_note(self.cfg, "a thought for him", ist(16, 4, 0))
+        self.assertEqual(Path(path).name, "2026-10-16-note.md")
+
+    def test_a_date_given_is_kept(self):
+        capture.capture_note(self.cfg, "on the 16th", ist(16, 9, 0), "text", "582")
+        path = capture.add_companion_note(self.cfg, "for the 16th", ist(16, 0, 30), local_date="2026-10-16")
+        self.assertEqual(Path(path).name, "2026-10-16-j.md")
+
+
+class TodayHeaderTest(unittest.TestCase):
+    """Between midnight and ``day_ends_at`` the today block names the journal day and the clock's day apart, and
+    says which day the tasks (the calendar's) are due."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.cfg = make_cfg(Path(self.tmp.name))
+
+    def tasks(self, day, at):
+        today._write_cache(self.cfg, {"at": at.isoformat(), "tasks": {
+            "count": 1, "names": ["call the bank"], "date": day, "at": at.isoformat()}})
+
+    def test_after_midnight_both_days_are_named(self):
+        self.tasks("2026-10-16", ist(16, 0, 30))
+        data = today.collect(self.cfg, ist(16, 0, 35).astimezone(timezone.utc))
+        self.assertEqual((data["date"], data["calendar_date"]), ("2026-10-15", "2026-10-16"))
+        self.assertEqual(today.header_of(data), "## Journal: today — journal day Thu 15 Oct 2026 · now Fri 00:35 IST")
+        self.assertIn("- tasks due Fri: 1 — call the bank", today.lines_of(data))
+
+    def test_in_the_day_the_header_is_as_before(self):
+        self.tasks("2026-10-16", ist(16, 9, 0))
+        data = today.collect(self.cfg, ist(16, 9, 12).astimezone(timezone.utc))
+        self.assertEqual(today.header_of(data), "## Journal: today — Fri 16 Oct 2026, 09:12 IST")
+        self.assertIn("- tasks due today: 1 — call the bank", today.lines_of(data))
+
+    def test_yesterdays_task_list_is_not_shown_after_midnight(self):
+        """The tasks stay keyed to the calendar date (a task is due by the calendar): at 00:35 Friday, Thursday's
+        cached list is not Friday's."""
+        self.tasks("2026-10-15", ist(15, 23, 0))
+        data = today.collect(self.cfg, ist(16, 0, 35).astimezone(timezone.utc))
+        self.assertIsNone(data["tasks"])
+
+    def test_a_block_without_the_calendar_date_reads_as_before(self):
+        """(an older dict, e.g. a pinned fixture: one day, as it always was)"""
+        data = {"date": "2026-10-15", "time": "09:12", "timezone": "IST"}
+        self.assertEqual(today.header_of(data), "## Journal: today — Thu 15 Oct 2026, 09:12 IST")
+
+
+class RangeDefaultTest(unittest.TestCase):
+    """serve's ``from``/``to`` default ends on the journal day, as Today does."""
+
+    def test_to_defaults_to_the_journal_day(self):
+        from types import SimpleNamespace
+        from journal.serve import api
+        with tempfile.TemporaryDirectory() as d:
+            cfg = make_cfg(Path(d))
+            req = SimpleNamespace(cfg=cfg, now=ist(16, 0, 30).astimezone(timezone.utc), query={})
+            self.assertEqual(api._range(req, 14), (date(2026, 10, 2), date(2026, 10, 15)))
+            req.now = ist(16, 4, 0).astimezone(timezone.utc)
+            self.assertEqual(api._range(req, 14)[1], date(2026, 10, 16))
+
+
 class AutoNoteDayTest(tc.Base):
     """A chat thread that answers no prompt becomes a note: one that starts at 00:30 IST is last night's."""
 

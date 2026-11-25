@@ -376,7 +376,9 @@ def collect(cfg: Config, now: datetime, stems: bool = False, with_standing: bool
 
     ``date`` and ``weekday`` are the journal day (``config.journal_day``: before ``windows.day_ends_at`` it is still
     last night's), and the practices, entries and reflection are that day's, so a note put down at 00:30 is among
-    *Written today* (issue #82); ``time`` is the clock's.
+    *Written today* (issue #82); ``time`` and ``calendar_date`` are the clock's. The tasks stay the calendar date's
+    (a task is due by the calendar, and the tick caches it so): between midnight and ``day_ends_at`` the block names
+    both days (``header_of``) and says which day the tasks are due (``lines_of``).
 
     Keys always present: ``date``, ``weekday``, ``time``, ``timezone``, ``location``, then one per source
     (``practices`` as ``{rows, open}``, ``program``, ``entries``, ``reflection``, ``tasks``, ``weather``), each
@@ -388,7 +390,7 @@ def collect(cfg: Config, now: datetime, stems: bool = False, with_standing: bool
     now_local = now.astimezone(cfg.tz)
     jday = journal_day(cfg, now)   # (issue #82: until ``windows.day_ends_at`` Today is still last night's day)
     wants = wanted(cfg)
-    out = {"date": jday.isoformat(), "weekday": jday.strftime("%a"),
+    out = {"date": jday.isoformat(), "weekday": jday.strftime("%a"), "calendar_date": now_local.date().isoformat(),
            "time": now_local.strftime("%H:%M"), "timezone": now_local.strftime("%Z"), "location": cfg.location or None,
            "practices": {"rows": [], "open": []}, "program": None, "entries": [], "reflection": None,
            "tasks": None, "weather": None}
@@ -480,7 +482,8 @@ def lines_of(data: dict) -> list[str]:
     if tasks:
         names = [_clip(n, TASK_CHARS) for n in tasks["names"]]
         extra = tasks["count"] - len(names)
-        lines.append(f"- tasks due today: {tasks['count']} — " + "; ".join(names) + (f"; +{extra} more" if extra > 0 else ""))
+        clock = _other_day(data)  # (after midnight, the tasks are the new calendar day's: say which)
+        lines.append(f"- tasks due {clock.strftime('%a') if clock else 'today'}: {tasks['count']} — " + "; ".join(names) + (f"; +{extra} more" if extra > 0 else ""))
     if data.get("weather"):
         lines.append(f"- weather: {data['weather']}")
     return lines
@@ -494,9 +497,27 @@ def _when_word(ref_date: str, today: str) -> str:
     return {0: "today's", 1: "yesterday's"}.get(gap, f"the {date.fromisoformat(ref_date).strftime('%a')}")
 
 
+def _other_day(data: dict) -> datetime | None:
+    """The calendar date, when it is not the journal day ``data`` names (between midnight and ``day_ends_at``)."""
+    clock = data.get("calendar_date")
+    if not clock or clock == data["date"]:
+        return None
+    try:
+        return datetime.strptime(clock, "%Y-%m-%d")
+    except ValueError:
+        return None
+
+
 def header_of(data: dict) -> str:
+    """The block's first line: the day and the time. Between midnight and ``windows.day_ends_at`` the journal day is
+    still last night's, so both are named ("journal day Thu 15 Oct 2026 · now Fri 00:35"), never the journal day with
+    the clock's time as if they were one moment."""
     d = datetime.strptime(data["date"], "%Y-%m-%d")
     where = f" · {data['location']}" if data.get("location") else ""
+    clock = _other_day(data)
+    if clock:
+        return (f"## Journal: today — journal day {d.strftime('%a %-d %b %Y')} · now {clock.strftime('%a')} "
+                f"{data['time']} {data['timezone']}{where}")
     return f"## Journal: today — {d.strftime('%a %-d %b %Y')}, {data['time']} {data['timezone']}{where}"
 
 

@@ -26,7 +26,17 @@ latest reflection) read last night's day until `day_ends_at`; the block's "a new
 `day_ends_at` instead of midnight, and `journal status`' block count is per journal day. The day reflection, `GET
 /days` and the Entries list key on the entry's date, so they read the new notes on the same day. **No file is moved**:
 a note filed by the calendar date before this change stays under that date. DECISIONS.md, NOTES-JOURNAL-DAY.
-**Side and restart.** `config.py`, `capture.py`, `conversations.py`, `today.py`, `slots.py` and `reflect.py` are all
+**On review (the owner's decision, 2026-11-25): the day reflection waits for the journal day to end.** It is no
+longer written when the evening entry is annotated (~22:40) but once `day_ends_at` has passed (04:00 by default), so
+it reads the after-midnight notes; the week review likewise waits for its Sunday to end (Monday 04:00). Both are now
+sent **silently** (they come in the night). A reply to a reflection (a reply to its message) is never filed as the
+answer to the morning prompt that may be open by then (`capture.match`, the sweep and the conversation writer leave it
+to the writer, which files it as a reply to the reflection). Her own note with no date follows the journal day. The
+today block names both days between midnight and `day_ends_at` ("journal day Thu 15 Oct 2026 · now Fri 00:35"), and
+says which day the tasks (still the calendar date's) are due. `GET /today` gains `calendar_date`. The first night after
+the deploy: a reflection already written that evening is unaffected; the next one comes at 04:00.
+**Side and restart.** `config.py`, `capture.py`, `conversations.py`, `today.py`, `slots.py`, `reflect.py`, `sweep.py`,
+`ledger.py` and `status.py` are all
 loaded by the gateway at import (CLAUDE.md's import check lists them), so **the restart is required**: until it, a
 `/j` the hook saves and the today block keep the calendar date while the tick's auto notes and the faces use the
 journal day. Ride the next gateway window with the pin move. The tick runs it from its next run. Serve side
@@ -37,7 +47,9 @@ journal-serve`.
 - Between midnight and `day_ends_at` (or with `JOURNAL_CONFIG` pointing at a copy whose `windows.day_ends_at` is a
   few minutes ahead, on a temporary root): a note from the web app lands as `<yesterday>-j…md`, and Today's date and
   *Written today* show yesterday with that note in it. After `day_ends_at`, Today shows the new day.
-- `journal doctor` is as before.
+- `journal doctor`'s day reflection row reads "once the day has ended, after the evening entry is annotated, …".
+- The next morning: `journal status` shows the day reflection written after `day_ends_at` (not at ~22:40), sent
+  silent; the morning prompt goes out as before.
 **Rollback.** `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the
 previous sha), `hermes gateway restart`, and serve's `uv tool install --force` at the previous sha with its restart.
 Nothing to undo in state: notes filed under last night's date stay there, as any entry does.
