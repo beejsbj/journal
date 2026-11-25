@@ -413,7 +413,8 @@ describe("Library", () => {
   it("groups into Situational, Daily and Frameworks", () => {
     const items = arr(LibraryItem)(fixtures.library);
     const groups = groupLibrary([...items, { ...items[0]!, id: "prep", kind: "program", schedule: [] }, { ...items[0]!, id: "free", kind: "practice", schedule: [] }]);
-    expect(groups.map((g) => g.group)).toEqual(["Situational", "Daily", "Frameworks"]);
+    // the three named groups first, then any other a file names (the built-in prompt decks), alphabetically
+    expect(groups.map((g) => g.group)).toEqual(["Situational", "Daily", "Frameworks", "Prompt decks"]);
     expect(groups[2]?.items.map((i) => i.id)).toEqual(["fix-life", "prep"]);   // the packaged program, then ours
     expect(groups[0]?.items.map((i) => i.id)).toContain("free");
   });

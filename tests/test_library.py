@@ -78,8 +78,9 @@ class ParseRenderTest(unittest.TestCase):
 
     def test_the_four_rituals_and_their_ids(self):
         b = library.builtins()
-        self.assertEqual(list(b), ["morning", "evening", "midweek", "weekly"])
-        self.assertEqual(library.builtin_ids(), tuple(b))  # the one list of them: read from the files
+        # the rituals first, by time and day, then the unscheduled prompt decks by id (PROMPT-DECKS)
+        self.assertEqual(list(b), ["morning", "evening", "midweek", "weekly", "check-in", "finitude", "storyworthy"])
+        self.assertEqual(library.builtin_ids(), ("morning", "evening", "midweek", "weekly"))  # read from the files
         self.assertEqual(b["evening"].closes, "day")
         self.assertEqual(b["weekly"].schedule, (library.Slot("20:00", 6),))
         self.assertEqual(b["midweek"].opener["limit"], 900)
@@ -347,7 +348,7 @@ class LoadTest(CleanEnv):
     def test_default_dir_and_builtins_only(self):
         self.assertEqual(self.cfg.practices_dir, self.cfg.state_dir / "practices")
         lib = library.load(self.cfg)
-        self.assertEqual(list(lib.practices), ["morning", "evening", "midweek", "weekly"])
+        self.assertEqual(list(lib.practices), ["morning", "evening", "midweek", "weekly", "check-in", "finitude", "storyworthy"])
         self.assertEqual(lib.problems, [])
         self.assertEqual([p.id for p in library.scheduled(self.cfg)], ["morning", "evening", "midweek", "weekly"])
         self.assertTrue(library.get(self.cfg, "evening").builtin)
@@ -357,12 +358,14 @@ class LoadTest(CleanEnv):
     def test_user_practice_is_added_and_ordered_by_its_slot(self):
         self.write("gratitude.md", GRATITUDE)
         lib = library.load(self.cfg)
-        self.assertEqual(list(lib.practices), ["morning", "gratitude", "evening", "midweek", "weekly"])
+        self.assertEqual(list(lib.practices), ["morning", "gratitude", "evening", "midweek", "weekly",
+                                                "check-in", "finitude", "storyworthy"])
         self.assertEqual(lib.source(lib.get("gratitude")), "user")
         self.assertEqual(lib.source(lib.get("evening")), "builtin")
         self.assertEqual(lib.user_files(), [self.dir / "gratitude.md"])
         self.write("someday.md", GRATITUDE.replace("id: gratitude", "id: someday").replace("schedule.time: 21:30\n", ""))
-        self.assertEqual(list(library.load(self.cfg).practices)[-1], "someday")  # unscheduled last
+        self.assertEqual(list(library.load(self.cfg).practices)[5:],  # the unscheduled last, by id
+                         ["check-in", "finitude", "someday", "storyworthy"])
         self.assertNotIn("someday", [p.id for p in library.scheduled(self.cfg)])
 
     def test_override_replaces_the_whole_built_in(self):
@@ -457,7 +460,7 @@ class LoadTest(CleanEnv):
             lib = library.load(self.cfg)
         finally:
             self.dir.chmod(0o700)
-        self.assertEqual(list(lib.practices), ["morning", "evening", "midweek", "weekly"])
+        self.assertEqual(list(lib.practices), ["morning", "evening", "midweek", "weekly", "check-in", "finitude", "storyworthy"])
         self.assertEqual(lib.problems, [f"{self.dir / 'gratitude.md'}: cannot read: PermissionError"])
 
     def test_duplicate_ids_across_files(self):
@@ -507,7 +510,7 @@ class LoadTest(CleanEnv):
         self.dir.rmdir()
         lib = library.load(self.cfg)
         self.assertEqual(lib.problems, [])
-        self.assertEqual(len(lib.practices), 4)
+        self.assertEqual(len(lib.practices), 7)
 
     def test_validate_file(self):
         good = self.write("gratitude.md", GRATITUDE)
@@ -836,7 +839,7 @@ class DoctorTest(CleanEnv):
     def test_fresh_install(self):
         self.assertEqual(self.rows(), [
             ("practices dir", "ok", f"{self.cfg.practices_dir} will be created (no user practices yet)"),
-            ("library", "ok", "4 practices (4 built-in): morning, evening, midweek, weekly")])
+            ("library", "ok", "7 practices (7 built-in): morning, evening, midweek, weekly, check-in, finitude, storyworthy")])
 
     def test_user_files_and_problems(self):
         from journal import status
@@ -846,8 +849,8 @@ class DoctorTest(CleanEnv):
         (d / "evening.md").write_text("---\nkind: practice\nid: evening\n---\n", encoding="utf-8")
         rows = self.rows()
         self.assertEqual(rows[0], ("practices dir", "ok", f"{d} (1 user practice)"))
-        self.assertEqual(rows[1], ("library", "ok", "5 practices (4 built-in, 1 user): morning, gratitude (user), "
-                                                    "evening, midweek, weekly"))
+        self.assertEqual(rows[1], ("library", "ok", "8 practices (7 built-in, 1 user): morning, gratitude (user), "
+                                                    "evening, midweek, weekly, check-in, finitude, storyworthy"))
         self.assertEqual(rows[2][:2], ("library", "warn"))
         self.assertIn("evening.md: title is required; no questions", rows[2][2])
         self.assertTrue(rows[2][2].endswith("(built-in 'evening' is used)"))
@@ -858,8 +861,8 @@ class DoctorTest(CleanEnv):
         d.mkdir(parents=True)
         (d / "midweek.md").write_text(library.builtins()["midweek"].raw.replace("---\n## 1.", "enabled: false\n---\n## 1."),
                                       encoding="utf-8")
-        self.assertEqual(self.rows()[1], ("library", "ok", "4 practices (3 built-in, 1 user): morning, evening, "
-                                                           "midweek (user, overrides the built-in, disabled), weekly"))
+        self.assertEqual(self.rows()[1], ("library", "ok", "7 practices (6 built-in, 1 user): morning, evening, "
+                                                           "midweek (user, overrides the built-in, disabled), weekly, check-in, finitude, storyworthy"))
 
     def test_a_file_the_parser_once_crashed_on_is_a_warning(self):
         from journal import status

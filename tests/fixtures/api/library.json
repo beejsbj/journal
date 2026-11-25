@@ -515,6 +515,156 @@
     "default_changed": null
   },
   {
+    "id": "check-in",
+    "kind": "practice",
+    "title": "Weekly check-in",
+    "emoji": "",
+    "source": "builtin",
+    "enabled": true,
+    "schedule": [],
+    "closes": null,
+    "annotate": true,
+    "collapse_hours": 6.0,
+    "opener": {
+      "mode": "companion",
+      "shape": "a short opener (max ~900 characters)",
+      "limit": 1100,
+      "plain": "A weekly check-in: how the week felt, not how much got done."
+    },
+    "companion": "a weekly look at moods, not progress; no advice unless asked",
+    "group": "prompt decks",
+    "path": "/package/library/practices/check-in.md",
+    "sections": [
+      {
+        "title": null,
+        "questions": [
+          {
+            "id": "1",
+            "text": "How many days this week did you keep your practice, whatever yours is? How was it when you did, and what got in the way when you didn't?",
+            "pinned": false
+          },
+          {
+            "id": "2",
+            "text": "Did you do one thing this week only for the pleasure of it, on your own? What was it like?",
+            "pinned": false
+          },
+          {
+            "id": "3",
+            "text": "Did anything line up unexpectedly this week: a coincidence, a door that opened?",
+            "pinned": false
+          },
+          {
+            "id": "4",
+            "text": "How did your mood move across the week?",
+            "pinned": false
+          },
+          {
+            "id": "5",
+            "text": "Is there anything else from this week that mattered and wants saying?",
+            "pinned": false
+          }
+        ]
+      }
+    ],
+    "mtime": 1760000000.0,
+    "default_changed": null
+  },
+  {
+    "id": "finitude",
+    "kind": "practice",
+    "title": "Finitude",
+    "emoji": "",
+    "source": "builtin",
+    "enabled": true,
+    "schedule": [],
+    "closes": null,
+    "annotate": true,
+    "collapse_hours": 6.0,
+    "opener": {
+      "mode": "companion",
+      "shape": "a short opener (max ~900 characters)",
+      "limit": 1100,
+      "plain": "A few questions about time running out. Take one; you don't need them all."
+    },
+    "companion": "finitude — what matters, given that time runs out; steady and plain, never morbid; one question is enough",
+    "group": "prompt decks",
+    "path": "/package/library/practices/finitude.md",
+    "sections": [
+      {
+        "title": null,
+        "questions": [
+          {
+            "id": "1",
+            "text": "As best you can tell today, what do you think you're here for?",
+            "pinned": false
+          },
+          {
+            "id": "2",
+            "text": "If your life ended sooner than you expect, what would you regret not having done or said?",
+            "pinned": false
+          },
+          {
+            "id": "3",
+            "text": "Where are you living on a compromise you've stopped noticing?",
+            "pinned": false
+          },
+          {
+            "id": "4",
+            "text": "What are you putting off until some later, better time?",
+            "pinned": false
+          },
+          {
+            "id": "5",
+            "text": "Think of someone who has died. What would they give for the ordinary hour you're in now?",
+            "pinned": false
+          },
+          {
+            "id": "6",
+            "text": "If something you did today were the last time you did it, which would you want to have noticed?",
+            "pinned": false
+          }
+        ]
+      }
+    ],
+    "mtime": 1760000000.0,
+    "default_changed": null
+  },
+  {
+    "id": "storyworthy",
+    "kind": "practice",
+    "title": "Homework for Life",
+    "emoji": "",
+    "source": "builtin",
+    "enabled": true,
+    "schedule": [],
+    "closes": null,
+    "annotate": true,
+    "collapse_hours": 6.0,
+    "opener": {
+      "mode": "companion",
+      "shape": "a short opener (max ~900 characters)",
+      "limit": 1100,
+      "plain": "One moment from today, in a sentence or two."
+    },
+    "companion": "one storyworthy moment from the day, a sentence or two, no more; never turn it into a review",
+    "group": "prompt decks",
+    "path": "/package/library/practices/storyworthy.md",
+    "sections": [
+      {
+        "title": null,
+        "questions": [
+          {
+            "id": "1",
+            "text": "If you had to tell one story from today, which moment would it be? A sentence or two is enough.",
+            "pinned": false
+          }
+        ]
+      }
+    ],
+    "mtime": 1760000000.0,
+    "default_changed": null
+  },
+  {
     "id": "fix-life",
     "kind": "program",
     "title": "Fix your entire life in 1 day",
@@ -547,6 +697,38 @@
     "default_changed": null
   },
   {
+    "id": "five-questions",
+    "kind": "situational",
+    "title": "Five questions",
+    "emoji": "🕰️",
+    "group": "prompt decks",
+    "source": "builtin",
+    "enabled": true,
+    "schedule": [],
+    "closes": null,
+    "sessions": 1,
+    "phases_total": 5,
+    "active_run": null,
+    "mtime": 1760000000.0,
+    "default_changed": null
+  },
+  {
+    "id": "mind-sweep",
+    "kind": "situational",
+    "title": "Mind sweep",
+    "emoji": "🧹",
+    "group": "prompt decks",
+    "source": "builtin",
+    "enabled": true,
+    "schedule": [],
+    "closes": null,
+    "sessions": 1,
+    "phases_total": 4,
+    "active_run": null,
+    "mtime": 1760000000.0,
+    "default_changed": null
+  },
+  {
     "id": "post-session-debrief",
     "kind": "situational",
     "title": "Post-session debrief",
@@ -558,6 +740,38 @@
     "closes": null,
     "sessions": 1,
     "phases_total": 2,
+    "active_run": null,
+    "mtime": 1760000000.0,
+    "default_changed": null
+  },
+  {
+    "id": "three-two-one",
+    "kind": "situational",
+    "title": "3-2-1 shadow process",
+    "emoji": "🌗",
+    "group": "prompt decks",
+    "source": "builtin",
+    "enabled": true,
+    "schedule": [],
+    "closes": null,
+    "sessions": 1,
+    "phases_total": 4,
+    "active_run": null,
+    "mtime": 1760000000.0,
+    "default_changed": null
+  },
+  {
+    "id": "values",
+    "kind": "situational",
+    "title": "Values",
+    "emoji": "🧭",
+    "group": "prompt decks",
+    "source": "builtin",
+    "enabled": true,
+    "schedule": [],
+    "closes": null,
+    "sessions": 1,
+    "phases_total": 4,
     "active_run": null,
     "mtime": 1760000000.0,
     "default_changed": null

@@ -406,7 +406,7 @@ class CliTest(Base):
         self.assertIn("Daily gratitude", out)
         code, _, err = self.run_cli("send", "nope")
         self.assertEqual(code, 2)
-        self.assertIn("no practice 'nope' (known: morning, gratitude, evening, midweek, weekly)", err)
+        self.assertIn("no practice 'nope' (known: morning, gratitude, evening, midweek, weekly, check-in, finitude, storyworthy)", err)
 
 
 class ForkTest(Base):
@@ -534,8 +534,12 @@ class StartCommandTest(CleanEnv):
         # WP4: the list names the programs and situational definitions after the practices (deliberate change)
         self.assertEqual(reply, "There's no practice called “nope”. You have: /start morning (Morning journal), "
                                 "/start evening (Evening journal), /start midweek (Midweek check-in), "
-                                "/start weekly (Weekly pattern scan), /start fix-life (Fix your entire life in 1 day), "
-                                "/start prep (Conversation prep), /start debrief (Post-session debrief).")
+                                "/start weekly (Weekly pattern scan), /start check-in (Weekly check-in), "
+                                "/start finitude (Finitude), /start storyworthy (Homework for Life), "
+                                "/start fix-life (Fix your entire life in 1 day), "
+                                "/start prep (Conversation prep), /start five (Five questions), /start sweep (Mind sweep), "
+                                "/start debrief (Post-session debrief), /start shadow (3-2-1 shadow process), "
+                                "/start values (Values).")
         self.assertEqual(self.spawned, [])
         self.assertTrue(commands.start("").startswith("Which practice? You have: /start morning"))
 
@@ -659,7 +663,12 @@ class SkillKindsTest(CleanEnv):
             "- **Midweek check-in** (`/start midweek`): a two-minute pulse — energy, drift, support; offer at most one "
             "nudge.",
             "- **Weekly pattern scan** (`/start weekly`): patterns across the week — celebrate wins as well as gaps; "
-            "one or two nudges at most."])
+            "one or two nudges at most.",
+            "- **Weekly check-in** (`/start check-in`): a weekly look at moods, not progress; no advice unless asked.",
+            "- **Finitude** (`/start finitude`): finitude — what matters, given that time runs out; steady and plain, "
+            "never morbid; one question is enough.",
+            "- **Homework for Life** (`/start storyworthy`): one storyworthy moment from the day, a sentence or two, no "
+            "more; never turn it into a review."])
         self.assertIn("or now with `/start <id>`", text)
 
 
