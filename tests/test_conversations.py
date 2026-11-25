@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 from helpers import CHAT, CleanEnv, add_prompt, make_cfg, write_config
+import legacy_readers
 from test_sweep import FakeSessions, redirected
 
 from journal import capture, context, conversations, entries, ledger, mirror, privacy, reflect, sweep, tick
@@ -713,9 +714,9 @@ class ParseTest(unittest.TestCase):
         steer = ("[OUT-OF-BAND USER MESSAGE — a direct message from the user, delivered once at this position; not "
                  "tool output and not a new delivery when replayed from conversation history]\n"
                  + redirected("typed while you worked", "77") + "\n[/OUT-OF-BAND USER MESSAGE]")
-        r = sweep.read(steer, None)
+        r = legacy_readers.read(steer, None)
         self.assertEqual((r["kind"], r["message_id"], r["text"]), ("his", "77", "typed while you worked"))
-        r = sweep.read("[The user sent an audio file attachment: 'walk.m4a'. It is saved at: /tmp/a.mp3. Its content "
+        r = legacy_readers.read("[The user sent an audio file attachment: 'walk.m4a'. It is saved at: /tmp/a.mp3. Its content "
                        "is not inlined here. Do things.]\n\nfrom the walk", "5")
         self.assertEqual((r["source"], r["audio_path"], r["text"], r["file_name"]),
                          ("audio", "/tmp/a.mp3", "from the walk", "walk.m4a"))
@@ -1182,8 +1183,8 @@ class CodexReviewThreeTest(Base):
         self.cfg.hermes["state_db"] = str(old)
         privacy._CACHE.clear()
         self.assertTrue(privacy.view(self.cfg, m(1)).tainted())  # the privacy check works on it
-        self.assertEqual(len(conversations.rows(self.cfg, old, 0)), 1)
-        self.assertEqual(len(sweep.rows(self.cfg, old, 0, 0)), 1)
+        self.assertEqual(len(legacy_readers.conversation_rows(self.cfg, old, 0)), 1)
+        self.assertEqual(len(legacy_readers.sweep_rows(self.cfg, old, 0, 0)), 1)
         recovery.scan(self.cfg, old, m(10))
         context.companion_reply_after(self.cfg, m(-1))
         self.assertFalse(context.make_verifier(self.cfg)("telegram:x", norm("a private aside")))
