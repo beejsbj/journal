@@ -5278,9 +5278,16 @@ input found). A label the floor refuses answers 422 `off-the-record`, as the rou
     under a `his:` key line) and `analysis.annotations` is the analysis alone. **Blank lines between a key line and
     her callout change nothing**: `_CALLOUT` (and the reply-context pattern, and reflections' patterns) take them, in
     the margin and in `## Conversation` alike, so a formatter (Prettier, Obsidian Linter) or a hand edit that puts a
-    blank line there never turns her words into his; that also closes the same gap that was there before for her
+    blank line (or a line of spaces) there never turns her words into his (`document._callout` skips them too, so the
+    document and `_CALLOUT` agree on whose words they are); that also closes the same gap that was there before for her
     `her:` replies in the conversation. The web app's Edit and Delete check the margin is left as it was
     (`serve/blocks._facts`).
+  - **A formatter's blank lines (re-review of #92).** Prettier, markdownlint (MD022) and Obsidian Linter put a blank
+    line after a heading, between it and the key line under it (and may leave a line of spaces). The key line is
+    found through any blank or space-only lines under the heading (`entries._HEAD_LINES`; the audio fill steps back
+    over them, `_back_over_blanks`), so the block keeps its anchor, Edit and Delete, its picture embeds and its
+    transcript fill; `### Margin notes` takes the same blank lines before its hidden line (`entries._MARGIN`).
+    `tests/test_margin_format.py` (`FormatterTest`).
   - **Old entries read exactly as before.** An annotations section without the margin's hidden line is all analysis,
     as it was; no file is migrated. `tests/test_margin_format.py` (`OldEntriesTest`) pins it.
   - **Rejected.** *The key above the heading* (this PR's first draft): it stays behind when he moves a section in
@@ -5301,7 +5308,10 @@ input found). A label the floor refuses answers 422 `off-the-record`, as the rou
     rollback keeps its placeholder, its capture record says `transcript: done`, and the kept recording stays beside
     the entry (transcribe it by hand, or set the capture's `transcript` back to `pending` after rolling forward). (3)
     Its `phase_blocks` reads a keyed answer's key line as the answer's first line, so a copy of the answers made
-    during the rollback (a program's insights) can carry the hidden line; the summary's copy drops engine lines.
+    during the rollback (a program's insights) can carry the hidden line; the summary's copy drops engine lines. The
+    same reading reaches the program's other readers: a schedule confirmation written (keyed) before the rollback and
+    settled after it reads as the key line and `07:00`, so `parse_confirmation` returns None, no interrupts are
+    scheduled and he is asked again; `_short` prose slots and `programview` read a keyed answer the same way.
     (4) Its document shows the pictures a keyed photo block opens with as part of his text (display only). Notes, if
     any were written by then, read as part of her annotations. *The first draft's key-above-the-heading had different
     effects (Edit and Delete refused on every keyed block but the last, and a Delete of the last leaving its key on
@@ -5313,3 +5323,6 @@ input found). A label the floor refuses answers 422 `off-the-record`, as the rou
     `demote_headings` does, or with `actions.refuse`'s 422): a `## ` line there would end the annotations section and
     with it the margin, and what follows would read as no section at all. A thread block's `key` (`his:<id>`,
     `conv:N`) is unique within its thread, not the entry, which MARGIN-WEB settles when the web app edits one.
+    **His replies in the margin reach the annotation model unlabelled** (`without_companion_replies`, `entries.py`,
+    keeps his keyed replies as his words with nothing saying they are replies to a note): MARGIN-NOTES labels them
+    when it writes replies.

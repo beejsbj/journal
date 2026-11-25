@@ -68,7 +68,7 @@ BLOCK_KEY = re.compile(r"^%% journal block:([A-Za-z0-9][A-Za-z0-9-]*) %%[ \t]*$"
 # (``%% journal times:… %%``, PARAGRAPH-TIMES, #74). Every reader takes them in either order and either alone
 # (``head_lines_end``, ``block_key_under``); his words start after them.
 _HEAD_LINE = r"%% journal (?:block|times):[^%\n]* %%[ \t]*"
-_HEAD_LINES = re.compile(rf"(?:\n{_HEAD_LINE}(?=\n|\Z))+")
+_HEAD_LINES = re.compile(rf"(?:\n(?:[ \t]*\n)*{_HEAD_LINE}(?=\n|\Z))+")
 _HEAD_LINE_RE = re.compile(_HEAD_LINE)
 # The margin: the companion's notes on single blocks of his, each with its thread and its state, a sub-section at the
 # end of her annotations section, after her analysis of the entry (``margin.py`` has a note's own grammar). The hidden
@@ -76,7 +76,7 @@ _HEAD_LINE_RE = re.compile(_HEAD_LINE)
 # (``_hers`` drops every engine line from her text).
 MARGIN_HEADING = "### Margin notes"
 MARGIN_MARK = "%% journal:margin %%"
-_MARGIN = re.compile(r"^### Margin notes[ \t]*\n\n?" + re.escape(MARGIN_MARK) + r"[ \t]*$", re.M)
+_MARGIN = re.compile(r"^### Margin notes[ \t]*\n(?:[ \t]*\n)*" + re.escape(MARGIN_MARK) + r"[ \t]*$", re.M)
 
 
 def _words_end(body: str, start: int = 0) -> re.Match | None:
@@ -465,6 +465,17 @@ _RECORDING_HEADING = re.compile(r"(?:### [0-9]{1,2}:[0-9]{2}\b[^\n]*?|\*\*[^*\n]
                                 r" · (?:audio file|voice transcript)\b[^\n]*")
 
 
+def _back_over_blanks(body: str, end: int, lo: int) -> int:
+    """``end`` moved back past blank lines (empty or only spaces and tabs) that end at it, never below ``lo``: what
+    is left ends the last line with something on it."""
+    while end > lo:
+        start = max(body.rfind("\n", lo, end) + 1, lo)
+        if body[start:end].strip(" \t") or start <= lo:
+            break
+        end = start - 1
+    return end
+
+
 def _recording_block(body: str, embed: str) -> tuple[int, int, int] | None:
     """Where the engine's block for this recording is: (its heading line's start and end, the embed's start). The
     embed counts only as a whole line with nothing but blank lines (and the engine's lines under a heading:
@@ -475,14 +486,12 @@ def _recording_block(body: str, embed: str) -> tuple[int, int, int] | None:
         if not span:
             continue
         for m in line.finditer(body, span[0], span[1]):
-            end = m.start()
-            while end > span[0] and body[end - 1] == "\n":
-                end -= 1
+            end = _back_over_blanks(body, m.start(), span[0])
             while True:   # (over the block's own key line, and its times line, right under the heading)
                 line_start = max(body.rfind("\n", span[0], end) + 1, span[0])
                 if line_start <= span[0] or not _HEAD_LINE_RE.fullmatch(body, line_start, end):
                     break
-                end = line_start - 1
+                end = _back_over_blanks(body, line_start - 1, span[0])   # (a formatter's blank line above it)
             head_start = max(body.rfind("\n", span[0], end) + 1, span[0])
             if _RECORDING_HEADING.fullmatch(body, head_start, end):
                 return head_start, end, m.start()

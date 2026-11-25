@@ -377,6 +377,81 @@ class ReviewFixesTest(Case):
                          r"\n\nthe transcript")
 
 
+class FormatterTest(Case):
+    """A formatter (Prettier, markdownlint MD022, Obsidian Linter) puts a blank line after a heading, between it and the
+    key line under it, or a line of spaces; the block keeps its anchor and every reader still finds it (re-review of
+    #92, M1, L1, L5)."""
+
+    GAPS = ("\n", "\n\n", "  \n", "\n \t\n")
+
+    def spaced(self, body: str, gap: str) -> str:
+        head = "### 09:12 IST · text\n"
+        return body.replace(head, head + gap, 1)
+
+    def test_a_blank_line_between_heading_and_key_keeps_the_anchor_and_his_words(self):
+        for gap in self.GAPS:
+            with self.subTest(gap=gap):
+                body = self.spaced(self.body(), gap)
+                (block,) = document.blocks_of(body, self.path.stem)
+                self.assertEqual((block["anchor"], block["text"]), (f"block:{self.key()}", HIS))
+                self.assertNotIn("%% journal", entries.his_words(body))
+
+    def test_edit_and_delete_are_allowed_there(self):
+        from journal.serve import blocks as web
+        for gap in self.GAPS:
+            with self.subTest(gap=gap):
+                body = self.spaced(self.body(), gap)
+                new = web.edit(body, "words:0", "Only the sea.", cfg=self.cfg, stem=self.path.stem)
+                (block,) = document.blocks_of(new, self.path.stem)
+                self.assertEqual((block["anchor"], block["text"]), (f"block:{self.key()}", "Only the sea."))
+                self.assertNotIn(HIS, new)
+                gone = web.remove(body, "words:0", stem=self.path.stem)
+                self.assertNotIn(self.key(), gone)
+                self.assertEqual(document.blocks_of(gone, self.path.stem), [])
+
+    def test_a_photo_block_keeps_its_pictures_as_pictures(self):
+        stem = self.path.stem
+        body = self.body().replace("· text", "· photo", 1).replace(HIS, f"![[{stem}.jpg]]\n\nA caption.", 1)
+        for gap in ("",) + self.GAPS:
+            with self.subTest(gap=gap):
+                (block,) = document.blocks_of(self.spaced(body, gap), stem)
+                self.assertEqual((block.get("images"), block["text"]), ([f"{stem}.jpg"], "A caption."))
+
+    def test_a_recording_is_filled_with_a_blank_line_above_its_key(self):
+        for gap in self.GAPS:
+            with self.subTest(gap=gap):
+                path = entries.record_reply(self.cfg.root, {**PROMPT, "stem": f"2026-11-25-r{len(gap)}{ord(gap[0])}"},
+                                            "", AT, source="audio", audio="rec.ogg", names=PERSON)
+                body = path.read_text(encoding="utf-8")
+                head = re.search(r"### [^\n]*audio file[^\n]*\n", body).group(0)
+                path.write_text(body.replace(head, head + gap, 1), encoding="utf-8")
+                self.assertTrue(entries.fill_audio_block(path, "rec.ogg", "the transcript"))
+                text = path.read_text(encoding="utf-8")
+                self.assertIn("the transcript", text)
+
+    def test_a_line_of_spaces_between_her_key_and_her_reply_keeps_it_hers(self):
+        entries.append_conversation(self.path, f"%% journal his:813 %%\n**23:44** — Later.\n\n%% journal her:814 %%\n"
+                                               f"> [!quote]- {PERSON.companion} · 23:45\n> {HER_REPLY} indeed.\n",
+                                    PERSON)
+        body = self.body().replace("%% journal her:814 %%\n", "%% journal her:814 %%\n  \n \t\n")
+        self.path.write_text(body, encoding="utf-8")
+        self.assertNotIn(HER_REPLY, entries.his_words(body))
+        self.assertFalse(document.matches(self.path, HER_REPLY))
+        blocks = document.blocks_of(body, self.path.stem)
+        self.assertEqual([b["kind"] for b in blocks], ["his", "his", "hers"])
+        self.assertTrue(all(HER_REPLY not in b["text"] for b in blocks if b["kind"] == "his"))
+
+    def test_spaces_or_two_blank_lines_under_the_margin_heading_keep_the_margin(self):
+        base = self.with_margin()
+        self.assertEqual(len(document.margin_of(base, self.path.stem)), 1)
+        for gap in ("\n", "  \n", "\n\n"):
+            with self.subTest(gap=gap):
+                body = base.replace("### Margin notes\n", "### Margin notes\n" + gap, 1)
+                (n,) = document.margin_of(body, self.path.stem)
+                self.assertEqual(n["anchor"], f"block:{self.key()}")
+                self.assertNotIn(HER, entries.his_words(body))
+
+
 class StrayBlockTest(ProgramBlockTest):
     """M3: a stray block found under the summary (old code appended it there) goes back after the last block of its
     phase, before the next block's own lines; every block keeps its own key."""

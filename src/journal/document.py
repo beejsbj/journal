@@ -259,9 +259,14 @@ def words_blocks(section: str, stem: str | None = None) -> list[dict]:
     return [block for block, _cut in _words_parts(section, stem)]
 
 
+def _lead_blank(text: str) -> int:
+    """How many characters of leading blank lines (empty, or only spaces and tabs) ``text`` starts with."""
+    return re.match(r"(?:[ \t]*\n)*", text).end()
+
+
 def _callout(text: str) -> tuple[str, list[str], str]:
     """A leading ``> [!kind]- title`` callout: (title line, body lines without the ``> ``, the text after it)."""
-    lines = text.lstrip("\n").split("\n")
+    lines = text[_lead_blank(text):].split("\n")
     n = 0
     while n < len(lines) and lines[n].startswith(">"):
         n += 1
@@ -273,13 +278,14 @@ def _callout(text: str) -> tuple[str, list[str], str]:
 
 def _after_callout(text: str) -> int:
     """Where the text after ``_callout``'s callout starts in ``text`` (0 when there is none)."""
-    lines = text.lstrip("\n").split("\n")
+    lead = _lead_blank(text)
+    lines = text[lead:].split("\n")
     n = 0
     while n < len(lines) and lines[n].startswith(">"):
         n += 1
     if n == 0:
         return 0
-    return min(len(text), len(text) - len(text.lstrip("\n")) + sum(len(l) + 1 for l in lines[:n]))
+    return min(len(text), lead + sum(len(l) + 1 for l in lines[:n]))
 
 
 def _his_message_cut(section: str, lo: int, hi: int, key: str, reply_to: str | None,
