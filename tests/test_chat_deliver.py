@@ -173,6 +173,18 @@ class PromptTest(ConversionCase):
         self.assertEqual((p["send_attempts"], p["send_error"]), (1, "Bad Gateway"))
         self.assertEqual(log[0], "2026-10-14-evening: send failed (can't parse entities); retrying with the plain opener")
 
+    def test_any_error_from_the_chat_is_a_failed_send_not_a_crash(self):
+        # a prompt's send catches every Exception (not only ChannelError): the tick goes on and the attempt is counted
+        from journal.chat import send
+        from journal import ledger
+        for n, error in enumerate((RuntimeError("boom"), OSError("connection reset")), 1):
+            with self.subTest(error=type(error).__name__):
+                self.chat.fail = [error]
+                rec = dict(self.record(), id=f"2026-10-1{n}-evening")
+                self.assertFalse(send.send_prompt(self.cfg, rec, []))
+                p = ledger.find(ledger.snapshot(self.cfg.ledger_path), rec["id"])
+                self.assertEqual(p["send_attempts"], 1)
+
 
 class AnnotationReplyTest(ConversionCase):
     def annotated(self):

@@ -1,9 +1,11 @@
 """``deliver``: the chat face's one operation for "send this to the journal's chat, record it, mirror it" (issue #43,
 CHAT-2).
 
-Every message the engine sends on its own goes through it: a prompt (``send.send_prompt``: practices, program phases,
-interrupts), an annotation reply (``replies.reply_annotations``), a reflection or week review (``reflect.send``), the
-catch-up letter after an outage (``recovery._send``) and a program session's summary (``programs._send_summary``).
+The five kinds of send the engine makes on its own go through it: a prompt (``send.send_prompt``: practices,
+program phases, interrupts), an annotation reply (``replies.reply_annotations``), a reflection or week review
+(``reflect.send``), the catch-up letter after an outage (``recovery._send``) and a program session's summary
+(``programs._send_summary``). Two stay outside, as DECISIONS records: a program's short notes
+(``programs._say_about``) and the earlier parts of a phase split into several messages.
 The three steps, always in this order:
 
 1. **Send** ``html`` to ``to`` (default the configured chat) through ``chat`` (default ``cfg.channel()``, made inside

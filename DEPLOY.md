@@ -16,7 +16,7 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
-## CHAT-2 — one send operation, `chat.deliver`, for every message the engine sends on its own (2026-11-25; tick and hook side; **gateway restart**; no config or state change)
+## CHAT-2 — one send operation, `chat.deliver`, for the five kinds of send the engine makes on its own (2026-11-25; tick and hook side; **gateway restart**; no config or state change)
 
 **What changes.** Issue #43, its second step. `journal/chat/deliver.py`'s `deliver` sends one message to the
 journal's chat, lets its caller record the outcome, and mirrors what the caller says into the companion's session.
