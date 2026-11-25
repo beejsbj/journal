@@ -181,7 +181,7 @@ class VoicesTest(Case):
         self.assertGreater(len(bank), 1)
         text = handlers.render_document(doc)
         sent = text.split("## Prompt (sent by the journal)")[1].split("\n## ")[0]
-        self.assertIn("- 1.1: What are you feeling right now? Find a word for it, or a few. What might be behind it?", sent)
+        self.assertIn("- 1.1: What's spinning in your mind?", sent)  # as the ledger recorded it when sent
         for q in bank[1:]:
             self.assertNotIn(q, sent, "a question that was not asked is listed as sent")
 

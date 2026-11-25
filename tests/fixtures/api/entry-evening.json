@@ -28,123 +28,58 @@
     "questions": [
       {
         "id": "1.1",
-        "text": "What's spinning in your mind?",
-        "section": "Brain Dump & Letting Go"
+        "text": "What are you feeling right now? Find a word for it, or a few. What might be behind it?",
+        "section": "Arriving"
       },
       {
         "id": "1.2",
-        "text": "What do you need to release before sleep?",
-        "section": "Brain Dump & Letting Go"
+        "text": "What's spinning in your mind? What do you need to put down before sleep?",
+        "section": "Arriving"
       },
       {
         "id": "2.1",
-        "text": "What went well today?",
-        "section": "Day Review"
+        "text": "What went well today? Where were you present, patient or kind? Let yourself be glad of it.",
+        "section": "The Day"
       },
       {
         "id": "2.2",
-        "text": "What challenged you?",
-        "section": "Day Review"
+        "text": "What's the moment from today you'd tell as a story, even a small one?",
+        "section": "The Day"
       },
       {
         "id": "2.3",
-        "text": "What did you learn?",
-        "section": "Day Review"
+        "text": "What gave you energy, and what drained it?",
+        "section": "The Day"
+      },
+      {
+        "id": "2.4",
+        "text": "Who showed up for you, and who did you show up for?",
+        "section": "The Day"
       },
       {
         "id": "3.1",
-        "text": "What interesting moments happened, even if small?",
-        "section": "Story-Worthy Moments"
+        "text": "Pick one moment that caused more harm than it needed to. How present were you in it? What came of it, for you and for anyone else?",
+        "section": "One Moment, Looked at Again"
       },
       {
         "id": "3.2",
-        "text": "What made you smile or laugh?",
-        "section": "Story-Worthy Moments"
-      },
-      {
-        "id": "3.3",
-        "text": "What surprised you?",
-        "section": "Story-Worthy Moments"
+        "text": "Regret what deserves it, and leave out the guilt and the self-blame. What would you do differently, and is there anything to mend tomorrow?",
+        "section": "One Moment, Looked at Again"
       },
       {
         "id": "4.1",
-        "text": "What wins, big or small, did you experience?",
-        "section": "Wins & Celebrations"
-      },
-      {
-        "id": "4.2",
-        "text": "What are you proud of?",
-        "section": "Wins & Celebrations"
+        "text": "What would the best part of yourself say about how you did today?",
+        "section": "The Best Part of You"
       },
       {
         "id": "5.1",
-        "text": "What realizations or new understandings emerged?",
-        "section": "Insights & Revelations"
+        "text": "What are you grateful for from today?",
+        "section": "Closing"
       },
       {
         "id": "5.2",
-        "text": "What did you learn about yourself or others?",
-        "section": "Insights & Revelations"
-      },
-      {
-        "id": "6.1",
-        "text": "How did you honor your values today?",
-        "section": "Values & Alignment"
-      },
-      {
-        "id": "6.2",
-        "text": "Where did you feel most/least aligned?",
-        "section": "Values & Alignment"
-      },
-      {
-        "id": "7.1",
-        "text": "What energized you today?",
-        "section": "Energy Awareness"
-      },
-      {
-        "id": "7.2",
-        "text": "What drained your energy?",
-        "section": "Energy Awareness"
-      },
-      {
-        "id": "8.1",
-        "text": "What attention bids did you notice?",
-        "section": "Connection Reflection"
-      },
-      {
-        "id": "8.2",
-        "text": "Which connections did you lean into?",
-        "section": "Connection Reflection"
-      },
-      {
-        "id": "8.3",
-        "text": "Who showed up for you, and who did you show up for?",
-        "section": "Connection Reflection"
-      },
-      {
-        "id": "9.1",
-        "text": "What moments from today are you thankful for?",
-        "section": "Gratitude"
-      },
-      {
-        "id": "9.2",
-        "text": "What simple joys touched you today?",
-        "section": "Gratitude"
-      },
-      {
-        "id": "10.1",
-        "text": "What brought you peace today?",
-        "section": "Peace & Calming"
-      },
-      {
-        "id": "10.2",
-        "text": "What's one thing you can appreciate about yourself?",
-        "section": "Peace & Calming"
-      },
-      {
-        "id": "10.3",
-        "text": "What do you want to carry into your sleep?",
-        "section": "Peace & Calming"
+        "text": "You have lived this day. What do you want to carry into sleep?",
+        "section": "Closing"
       }
     ],
     "phases": []

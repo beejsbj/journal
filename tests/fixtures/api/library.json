@@ -35,52 +35,37 @@
           },
           {
             "id": "2",
-            "text": "How are you feeling — physically, mentally, emotionally?",
+            "text": "What are you feeling right now? Find a word for it, or a few. What might be behind it?",
             "pinned": false
           },
           {
             "id": "3",
-            "text": "What's on your chest right now?",
+            "text": "What does your heart want today: for you, for the people you love, for the world?",
             "pinned": false
           },
           {
             "id": "4",
-            "text": "Which of your values will you experiment with today?",
+            "text": "Two things you're grateful for, and why.",
             "pinned": false
           },
           {
             "id": "5",
-            "text": "What's your centering mantra?",
+            "text": "What matters most today?",
             "pinned": false
           },
           {
             "id": "6",
-            "text": "Two things you're grateful for — why?",
+            "text": "Where is today likely to get hard? What would the best part of yourself do there? Picture yourself meeting it a little better than usual.",
             "pinned": false
           },
           {
             "id": "7",
-            "text": "Top priority today?",
+            "text": "Who needs you today, and how will you show up?",
             "pinned": false
           },
           {
             "id": "8",
-            "text": "2-3 supporting goals for a successful day?",
-            "pinned": false
-          },
-          {
-            "id": "9",
-            "text": "Any worries about the day ahead? What's the plan?",
-            "pinned": false
-          },
-          {
-            "id": "10",
-            "text": "Who needs your support today? How will you show up?",
-            "pinned": false
-          },
-          {
-            "id": "11",
-            "text": "What would make today deeply satisfying?",
+            "text": "One intention for today, in a sentence.",
             "pinned": false
           }
         ]
@@ -161,171 +146,81 @@
     "path": "/package/library/practices/evening.md",
     "sections": [
       {
-        "title": "Brain Dump & Letting Go",
+        "title": "Arriving",
         "questions": [
           {
             "id": "1.1",
-            "text": "What's spinning in your mind?",
+            "text": "What are you feeling right now? Find a word for it, or a few. What might be behind it?",
             "pinned": false
           },
           {
             "id": "1.2",
-            "text": "What do you need to release before sleep?",
+            "text": "What's spinning in your mind? What do you need to put down before sleep?",
             "pinned": false
           }
         ]
       },
       {
-        "title": "Day Review",
+        "title": "The Day",
         "questions": [
           {
             "id": "2.1",
-            "text": "What went well today?",
+            "text": "What went well today? Where were you present, patient or kind? Let yourself be glad of it.",
             "pinned": false
           },
           {
             "id": "2.2",
-            "text": "What challenged you?",
+            "text": "What's the moment from today you'd tell as a story, even a small one?",
             "pinned": false
           },
           {
             "id": "2.3",
-            "text": "What did you learn?",
-            "pinned": false
-          }
-        ]
-      },
-      {
-        "title": "Story-Worthy Moments",
-        "questions": [
-          {
-            "id": "3.1",
-            "text": "What interesting moments happened, even if small?",
+            "text": "What gave you energy, and what drained it?",
             "pinned": false
           },
           {
-            "id": "3.2",
-            "text": "What made you smile or laugh?",
-            "pinned": false
-          },
-          {
-            "id": "3.3",
-            "text": "What surprised you?",
-            "pinned": false
-          }
-        ]
-      },
-      {
-        "title": "Wins & Celebrations",
-        "questions": [
-          {
-            "id": "4.1",
-            "text": "What wins, big or small, did you experience?",
-            "pinned": false
-          },
-          {
-            "id": "4.2",
-            "text": "What are you proud of?",
-            "pinned": false
-          }
-        ]
-      },
-      {
-        "title": "Insights & Revelations",
-        "questions": [
-          {
-            "id": "5.1",
-            "text": "What realizations or new understandings emerged?",
-            "pinned": false
-          },
-          {
-            "id": "5.2",
-            "text": "What did you learn about yourself or others?",
-            "pinned": false
-          }
-        ]
-      },
-      {
-        "title": "Values & Alignment",
-        "questions": [
-          {
-            "id": "6.1",
-            "text": "How did you honor your values today?",
-            "pinned": false
-          },
-          {
-            "id": "6.2",
-            "text": "Where did you feel most/least aligned?",
-            "pinned": false
-          }
-        ]
-      },
-      {
-        "title": "Energy Awareness",
-        "questions": [
-          {
-            "id": "7.1",
-            "text": "What energized you today?",
-            "pinned": false
-          },
-          {
-            "id": "7.2",
-            "text": "What drained your energy?",
-            "pinned": false
-          }
-        ]
-      },
-      {
-        "title": "Connection Reflection",
-        "questions": [
-          {
-            "id": "8.1",
-            "text": "What attention bids did you notice?",
-            "pinned": false
-          },
-          {
-            "id": "8.2",
-            "text": "Which connections did you lean into?",
-            "pinned": false
-          },
-          {
-            "id": "8.3",
+            "id": "2.4",
             "text": "Who showed up for you, and who did you show up for?",
             "pinned": false
           }
         ]
       },
       {
-        "title": "Gratitude",
+        "title": "One Moment, Looked at Again",
         "questions": [
           {
-            "id": "9.1",
-            "text": "What moments from today are you thankful for?",
+            "id": "3.1",
+            "text": "Pick one moment that caused more harm than it needed to. How present were you in it? What came of it, for you and for anyone else?",
             "pinned": false
           },
           {
-            "id": "9.2",
-            "text": "What simple joys touched you today?",
+            "id": "3.2",
+            "text": "Regret what deserves it, and leave out the guilt and the self-blame. What would you do differently, and is there anything to mend tomorrow?",
             "pinned": false
           }
         ]
       },
       {
-        "title": "Peace & Calming",
+        "title": "The Best Part of You",
         "questions": [
           {
-            "id": "10.1",
-            "text": "What brought you peace today?",
+            "id": "4.1",
+            "text": "What would the best part of yourself say about how you did today?",
+            "pinned": false
+          }
+        ]
+      },
+      {
+        "title": "Closing",
+        "questions": [
+          {
+            "id": "5.1",
+            "text": "What are you grateful for from today?",
             "pinned": false
           },
           {
-            "id": "10.2",
-            "text": "What's one thing you can appreciate about yourself?",
-            "pinned": false
-          },
-          {
-            "id": "10.3",
-            "text": "What do you want to carry into your sleep?",
+            "id": "5.2",
+            "text": "You have lived this day. What do you want to carry into sleep?",
             "pinned": false
           }
         ]

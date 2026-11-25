@@ -75,7 +75,7 @@ describe("Today", () => {
     expect(missed.querySelector(".letter-from")?.textContent).toBe("From Adasent 06:00 IST");
     expect(missed.querySelector(".letter-body")?.textContent).toContain("Morning, Sam.");
     expect(missed.querySelector(".letter-asked")?.textContent).toBe("How did you sleep?");
-    expect(missed.querySelectorAll(".letter-qlist li")).toHaveLength(11);
+    expect(missed.querySelectorAll(".letter-qlist li")).toHaveLength(8);
     expect(missed.querySelector(".letter-qlist li.asked")?.textContent).toContain("How did you sleep?");
     // sent with the plain opener: nothing recorded, so the questions are the letter
     expect(open.querySelector(".letter-asked")).toBeNull();

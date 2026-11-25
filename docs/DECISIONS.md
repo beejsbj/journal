@@ -4628,7 +4628,17 @@ to it (not this host's setup: the gateway runs as a service).
   - **Goldens.** `tests/golden/morning.*` and `evening.*` are regenerated (`python3 tests/test_golden.py --write`, a
     switch this change adds beside `test_golden_engine.py --write`; midweek and weekly come out byte-identical, which
     is the check that the writer reproduces the old goldens). The tests that pinned an old question (as a sample of
-    the evening's bank) now pin the new one at the same place.
+    the evening's bank) now pin the new one at the same place, except where they read a ledger's `asked` record, which
+    keeps the old text (that is the point of recording it). The web app's API fixtures (`tests/fixtures/api/`,
+    `JOURNAL_UPDATE_FIXTURES=1`) are regenerated, and the two web tests that counted the old banks follow; no web
+    source changes, so the committed build stands.
+  - **Raised, not changed: an old entry's "asked" mark in the web app.** An entry's document carries the practice's
+    *current* bank (`prompt.questions`) and the asked ids as recorded (`prompt.asked`), and the web app marks the bank
+    line whose id was asked (`ui/Letter.tsx`, `components/Prompt.tsx`). After this change an evening entry from before
+    it shows the new bank with `1.1` marked (now the feelings check) under the asked line as it was sent ("What's
+    spinning in your mind?"). The asked text is right; the mark beside the bank is not. The same happens after any
+    edit of a practice, his own included. To close: mark a bank line only when its text is the asked text, or show an
+    old entry the bank it was sent with (the entry file keeps it, folded under `## Prompt`).
   - **Not changed, noted:** `prompts.OPENER_REQUEST`'s example ("what simple joys touched you today?" turned into
     "what was cozy about today?") names a question the evening no longer has. It is an example of the move, not a
     question to ask, and changing it would rewrite every opener request; left as it is.
