@@ -138,3 +138,4 @@
   .ds-curve { grid-template-columns: 1fr 110px; }
   .ds-curve small { display: none; }
 }
+.ds .ds-daylog { max-width: calc(var(--measure) + var(--margin-l)); margin: var(--s3) 0 var(--s7); }

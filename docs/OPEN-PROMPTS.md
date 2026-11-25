@@ -181,8 +181,8 @@ The writes sit in one engine module (`journal/actions.py`): `answer` and `note`,
 `deliver`, which is the spawn. Serve, the CLI and MCP call it instead of `capture.capture_web`. `/start` and
 `journal send` take their slot from `slots.resolve` too, which changes two things in the chat. `/start water` at 15:00
 delivers the 12:00 slot rather than always slot 1. And `/start morning` after the morning is answered starts an
-extra entry, where today it re-sends and appends to the same one. MCP keeps importing `serve.api` and `serve.document` for its reads
-until a reading module exists; that is a later package.
+extra entry, where today it re-sends and appends to the same one. MCP read through `serve.api` and `serve.document`
+until the shared readers moved into the core (`document.py`, issue #47); it imports nothing from `serve/` now.
 
 ## Decided (the owner, 2026-11-09)
 
@@ -262,7 +262,7 @@ Where the prompt record is read or written, what the code assumes about delivery
 | Area | Code | Assumes today | Change |
 | --- | --- | --- | --- |
 | Due slots | `tick.send_due` (`done`), `schedule.slots_due` | Done = delivered, out of attempts, or backfilled. | Also done when answered on a face (rule 1). |
-| Delivery | `tick.send_prompt`, `count_send_failure` | Every scheduled prompt goes to `cfg.channel()`; the record is read again only after the send. | A check before the send (rule 2), attach-only onto a face-made record (rule 3), nothing with no channel (rule 6). |
+| Delivery | `chat.send.send_prompt`, `count_send_failure` | Every scheduled prompt goes to `cfg.channel()`; the record is read again only after the send. | A check before the send (rule 2), attach-only onto a face-made record (rule 3), nothing with no channel (rule 6). |
 | Matching chat replies | `capture.open_prompts`, `match`, `window` | Open = delivered, inside the window from `sent_at`. | Unchanged (rule 4). |
 | Words from a face | `capture.capture_web` (web, MCP) | Answers a delivered open prompt, else a `/j` note. | `actions.answer` over `slots.resolve`. |
 | Notes | `capture.new_note_prompt`, `capture_note` | A note is a record with `message_id: None` and `sent_at`. | Unchanged. |
@@ -272,15 +272,15 @@ Where the prompt record is read or written, what the code assumes about delivery
 | The opener's signals | `standing.unanswered`, `prompts.missed_note`, `context.missed_openers`, `_opener_key`, `her_messages` | Read delivered prompts; `missed_note` indexes `sent_at`. | `unanswered` counts slots he saw: delivered, or answered on a face. A no-chat install's derived misses are not "his last N prompts got no reply". `her_messages` stays delivered-only (what she said in the chat). |
 | Web history | `serve/api._sent_prompts`, `_prompt_outcome`, `week_strip`, `insights_weeks` | Delivered prompts only, so a no-chat install shows nothing. | Slot states. |
 | Entry header | `entries._prompt_md`, MCP's prompt time | The time comes from the delivery. | A face-made record says when and where he wrote it. |
-| Folding | `tick.fold` | Skips records with no `message_id`. | Unchanged. |
-| Re-send | `tick.send_prompt` (`previous_message_ids`, `earlier_openers`) | A second send of a delivered id makes the new message current. | Unchanged for delivered records; attach for face-made ones (rule 3). |
+| Folding | `chat.fold.fold` | Skips records with no `message_id`. | Unchanged. |
+| Re-send | `chat.send.send_prompt` (`previous_message_ids`, `earlier_openers`) | A second send of a delivered id makes the new message current. | Unchanged for delivered records; attach for face-made ones (rule 3). |
 | Mirror | `mirror.to_chat` from `send_prompt` | Every delivery is mirrored. | Unchanged; faces mirror nothing (rule 8). |
 | Thread boundaries, `/x` | `conversations._send_times`, `privacy.send_times`, `today.note_send` | Delivered records plus every `sent.jsonl` line. | Unchanged, and pinned (rule 7). |
 | Sweep, recovery | `sweep`, `recovery` | Chat only. | Unchanged. |
 | Conversation writer | `conversations._Saved`, `classify` | A capture with no `platform_message_id` is a legacy chat capture, matched by its words. | Captures with `via` are not (rule 10). |
-| Failed sends | `tick.count_send_failure` | Leaves a record with `send_attempts` and nothing else. | Reads as *due*; `answer` fills it in (slot resolution). |
+| Failed sends | `chat.send.count_send_failure` | Leaves a record with `send_attempts` and nothing else. | Reads as *due*; `answer` fills it in (slot resolution). |
 | Annotations | `tick.annotate`, `context.companion_reply_after` | Need captures (not a message); aligned with her next chat reply. | No alignment for face captures (rule 9). |
-| Sends after the fact | `tick.reply_annotations`, `reflect.run`, `programs._send_summary`, `_retry_summary`, `_say_about`, `cli._notify` | Always send, with attempts and alerts. | Nothing with no channel (rule 6). |
+| Sends after the fact | `chat.replies.reply_annotations`, `reflect.run`, `programs._send_summary`, `_retry_summary`, `_say_about`, `cli._notify` | Always send, with attempts and alerts. | Nothing with no channel (rule 6). |
 | Program phases, interrupts | `programs._send_phase`, `send_interrupts`, `serve/writes._phase_target` | A phase is open only once delivered; interrupts are chat-only. | OPEN-PROGRAMS (package 3). |
 | Faces | `serve/writes.library_send`, `mcp/handlers.start`, `commands.start_reply`, `cli send` | "Start" means "send to the chat". | A view on faces, a delivery from the chat; `slots.resolve` for both. |
 | Channel config | `Config.channel()`, `ports.NoChannel` | `NoChannel` refuses each send, so each send fails. | `channel.platform: none` (rule 6). |

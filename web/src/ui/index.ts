@@ -15,6 +15,7 @@ export { Toast } from "./Toast";
 export { Letter, questionsLine, type LetterQuestion } from "./Letter";
 export { MarginNote } from "./MarginNote";
 export { HourLines, MarginHour, shownHours } from "./Hours";
+export { DayLog, LogEntry, LogLine, LogReplies } from "./DayLog";
 export { AudioPlayer, bars, clock } from "./AudioPlayer";
 export { Calendar, shiftMonth } from "./Calendar";
 export { ProgressStrip } from "./ProgressStrip";

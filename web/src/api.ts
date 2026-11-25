@@ -8,7 +8,7 @@ import { rememberVia, setAuthLost } from "./auth";
 import { OFFLINE_WRITE, isOnline, keptAt, noteRead } from "./offline";
 import { ShapeError, arr, num, obj, str, type Json, type Parser } from "./schema";
 import {
-  Block202, BlockEdited, BlockRemoved, Created, DoctorRow, EntryDoc, EntryPage, Health, LibraryDefault, LibraryItem, LibraryOne, MetaWritten, Reflection, Run,
+  Block202, BlockEdited, BlockRemoved, Created, DayLog, DoctorRow, EntryDoc, EntryPage, Health, LibraryDefault, LibraryItem, LibraryOne, MetaWritten, Reflection, Run,
   Located, PracticeView, PushInfo, RunOne, Session, Settings, SettingsWritten, Spawned, Status, Today, UploadMade, Validation, Week,
   type RunAction,
 } from "./types";
@@ -169,6 +169,7 @@ export const api = {
     get(`/entries${query(params)}`, EntryPage, signal),
   entry: (stem: string, signal?: AbortSignal) => get(`/entries/${encodeURIComponent(stem)}`, EntryDoc, signal),
   /** The entry, read for the write room: quiet, so the page behind keeps its own offline marks. */
+  day: (date: string, signal?: AbortSignal) => get(`/days/${encodeURIComponent(date)}`, DayLog, signal),
   entryQuiet: (stem: string, signal?: AbortSignal) => get(`/entries/${encodeURIComponent(stem)}`, EntryDoc, signal, true),
   reflections: (params: Record<string, string | number | undefined>, signal?: AbortSignal) =>
     get(`/reflections${query(params)}`, arr(Reflection), signal),

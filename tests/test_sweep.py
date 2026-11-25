@@ -8,9 +8,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
-from helpers import CHAT, add_prompt, make_cfg
+from helpers import CHAT, add_prompt, make_cfg, unkeyed
+import legacy_readers
 
 from journal import capture, compose, entries, ledger, sweep, tick
+from journal.chat import send as chat_send  # (send_prompt's clock, moved from tick: issue #43)
 
 SENT = datetime(2026, 10, 15, 0, 31, tzinfo=timezone.utc)  # 06:01 IST
 NOW = SENT + timedelta(hours=10)
@@ -95,7 +97,7 @@ class SweepTest(unittest.TestCase):
         self.assertEqual(n, 1, log)
         self.assertEqual(log, ["swept message 3528 into 2026-10-15-morning.md (next-message)"])
         body = self.entry.read_text()
-        self.assertIn("### 06:21 IST · text\n\nslept badly, the rain was loud", body)
+        self.assertIn("### 06:21 IST · text\n\nslept badly, the rain was loud", unkeyed(body))
         c = self.captures()[0]
         self.assertEqual((c["platform_message_id"], c["via"], c["rule"]), ("3528", "sweep", "next-message"))
         self.assertEqual(c["at"], (SENT + timedelta(minutes=20)).isoformat())
@@ -141,7 +143,7 @@ class SweepTest(unittest.TestCase):
         n, log = self.sweep()
         self.assertEqual(n, 1, log)
         body = self.entry.read_text()
-        self.assertIn("### 14:01 IST · voice transcript\n\nI slept okay, woke at five\n\nps: rain", body)
+        self.assertIn("### 14:01 IST · voice transcript\n\nI slept okay, woke at five\n\nps: rain", unkeyed(body))
         self.assertNotIn("![[", body)
         self.assertEqual(self.captures()[0]["source"], "voice")
 
@@ -251,7 +253,7 @@ class SweepTest(unittest.TestCase):
             @classmethod
             def now(cls, tz=None):
                 return NOW if tz is None else NOW.astimezone(tz)
-        with mock.patch.object(tick, "datetime", FixedNow), \
+        with mock.patch.object(tick, "datetime", FixedNow), mock.patch.object(chat_send, "datetime", FixedNow), \
                 mock.patch("journal.agent.ask", lambda *a, **k: "- He slept badly."), \
                 mock.patch("journal.context.companion_reply_after", lambda *a, **k: None), \
                 mock.patch.object(tick, "send_due", lambda *a, **k: None), \
@@ -266,22 +268,22 @@ class SweepTest(unittest.TestCase):
 
 class ParseTest(unittest.TestCase):
     def test_parse_forms(self):
-        p = sweep.parse('[Replying to your previous message: "x · y"]\n\nhello', "7")
+        p = legacy_readers.sweep_parse('[Replying to your previous message: "x · y"]\n\nhello', "7")
         self.assertEqual((p["message_id"], p["quote"], p["text"], p["source"]), ("7", "x · y", "hello", "text"))
-        p = sweep.parse(redirected('"a transcript"', "8"), None)
+        p = legacy_readers.sweep_parse(redirected('"a transcript"', "8"), None)
         self.assertEqual((p["message_id"], p["text"], p["source"]), ("8", "a transcript", "voice"))
-        p = sweep.parse("[voice message could not be transcribed automatically; the audio is available at: "
+        p = legacy_readers.sweep_parse("[voice message could not be transcribed automatically; the audio is available at: "
                         "/tmp/a.ogg]", "9")
         self.assertEqual((p["source"], p["audio_path"]), ("audio", "/tmp/a.ogg"))
-        self.assertIsNone(sweep.parse('"words"\n\n[Journal reply — saved …]\n\n', "10"))
+        self.assertIsNone(legacy_readers.sweep_parse('"words"\n\n[Journal reply — saved …]\n\n', "10"))
         self.assertEqual(sweep.words("🌻 Morning journal · Thu 15 Oct"), "morning journal thu 15 oct")
 
     def test_gateway_rows_are_not_his_words(self):
         doc = ("[The user sent a document: 'scan.pdf'. It is saved at: /tmp/doc.pdf. Its text is not inlined "
                "here (it's a binary format such as PDF or DOCX).]")
-        self.assertIsNone(sweep.parse(doc, "11"))
-        self.assertIsNone(sweep.parse("[Your active task list was preserved across context compression]\n- [ ] x", "12"))
-        p = sweep.parse("[Note: model was just switched from a to b. Adjust your self-identification accordingly.]"
+        self.assertIsNone(legacy_readers.sweep_parse(doc, "11"))
+        self.assertIsNone(legacy_readers.sweep_parse("[Your active task list was preserved across context compression]\n- [ ] x", "12"))
+        p = legacy_readers.sweep_parse("[Note: model was just switched from a to b. Adjust your self-identification accordingly.]"
                         "\n\nYes, undo it.", "13")
         self.assertEqual(p["text"], "Yes, undo it.")
 

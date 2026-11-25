@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from helpers import CleanEnv, make_cfg
+from helpers import CleanEnv, make_cfg, unkeyed
 from serve_helpers import NEUTRAL
 
 from journal import capture, entries, ledger, library
@@ -298,7 +298,7 @@ class WebCaptureTest(CleanEnv):
         cap = p["captures"][0]
         self.assertEqual((cap["rule"], cap["source"], cap["via"]), ("web", "web", "web"))
         text = Path(info["path"]).read_text(encoding="utf-8")
-        self.assertIn("### 09:12 IST · text\n\nSlept well.\n", text)
+        self.assertIn("### 09:12 IST · text\n\nSlept well.\n", unkeyed(text))
         self.assertEqual(capture.open_prompts(ledger.snapshot(self.cfg.ledger_path), self.cfg, NOW), [])
 
     def test_without_an_open_prompt_it_is_a_note_and_nothing_is_folded(self):

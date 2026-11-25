@@ -22,12 +22,12 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from unittest import mock
 
-from helpers import CleanEnv, add_prompt, make_cfg
+from helpers import CleanEnv, add_prompt, make_cfg, no_model, unkeyed
 from serve_helpers import HERS, IST, NOW, build_journal
 
 from journal import cli, ledger
 from journal.mcp import handlers
-from journal.serve import api, document
+from journal import document
 
 HAS_SDK = importlib.util.find_spec("mcp") is not None and importlib.util.find_spec("mcp.server.mcpserver") is not None
 
@@ -82,7 +82,7 @@ class ReadTest(Case):
         self.assertEqual(stems, ["2026-10-15-j", "2026-10-15-fix-life-s01", "2026-10-14-evening"])
         self.assertIsNone(got["next"])
         lib = __import__("journal.library", fromlist=["load"]).load(self.cfg)
-        self.assertEqual(got["items"], [document.summary(self.cfg, p, lib) for p, _ in api.filter_entries(self.cfg)])
+        self.assertEqual(got["items"], [document.summary(self.cfg, p, lib) for p, _ in document.filter_entries(self.cfg)])
         # his own pages (2026-10-14.md, a hand-written -thoughts.md) are never listed
         self.assertNotIn("2026-10-14", stems)
         self.assertNotIn("2026-10-14-thoughts", stems)
@@ -217,7 +217,7 @@ class SaveTest(Case):
         self.assertIsNone(got["answered"])
         self.assertEqual(got["stem"], "2026-10-15-j-2")  # 2026-10-15-j is taken: a /j note of its own
         # verbatim inside; the whole text's outer whitespace is trimmed, as every capture trims it (capture._web_record)
-        self.assertIn("### 09:12 IST · text\n\n" + words.strip() + "\n", Path(got["path"]).read_text(encoding="utf-8"))
+        self.assertIn("### 09:12 IST · text\n\n" + words.strip() + "\n", unkeyed(Path(got["path"]).read_text(encoding="utf-8")))
         after = _digest(self.cfg.root)
         self.assertEqual({k: v for k, v in after.items() if k in before}, before)  # nothing else changed
         doc = handlers.entry_document(self.cfg, got["stem"])
@@ -232,7 +232,7 @@ class SaveTest(Case):
         p = ledger.find(ledger.snapshot(self.cfg.ledger_path), "2026-10-15-morning")
         self.assertTrue(p["needs_edit"])
         self.assertEqual((p["captures"][0]["source"], p["captures"][0]["via"]), ("mcp", "mcp"))
-        self.assertIn("### 09:12 IST · text\n\nSlept well, woke at six.", Path(got["path"]).read_text(encoding="utf-8"))
+        self.assertIn("### 09:12 IST · text\n\nSlept well, woke at six.", unkeyed(Path(got["path"]).read_text(encoding="utf-8")))
 
     def test_a_practice_with_no_open_prompt_fills_its_slot_never_a_note(self):
         # OPEN-FACES: words for a practice go through actions.answer (slots.resolve): at 09:12 tonight's evening slot
@@ -370,7 +370,8 @@ class StartTest(Case):
 
 class PrivacyTest(Case):
     """No tool opens the chat transcript: every handler runs with ``sqlite3.connect`` made to fail, and the journal
-    beside it has a sessions database holding a chat thread (``build_journal``)."""
+    beside it has a sessions database holding a chat thread (``build_journal``). Nor does any reach a model: every way
+    to one is fenced too (``helpers.no_model``)."""
 
     def test_no_tool_opens_a_database(self):
         add_prompt(self.cfg, kind="morning", local_date="2026-10-15", sent=NOW - timedelta(hours=2), message_id="900")
@@ -380,7 +381,7 @@ class PrivacyTest(Case):
             calls.append(a)
             raise AssertionError("a tool opened a database")
 
-        with mock.patch.object(sqlite3, "connect", refuse):
+        with mock.patch.object(sqlite3, "connect", refuse), no_model() as asked:
             runs = [lambda: handlers.today_text(self.cfg, NOW),
                     lambda: handlers.entry_list(self.cfg, NOW, query="harbour"),
                     lambda: handlers.entry_text(self.cfg, "2026-10-14-evening"),
@@ -397,6 +398,7 @@ class PrivacyTest(Case):
             with self.assertRaises(handlers.Refused):
                 handlers.save(self.cfg, NOW, "/x no")
         self.assertEqual(calls, [])
+        self.assertEqual(asked, [])
 
 
 EDITING = ("edit", "delete", "remove", "update", "replace", "rewrite", "patch", "set", "write", "overwrite", "amend",

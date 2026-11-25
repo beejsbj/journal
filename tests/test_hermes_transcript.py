@@ -14,6 +14,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from helpers import ROOT
+import legacy_readers
 
 from journal import conversations, ledger, privacy, recovery, sweep
 from journal.config import Config, Names
@@ -204,12 +205,12 @@ class DatabaseTest(CorpusDB):
         self.assertIsInstance(self.cfg.transcript(self.db), NullTranscript)
 
     def test_the_old_tuple_readers_still_answer(self):
-        tuples = conversations.rows(self.cfg, self.db, 0)
+        tuples = legacy_readers.conversation_rows(self.cfg, self.db, 0)
         self.assertEqual(len(tuples), len(self.originals) + 1)
         self.assertEqual(tuples[-1][8], self.originals[0]["id"])
-        his = sweep.rows(self.cfg, self.db, 0, 0)
+        his = legacy_readers.sweep_rows(self.cfg, self.db, 0, 0)
         self.assertEqual(len(his), sum(1 for r in self.originals if r["role"] == "user") + 1)
-        self.assertEqual(sweep.read("hello", "5")["kind"], "his")
+        self.assertEqual(legacy_readers.read("hello", "5")["kind"], "his")
 
 
 class UnreadableTimeTest(CorpusDB):

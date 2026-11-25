@@ -8,7 +8,7 @@ entry per session (``YYYY-MM-DD-<program>-sNN.md``, dated the day the session st
 **A phase is a ledger prompt** (``<run>-sNN-pM``, ``collapse_hours: 3``). It becomes current by being *opened*
 (``_open``: the record written with ``message_id: None``, ``sent_at`` the moment it became current, ``phase_open``),
 so a face can answer it with no chat at all (OPEN-PROGRAMS); with a chat it is then delivered by
-``tick.send_prompt``, so capture, the sweep, folding, threading, the mirror and annotation are the existing code
+``chat.send.send_prompt``, so capture, the sweep, folding, threading, the mirror and annotation are the existing code
 paths. ``send_due`` on the run's phase means "owed a delivery"; ``phase_opened`` says whether it is current. The phase that is
 open (``phase_open`` on its record) takes every message while it is visible and the newest prompt in the chat, not
 only the first (``capture.open_phase``, ``capture.superseded``); a break closes it.
@@ -52,7 +52,9 @@ from datetime import date, datetime, timedelta, timezone
 from datetime import time as dtime
 from pathlib import Path
 
-from . import agent, audio, capture, compose, entries, ledger, library, mirror, notebook, outage, programdefs, prompts, validate
+from . import (agent, audio, capture, compose, entries, ledger, library, mirror, notebook, outage, programdefs, prompts,
+               ticklock, validate)
+from .chat.deliver import Delivery, Mirror, deliver
 from .config import Config, settle_minutes
 from .ports import ChannelError
 from .programdefs import Program
@@ -295,14 +297,10 @@ def _save(cfg: Config, run: dict) -> None:
 @contextlib.contextmanager
 def locked(cfg: Config):
     """The tick's lock, waited for: every transition outside the tick runs under it (a spawned ``journal program
-    …``), so it never races the tick's ``step`` or another spawn."""
-    cfg.state_dir.mkdir(parents=True, exist_ok=True)
-    with open(cfg.state_dir / "tick.lock", "a+") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
-        try:
-            yield
-        finally:
-            fcntl.flock(lock, fcntl.LOCK_UN)
+    …``), so it never races the tick's ``step`` or another spawn. A running tick lets it go first at its next safe
+    point (``ticklock``), so it waits for the rest of one step, not the whole tick."""
+    with ticklock.waited(cfg):
+        yield
 
 
 def _iso(at: datetime) -> str:
@@ -568,8 +566,8 @@ def _open(cfg: Config, run: dict, s: int, p: int, record: dict, now: datetime) -
     opening a phase is never a chat boundary. ``send_due`` is then "owed a delivery": only with a chat.
 
     A record the chat already has (a ``/back``, a ``/start`` that takes the phase up again) keeps its message and its
-    send times; the delivery that follows (``tick.send_prompt``'s re-send) brings the new text. With no chat it gets
-    the new text now."""
+    send times; the delivery that follows (``chat.send.send_prompt``'s re-send) brings the new text. With no chat it
+    gets the new text now."""
     pid = record["id"]
     at = _iso(datetime.now(timezone.utc))
     with ledger.locked(cfg.ledger_path) as data:
@@ -639,8 +637,8 @@ def _answered_this_visit(cfg: Config, run: dict, s: int, p: int) -> bool:
 
 
 def _given_up(cfg: Config, pid: str) -> bool:
-    """The phase's delivery used its last attempt (``tick.SEND_ATTEMPTS``, alerted then): the engine does not try it
-    again on its own."""
+    """The phase's delivery used its last attempt (``chat.send.SEND_ATTEMPTS``, alerted then): the engine does not
+    try it again on its own."""
     from .tick import SEND_ATTEMPTS
     return (ledger.find(ledger.snapshot(cfg.ledger_path), pid) or {}).get("send_attempts", 0) >= SEND_ATTEMPTS
 
@@ -650,9 +648,9 @@ def _send_phase(cfg: Config, prog: Program, run: dict, s: int, p: int, now: date
     """Make the phase current (``_open``) if it is not yet, then deliver it when a delivery is owed. Returns True
     when it is current and nothing is owed any more (delivered, or no chat).
 
-    The delivery goes through ``tick.send_prompt`` (retries, ``sent.jsonl``, re-send semantics, the mirror). A phase
-    is never deferred for want of a model: a reflect phase without usable model text goes out with the template at
-    once.
+    The delivery goes through ``chat.send.send_prompt`` (retries, ``sent.jsonl``, re-send semantics, the mirror). A
+    phase is never deferred for want of a model: a reflect phase without usable model text goes out with the template
+    at once.
 
     ``auto``: the engine is delivering on its own (a settle, or the tick delivering a phase it owed), not because he
     asked. Such a delivery never closes a bare ``/x`` window (``_held_off``): it is held, ``send_due`` stays set, and
@@ -747,8 +745,7 @@ def _held_off(cfg: Config, run: dict, s: int, p: int, now: datetime, log: list[s
     sends its rituals before the programs step, and a ritual sent in this tick ended the window after ``now``, so
     only ``now`` still calls it open. Holding for that one tick leaves the ritual the newest message, so his reply
     to it is the ritual's and not the phase's; the phase goes out at the next tick, after it."""
-    clock = datetime.now(timezone.utc)
-    if not (_off_the_record(cfg, max(now, clock)) or _off_the_record(cfg, now)):
+    if not _off_the_record_now(cfg, now):
         return False
     log.append(f"{run['id']}: session {s} phase {p} held back: off the record (or the privacy pass cannot say); "
                f"the tick sends it once the window closes")
@@ -784,7 +781,7 @@ def _expire(cfg: Config, prog: Program, run: dict, now: datetime, log: list[str]
 
 def _owed_expiry_notice(cfg: Config, run: dict, now: datetime, log: list[str], alerts: list[str]) -> None:
     """Tell him the interrupts he had set were cancelled when the run expired. The send is tried on the tick that
-    expires the run and, if Telegram is down, on the next ones (``tick.SEND_ATTEMPTS`` in all), then alerted: he is
+    expires the run and, if Telegram is down, on the next ones (``chat.send.SEND_ATTEMPTS`` in all), then alerted: he is
     otherwise still expecting reminders that were quietly removed."""
     from .tick import SEND_ATTEMPTS
     owed = run.get("expiry_notice")
@@ -1192,6 +1189,13 @@ def settle(cfg: Config, run_id: str, now: datetime, log: list[str]) -> bool:
     return advance(cfg, run_id, now, log, reason="settle", capture_id=_capture_key(newest), expect=(s, p))
 
 
+def _off_the_record_now(cfg: Config, now: datetime) -> bool:
+    """``_off_the_record`` at the later of ``now`` and the clock, or at ``now``: either says open. See ``_held_off``
+    for why both. The tick yields ``tick.lock`` to a waiter (``ticklock``) and goes on with the same ``now``, so a
+    ``/x`` begun while it was yielded is after ``now`` and only the clock sees it."""
+    return (_off_the_record(cfg, max(now, datetime.now(timezone.utc))) or _off_the_record(cfg, now))
+
+
 def _off_the_record(cfg: Config, now: datetime) -> bool:
     """Whether a bare ``/x`` is holding the chat off the record (or the privacy pass cannot say). A phase send ends
     such a window (``privacy``: a prompt send does), so an automatic send while he is talking privately would make
@@ -1441,7 +1445,7 @@ def send_interrupts(cfg: Config, now: datetime, log: list[str], tried: set[str] 
 
     Only the newest of several due at once goes (a tick that was down for an hour would otherwise send two or three
     questions back to back); the older ones are recorded as missed. A send that fails is tried again on the next tick
-    while the window lasts, and alerts, like any prompt, once ``tick.SEND_ATTEMPTS`` ticks have failed. Returns the
+    while the window lasts, and alerts, like any prompt, once ``chat.send.SEND_ATTEMPTS`` ticks have failed. Returns the
     alerts. ``tried`` (the tick's, shared by its two passes) holds the ids already attempted this tick: they are left
     alone, and each attempt made here is added."""
     from . import schedule, tick
@@ -1490,7 +1494,7 @@ def send_interrupts(cfg: Config, now: datetime, log: list[str], tried: set[str] 
     _open_interrupts(cfg, due, log)
     if not cfg.has_channel:
         return alerts  # no chat: an interrupt is opened at its time and answered on a face; nothing is sent
-    if due and _off_the_record(cfg, now):
+    if due and _off_the_record_now(cfg, now):
         # a send ends a bare /x window (privacy: a prompt send does), so his next private message would be filed;
         # they stay pending inside the grace window and are missed after it (``held_back`` is what makes that an
         # alert: a protocol day lost to a long /x, or to a privacy pass that cannot run, is not lost silently)
@@ -1796,23 +1800,29 @@ def _send_summary(cfg: Config, prog: Program, run: dict, s: int, now: datetime, 
         # the tick's step sends it once the window has closed, ``_retry_summary``)
         log.append(f"{run['id']}: session {s} summary held back: off the record (or the privacy pass cannot say)")
         return False
-    try:
-        mid = cfg.channel().send(cfg.chat_id, html, keyboard=compose.REMOVE_KEYBOARD)
-    except ChannelError as e:
+    plain = "\n\n".join(t for t in (completion, summary, document, next_line) if t)
+    return deliver(cfg, html, log, keyboard=compose.REMOVE_KEYBOARD,
+                   record=lambda d: _summary_account(cfg, prog, run, s, now, log, plain, d)).told is not None
+
+
+def _summary_account(cfg: Config, prog: Program, run: dict, s: int, now: datetime, log: list[str], plain: str,
+                     d: Delivery) -> Mirror | None:
+    """A session summary's send, accounted on the run (``deliver``'s ``record``): a send that raised nothing is sent
+    (whatever the chat gave back); one that failed is an attempt and its error. What the companion is told when sent."""
+    sess = _session(run, s)
+    if d.error is not None:
         sess["summary_attempts"] = sess.get("summary_attempts", 0) + 1
-        sess["summary_error"] = str(e)[:300]
+        sess["summary_error"] = str(d.error)[:300]
         _save(cfg, run)
-        log.append(f"{run['id']}: session {s} summary not sent ({e}); attempt {sess['summary_attempts']}/"
+        log.append(f"{run['id']}: session {s} summary not sent ({d.error}); attempt {sess['summary_attempts']}/"
                    f"{SUMMARY_ATTEMPTS}")
-        return False
-    sess.update(summary_sent_at=_iso(now), summary_message_id=mid)
+        return None
+    sess.update(summary_sent_at=_iso(now), summary_message_id=d.message_id)
     sess.pop("summary_error", None)
     _save(cfg, run)
-    plain = "\n\n".join(t for t in (completion, summary, document, next_line) if t)
     what = (f"{cfg.names.companion} sent the summary of {prog.id} " +
             (f"session {s} " if not prog.situational else "") + f"at {mirror.stamp(cfg, now)}")
-    mirror.to_chat(cfg, what, plain, log)
-    return True
+    return Mirror(what, plain)
 
 
 def step(cfg: Config, now: datetime, log: list[str], *, tried: set[str] | None = None) -> None:

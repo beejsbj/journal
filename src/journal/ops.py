@@ -37,7 +37,7 @@ The kinds (thresholds under ``ops.*``):
 - ``send_failing``: the newest scheduled prompts were not delivered after all their attempts (a chat or bot token
   that stopped working). Only with a chat (``channel.platform`` other than ``none``).
 - ``fold_given_up``: a prompt's fold was given up for good within ``fold_hours`` (72). The one field read is the
-  ledger's ``fold_gave_up`` record (``at``, ``reason``, ``attempts``, ``error``), which ``tick.fold`` writes when
+  ledger's ``fold_gave_up`` record (``at``, ``reason``, ``attempts``, ``error``), which ``chat.fold.fold`` writes when
   it stops trying.
 - ``step_failing``: a step of the tick crashed in ``step_ticks`` (6) scheduled ticks in a row.
 - ``tick_stale``: no scheduled tick has finished for ``tick_stale_hours`` (1). A tick cannot see its own absence, so
@@ -419,7 +419,7 @@ def _send_failing(cfg: Config, data: dict, now: datetime, send_attempts: int):
     return {"since": _iso(run[-1][0]), "undelivered": len(run), "error": error_class(run[0][1].get("send_error"))}
 
 
-_GAVE_UP_REASONS = ("permanent", "attempts")  # ``tick.fold``'s words for why it stopped
+_GAVE_UP_REASONS = ("permanent", "attempts")  # ``chat.fold.fold``'s words for why it stopped
 
 
 def _fold_given_up(cfg: Config, data: dict, now: datetime):

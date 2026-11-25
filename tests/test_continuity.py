@@ -44,7 +44,7 @@ class Earlier(Base):
         self.answer_prompt("evening", "2026-10-14", words, sent + timedelta(minutes=10), "11")
 
     def query(self):
-        alerts, log = self.reflect(datetime(2026, 10, 14, 23, 45, tzinfo=IST))
+        alerts, log = self.reflect(datetime(2026, 10, 15, 4, 45, tzinfo=IST))
         self.assertEqual(alerts, [])
         return self.asked[-1][0], log
 
@@ -161,7 +161,7 @@ class ContinuityTest(Earlier):
             self.analysis("week", day, f"**What I notice** — the week ending {day}.")
         wk = self.prompt("weekly", "2026-10-18", "20", "20", "End of the week.")
         self.answer_prompt("weekly", "2026-10-18", "a soft week", wk + timedelta(minutes=10), "20")
-        self.reflect(datetime(2026, 10, 18, 20, 40, tzinfo=IST))
+        self.reflect(datetime(2026, 10, 19, 4, 40, tzinfo=IST))
         query, toolsets = self.asked[-1]
         self.assertEqual(toolsets, tools.READ_TOOLSET)
         self.assertIn("the week ending 2026-10-11", query)
@@ -175,7 +175,7 @@ class QuotesTest(Earlier):
     passes is never written, as before."""
 
     def tick(self, minute):
-        return self.reflect(datetime(2026, 10, 14, 23, minute, tzinfo=IST))
+        return self.reflect(datetime(2026, 10, 15, 4, minute, tzinfo=IST))
 
     def never_written(self, answer):
         """Three attempts at ``answer``, each a bad one; then the alert, and no file."""
@@ -216,7 +216,7 @@ class QuotesTest(Earlier):
                 rec = self.rec("2026-10-14-reflection")
                 self.assertEqual(rec["error"], reason)
                 self.assertEqual(alerts, [f"2026-10-14-reflection was not written after 3 attempts: {reason}"])
-                shown = str(status.status(self.cfg, datetime(2026, 10, 14, 23, 56, tzinfo=IST), web=True)["reflections"])
+                shown = str(status.status(self.cfg, datetime(2026, 10, 15, 4, 56, tzinfo=IST), web=True)["reflections"])
                 self.assertIn(reason, shown)
                 for line in [*said, shown]:
                     for words in ("lake house", "soup", "meant it", "rain all day"):
@@ -371,7 +371,7 @@ class DoubleQuoteMarksTest(Earlier):
     INVENTED = "I hate my job"
 
     def tick(self, minute):
-        return self.reflect(datetime(2026, 10, 14, 23, minute, tzinfo=IST))
+        return self.reflect(datetime(2026, 10, 15, 4, minute, tzinfo=IST))
 
     INPUTS = [f"You wrote ″{INVENTED}″ today.", f"You wrote ＂{INVENTED}＂ today.", f"You wrote ❝{INVENTED}❞ today.",
               f"You wrote 〝{INVENTED}〞 today.", f"You wrote 「{INVENTED}」 today.", f"You wrote 『{INVENTED}』 today.",
@@ -461,7 +461,7 @@ class LongRunTest(Earlier):
 
     def test_a_timeout_after_the_model_answered_this_tick_uses_an_attempt(self):
         with mock.patch.object(agent, "answered_this_run", return_value=True):
-            alerts, log = self.reflect(datetime(2026, 10, 14, 23, 45, tzinfo=IST))
+            alerts, log = self.reflect(datetime(2026, 10, 15, 4, 45, tzinfo=IST))
         self.assertEqual(self.asked[0][2], reflect.BUDGET)
         self.assertIn("2026-10-14-reflection: reflection attempt 1/3 failed (timed out after 540s)", log)
         rec = self.rec("2026-10-14-reflection")
@@ -470,7 +470,7 @@ class LongRunTest(Earlier):
 
     def test_a_timeout_with_no_other_answer_is_still_an_outage(self):
         with mock.patch.object(agent, "answered_this_run", return_value=False):
-            _, log = self.reflect(datetime(2026, 10, 14, 23, 45, tzinfo=IST))
+            _, log = self.reflect(datetime(2026, 10, 15, 4, 45, tzinfo=IST))
         self.assertIn("2026-10-14-reflection: reflection deferred, model unreachable (timed out after 540s)", log)
         rec = self.rec("2026-10-14-reflection")
         self.assertNotIn("attempts", rec)
@@ -478,8 +478,8 @@ class LongRunTest(Earlier):
 
     def test_after_a_deferred_timeout_the_next_try_goes_without_the_search(self):
         with mock.patch.object(agent, "answered_this_run", return_value=False):
-            self.reflect(datetime(2026, 10, 14, 23, 45, tzinfo=IST))
-            self.reflect(datetime(2026, 10, 15, 0, 20, tzinfo=IST))  # retried after 30 minutes
+            self.reflect(datetime(2026, 10, 15, 4, 45, tzinfo=IST))
+            self.reflect(datetime(2026, 10, 15, 5, 20, tzinfo=IST))  # retried after 30 minutes
         (q1, tools1, budget1), (q2, tools2, budget2) = self.asked
         self.assertEqual((tools1, budget1), (tools.READ_TOOLSET, reflect.BUDGET))
         self.assertEqual((tools2, budget2), ("none", reflect.RETRY_BUDGET))

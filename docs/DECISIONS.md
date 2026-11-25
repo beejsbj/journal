@@ -503,8 +503,66 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   count such rows read-only in a live database, then add `[System: ` to the skip prefixes and to the marks
   (`_LEFTOVER`).
 
-## Taken by packages (recorded here; later packages follow them)
+- **TICK-LOCK-WAIT (2026-11-24) — a `/next` or `journal send` waits behind a tick's model calls; measured; fixed
+  by option (b), the owner's choice of 2026-11-24 (issue #45; TICK-LOCK-YIELD under *Taken by packages*).** `tools/measure_tick_lock.py` runs a real `tick.run` over a temporary root with one
+  annotation due, the clock pinned to a time when no ritual is due (a due opener would add a model call; the harness
+  prints which steps asked the model), and a fake companion, and a second party that takes `tick.lock` as a spawned
+  `journal program next` does (`programs.locked`). With a 3 s model call the second party, arriving 0.2 s in, waited 2.83 s; with 8 s, 7.85 s
+  (the tick itself added about 0.05 s). So the wait is the rest of the model call plus every step after it that also
+  calls a model. One call is bounded by its budget (the companion is killed 60 s after it): opener 240 s, annotation
+  180 s per prompt, picture 120 s per picture, day reflection or week review 480 s, outage catch-up 150 s, a program
+  phase's reflect text 120 s, bridge 60 s, insights 240 s. A tick that writes a reflection and annotates two entries
+  can hold the lock for 480 + 2 × 180 = 840 s (14 minutes) plus up to 60 s of kill grace per call, about 17 minutes
+  with three calls, though the usual annotation is far shorter. `journal send` (`tick.run(only=…)`) and
+  every spawned `journal program …` wait the same way and are never lost, only late (both are detached, so nothing
+  times out). Why it is not a small fix: the lock also orders sends. A `/next` that sent a phase while the tick sent a
+  ritual would race on "the newest message" that a reply is matched to (`tick.run`: the interrupts go before the
+  practices for that reason), and `programs.step` makes model calls itself. Options: (a) leave it: it only costs a
+  late reply in the few ticks a day that call a model, and the web app and chat both say "waiting" (recommended
+  while in maintenance); (b) the tick yields the lock between steps when someone waits (a waiter marker, or a second
+  lock file the waiter holds shared), which bounds the wait by the longest single step, not the whole tick, at the
+  price of every step re-reading what a transition may have changed; (c) the issue's own proposal for the tick-only
+  steps (annotate, reflect, images, recovery): the model call outside the lock and a re-check under the ledger lock
+  before writing, as sends already do, which leaves `programs.step` and sends under it; (d) a separate lock for program
+  transitions, which needs a rule for send order first. (b) or (c) is a package of its own with a gateway restart
+  (the gateway reaches `tick` through `programs`' function-level imports, not through `journal.hermes` at load).
 
+- **PLATFORM-FIELDS-R2 — write the platform-neutral names (open, after release 1 is deployed everywhere; issue #50
+  closes with it).** Release 1 (PLATFORM-FIELDS under *Taken*) reads `chat` and `telegram` for a reflection's send
+  record and `chat_history` and `telegram_history` for the source, and writes the old names. Release 2 is the step
+  that writes the new ones, and it waits for the one thing that makes it safe: **no process left that reads only the
+  old name.** A record written under `chat` is invisible to a reader that knows `telegram`, and a reflection that
+  looks unsent is sent again.
+  - **Precondition, checked before the PR merges, not after.** Release 1 is on the plugin pin, the CLI and serve (the
+    pin and the CLI are one sha, doctor's `same version as tick` row), and the gateway has been restarted at or after
+    that sha (`hermes gateway restart`: the gateway is the long-lived reader; the tick takes the new code on its next
+    run). The check is the gateway's start time against the release's merge time, and a log with no hook
+    exception; a gateway that predates release 1 blocks release 2.
+  - **The change.** `ledger.SEND_KEY = "chat"` (and `SEND_KEYS` keeps both, so the fallback read stays), so
+    `ledger.send_slot` makes new send records under `chat` and `send_of` still reads either; `reflect.send`'s mirror
+    reference names `ledger.SEND_KEY`; `DEFAULTS["sources"]` moves the default under `chat_history`, `SOURCE_ALIASES`
+    stays, `sources.check` and the doctor row say `chat_history`; `config.problems` warns once on the old key
+    (`sources.telegram_history is now sources.chat_history; the old name still works`), the docs and `plugin.yaml`
+    name the new key. A deployment's own config moves to `chat_history` in its overlay, after release 1 runs
+    everywhere: an older process ignores the new key and reads the default.
+  - **Migration: none needed, offered not required.** Old records are read under their old name for as long as the
+    fallback stays, and the tick's prune drops a reflection with the ledger after `KEEP_DAYS` (120): the old name is
+    gone from disk by itself 120 days after release 2. A one-shot rename (`telegram` → `chat` on every reflection,
+    under `ledger.locked`) would make the disk uniform at once, at the cost of one more write to a shared file on the
+    day of the deploy; recommended against, since the fallback read is a line.
+  - **Release 3 (optional, no earlier than 120 days after release 2):** drop the `telegram` fallback read and the
+    `telegram_history` alias, once no record carries the old name. Not planned; the fallback costs nothing.
+  - **Tests release 2 changes:** `tests/test_platform_fields.py` (writers' expectations of the old name become the
+    new, the reader tests stay as they are), the existing tests that pin `["telegram"]` on a written record
+    (`test_reflect.py`, `test_mirror.py`, `test_outage.py`), and the golden engine tests only if they hold a ledger.
+
+## Taken by packages (recorded here; later packages follow them)
+ **On review (2026-11-25):** the double-send guard is the tick's and the CLI's version, not the gateway's (the gateway
+  never sends a reflection; doctor's `same version as tick` row shows the tick's): release 2 ships only once the tick and
+  CLI run release 1 or later, and **its rollback goes to release 1 or later, never before it** (a tick from before
+  release 1 reads a `chat` send as unsent and sends it again). The gateway restart stays the condition for the
+  companion's context. `send_of` already prefers the name that says sent or skipped, and the mirror reference is
+  `ledger.SEND_KEY`, so release 2 is the one constant. Config: the new source name wins whatever layer it is set in.
 - **WP0 — an unknown entry id is recognised only with the engine's authorship marker.** The spec's fallback
   (`kind: <id>` or `practice: <id>` in the file's own front matter) alone would have turned a hand-written
   `2026-10-20-thoughts.md` with `kind: thoughts` into an engine entry, and `journal_add_note` (whose default
@@ -1373,7 +1431,6 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   the run, 404 until compiled. None of this opens the chat transcript or the privacy pass
   (`test_serve_programs.NoChatTest`).
 
-
 - **WP6 — the program block is read when the turn starts, from a queued pointer.** The dispatch hook (typed answers
   and voice or audio replies alike) queues `{run, session, phase, prompt}` under the turn's reply note in
   `hook-state.json` (`hookstate.remember_program` / `take_program`, a new section `programs`, same 15-minute
@@ -1935,7 +1992,6 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   the config file) and, for a key Hermes or the environment owns, the line that changes it; its "Saved" line names the
   layer written. This supersedes WP10's "The unit is not widened for the config file".
 
-
 - **TSAUTH (2026-10-20) — on the tailnet, signed in by Tailscale identity; no pairing (the owner's decision).** Opening
   the URL on any of his devices should just work. Choices:
   - **Both listeners, always.** `serve.socket` (an absolute path, at most 107 bytes, the `AF_UNIX` limit) is served
@@ -2094,9 +2150,6 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
   the names the entry gives its pictures, `<stem>.ext`, `<stem>-N.ext`); and `agent.ask` with a picture on a
   companion that cannot take one returns None without marking the model as having answered (it ran nothing, so
   it is no sign an outage is over for `recovery`).
-
-
-
 
 - **WEBEDIT (2026-10-26) — the sacred-ground line in `AGENTS.md` (and `CLAUDE.md`, its symlink) amended.** The owner's
   reason: AGENTS.md speaks to the agents building the engine, so it states the engine's rule: "His words are append-only
@@ -2973,7 +3026,6 @@ design docs ([ARCHITECTURE.md](ARCHITECTURE.md) §Decisions, [PRACTICES.md](PRAC
     as Hermes' own errors, and with a token in the environment the target and the platform's config resolve and the
     router receives `Platform.DISCORD`, the chat and the text with a `MEDIA:` tag left as text; nothing was written
     outside the temporary home. Not checked: a real send to Discord (no sends in development).
-
 
 - **BUILTIN-EDIT (the owner, 2026-10-26) — a built-in is edited in place, with a way back to the default.** The
   owner asked that even built-ins be changed in place, with an option to reset to the default. Before, a built-in
@@ -4590,13 +4642,14 @@ that echoes it has the line dropped. Left as known: `journal_search` refuses in 
 to it (not this host's setup: the gateway runs as a service).
 
 - **PARAGRAPH-TIMES (2026-11-24; issue #40, the owner said yes) — a typed block keeps when each of its paragraphs was
-  begun, on one hidden line under its heading.** *A change to the entry format.* The accepted prototype hangs an hour
+  begun, on one hidden line under its heading, after the block's key.** *A change to the entry format.* The accepted prototype hangs an hour
   beside each paragraph of his; the engine kept one time per block. Now the web app's write room (and the entry's own
   box: both are `useCompose`) notes when each paragraph was begun while he writes, the save sends those times, and
   the block keeps them:
 
   ```markdown
   ### 09:12 IST · text
+  %% journal block:b1a2b3c4d %%
   %% journal times:08:32 08:42 09:11 %%
 
   The sea was loud.
@@ -4613,8 +4666,15 @@ to it (not this host's setup: the gateway runs as a service).
     leaves it out (`raw_entry`, `his_words`, `his_text`, `without_companion_replies`, the document's `_clean`), his
     words can never hold one (`actions.refuse`: `reserved-line`), and a notes app that hides `%% … %%` comments
     hides it. Written once, with the block, in the same write: append-only holds; nothing is added to a block later.
-  - **Where it is not kept.** A block with a recording or pictures (its words are a caption, or a transcript to come;
-    and `fill_audio_block` wants the embed directly under the heading), an answer to a program's phase or interrupt
+  - **Its place: under the heading, after the block's key (MARGIN-FORMAT, 2026-11-25).** The engine's lines under a
+    heading are the block's key (`%% journal block:<id> %%`), then the times line; `entries.record_reply` writes both
+    with the block (`_raw_block`). Every reader takes the lines under a heading through MARGIN-FORMAT's helpers
+    (`entries.head_lines_end`, `entries.times_under` beside `entries.block_key_under`), so it takes them in either
+    order, either alone, and with blank lines (a formatter's) between the heading, the key and the times: a block
+    written by this package's first draft (times, no key), a block written before keys and times, and a keyed block
+    without times all read. The document's words, the edit cut (it starts after both lines, so Edit keeps both) and
+    Delete (the block's unit holds both) follow from that.
+  - **Where it is not kept.** A block with a recording or pictures (its words are a caption, or a transcript to come), an answer to a program's phase or interrupt
     (`phase_blocks` reads those back line for line, and an older engine would read the line as part of the answer),
     every chat capture (his chat words keep one time per message; nothing changes there), the CLI and MCP (no times
     to give).
@@ -4638,9 +4698,11 @@ to it (not this host's setup: the gateway runs as a service).
     Accepted: the times are a note of when he wrote, not a claim the engine can re-check against a file he is free to
     change. **The room's clock is the device's**: the room stamps each paragraph with the device's clock, while the
     saved entry shows it in the configured time zone (`cfg.tz`); the two differ only when he travels.
-  - **Older readers.** An older engine reads a block with the line as before (the line is an engine line everywhere),
-    except the web app's in-place Edit and Delete of that block, which refuse it (`not-editable`: "a line of the
-    engine's own"; change it in your notes app). An older web app shows the block's one time.
+  - **Older readers.** An older engine reads a block with the line as before (the line is an engine line everywhere).
+    MARGIN-FORMAT's code (the release before this one) also edits and deletes such a block in the web app (its cut
+    starts after the lines under the heading); code from before MARGIN-FORMAT refuses that block's in-place Edit and
+    Delete (`not-editable`: "a line of the engine's own"; change it in your notes app). An older web app shows the
+    block's one time.
   - **Rejected.** *A line before each paragraph* (`%% journal at:23:15 %%` between his paragraphs): machine lines
     inside his text, which a notes-app edit would carry around and which split his words in plain viewers.
     *Inline marks in his text* (`<span data-at>`, a trailing `^23:15`): change his words. *The ledger only*
@@ -4656,6 +4718,118 @@ to it (not this host's setup: the gateway runs as a service).
     beside it where the hour changes; on a page too narrow for a margin those become small running heads. The write
     room hangs each paragraph's hour beside its first line while he writes, and the hour of the day before a word.
 
+- **X-FLOOR (2026-11-24) — `/x` is refused at the bottom of the write path too (issue #46).** The callers refuse
+  off-the-record words before they write and decide what to answer (`actions.refuse` on the faces, `inbound` and the
+  privacy pass in the chat, `writes._his_words` for an edit); the functions under them did not, so the guarantee
+  rested on every new caller remembering. Now `capture.refuse_off_record(cfg, text)` (the text starts with the
+  configured command or has a line that does: `opt_out`, `opt_out_inside`) raises `capture.OffRecord` (a
+  `ValueError`), before anything changes, in `capture.record`, in `capture.write_words` (new: the one caller of
+  `entries.record_reply`, which takes no config and so cannot read the command itself), in `conversations.his_block`,
+  and in `serve/blocks.edit`, which now requires `cfg` (keyword-only, no default, so a caller cannot leave it out) and
+  answers with its own `Refused(422, "off-the-record")`. `test_off_record_floor.py` calls each directly as a forgetful
+  caller would (and `capture`, `capture_to`, `capture_note`, `capture_web`, `add_web_block`, which leave the check to
+  their callers) and shows nothing is written, no ledger change and no recording kept; it pins that
+  `entries.record_reply` and `entries.append_conversation` have one caller each. **Raise, not a quiet skip:** a
+  forgotten check is a bug, and a refusal that returned nothing could pass for a capture; the ledger is written only on
+  a clean exit (`ledger.locked`), so a raise leaves it as it was. **Only the command in the text:** whether a message
+  falls in a `/x` window stays the privacy pass's. **Not covered:** `entries.fill_audio_block` (a transcript of his
+  voice, never typed) and `capture.add_companion_note` (her words; a note in a `/x` turn is refused by the turn's mark,
+  `tools.call`).
+  **Review of #78 (Claude Opus 5.5, high): `/j /x` is off the record, everywhere.** Found: a chat message `/j /x
+  secret` was, on main, a `/j` note whose words were `/x secret` (a live privacy bug: the hook, the conversation
+  writer, the privacy pass and the sweep read `/x` only at the start of the whole message, then stripped `/j`); and
+  with the floor alone, the floor raised on it inside the conversation writer's and the sweep's batch, every tick, so
+  nothing after it was ever written. Decided: (a) `capture.opt_out` reads through a leading `/j` (`/j /x …` is `/x
+  …`; a later line `/j /x …` counts for `opt_out_inside`), so every reader agrees with the floor by construction:
+  `inbound`, the privacy pass (`row_marked`; and a bare `/j /x` on the busy path starts a window), the writer's
+  `classify`, the sweep, `actions.refuse` on the faces and `stored_opener`. **A bare `/j /x` opens the window as a
+  bare `/x` does** (consistency: `/j` means keep, `/x` means don't, and the more private reading wins): the hook
+  records the window and rewrites the message to the bare opt-out command, so the platform runs `/x` and its answer,
+  not `/j`'s usage. (b) The writer (`_Threads._place`, with the check before any copy is kept in `_Writer.his` and
+  `new_note`) and the sweep (`run`, around `reconcile`) catch `capture.OffRecord` per message: that message is dropped
+  as off the record (its hook copies go, her answer to it stays out; the sweep logs its id, never its words) and the
+  batch, the cursor and the watermark go on. (c) Regression tests in `test_conversations.OffRecordTest` (run on the
+  Hermes adapter and on the fake transcript by `test_fake_transcript`): through the hook, on the busy path, a bare `/j
+  /x`, and the backstop with the floor made stricter than its callers. Also traced: `entries.set_meta` writes his
+  `mood` and `people` labels (typed on the web app), so it is under the floor now through `capture.write_meta` (its
+  one caller; each value and each list item refused), and the route answers a `/x` label with 422 `off-the-record`;
+  the program reply note (`inbound._program_note` → `programs.reply_note`) writes nothing: it is the companion's note
+  in front of his words, which `capture.capture` has already recorded through `record`, under the floor.
+
+- **SHARED-READERS (2026-11-24) — the readers the web app and MCP share live in the core (issue #47).** `mcp/` read
+  entries through `serve/` (`serve.api.filter_entries`, `serve.document`, `serve.writes.TEXT_LIMIT`), so the MCP face
+  depended on the web server's package. Moved, with no behaviour change: `serve/document.py` → `document.py` (core);
+  `filter_entries`, its `_order` and `LIST_LIMIT` from `serve/api.py` into it; `TEXT_LIMIT` into `actions.py`, the
+  words-writing module of every face. The old names stay: `serve.api.filter_entries` / `LIST_LIMIT` and
+  `serve.writes.TEXT_LIMIT` are the same objects, and `journal.serve.document` is an alias of the moved module (the
+  same module object, set in `sys.modules`), so an import or a test's patch through either name reaches the same code.
+  **Fences tightened:** `test_mcp_fence.py` now forbids `mcp/` to import `serve` at all (importing `journal.mcp.handlers`
+  loads no `journal.serve` module), and `test_serve_fence.py` checks the moved reader (`SHARED`) with serve's forbidden
+  list plus `serve`, `mcp` and `tools`. `today.collect`, the third reader the issue named, was already in the core.
+  The serve modules now import `document` from the core (`from .. import document`); tests import it from there too.
+
+- **ROUTE-OPENS (2026-11-24) — the faces' fence is held by what they open, and the import fence says it is direct
+  (issue #44).** `test_serve_fence` / `test_mcp_fence` check what `serve/` and `mcp/` import themselves; loading them
+  also loads `agent`, `mirror`, `notebook`, `ports` and `sqlite3` through the engine (at import; `conversations`,
+  `context` and `sweep`, which the audit listed, no longer load then). **Chosen:** reword AGENTS.md to say the fence is
+  direct, not make it transitive (a transitive fence fails today on modules serve loads and never calls), and pin that
+  set exactly (`ModuleLoadTest`) so it changes only by a decision. **The behavioural half:** `test_route_opens.py`
+  installs an audit hook (`open`, which `os.open` raises too, `os.listdir`, `os.scandir`; every thread, so the server's
+  handler threads are seen) and re-runs the existing walks (`test_serve_privacy`'s GET, write, Write-now and push
+  walks; `test_mcp.PrivacyTest`'s tool walk) unchanged, failing on any path under `state_dir` outside `ALLOWED` (a file
+  brings its lock and an atomic write's temporary file) and on the sessions database wherever it is. `NEVER` names
+  what must stay out (the notebook and its archive, `packs/`, `conversations.json`, the mirror queue, `sent.jsonl`,
+  `send-times.json`, `audio-stash/`, `tick.lock`, `hook-state.json`, `sweep.json`). A path test, not a content test: a
+  file's existence check (`stat`) is not recorded. **Found and settled (the orchestrator's call for the owner,
+  2026-11-24, option (a) of the open point the first draft raised):** `GET /api/v1/status` opened `hook-state.json`
+  (through `today.injections`, parsing the whole file, which also holds queued packs, voice notes awaiting transcripts
+  and off-record turn marks, for the today block's count and last time) and `sweep.json` (its watermark, served as
+  `{at}` since AUDIT-LEFTOVERS). Nothing of his or hers reached the client, but `status`'s docstring and API.md
+  Decision 2 said no web route reads the hook's records while API.md's `/status` row listed the injections. Now the web
+  status has no `sweep` and its `today` no `count`/`last` (`{enabled, cache_age_minutes}`), so no web route opens
+  either file; both are in `NEVER` with no exception, and API.md says so. The PWA calls `/status` only as a sign-in
+  probe and reads neither field; the CLI's `journal status` is unchanged. **Review of #77 (Claude Opus 5.5):** the hook
+  also records `sqlite3.connect` (SQLite opens its file in C, raising no `open` event), and a path opened relative to a
+  directory handle (`os.open(name, dir_fd=…)`, `os.scandir(fd)`) is kept as given, not resolved against the cwd, and
+  fails when its name is in `NEVER`.
+
+- **MODEL-WALK (2026-11-24) — "the web app calls no model" is fenced by behaviour at `ask`, not at building a
+  companion (issue #3).** The import fence (`test_serve_fence.py`) sees only what `serve/` imports itself; serve
+  loads `reflect`, which imports `agent`, so a route could reach a model by another module. `helpers.no_model()` now
+  records and fails `agent.ask`, the `ask` of every companion `Config.companion()` hands out (the outage probe asks the
+  same one) and the companion classes' own `ask`, and every serve route walk and the MCP tool walk run inside it and
+  assert nothing was recorded, so a route that catches the failure still fails the suite. **Why at `ask` and not
+  `Config.companion()` raising, as the issue first put it:** `journal doctor` (`GET /api/v1/doctor`) builds the
+  configured companion to read its `doctor_rows` (the `one-shot tools` row: a check of files, no model run) and
+  catches whatever that raises, so a raise there would be swallowed, and would wrongly fail the walk on any host
+  where the Hermes command is found. `test_doctor_checks_the_companion_without_asking_it` runs that branch through
+  the fence; `test_the_model_fence_is_not_vacuous` shows each watched way records. Verified by mutation: a swallowed
+  `reflect.agent.ask` call in the doctor route fails the GET walk. Not fenced here: a model reached by a process
+  serve spawns (`journal send`, `journal program`), which is the engine's own step with its usual fallback.
+
+- **AUDIT-LEFTOVERS (2026-11-24) — what issue #50 took, and what it left.** Taken: (1) the web's `/status` serves
+  `sweep` as `{at}`: the doc listed `sweep.json` as unservable, and its database path and row id are chat-side, so the
+  web gets the time alone (the CLI's status line is unchanged); (2) `/status` and the hook state: already so on main
+  (`hook_state` is not read in web mode, `tests/test_serve.py` pins it); (3) the thin tuple readers WP7 kept
+  (`sweep.parse/rows/read`, `conversations.rows`) are called by no `src/` code, so they moved to
+  `tests/legacy_readers.py` and the suites that pin the row semantics call them there (WP13 had left this for exactly
+  that rewrite; `context.clean_user_text`, `agent.is_failure_text` and `mirror.turn_running` are not in the issue and
+  stay). **Not taken, needs the owner:** the platform-named fields. The ledger's `telegram` record (a prompt's send,
+  a reflection's send, an annotation reply; read at about twenty sites and by `standing`, `context`, `status`,
+  `reflect`) and the `telegram_history` source (a key in deployments' config and in `plugin.yaml`) would each need
+  read-old/write-new. The ledger is shared by a gateway that runs old code until it restarts and by a tick that runs
+  new code at once: a record written under the new name is invisible to the old reader, so a prompt could look unsent
+  and be sent twice. Options: (a) leave the names (cosmetic; recommended while in maintenance); (b) rename in two
+  releases, the first reading both names and writing the old, the second writing the new once every gateway has
+  restarted; (c) add `chat_history` as an alias for the source only, which is config-side and safe. *The owner chose (b)
+  on 2026-11-24: see PLATFORM-FIELDS (release 1) under *Taken* and PLATFORM-FIELDS-R2 (open).*
+- **INVISIBLE-PY (2026-11-24) — the invisible-character guard covers the Python source.** #63 guarded the built web
+  app; three literal U+FEFF in `library.py`, `programdefs.py` and `tests/test_library.py` still tripped Hermes'
+  scanner (it reads `.py`, tests included). Rule: a Python file writes such a character as an escape (`"\ufeff"`), and
+  `tests/test_install_scan.py` fails on a literal in any file under the repo root with an extension the scanner reads
+  (`SCANNABLE_EXTENSIONS`: Python including the root `__init__.py` and `tools/`, docs, JSON, shell, fixtures), minus
+  the scanner's excluded directories. A file that must hold one on purpose (a fixture) would be named as an exception
+  in that test, with its reason.
 - **DOCTOR-STUB (2026-11-24) — the doctor judges the cron stub by what it runs, not by the install that asks (issue
   #7).** `cron.checks` compared the stub with `stub_text(src, home)` for the caller's `src`; from a `uv tool` CLI that
   is site-packages, so a correct stub (naming the plugin's `src`) read "out of date" on one face and ok on the other.
@@ -4665,3 +4839,567 @@ to it (not this host's setup: the gateway runs as a service).
   running CLI; the `same version as tick` row already does that.
   Accepted trade: a stub whose `SRC` still exists with `journal/cli.py` reads ok even if it is no longer the install
   the profile uses; version skew between the two is covered by the `same version as tick` row, not by this one.
+
+- **CATCH-UP-LETTER (2026-11-24) — one message after an outage, in place of late replies (#42, the owner's decision 1
+  of 2026-11-15, its last open item).** On main after OUTAGES and STALE-COUNT, an outage left two things for the chat:
+  the catch-up (`recovery.py`: one message to his chat messages that got only Hermes' failure line) and, once the
+  model was back, the annotation replies to every entry he wrote meanwhile, paced and up to 24 h late, one by one. A
+  prompt reply in the chat is both (a failed turn and an entry), so the same words could be answered twice, late. The
+  owner: "I was away, I read your letters": one message, and the notes still go into the files.
+  - **Built on the catch-up, not beside it.** One `recovery` record per outage still: a waiting chat catch-up takes in
+    the entries (`_attach`), and with no unanswered chat message the entries get a record of their own
+    (`outage-<UTC minute of down_since>`). A record is tied to the breaker's outage by `outage_down_since`, so it is
+    made once (idempotent across ticks and restarts: the record is the ledger's, and a record of that outage that
+    ended, sent or not, stops a second); an entries-only letter sets `last_row` to the newest chat row read, so the
+    chat scan never makes a second message for the same rows. The breaker having been open is the outage's evidence
+    (`outage_seen`), as OUTAGES' catch-up already treats a deferral the probe confirmed.
+  - **Which entries.** The breaker's outage (`outage.span`: `down_since` to the `answered_at` of the model that came
+    back; open: to now) when it lasted `recovery.letter_min_minutes` (60) or more; the prompts with his words from
+    `annotate_after_minutes` before it began (their notes fell due inside it) to its end whose reply is still owed and
+    would be annotated; not a program phase (a run has its own flow: its reflect phases, its own summaries). With the
+    breaker off nothing is known across ticks, so nothing changes. With `telegram.annotation_replies` off there are no
+    replies to replace, so no entries (the chat catch-up is unchanged).
+  - **When: at once, the first tick a model answers** (subject to the companion's turn lease and `/x`), **not after
+    the paced annotations.** Chosen because the owner put it as "when the model comes back", because the letter reads
+    his words in the entries rather than her notes (so it depends on no model step but its own), and because waiting
+    for every held annotation (two a tick) would hold the replies longer and need a "done" rule for work that may
+    defer for 7 days. The cost: the letter cannot lean on her considered notes; they are still written and are in the
+    entries. From the moment a model answers (the breaker's `last.answered_at`), `tick.reply_annotations` holds those
+    replies (`recovery.held`), before the record exists, because the tick's annotate step (which usually closes the
+    breaker) and reply step run before the recover step.
+  - **The floor: no letter, never a fixed line.** No model: it waits (deferred as before) and the replies stay held,
+    so nothing late goes; past `max_age_hours` it is noted and they are released, already stale. Three bad answers or
+    six refused sends, or none sent `letter_deadline_minutes` after a model came back (on review, below): the mirrored
+    note, and the replies are released to the old path (paced, dropped once stale, counted for her by STALE-COUNT). **Chosen over** a plain fixed line ("I was away; my notes are in the entries"):
+    code would be speaking in her voice and claiming she read something, which the model alone may write; and her
+    replies are her real words, which the old path still delivers when they are not stale.
+  - **Checked like the catch-up.** `validate.check_catchup`: short prose, no failure text, no technical account, and
+    every quote among his words it was shown (his messages, his lines of the conversation, his words in the entries:
+    `entries.his_text`, never her notes, folded replies or the opener). No citation rule: like the catch-up, the
+    message is prose to him, not a sourced opener; "uncited claims" are held off by the request (only what is given,
+    nothing invented) and by quotes being checked.
+  - **Privacy.** The whole message waits while a bare `/x` window is open now or the privacy pass cannot run (fail
+    closed; `privacy.view`, as program phases do): his catch-up is not a prompt send and ends no window, but it would
+    land in a private conversation. Its material holds nothing off the record: chat rows are those `scan` keeps
+    (`conversations.row_is_off` skips private ones), and entry words are his blocks, which capture writes only on the
+    record. Tested with an outage spanning an `/x` window, a window open at recovery, and a pass that cannot run.
+    `channel.platform: none`: `recovery.enabled` is now false without a channel (it already needed a chat id), so
+    nothing is asked, written or sent, and the replies are skipped `no chat` as before.
+  - **Product choices left to the owner** (the conservative pick taken, each a setting): a short outage (under 60
+    minutes) keeps the replies, barely late (`recovery.letter_min_minutes`); the letter can be switched off
+    (`recovery.letter: false`: the old behaviour); its length is the catch-up's (about 900 characters asked, 1,500 the
+    hard limit), in one message, talking about what he wrote as a whole rather than entry by entry; day reflections
+    and week reviews held by an outage are not folded into it (they are analyses, not replies, and keep OUTAGES' pace
+    and stale rule). Shown to her: the mirrored message says it was sent after reconnecting and is about his messages
+    and the N entries; covered replies are marked `skipped: "letter"`, which STALE-COUNT does not count (they were not
+    lost: the letter went in their place).
+  - **Tests.** `tests/test_catchup_letter.py`: the letter in place of the late replies and a later annotation not
+    sent; one per outage across ticks and processes; entries alone; one message with the chat catch-up; answered live
+    since (the entries stay); a quote of her note refused; the floor (bad answers release the replies; no model keeps
+    them held); a short outage, the setting off and the breaker off change nothing; an `/x` window inside the outage,
+    one open at recovery, and a privacy pass that cannot run; `channel.platform: none`. **Tests changed on purpose:**
+    `test_outage_breaker.py`'s `ConfigTest` lists the three new defaults. `test_recovery.py` passes unchanged (the
+    messages-only request is byte for byte the old one).
+  - **On review (2026-11-25, an independent Opus pass on f738750).** The design held (no reply goes out twice, nothing
+    off the record reaches the letter, her voice only through checked model text); these were changed:
+    - **A deadline** (`recovery.letter_deadline_minutes`, 120). Held replies had none: with a letter waiting and the
+      sessions database or the privacy pass unreadable, `run` stopped at the scan every tick and the replies stayed
+      held (still at +200 h in the probe); and a letter request that kept timing out while other steps' models
+      answered was deferred every 30 minutes with no attempt counted, until every reply was stale (92 asks in 46 h,
+      then no letter and no replies). Now, 120 minutes after a model came back (the breaker's `answered_at`; a later
+      outage pauses it, since that one will be taken in), the record is noted, checked before the scan so an unreadable
+      chat cannot block it, and `held` lets the replies go from that moment by itself; past it no letter is begun.
+      Two hours is well under `stale_hours` (24), so released replies still go. **Cost, named:** the note ends the
+      whole record, so in that rare case his unanswered chat messages in it get the mirrored note, not a reply, where
+      on main a chat catch-up alone could keep trying for up to `max_age_hours`.
+    - **`/x` again just before the send.** The check ran before the model call (up to 150 s); a window opened
+      meanwhile was missed. It runs again after the text is checked; a window then (one that began after the tick's
+      `now` counts as open) keeps the text for the next tick's resend.
+    - **Rollback without a ledger edit.** A record of entries alone, or one whose messages were answered live, has no
+      `messages` key (never `[]`): the older `run` reads `waiting.get("messages", [{}])[0]` and raised IndexError on
+      `[]` every tick (OPS-NOTICE would have filed `step_failing` after six). `RollbackTest` runs the older module
+      (from git history; skipped in a shallow clone, where the shape tests still run).
+    - **Her note says what is true.** "The replies go to the chat as usual" only for replies released and not stale;
+      otherwise how many go, or that they are too late and stay in the entries.
+    - **Two outages close together make one letter.** A record of an earlier outage not yet written takes in a later
+      one (its earliest start, the later end, the covered prompts taken again over the whole span), instead of two
+      letters minutes apart.
+    - **Kept as before, said plainly:** an outage under `letter_min_minutes`, `recovery.letter: false`, or the breaker
+      off keeps main's behaviour, which can answer one prompt reply twice (the chat catch-up, as a failed turn, and its
+      annotation reply). Accepted as the cost of a short outage's replies staying barely late.
+    - **Known limit, recorded rather than fixed:** words he adds to a covered prompt after the letter went but before
+      it is annotated get no reply of their own (it is already `skipped: "letter"`). Not re-opened because the reply
+      would carry her notes on the whole entry, answering again what the letter answered (the double answer this
+      package removes); words he adds in the chat after she is back are answered by her live turn anyway, so only
+      words added on a face are affected, and her notes on them are still written into the entry.
+    - Tests added: a quote of entry words that were never chat messages; a pass closed for the scan alone and one
+      closed at the send alone; an `/x` window in the outage with entry words written on a face; a window opened while
+      the letter was written; six refused sends; the deadline with the request failing, with the chat unreadable, and
+      with no record made; a note with stale replies; two outages merged; the rollback shape. Each was run with its fix
+      reverted and failed.
+  - **On re-review (2026-11-25, an independent Opus pass on e5100e3).** Nothing doubles, nothing leaks, rollback is
+    safe; the deadline's clock was changed:
+    - **A chat-only catch-up has no deadline again.** `_attach` ties a waiting chat catch-up to the outage even when it
+      takes in no entry (`prompts: []`), and the deadline then ended it at 120 minutes, where main kept trying for up
+      to `max_age_hours`. The deadline is there only to let held replies go, so `_overdue` is false for a record
+      holding none; and past the deadline such a record takes no entries in (it stays a chat catch-up).
+    - **Only a later outage the letter takes in moves the clock.** `_back` moved it for any later outage, including
+      one shorter than `letter_min_minutes` that `_attach` never takes in; the letter's own failed request can trip
+      the breaker for minutes, so a flaky provider held the replies until stale (still waiting 23 h after the model
+      came back, in the probe). Now only a later outage of `letter_min_minutes` or more (so far, while it lasts)
+      moves it. **And a total hold cap, both:** the record keeps `first_back_at` (the first time a model came back
+      for it, never moved), and `hold_cap` = min(3 × `letter_deadline_minutes`, `stale_hours` − 1 h) (6 h by default)
+      ends it whatever moved or paused the clock since, so the replies it lets go are always still sendable. Both
+      rather than one: the first keeps the usual case at the 2 h deadline; the cap bounds what no rule foresees
+      (long outages recurring, a window that never reads as closed).
+    - **The clock stops while he is off the record** (the orchestrator's decision). A bare `/x` window open after
+      she was back held the letter (rightly), but the deadline ran on, so the record was noted and the replies went
+      in the middle of his off-the-record conversation. Now `_off_record`, for a letter holding replies, keeps the
+      windows the privacy pass sees on the record (`off_record`: `[since, until]`, `until` null while open; one that
+      ended is closed at its last activity plus the quiet gap, or a prompt send), and the deadline does not count
+      the time inside them. A pass that cannot run keeps nothing, so an unreadable chat still lets the replies go at
+      the deadline (the first review's point); the hold cap applies in every case, so a window cannot hold them
+      forever. **Cost, named:** a window seen open and never seen again (the chat unreadable from then) pauses the
+      clock until the cap (6 h), not 2 h.
+    - **An entries-only letter's rows stop below a turn still running.** Its `last_row` was the newest row read,
+      which can be his message whose live turn has not ended (`scan`'s `pending`); had that turn then failed, the
+      chat catch-up (scanning after `last_row`) would not see it. Now, when pending, `last_row` stops below the first
+      of his unanswered messages.
+    - Tests (`ClockTest`): a chat-only catch-up past 120 minutes, then sent; a 5-minute outage at 110 minutes does
+      not move the deadline; 60-minute outages recurring every ~3 h are released within the cap; a 2.5 h `/x`
+      conversation after she is back releases nothing and sends nothing, and the letter goes once it closes; a turn
+      running when an entries-only letter goes, then failing, gets the chat catch-up. Each was run with its fix
+      reverted (the hold cap and the short-outage rule separately) and failed.
+
+- **PRIV4 (2026-11-24) — an old compaction copy and a queued bare `/x` (#4, #5).** Two holes the BACKLOG-PRIVACY
+  entries above left open; both fixes only make rows private, never the reverse.
+  - **A copy whose original the view did not read is answered from a slice around the original (#4).** A
+    compaction copy is private when its original is, and an original older than the view's recompute was answered
+    only by its saved id, which ages out at `KEEP_DAYS` (400). A copy of a private row older than that, with no mark
+    of its own (a message steered in inside a bare-`/x` window, her reply there), read as public to the outage
+    catch-up, the pack and annotation alignment. Option (a) of the issue is taken, bounded: when a view holds a copy
+    whose original it did not read and no saved answer names private, `_originals` reads each such original by its
+    id (originals a few ids apart in one read) and runs the pass over a slice from `RECOMPUTE` before it (a window
+    or turn begun in those hours; a saved window still open there takes it back to that window's start) to
+    `RECOMPUTE` after it (a row he sent before it but that was queued is stored after it), originals whose slices
+    meet sharing one; what a slice finds private is added to the view, nothing is taken from it. The hook's records
+    it needs are kept for good since BACKLOG-PRIVACY. Option (b) (keep saved private ids for good) was not taken: it
+    grows with every private row and is still only a floor.
+    A slice cannot see a window begun before it and kept open into it (his messages less than `quiet_minutes`
+    apart, no prompt send), and once the saved windows have aged out nothing records one (the re-review of this
+    section reproduced the leak, on main too). So the pass runs over each slice a second time with a window opened
+    at the slice's start, the widest one that could be open there; an original private in that run but public in
+    the real one could be covered by an earlier window, and its copies are answered private (its own id is not, so
+    `update` never saves the old row as private on a guess). No read is added. The limit, and its price: a public
+    copy reads private when the `RECOMPUTE` before its original had no quiet gap and no prompt send, and no saved
+    window answers for it: the readers of raw rows (the catch-up, the pack, alignment) then leave that copy out.
+    The second run costs no read, only the pass again over rows already in memory: re-run on the benchmark below
+    (single runs on a loaded host, so noisy), a view holding copies took 167 / 706 ms on main, 335 / 676 ms before
+    the second run and 168 / 599 ms with it (60 days and 20,000 rows / 180 days and 60,000). The tick's log counts
+    those originals.
+    Cost: a view that holds such a copy reads, besides its own hours, each original by id and one slice of about
+    four days per group of originals, on each uncached call (the gateway's on each of his messages and each
+    journal-writing tool call included) until the copy is older than the view. That is the common case, a copy of a
+    public row, and Hermes' compressor can carry a conversation's first exchange, so the original can be as old as
+    the conversation: the slice bounds it. Measured on a synthetic database with Hermes' indexes
+    (`tests/test_privacy_retake_cost.py`, an uncached view): 60 days and 20,000 rows, 240 ms on main, 375 ms here
+    (2.4 s for the first version of this fix, which re-took the whole view from the oldest original); 180 days and
+    60,000 rows, 620 ms on main, 675 ms here (8 s before). A copy whose original is saved private costs nothing more.
+    The tick logs each re-take (`privacy: answered N compaction-copy original(s) …`, counts only, with `; the
+    copies of U read private …` when the second run decided any). An original that can't be read by its id, is
+    read as newer than the view's start (two reads that disagree) or is missing from its slice closes that view
+    (everything private) until the next read; no read steps back again. Each bound is pinned by a test that fails
+    when it is moved (`SliceBoundsTest`, `SliceReadsTest`): the lookback, the look-ahead, the saved-window start,
+    the two closing reads and the second run.
+  - **A bare `/x` stored as a row also opens its window at its own time (#5).** The pass opened a busy-path bare
+    `/x`'s window at the stored-order clock (the latest time seen), so a message he sent after the `/x` but stored
+    before it was read before any window existed and was public. The pass now gathers the own times of those rows
+    before the walk and adds them to the hook's starts (`_busy_starts`), as the issue proposed; the walk still opens
+    one where it reaches the row, as before. For a row stored in order the two are the same moment, so nothing
+    changes there. The window rule then reaches her rows too: a `/x` he sent at 10:01, queued during her turn
+    and stored after her 10:03 answer to his public 10:00 question, makes that answer private (the window is open from
+    10:01; more private, as the rule says, and pinned by a test). Whether Hermes can store the two in that order was not checked on a live gateway (the issue's
+    open question): the fix holds either way and costs nothing when it cannot.
+  - Not done here: #10 (a captionless photo that ends a window takes her next public reply off the record) and #11
+    (compacting and dropping the `/x` records) trade privacy for something else and wait for the owner.
+
+**X-FLOOR, on re-review (2026-11-25).** `capture.opt_out` reads past every leading `/j` (`/j /j /x …` too), so the
+gate strips as deep as the floor and a doubled `/j` before `/x` keeps nothing, a photo or voice note included. The
+writer's and the sweep's per-message catch of `OffRecord` is a backstop: it drops that message from their own output
+and moves on, but records nothing for the other readers (with the gate and floor agreeing it is not reached by any
+input found). A label the floor refuses answers 422 `off-the-record`, as the route's own refusal does.
+
+- **PLATFORM-FIELDS (2026-11-24) — release 1 of 2: the platform-named fields are read under their neutral names too
+  (issue #50, the owner's choice of 2026-11-24: rename over two releases).** AUDIT-LEFTOVERS left the rename for the
+  owner; he chose option (b). Release 1 changes what is *read* and nothing on disk: every writer still writes the old
+  name. Release 2 (PLATFORM-FIELDS-R2, open above) writes the new one once no reader is old.
+  - **The names.** A reflection's or week review's send record (`message_id`, `sent_at`, `attempts`, `error`,
+    `skipped`, `skipped_at`, `silent`, `mirrored`): `telegram` → **`chat`**. The source of his recent chat messages:
+    `telegram_history` → **`chat_history`**. Checked against the code: nothing keyed a ledger record or a source by
+    `chat` or `chat_history` before. (`chat` is also a citation kind in `validate`/`channel.cite`, a field of
+    `standing`'s result and a key in the web's capability list; none of them is a ledger record, so there is no
+    collision on the record a reader looks in.) The ledger's other fields are not platform-named: AUDIT-LEFTOVERS'
+    "twenty sites" were all this one record, on reflections (a prompt's send is the flat `message_id`/`sent_at`/`chat_id`
+    of its own record, and an annotation reply's is `annotation_reply`). The `telegram` *config section* (`chat_id`,
+    `token_*`, `annotation_replies`) holds settings of the Telegram adapter, which are Telegram's; it stays.
+  - **One reader, one writer.** `ledger.send_of(rec)` reads the record's send (`chat` when it holds one, else
+    `telegram`, else `{}`; it never makes a key by looking) and `ledger.send_slot(rec)` gives the dict to change (the
+    one `send_of` reads, else a new `telegram`), so a record never holds half a send under each name, and release 2
+    is one constant. Every reader (`standing`, `context`, `status`, `conversations`, `outage`, `reflect`) and every
+    writer (`reflect`'s send, skip and stale marks, `mirror._mark`, which takes the key a queued mirror carries,
+    from either release) goes through them; `tests/test_platform_fields.py` fences the old spelling out of the rest of
+    `src/`.
+  - **The source.** `Config.source(name)` treats `telegram_history` and `chat_history` as one source
+    (`config.SOURCE_ALIASES`): the settings under the old name (defaults included), the new name's over them,
+    whichever is asked for, so `chat_history: {enabled: false}` turns it off for every reader. The default stays under
+    `telegram_history`, and the doctor row, the plugin settings and the docs keep the old name for now. No warning on
+    either name yet.
+  - **What release 1 does not do for a deployment's own config.** A process on older code ignores `chat_history`, so
+    a deployment keeps `telegram_history` in its overlay until release 2's precondition holds.
+  - **Proof the second release is safe.** `tests/test_platform_fields.py` runs every reader on a ledger holding
+    each state of a send record (sent, skipped as no chat, skipped as stale, owed), then with every `telegram`
+    renamed to `chat`, and the readings are equal; `reflect.send` over a reflection sent under `chat` sends nothing; a
+    skip lands in the record's own `chat` dict; the mirror marks either name. A mutation (the readers' list cut to the
+    old name) fails seven of them.
+  - **Also changed.** `context.py` kept a local cache under the key `"telegram"`
+    for the quote verifier's chat text; renamed `"chat"` (no persisted name).
+
+- **TICK-LOCK-YIELD (2026-11-24) — the tick lets a waiting send or program step go first, between steps (issue #45,
+  TICK-LOCK-WAIT's option (b), the owner's choice).** `ticklock.py` owns `tick.lock` now. A waiter (`journal send`,
+  `journal program …` through `programs.locked`, `journal sweep`, `journal backfill-conversations`) that finds the
+  lock busy holds `tick-wait.lock` shared while it blocks, and lets go of it once it has `tick.lock`. The scheduled
+  tick asks at safe points (`ticklock.pause`) whether that flag is held (an exclusive try without blocking), and if so
+  lets go of `tick.lock`, waits for the flag exclusive (every waiter has had the lock: `flock` is not fair, so without
+  this wait the tick could take the lock straight back) and then for `tick.lock` behind the last waiter, and goes on
+  with the next step. No busy-poll: a waiter sleeps in `flock`; the tick asks only at its safe points. A third lock,
+  `tick-run.lock`, held by a scheduled tick for its whole run, makes a tick that starts while another is yielded skip
+  its round, as it skips behind a running tick: two ticks never interleave. All three are `flock`s, released by the
+  kernel when a process dies, so no marker goes stale. Sends and transitions keep waiting blocking; the scheduled tick
+  keeps not waiting.
+  **Continue, not end.** After a yield the tick takes the lock back and runs its remaining steps with the same `now`.
+  Ending would leave the rest (folds, replies, mirror, prune, the ops notice) five minutes late for nothing: each step
+  reads the ledger, runs, entries and the chat afresh when it starts, so what the waiter did is simply there. A tick's
+  `now` already lagged the clock by its model calls (minutes); a yield adds the waiter's time, and the later steps'
+  comparisons with `now` err to "not yet" (a settle, an expiry, an interrupt's time, a retry: all left to the next
+  tick), never to a double. **Where it yields** (`tick.YIELDS_BEFORE`): before `privacy`, `programs` and every step
+  from `fold` on; inside the steps that call a model once per item, between items (`annotate`, `process_images`,
+  `process_audio`, `reflect.run`), with no other lock held and nothing carried across items that a waiter writes (a
+  waiter never annotates, describes, transcribes or reflects; their per-item ledger writes find the record again;
+  `annotate` reads the entry after the yield; the image note checks its block again under the ledger lock). **Not**
+  before `send`: the tick's interrupts and practices go out together, a ritual due in that tick the newest message, as
+  before. Not before `sweep` or `conversations`: they read the chat right after the privacy pass and call no model.
+  **Ordering.** Every send is still made under `tick.lock`, one at a time, and every ledger record of a send or an
+  opening stamps the real time (`send_prompt`'s `sent_at`, `programs._open`, `_open_interrupts`), so the ledger's
+  order is the chat's and `capture.superseded` matches a reply to the prompt sent last
+  (`tests/test_tick_lock.py`: a `journal send` during the tick's opener goes after the tick's send and before its next
+  step; every send finds the lock held; ledger order equals chat order). **What it costs:** a waiter now waits for the
+  rest of one step, or one model call inside a step: at most one budget (the longest single call is a reflection,
+  480 s plus kill grace), no longer the sum. The head of the tick (`interrupts`, `send`) is one unit, so a waiter that
+  arrives during an opener waits for every opener due in that tick. `programs.step` makes its own model calls and is
+  not split. **Measured** (`tools/measure_tick_lock.py`, which now takes `--calls`): with three annotations due and a
+  3 s model call, a waiter arriving 0.2 s into the first waited 8.83 s on main and 2.80 s with this change (one
+  annotation: 2.83 s and 2.80 s, the rest of that call either way). **Mixed versions** during a deploy only lose the
+  yield, never the lock: an old waiter raises no flag (the tick does not yield to it, as before), an old tick ignores
+  the flag. `migrate` still takes `tick.lock` shared without raising the flag: it can slip into a tick's yield and copy
+  the state between two of the tick's steps, which is as consistent as between two ticks.
+  **A stream of waiters can keep the tick yielded:** while waiters keep overlapping, the flag is never free (Linux
+  `flock` does not favour a waiting exclusive request), so the tick stays yielded for as long as that lasts. Bounded in
+  practice by human-paced waiters (a `/next` or a Send each takes seconds).
+
+- **NOTES-JOURNAL-DAY (2026-11-25) — notes are filed by the journal day, and Today shows it (issue #82, part 2).**
+  The owner's call (issue #82): a 00:30 line belongs to last night, as a prompt answered then already did
+  (`slots.resolve`). One helper decides "which day" for every writer and reader: `config.journal_day(cfg, at)` (moved
+  from `slots.journal_day`, which now calls it, so `capture` can ask it without importing `slots`). It dates every
+  note: `capture.new_note_prompt` (the chat `/j`, the sweep's and the conversation writer's notes, `actions.note` for
+  the web app, the CLI and MCP) and the conversation writer's dry-run plan. The readers that key on the entry's date
+  (the day reflection's `entries_on`, `GET /days`, the Entries list, Insights) follow without change. Today followed
+  by decision, since otherwise the note just put down at 00:30 would not be in *Written today*: `today.collect`'s
+  `date`, `weekday`, practices, entries and reflection are the journal day's (`time` stays the clock's; on review the
+  block names both days then, below), the web's week strip ends on it, and the today block's day boundary
+  (`thread_started`) and its per-day count turn at `day_ends_at`. This changed one pinned behaviour on purpose:
+  `test_today.DayChangeTest` held that a chat running past midnight gets a new block naming the new date; it now holds
+  that this happens at `day_ends_at` (the block at 00:10 would have repeated Thursday). A week review's count of his
+  replies to a reflection reads the reply's journal day too (`reflect`, the day its note is filed under). **Not
+  changed:** the companion's own notes given a date (`capture.add_companion_note` keeps its caller's date; with none it
+  takes the journal day, on review below), program sessions and
+  their dates, `journal status`' slot list (`slots.day` on the calendar date, a CLI view), the tasks cache (due
+  today by the calendar), the conversation writer's time markers (a 00:30 line in last night's note is labelled
+  "Fri 16 Oct 00:30", as a late evening reply always was), the chat-thread boundaries (`conversations.quiet_minutes`
+  and prompt sends), and the stamps window check of `actions.entry_for` and serve's `at` (a block may not predate its
+  entry's date: a journal day is never earlier than the calendar date, so nothing new is refused). **Existing files
+  are not moved**: a note filed by the calendar date before this stays there (the owner: nothing merged or
+  rewritten). Tests: `tests/test_note_journal_day.py` (the boundary at 23:59, 00:00, 00:30, 03:59, 04:00, every way a
+  note is made, the readers agreeing at 00:30, Today turning at 04:00, an existing note left alone).
+  - **On review (2026-11-25, an independent Opus pass on b603ed0).** Changed:
+    - **The day reflection waits for the journal day to end (the owner's decision, 2026-11-25).** It fired as soon as
+      the evening entry was annotated (usually ~22:40), so a note put down at 00:30, filed under that day, reached no
+      day reflection. Now `reflect.due` writes no analysis of a period before its last journal day has ended
+      (`reflect.day_over`: `windows.day_ends_at` the next morning, 04:00 by default); from then the triggers are as
+      before (the closing entry annotated, else `fallback_time`, never an hour before the closing prompt), and the
+      fallback is never before the day's end (`reflect._fallback`), so with `day_ends_at` 05:00 and the fallback
+      04:00 it comes at 05:00. It reads all of the day's files, the after-midnight notes included; the candidates are
+      the journal day and the one before (so a day stays due for a full day after it ends). **The week review
+      follows** (its last day must end too: Monday 04:00 for a Sunday week), our call on the same reasoning: the week's
+      Sunday notes after midnight and Sunday's own day reflection are then in it (both are written in the same tick
+      at 04:00, the day first, `recovery.catchup_per_tick` 2). **Sent silently**, both, whichever way they were
+      triggered: they now come at night, and a loud message at 04:00 would wake him (before, only the fallback's was
+      silent). Checked against the rules that read the reflection's time: the **stale rule** (OUTAGES/STALE-COUNT:
+      not sent more than `recovery.stale_hours` after its time) counts from `_fallback`, so it moves with the day's
+      end; **OPS-NOTICE `model_floor`** counts a reflection's `written_at` as a model success: it now comes at ~04:00
+      instead of ~22:40, which only moves when the evening's floors are reset (no new incident, none lost); the
+      **catch-up letter** never folds analyses in and is unchanged; the **morning ritual** (06:00) comes after the
+      reflection: its opener's pack and the today block read that reflection as they did (it was written the night
+      before then too), the mirror puts the reflection into her session before the morning prompt, and a thread's
+      boundaries are prompt sends, so nothing is folded into the morning's thread. **One collision, fixed:** with the
+      morning prompt open, his reply to the reflection (a reply to its message) went to the open prompt by the
+      next-message rule and became his morning answer. Now a direct reply to a day reflection or week review answers
+      no prompt on any path: the hook (`capture.match`, by the message it replies to:
+      `ledger.analysis_by_message_id`), the sweep and the conversation writer's sweep-place filing (by the quote:
+      `sweep.quotes_analysis`, the writer's `answers_ours` test, now one helper `sweep.analysis_sends`); the writer
+      files it as a reply to the reflection (an auto note carrying its id, which the next reflection reads). A typed
+      message, not a reply, still answers the open morning prompt. A reply to an annotation reply while another prompt
+      is open is the same shape and is **not changed here** (pre-existing; it is not made more common by this).
+    - **Her note with no date follows the journal day** (`capture.add_companion_note`: `journal_day`, not the
+      calendar date): at 00:30 it joins his note of last night instead of starting `<today>-note.md`.
+    - **The today block names both days** between midnight and `day_ends_at`: "journal day Thu 15 Oct 2026 · now Fri
+      00:35 IST", not "today — Thu 15 Oct 2026, 00:35" on a Friday (`today.header_of`; `collect` adds
+      `calendar_date`, the clock's date, so `GET /today` gains it). **The tasks stay keyed to the calendar date**: a
+      task is due by the calendar, the tick caches the list by it, and at 00:35 Friday Friday's tasks are the ones due;
+      the line then says so ("tasks due Fri"). The web app's Today is unchanged by this (no web change in this PR):
+      its *Due today* shows the calendar date's tasks under the journal day's date for those hours.
+    - **serve's date ranges default to the journal day** (`api._range`'s `to`), as Today and the week strip do.
+    Tests: `tests/test_day_end_reflection.py` (an annotated evening waits for 04:00 and reads a 00:30 note; silent;
+    a later `day_ends_at`; a fallback earlier than the day's end; the stale rule from the day's end; the week review
+    waiting for Monday; a reply to the reflection not taken by the open morning prompt on the hook and the sweep);
+    `tests/test_note_journal_day.py` (her note at 00:30 and 04:00, the header and tasks line after midnight, the
+    range default). **Tests changed on purpose:** the reflection tests that wrote the day reflection or week review
+    the evening its closing entry was annotated now run at or after 04:00 the next day, and those asserting a loud
+    send now assert a silent one; `test_practices_engine`'s doctor row reads "once the day has ended, …"; the pinned
+    `today.json` fixtures gain `calendar_date`.
+- **DAY-VIEW (2026-11-25) — a day as one log, read from the files as they are (issue #82, part 1).** The owner's
+  call: storage stays (separate files, no format change, nothing merged); the web app shows a day as one log instead.
+  `daylog.day(cfg, date)` reads every entry the Entries list shows under that date (`document.all_entries`, so a hand
+  file named like an entry too) and returns each block (`document.blocks_of`, his words, his conversation messages, her
+  replies) as a line with its entry's stem and block key, in time order; `GET /api/v1/days/{date}` serves it. **Times:**
+  a words heading carries a time only, and a conversation marker or her reply carries a date only when it fell on
+  another day than the entry's. A block whose time matches a capture the ledger still has for the entry (same local
+  hour and minute, each used once in order; the words' captures for the words, the `conversation` ones for the
+  conversation) takes that capture's day, so an *Add* days later or backdated is placed when it was written.
+  Otherwise the words section and the conversation are each walked in file order, apart (an *Add* appends to the
+  words after a conversation may have begun, and must not push the conversation to the next day), from the entry's
+  start day: the day of its first capture while the ledger has it, else its date; a dated marker sets the day; an
+  hour earlier than the one before means the next day. With no ledger record, an entry whose first time is before
+  `windows.day_ends_at` is the night after its date (an evening answered at 00:30). **Known limit** (a `shortcut:` in
+  `daylog.py`): once the ledger has pruned an entry (weeks), file order alone places it, so a note filed by the
+  calendar date at 00:30 before notes followed the journal day (NOTES-JOURNAL-DAY) is placed a day late, a block
+  added days later reads as the entry's day, and a backdated one earlier than the block before it as the next day;
+  the files and the Entries list are right. A line on another calendar day than the page's (his or hers) shows its
+  weekday beside the hour. **Her words** are lines of their own
+  (`kind: "hers"`), folded in the page and never mixed into his; the route reads only entry files and the ledger, and
+  entries never hold off-the-record words. **Not done:** her margin notes and readings (the entry shows them), a day
+  picker of its own (the Entries calendar and the numerals lead in), the week strip's days (they still filter the
+  Entries list), playing a recording in the log (its hour opens the entry, where the player is). A new part,
+  `ui/DayLog` (`LogEntry`, `LogLine`, `LogReplies`), is drawn on `/design`.
+- **TODAY-QUICK-J (2026-11-25) — a line put down from Today is a `/j` note (issue #82, part 3).** The owner's call:
+  `/j` is the one gesture (no `/log`). Today's box therefore makes nothing new: `POST /entries` with the text and no
+  practice, which is `actions.note`, the same call the write room's *A note* and the chat's `/j` reach (a note of its
+  own, stamped now). It is one line to start with (Enter submits) because longer pieces belong to the write room; **on
+  review (2026-11-25)** it became a one-row `<textarea>` rather than an `<input>`: an input drops the newlines of a
+  pasted paragraph, which changed his words without a word. Shift+Enter adds a line, a multi-line paste keeps its
+  lines, and the box grows with them (up to six rows), so what is sent is what he sees; Enter ending an IME
+  composition is the composition's. A 413 (too long) is treated as a 422: kept in the box with the server's plain
+  reason and no Retry, since sending the same words again would fail the same way. It runs on the composer's own rules (`useCompose`, unchanged): the draft
+  kept in the tab under its own key, a retry the same write (`client_id`), the offline line, a 422 refusal (`/x`, an
+  engine line, the placeholder) kept in the box with no Retry. The button is a quiet secondary (*Put down*), not the
+  lamp: Today's lamp is *Write now* on her prompts. Not a new `ui/` part: it is a `TextField`-styled ruled line and a
+  `Button`, both drawn on `/design`; it lives in `components/` as `Composer` does.
+
+- **CHAT-1 (2026-11-25) — the chat face's first step: the tick's send, fold and annotation replies move into
+  `journal/chat/` (issue #43, step 1 of its order).** A pure move. `journal/chat/send.py`: `send_prompt`,
+  `count_send_failure`, `_attach` / `ATTACHED`, `_archive_sent` / `SENT_FIELDS`, `prune_sent`, `SEND_ATTEMPTS`,
+  `EARLIER_OPENERS`, `SendFailed`. `journal/chat/fold.py`: `fold`, `_fold_edit`, `_fold_owed_again`,
+  `_folds_due_again`, `FOLD_*`. `journal/chat/replies.py`: `reply_annotations` and its helpers, `REPLY_ATTEMPTS`, and
+  `_newest_words` (which the tick's `annotate` also reads, through its import). `Alert` moves to `journal/alert.py`
+  so the chat face raises it without importing the tick (`SendFailed` is still an `Alert`, and `tick.Alert` is the same
+  class). **Proven unchanged:** an AST comparison of every top-level definition of the old `tick.py` with its new home
+  finds each one byte for byte; the full suite collects the same 2716 tests as main and passes; the goldens and
+  `gen_builtins.py --check` are untouched; the fences (`test_purity`, the serve and MCP fences, `test_route_opens`'
+  pinned module set) pass unchanged; the gateway loads the same modules at import.
+  - **The old names stay.** `tick` imports every moved name (the same objects), and the callers (`programs`, `ops`,
+    `cli`) still reach them through `tick`, so a test's patch of `tick.send_prompt` or `tick.fold` still reaches every
+    caller, and the tick's `run` still calls its steps through its own names (`tick.fold` patched still skips the
+    fold). Moving the callers to `chat` is left for when the operation they call changes (CHAT-2).
+  - **One test edit beyond imports, named here:** ten places in seven test files patched `tick.datetime` with a clock,
+    which `send_prompt` read for `sent_at` and `sent_at_local`. `send_prompt` now reads `chat.send`'s `datetime`, so
+    each of them patches that module with the same clock too (`test_tick_lock` binds one stepping clock to both, so
+    the order of `sent_at` across the two modules is the one clock's, as before). No assertion changed. The other
+    choice, `send_prompt` reading the tick's clock, would have tied the chat face back to the tick.
+  - **Kept as is:** the steps of `tick.run`, their order, `YIELDS_BEFORE` and every lock; `mirror.py` and
+    `recovery.py`, already modules of their own, stay where they are (moving them into `chat/` changes no seam), and
+    the readers (`sweep`, `conversations`) move last, as #43 orders.
+
+- **CHAT-2 (2026-11-25) — `chat.deliver`: one send operation for every message the engine sends on its own (issue
+  #43, step 2 of its order).** `deliver(cfg, html, log, *, record, to=None, chat=None, catch=(ChannelError,),
+  fallback=None, **keywords)` sends, hands the outcome (`Delivery`: `message_id`, `error`, the channel) to the
+  caller's `record`, and mirrors the `Mirror` that `record` returns (none: nothing is told). Converted, one commit
+  each: prompts (`send_prompt`, whose plain-opener retry is `deliver`'s `fallback` and which still catches every
+  exception), annotation replies (still catching `ValueError` too), reflections and week reviews, the catch-up letter,
+  and program session summaries.
+  - **Behaviour kept exactly, and how it was checked.** Each caller's account moved, unchanged in order and content,
+    into a `record` function beside it (`send._account`, `replies._reply_account`, `reflect._sent_account`,
+    `recovery._sent_account`, `programs._summary_account`). The full suite passes with no existing test edited;
+    `tests/test_chat_deliver.py` adds `deliver`'s own contract and, per kind, one test that the send is one `deliver`
+    call with the keywords it always sent, the ledger fields, log lines and mirror row as before, and its failure
+    path. Goldens and fences unchanged.
+  - **What stays with the callers, on purpose:** whether anything is owed (`channel.platform: none`, `/x` and the
+    privacy pass, `outage.chat_room` pacing, staleness, the catch-up letter's hold, TICK-LOCK-YIELD's yield points),
+    and each kind's texts and ledger shape. `deliver` decides none of them, so moving a send onto it changes no rule;
+    a kind's account is still its own (a prompt record, `annotation_reply`, a reflection's send slot through
+    `ledger.send_slot`, a `recovery` record, a run's session).
+  - **Nothing sent, still counted:** a reflection whose file is gone and an entry with no annotations count an
+    attempt through the same `record` with no send (`Delivery(error=...)`), as before.
+  - **A summary counts as sent when the send raised nothing,** whatever id came back, as before (its `record` reads
+    `error`, not `message_id`); the others read `message_id`, as they did.
+  - **Not converted here:** a program's short notes (`programs._say_about`) and the earlier parts of a phase split
+    over the platform's length limit (`programs._deliver`) send directly as before; they are outside this step's five
+    kinds. They can move onto `deliver` when margin notes (#31) shape what a chat message is. "What a reply answers"
+    is left for #31.
+
+- **MARGIN-FORMAT (2026-11-25; issue #31, its first step) — the entry format margin notes stand on: a stable key on
+  every block of his, and a margin note as one record at the end of her annotations section.** *A change to the entry
+  format.* The owner's answers of 2026-11-16 set the shape: margin notes are the annotations grown up, not a feature
+  beside them; a note, its thread and its state are **one record in the entry**, which the web app and the chat both
+  show and act on; the per-entry analysis stays in the entry, shown with it; old entries are not migrated. His
+  decisions of 2026-11-25 on the review of #92 place the key and settle whose words the margin holds (below). This
+  step is the format and its readers only: **nothing in the engine writes a note yet** (MARGIN-NOTES does).
+
+  ```markdown
+  ## Sam
+
+  ### 09:12 IST · text
+  %% journal block:b3f9a2c10 %%
+
+  The sea was loud.
+
+  ## Ada's annotations
+
+  - He comes back to the sea twice; the second time it is quiet.
+
+  ### Margin notes
+
+  %% journal:margin %%
+
+  %% journal note:n4c1e9a07 at:2026-11-25T09:14:00+05:30 state:open on:block:b3f9a2c10 %%
+  > [!note] Ada · 09:14 · on 09:12
+  > Which part of the quiet stayed with you?
+
+  %% journal his:web-9b21 %%
+  **09:20** — The gull, mostly.
+
+  %% journal her:n4c1e9a07-2 %%
+  > [!note]- Ada · 09:21
+  > The late ones always sound surprised.
+  ```
+
+  - **Block keys, under the heading (the owner, 2026-11-25).** `entries.record_reply`, the one writer of his words
+    section, puts `%% journal block:<id> %%` as the **first line under each block's heading**, in the same write as
+    the block (append-only holds: nothing is added to a block later). Under the heading, so the key travels with its
+    own section when he drags or cuts sections in Obsidian; a line above the heading would stay behind with the block
+    before. A program's `phase:N` / `interrupt:N` line stays above the heading, where it always was, and so do the
+    conversation's `his:` / `her:` lines: keys that sit above stay as they are. **The order under a heading is the
+    block's key, then PARAGRAPH-TIMES' `%% journal times:… %%` line** (#74, not merged when this was written: when it
+    lands, its writer puts the times line after the key, and its reader takes the lines under the heading through
+    `entries.head_lines_end`). Every reader takes those lines in either order and either alone: the document
+    (`entries.block_key_under`, and the edit cut starts after them), the audio fill (`entries._recording_block`), the
+    pictures a photo block opens with, and the program answers (`_answer_blocks` drops engine lines). `<id>` is `b`
+    and eight hex digits of a hash of the capture's time, source and words (`entries.new_block_key`): one capture
+    always gets the same key, so the goldens stay byte for byte (they gained the line: `tests/golden/*.entry.md`,
+    regenerated when the key moved under the heading), and `-2`, `-3` … when the file already holds one. The capture
+    record in the ledger keeps the key (`captures[].block_key`), so a later step can map a chat message to its block
+    (MARGIN-CHAT). A block of his in `## Conversation` already has a stable key (`his:<message id>`). The key
+    survives appends, the web app's Edit (it is outside the words the edit replaces), the times line and an edit in a
+    notes app that leaves the hidden line where it is; Delete takes it with the block (it is inside the block's own
+    lines). A block found under the summary (old code appended it there) goes back before the next block's own lines,
+    which start at its answer key, so every block keeps its own key (`entries._place_block`,
+    `tests/test_margin_format.py`, `StrayBlockTest`). The document gives each block of his an `anchor` (`block:<id>`,
+    `his:<id>`, or null for a block written before keys, words above the first heading and unmarked conversation
+    text); `key` (`words:N` …) is unchanged, so no client changes. **A duplicated block key** (he copies a block with
+    its key line in his notes app): a note names the first block in the file with it; the later copy has no anchor.
+  - **Where notes live: the annotations section, after her analysis, under `### Margin notes` and its hidden line
+    `%% journal:margin %%`.** Inside her section, so an older reader reads the whole margin as hers (the safe way to
+    be wrong), and *grown up* in the file as the owner put it, not a section beside it. The hidden line tells it
+    from a `### Margin notes` line in her analysis, which can never carry one (`entries._hers` drops engine lines from
+    her text). `entries.annotations()` is now her analysis only (up to the margin); `annotations_pending` asks of the
+    analysis; `write_annotations` replaces the analysis and carries the margin over byte for byte.
+  - **A note is one record** (`margin.py`): its key line (`note:<id>`, `at:` when she wrote it, `state:` open,
+    resolved or dismissed, `closed:` when it stopped being open, then `on:` the anchor, last, so an anchor is the rest
+    of the line; a field this version does not know is kept), her words in a callout (`[!note]` open, `[!note]-` folded
+    once resolved or dismissed, the state at the end of its title, so a plain viewer and a notes app show it), then
+    the thread in the conversation's own grammar: his messages under `his:<id>` lines, her replies in callouts under
+    `her:<id>` lines. A state change rewrites the note's key line and its callout's title: both the engine's lines,
+    never her words or his. `margin.render` writes a note and refuses what would not read back: `%` or a line break in
+    any field of the key line or the title, an id or a field that is not one token; it ends by parsing what it wrote
+    and raises unless that is the same note, her words matched as hers (`entries._CALLOUT`). `margin.parse` reads it
+    back (`tests/test_margin_format.py` round-trips both); `on:entry` is a note on the entry as a whole, and a note
+    whose block is gone shows there (`document.margin_of`, for the web app and MCP alike).
+  - **The margin fails closed (the owner, 2026-11-25): only what sits under a `his:` key line is his.** Her note,
+    her replies and any other text in the margin (what he types under a note by hand in his notes app, too) are hers,
+    as OWN-WORDS fails closed: the safe way to be wrong is to keep words of his out of his record, never to put hers
+    in it. `entries.margin_parts` cuts the margin at its key lines; `his_margin` keeps the parts under `his:`, and
+    every reader of his words takes the margin through it: `his_words` (and so `entry_words`, `his_text`, the quote
+    checks, packs, search through `document.parsed`), `without_companion_replies` (the annotation input). The margin
+    sits outside his words section and the conversation, so `raw_entry` never reads it. Reflections label her note,
+    her replies and any other margin text as hers and his keyed replies as his (`reflect._her_replies_labelled`);
+    MCP's `journal_entry` labels each voice and names a note's block by its time (`on his 09:12 block`); the document
+    has `analysis.margin` (`[{id, anchor, at, state, closed, text, thread}]`, `thread` as blocks, `kind: "his"` only
+    under a `his:` key line) and `analysis.annotations` is the analysis alone. **Blank lines between a key line and
+    her callout change nothing**: `_CALLOUT` (and the reply-context pattern, and reflections' patterns) take them, in
+    the margin and in `## Conversation` alike, so a formatter (Prettier, Obsidian Linter) or a hand edit that puts a
+    blank line (or a line of spaces) there never turns her words into his (`document._callout` skips them too, so the
+    document and `_CALLOUT` agree on whose words they are); that also closes the same gap that was there before for her
+    `her:` replies in the conversation. The web app's Edit and Delete check the margin is left as it was
+    (`serve/blocks._facts`).
+  - **A formatter's blank lines (re-review of #92).** Prettier, markdownlint (MD022) and Obsidian Linter put a blank
+    line after a heading, between it and the key line under it (and may leave a line of spaces). The key line is
+    found through any blank or space-only lines under the heading (`entries._HEAD_LINES`; the audio fill steps back
+    over them, `_back_over_blanks`), so the block keeps its anchor, Edit and Delete, its picture embeds and its
+    transcript fill; `### Margin notes` takes the same blank lines before its hidden line (`entries._MARGIN`).
+    `tests/test_margin_format.py` (`FormatterTest`).
+  - **Old entries read exactly as before.** An annotations section without the margin's hidden line is all analysis,
+    as it was; no file is migrated. `tests/test_margin_format.py` (`OldEntriesTest`) pins it.
+  - **Rejected.** *The key above the heading* (this PR's first draft): it stays behind when he moves a section in
+    Obsidian, so the moved block loses its key and the one above gains a stray. *A `## Margin` section of its own*:
+    the owner said grown out of the annotations, and an older reader would treat it as no section at all. *Notes
+    beside his blocks, inside his words section*: hers inside his section, which append-only and the voices rule
+    forbid. *His replies in his conversation section, linked to the note*: the thread would be split across the file,
+    against "one record". *Positional anchors* (`words:2`): a Delete above renumbers them. *Obsidian block ids*
+    (`^abc123` at the end of a line): visible in every viewer, and on the heading line older readers parse. *A random
+    key*: the goldens could not hold the file byte for byte. *Unkeyed text in the margin read as his* (the first
+    draft, as in the conversation): one hand edit or formatter would put her words in his record.
+  - **Older code on a newer file** (a rollback; checked against main's code, since the key now sits inside the block).
+    It reads a block's key line as an engine line (never his words), with these effects until the next forward
+    deploy, none of which loses words of his: (1) its web app refuses Edit and Delete of **every** block that carries a
+    key line (`not-editable`: an engine line inside the block's body), and leaves nothing behind, since nothing is
+    removed; after rolling forward they work again. (2) Its audio fill (`_recording_block`) does not find a recording
+    whose key line sits between heading and embed: a voice note captured after the deploy and transcribed after the
+    rollback keeps its placeholder, its capture record says `transcript: done`, and the kept recording stays beside
+    the entry (transcribe it by hand, or set the capture's `transcript` back to `pending` after rolling forward). (3)
+    Its `phase_blocks` reads a keyed answer's key line as the answer's first line, so a copy of the answers made
+    during the rollback (a program's insights) can carry the hidden line; the summary's copy drops engine lines. The
+    same reading reaches the program's other readers: a schedule confirmation written (keyed) before the rollback and
+    settled after it reads as the key line and `07:00`, so `parse_confirmation` returns None, no interrupts are
+    scheduled and he is asked again; `_short` prose slots and `programview` read a keyed answer the same way.
+    (4) Its document shows the pictures a keyed photo block opens with as part of his text (display only). Notes, if
+    any were written by then, read as part of her annotations. *The first draft's key-above-the-heading had different
+    effects (Edit and Delete refused on every keyed block but the last, and a Delete of the last leaving its key on
+    the block above); they no longer apply.*
+  - **Left to the next steps** (the plan is on #31): context packs and annotation replies read the analysis only, not
+    the notes, until MARGIN-NOTES decides what of them she is given; a reply to a note is not written anywhere yet,
+    so its `/x` refusal (`capture.refuse_off_record`) comes with its writer (MARGIN-WEB, MARGIN-CHAT). **The writers
+    of his replies in a thread (MARGIN-WEB, MARGIN-CHAT) must refuse or neutralise a `## ` line in his reply** (as
+    `demote_headings` does, or with `actions.refuse`'s 422): a `## ` line there would end the annotations section and
+    with it the margin, and what follows would read as no section at all. A thread block's `key` (`his:<id>`,
+    `conv:N`) is unique within its thread, not the entry, which MARGIN-WEB settles when the web app edits one.
+    **His replies in the margin reach the annotation model unlabelled** (`without_companion_replies`, `entries.py`,
+    keeps his keyed replies as his words with nothing saying they are replies to a note): MARGIN-NOTES labels them
+    when it writes replies.

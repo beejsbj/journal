@@ -36,6 +36,7 @@ from . import audio, capture, channel, compose, entries, ledger, library, slots
 from .config import Config
 
 FACES = tuple(entries.FACES)  # web, cli, mcp
+TEXT_LIMIT = 50_000       # characters of any text field a face sends (API.md Decision 7; serve and MCP)
 FUTURE_SLACK = timedelta(minutes=5)  # a face's clock a little ahead of the server's (as ``serve/writes`` allows)
 TIMES_MAX = 2000                     # paragraph times one write may bring (more than a 50,000-character piece has)
 
@@ -147,7 +148,7 @@ def _practice(cfg: Config, practice) -> library.Practice:
 def _face_fields(cfg: Config, at: datetime, via: str) -> dict:
     """When and where his first words on a face were written: ``sent_at`` (the many readers that need a time keep
     working; nothing that reads the chat reads a record without ``message_id``), and ``opened_*``, which a later
-    delivery (``tick.send_prompt``'s attach) leaves as they are."""
+    delivery (``chat.send.send_prompt``'s attach) leaves as they are."""
     return {"sent_at": at.isoformat(), "opened_via": via, "opened_at": at.isoformat(),
             "opened_at_local": at.astimezone(cfg.tz).strftime("%H:%M %Z")}
 

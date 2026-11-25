@@ -1,10 +1,13 @@
 """The time each paragraph of a typed block was begun (issue #40; DECISIONS.md, PARAGRAPH-TIMES).
 
 The web app's write room notes when each paragraph (a line that is not blank) was begun and sends those times with the
-words; the block keeps them on one hidden line under its heading (``%% journal times:23:12 23:15 %%``) and the entry
-document gives them back, one per paragraph. What these pin:
+words; the block keeps them on one hidden line under its heading, after the block's own key (MARGIN-FORMAT:
+``%% journal block:<id> %%``, then ``%% journal times:23:12 23:15 %%``) and the entry document gives them back, one per
+paragraph. What these pin:
 
-* the format: the line, where it goes, his words byte for byte beside it, and a block without times exactly as before;
+* the format: the line, where it goes (after the key, in the same write), his words byte for byte beside it, and a
+  block without times exactly as MARGIN-FORMAT writes it;
+* the readers take the key and the times in either order, either alone, with a formatter's blank lines between them;
 * every reader of his words leaves the line out (it is an engine line: ``ENGINE_MARK``), so an older engine does too;
 * the server's check: malformed, miscounted, future or far-past times are dropped whole and the words are saved anyway;
 * ``/x`` is still refused on this path, times or not;
@@ -12,10 +15,12 @@ document gives them back, one per paragraph. What these pin:
   takes the line with the block;
 * a recording's block, and a program's answer, keep no times.
 """
+import re
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from helpers import unkeyed
 from serve_helpers import IST, NOW, SESSION
 from test_serve_blocks import EVENING_STEM, URL, EditCase, block
 from test_serve_writes import WriteCase, checksum
@@ -24,6 +29,12 @@ from journal import actions, entries
 from journal.serve import blocks, document
 
 WORDS = "The sea was loud.\n\nThen it went quiet.\nA gull, late."
+KEY = r"%% journal block:b[0-9a-f]{8}(?:-[0-9]+)? %%\n"   # (the block's own key, MARGIN-FORMAT)
+
+
+def keyed(head: str, rest: str) -> str:
+    """A pattern: ``head`` (a heading line, with its newline), the block's key line, then ``rest``, all literal."""
+    return re.escape(head) + KEY + re.escape(rest)
 
 
 def iso(minutes_before_now: float) -> str:
@@ -53,12 +64,12 @@ class FormatTest(unittest.TestCase):
 
     def test_the_times_sit_on_one_hidden_line_under_the_heading_and_his_words_are_untouched(self):
         body = self.write(WORDS, ["23:12", "23:15", "23:31"])
-        self.assertIn("### 23:40 IST · text\n%% journal times:23:12 23:15 23:31 %%\n\n" + WORDS + "\n", body)
+        self.assertRegex(body, keyed("### 23:40 IST · text\n", "%% journal times:23:12 23:15 23:31 %%\n\n" + WORDS + "\n"))
         self.assertRegex("%% journal times:23:12 23:15 23:31 %%\n", entries.ENGINE_MARK)
         self.assertEqual(body.count(WORDS), 1)
 
     def test_without_times_the_block_is_byte_for_byte_what_it_was(self):
-        self.assertIn("### 23:40 IST · text\n\n" + WORDS + "\n\n", self.write(WORDS))
+        self.assertRegex(self.write(WORDS), keyed("### 23:40 IST · text\n", "\n" + WORDS + "\n\n"))
 
     def test_a_count_that_does_not_match_the_paragraphs_writes_no_line(self):
         self.assertNotIn("journal times", self.write(WORDS, ["23:12", "23:15"]))
@@ -106,6 +117,106 @@ class FormatTest(unittest.TestCase):
         body = self.write("one\ntwo").replace("one\ntwo", "one\n%% journal times:01:00 02:00 %%\ntwo")
         (b,) = [b for b in document.blocks_of(body, "2026-10-14-j") if b["kind"] == "his"]
         self.assertNotIn("times", b)
+
+
+class KeyOrderTest(unittest.TestCase):
+    """The times line beside MARGIN-FORMAT's block key: written after the key in the same write; read through
+    ``entries.head_lines_end`` / ``entries.times_under`` in either order, either alone, and with a formatter's blank
+    lines (empty or only spaces) between the heading, the key and the times; kept by an edit and taken by a delete."""
+
+    STEM = "2026-10-14-j"
+    TIMES = "%% journal times:23:12 23:15 23:31 %%"
+
+    def setUp(self):
+        import tempfile
+        from helpers import make_cfg
+        self.tmp = tempfile.TemporaryDirectory()
+        self.cfg = make_cfg(Path(self.tmp.name))
+        self.at = datetime(2026, 10, 14, 23, 40, tzinfo=IST)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def write(self, times=("23:12", "23:15", "23:31")):
+        prompt = {"stem": self.STEM, "kind": "j", "local_date": "2026-10-14"}
+        written = {}
+        path = entries.record_reply(self.cfg.root, prompt, WORDS, self.at, "web", written=written, times=times)
+        return path.read_text("utf-8"), written["block_key"]
+
+    def his(self, body):
+        (b,) = [b for b in document.blocks_of(body, self.STEM) if b["kind"] == "his"]
+        return b
+
+    def head(self, body, key, lines):
+        """``body`` with the lines under the heading replaced by ``lines`` (``{key}`` and ``{times}`` filled)."""
+        written = f"### 23:40 IST · text\n%% journal block:{key} %%\n{self.TIMES}\n\n"
+        assert written in body
+        return body.replace(written, "### 23:40 IST · text\n" + lines.format(
+            key=f"%% journal block:{key} %%", times=self.TIMES) + "\n\n")
+
+    def test_a_block_with_both_lines_round_trips(self):
+        body, key = self.write()
+        self.assertIn(f"### 23:40 IST · text\n%% journal block:{key} %%\n{self.TIMES}\n\n{WORDS}\n", body)
+        b = self.his(body)
+        self.assertEqual((b["text"], b["times"], b["anchor"], b["at"]),
+                         (WORDS, ["23:12", "23:15", "23:31"], f"block:{key}", "23:40 IST"))
+        for reader in (entries.raw_entry, entries.his_words, entries.without_companion_replies):
+            with self.subTest(reader.__name__):
+                self.assertNotIn("journal block:", reader(body))
+                self.assertNotIn("journal times:", reader(body))
+                self.assertIn(WORDS, reader(body))
+
+    def test_a_keyed_block_without_times_reads(self):
+        body, key = self.write(times=())
+        self.assertIn(f"### 23:40 IST · text\n%% journal block:{key} %%\n\n{WORDS}\n", body)
+        b = self.his(body)
+        self.assertEqual((b["text"], b["anchor"]), (WORDS, f"block:{key}"))
+        self.assertNotIn("times", b)
+
+    def test_an_old_block_with_times_and_no_key_reads(self):
+        # (this package's first draft wrote the times line straight under the heading, before keys existed)
+        body, key = self.write()
+        body = body.replace(f"%% journal block:{key} %%\n", "")
+        self.assertIn(f"### 23:40 IST · text\n{self.TIMES}\n\n{WORDS}\n", body)
+        b = self.his(body)
+        self.assertEqual((b["text"], b["times"], b["anchor"]), (WORDS, ["23:12", "23:15", "23:31"], None))
+
+    def test_either_order_and_a_formatters_blank_lines_read_the_same(self):
+        body, key = self.write()
+        for name, lines in {
+            "times above the key": "{times}\n{key}",
+            "a blank line under the heading": "\n{key}\n{times}",
+            "blank lines between them": "\n{key}\n\n{times}",
+            "a line of spaces between them": "{key}\n   \n{times}",
+            "times first, blank between": "\n{times}\n\n{key}",
+        }.items():
+            with self.subTest(name):
+                b = self.his(self.head(body, key, lines))
+                self.assertEqual((b["text"], b["times"], b["anchor"]),
+                                 (WORDS, ["23:12", "23:15", "23:31"], f"block:{key}"))
+
+    def test_an_edit_keeps_both_lines_and_a_delete_takes_both(self):
+        body, key = self.write()
+        for name, lines in {"as written": "{key}\n{times}", "times above the key": "{times}\n{key}",
+                            "blank lines between them": "\n{key}\n\n{times}", "no key": "{times}"}.items():
+            with self.subTest(name):
+                was = self.head(body, key, lines)
+                new = blocks.edit(was, "words:0", WORDS.replace("loud", "LOUD"), cfg=self.cfg, stem=self.STEM)
+                self.assertEqual(new, was.replace("loud", "LOUD"))
+                b = self.his(new)
+                self.assertEqual(b["times"], ["23:12", "23:15", "23:31"])
+                gone = blocks.remove(was, "words:0", stem=self.STEM)
+                self.assertNotIn("%% journal block:", gone)
+                self.assertNotIn("%% journal times:", gone)
+                self.assertNotIn("The sea was loud.", gone)
+
+    def test_an_edit_that_changes_the_count_keeps_the_lines_and_shows_one_time(self):
+        body, key = self.write()
+        new = blocks.edit(body, "words:0", WORDS + "\nOne more.", cfg=self.cfg, stem=self.STEM)
+        self.assertIn(f"%% journal block:{key} %%\n{self.TIMES}\n\n{WORDS}\nOne more.\n", new)
+        b = self.his(new)
+        self.assertNotIn("times", b)
+        self.assertEqual(b["anchor"], f"block:{key}")
 
 
 class CheckTest(unittest.TestCase):
@@ -188,7 +299,7 @@ class RouteTest(WriteCase):
     def test_a_note_keeps_its_times_and_the_document_gives_them_back(self):
         got = self.ok("POST", "/api/v1/entries", {"text": WORDS, "times": times_for(WORDS, 40, 30, 1)}, want=201)
         body = self.entry(got["stem"])
-        self.assertIn("### 09:12 IST · text\n%% journal times:08:32 08:42 09:11 %%\n\n" + WORDS + "\n", body)
+        self.assertRegex(body, keyed("### 09:12 IST · text\n", "%% journal times:08:32 08:42 09:11 %%\n\n" + WORDS + "\n"))
         doc = self.ok("GET", f"/api/v1/entries/{got['stem']}")
         (b,) = [b for b in doc["blocks"] if b["kind"] == "his"]
         self.assertEqual((b["text"], b["times"]), (WORDS, ["08:32", "08:42", "09:11"]))
@@ -205,13 +316,14 @@ class RouteTest(WriteCase):
     def test_an_answer_keeps_its_times(self):
         got = self.ok("POST", "/api/v1/entries", {"practice": "morning", "text": "Slept well.\n\nTwo lines.",
                                                   "times": times_for("a\nb", 20, 10)}, want=201)
-        self.assertIn("%% journal times:08:52 09:02 %%\n\nSlept well.\n\nTwo lines.\n", self.entry(got["stem"]))
+        self.assertRegex(self.entry(got["stem"]),
+                         KEY + re.escape("%% journal times:08:52 09:02 %%\n\nSlept well.\n\nTwo lines.\n"))
 
     def test_a_block_added_to_an_entry_keeps_its_times(self):
         self.ok("POST", f"/api/v1/entries/{EVENING_STEM}/blocks",
                 {"text": "More, later.\nAnd more.", "times": times_for("a\nb", 20, 10)}, want=201)
         body = self.entry(EVENING_STEM)
-        self.assertIn("### 09:12 IST · text\n%% journal times:08:52 09:02 %%\n\nMore, later.\nAnd more.\n", body)
+        self.assertRegex(body, keyed("### 09:12 IST · text\n", "%% journal times:08:52 09:02 %%\n\nMore, later.\nAnd more.\n"))
         doc = self.ok("GET", f"/api/v1/entries/{EVENING_STEM}")
         self.assertEqual([b.get("times") for b in doc["blocks"] if b["kind"] == "his" and b["key"].startswith("words:")],
                          [None, None, ["08:52", "09:02"]])
@@ -222,7 +334,7 @@ class RouteTest(WriteCase):
                 text = f"Words {i}.\nStill mine.\nAll of it."
                 got = self.ok("POST", "/api/v1/entries", {"text": text, "times": raw}, want=201)
                 body = self.entry(got["stem"])
-                self.assertIn(f"### 09:12 IST · text\n\n{text}\n", body)
+                self.assertIn(f"### 09:12 IST · text\n\n{text}\n", unkeyed(body))
                 self.assertNotIn("journal times", body)
 
     def test_off_the_record_is_still_refused_with_times(self):
@@ -280,18 +392,21 @@ class EditTimesTest(EditCase):
         self.assertEqual(self.entry(EVENING_STEM), before.replace("One.\nTwo.", "One, better.\nTwo."))
         got = self.patch(key, "One, better.\nTwo.\nThree, new.")
         self.assertNotIn("times", got["block"])
-        self.assertIn("%% journal times:08:52 09:02 %%\n\nOne, better.\nTwo.\nThree, new.\n", self.entry(EVENING_STEM))
+        self.assertRegex(self.entry(EVENING_STEM),
+                         KEY + re.escape("%% journal times:08:52 09:02 %%\n\nOne, better.\nTwo.\nThree, new.\n"))
 
     def test_a_delete_takes_the_line_with_the_block(self):
+        keys_before = re.findall(KEY, self.entry(EVENING_STEM))
         key = self.add("Gone soon.", 2)
         self.delete(key)
         self.assertNotIn("journal times", self.entry(EVENING_STEM))
+        self.assertEqual(re.findall(KEY, self.entry(EVENING_STEM)), keys_before)   # (its key went with it)
         self.assertNotIn("Gone soon.", self.entry(EVENING_STEM))
 
     def test_the_splice_alone_keeps_every_other_byte(self):
         key = self.add("A.\nB.", 3, 2)
         body = self.entry(EVENING_STEM)
-        new = blocks.edit(body, key, "A!\nB.", stem=EVENING_STEM)
+        new = blocks.edit(body, key, "A!\nB.", cfg=self.cfg, stem=EVENING_STEM)
         self.assertEqual(new, body.replace("A.\nB.", "A!\nB."))
         self.assertEqual(block({"blocks": document.blocks_of(new, EVENING_STEM)}, key)["times"], ["09:09", "09:10"])
 

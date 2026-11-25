@@ -9,6 +9,7 @@ from unittest import mock
 from zoneinfo import ZoneInfo
 
 from helpers import CHAT, CleanEnv, add_prompt, make_cfg
+import legacy_readers
 from test_reflect import Base as ReflectBase, FakeBot
 from test_sweep import FakeSessions
 
@@ -282,10 +283,10 @@ class AnnotationAndReflectionMirrorTest(ReflectBase):
         sent = self.day()
         self.answer_prompt("evening", "2026-10-14", "rain all day, walked anyway. the soup was good. "
                                                     "the bus can wait", sent + timedelta(minutes=9), "11")
-        self.reflect(datetime(2026, 10, 15, 0, 30, tzinfo=IST))
+        self.reflect(datetime(2026, 10, 15, 4, 30, tzinfo=IST))
         call = self.rec.calls[-1]
         head, body = call["text"].split("\n", 1)
-        self.assertEqual(head, "[Journal: Iris's reflection — Wed 14 Oct 2026, sent at 00:30 IST]")
+        self.assertEqual(head, "[Journal: Iris's reflection — Wed 14 Oct 2026, sent at 04:30 IST]")
         self.assertIn("**What stood out**", body)
         self.assertNotIn("FOLLOW-UP", body)
         self.assertIs(self.rec_of()["telegram"]["mirrored"], True)
@@ -322,8 +323,8 @@ class NeverHisWordsTest(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_the_sweep_never_captures_one(self):
-        self.assertIsNone(sweep.parse(MIRRORED, None))
-        self.assertIsNone(sweep.parse("[Journal: Iris sent x]\nwords", "51"))
+        self.assertIsNone(legacy_readers.sweep_parse(MIRRORED, None))
+        self.assertIsNone(legacy_readers.sweep_parse("[Journal: Iris sent x]\nwords", "51"))
         log = []
         sweep.run(self.cfg, datetime.now(timezone.utc), log)
         p = ledger.snapshot(self.cfg.ledger_path)["prompts"][0]

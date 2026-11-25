@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 from helpers import CHAT, CleanEnv, make_cfg
+import legacy_readers
 
 from journal import (agent, capture, cli, compose, config, context, entries, ledger, library, programdefs, programs,
                      sweep, telegram, tick, today)
@@ -19,6 +20,7 @@ from journal import commands as jcommands
 from journal.config import Names
 from journal.hermes import commands as hcommands
 from journal.hermes import hooks
+from journal.chat import send as chat_send  # (send_prompt's clock, moved from tick: issue #43)
 
 NAMES = Names(user="Sam", companion="Ada", emoji="🌿", pronouns="he/him/his", frontmatter_source="journal")
 T0 = datetime(2026, 10, 20, 10, 0, tzinfo=timezone.utc)  # 15:30 IST, a Tuesday
@@ -72,7 +74,7 @@ class Base(CleanEnv):
                 raise agent.AgentUnavailable("no model in this test")
             return self.model(query)
         for p in (mock.patch.object(telegram, "_call", self.bot), mock.patch.object(telegram, "token", lambda c: "T"),
-                  mock.patch.object(agent, "ask", ask), mock.patch.object(tick, "datetime", Clock),
+                  mock.patch.object(agent, "ask", ask), mock.patch.object(tick, "datetime", Clock), mock.patch.object(chat_send, "datetime", Clock),
                   mock.patch.object(programs, "datetime", Clock), mock.patch.object(hooks, "datetime", Clock)):
             p.start()
             self.addCleanup(p.stop)
@@ -597,7 +599,7 @@ class SurfaceTest(Base):
         self.assertIn("phase 1/6 “Current Reality Excavation”", note)
         self.assertTrue(note.rstrip().endswith("annotations are written automatically.]"))
         self.assertEqual(context.clean_user_text(out["text"]), "my answer")
-        self.assertEqual(sweep.read(out["text"], "88")["kind"], "handled")
+        self.assertEqual(legacy_readers.read(out["text"], "88")["kind"], "handled")
         self.assertEqual(spawned, [("program", "settle", rid)])
 
     def test_start_resolves_programs_aliases_sessions_and_insights(self):

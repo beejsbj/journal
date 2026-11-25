@@ -9,6 +9,7 @@ from datetime import timedelta
 from pathlib import Path
 from unittest import mock
 
+from helpers import unkeyed
 from serve_helpers import NOW
 from test_serve_writes import WriteCase, checksum
 
@@ -130,7 +131,7 @@ class PhaseBlockTest(ProgramCase):
         self.assertEqual(got["advance"], "settle")
         self.assertEqual(self.spawned, [["program", "settle", self.rid]])
         body = self.entry(self.stem)
-        self.assertIn("%% journal phase:1 %%\n### 09:12 IST · text\n\nThe life I do not want.\n\nSecond line.\n", body)
+        self.assertIn("%% journal phase:1 %%\n### 09:12 IST · text\n\nThe life I do not want.\n\nSecond line.\n", unkeyed(body))
         p = self.prompt(f"{self.rid}-s01-p1")
         self.assertEqual((p["captures"][0]["rule"], p["captures"][0]["source"], len(p["captures"])), ("web", "web", 1))
         self.assertTrue(p["needs_edit"])    # the Telegram message folds, as after a Telegram answer

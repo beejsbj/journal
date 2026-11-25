@@ -52,6 +52,50 @@ from journal import mirror  # noqa: E402
 
 mirror._mirror_to_session = _no_mirror  # tests that mirror patch journal.mirror._mirror_to_session themselves
 
+
+import contextlib  # noqa: E402
+
+from journal import audio  # noqa: E402
+
+
+@contextlib.contextmanager
+def no_model():
+    """README *Guarantees*, "the web app calls no model", held by behaviour (issue #3): while open, every way a model
+    is reached records the attempt and fails. That is ``agent.ask`` (the facade every model step calls), every
+    companion ``Config.companion()`` hands out (its ``ask``; the outage probe asks the same one), and the companion
+    classes' own ``ask`` (one built without ``Config.companion``), and ``audio.transcribe`` (speech-to-text, a model
+    run by a command or Hermes' own STT). Yields the list of attempts: the caller asserts it
+    is empty, so a failure a route catches and swallows still fails the test.
+
+    The fence is at ``ask``, not at building a companion: ``journal doctor`` (``GET /api/v1/doctor``) builds the
+    configured one to read its ``doctor_rows``, a check of files that runs no model, and catches whatever that
+    raises, so a ``Config.companion`` that raised would be swallowed there and prove nothing."""
+    calls: list[tuple] = []
+
+    def refuse(where):
+        def ask(*a, **k):
+            calls.append((where, a, k))
+            raise AssertionError(f"a model was reached through {where}")
+        return ask
+
+    class Fenced:
+        """The configured companion, with its ``ask`` fenced; every other attribute (``doctor_rows``) is its own."""
+
+        def __init__(self, inner):
+            self._inner = inner
+            self.ask = refuse(f"{type(inner).__name__}.ask (from Config.companion)")
+
+        def __getattr__(self, name):
+            return getattr(self._inner, name)
+
+    real = Config.companion
+    with mock.patch.object(Config, "companion", lambda self: Fenced(real(self))), \
+            mock.patch.object(agent, "ask", refuse("agent.ask")), \
+            mock.patch.object(agent.CommandCompanion, "ask", refuse("CommandCompanion.ask")), \
+            mock.patch.object(agent.NoCompanion, "ask", refuse("NoCompanion.ask")), \
+            mock.patch.object(audio, "transcribe", refuse("audio.transcribe")):
+        yield calls
+
 PERSON = Names(user="Theo", companion="Iris", emoji="🌻", pronouns="he/him/his", frontmatter_source="iris-journal")
 CHAT = "100200300"
 
@@ -87,6 +131,14 @@ def make_cfg(tmp: Path, names: Names = PERSON, **kw) -> Config:
                  timezone=kw.pop("timezone", "Asia/Kolkata"), **kw)
     cfg.root.mkdir(parents=True, exist_ok=True)
     return cfg
+
+
+def unkeyed(text: str) -> str:
+    """An entry's text without the blocks' own key lines (``%% journal block:<id> %%``, the first line under each
+    heading of his words, MARGIN-FORMAT): for the tests that pin a block's heading and words as one run of text, from
+    before the key; ``test_margin_format`` pins the key itself."""
+    import re
+    return re.sub(r"(?m)^%% journal block:[A-Za-z0-9-]+ %%[ \t]*\n", "", text)
 
 
 def add_prompt(cfg, kind="morning", local_date="2026-10-14", sent=None, message_id="100"):

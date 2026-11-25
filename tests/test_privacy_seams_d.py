@@ -14,11 +14,12 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
-from helpers import make_cfg
+from helpers import make_cfg, unkeyed
 
 from journal import agent, audio, context, conversations, entries, privacy, sweep, tick
 from journal.mcp import handlers as mcp_handlers
-from journal.serve import blocks, document
+from journal import document
+from journal.serve import blocks
 from serve_helpers import IST, NEUTRAL, NOW as SERVE_NOW
 from test_conversations import Base, m, near_t0, _NearT0
 from test_images import NOW as IMAGES_NOW, ReceiveBase, note as image_note
@@ -199,7 +200,7 @@ class FillAudioTest(unittest.TestCase):
     def edit_first(self, words):
         body = self.path.read_text()
         b = next(x for x in document.blocks_of(body, self.STEM) if x["key"] == "words:0")
-        self.path.write_text(blocks.edit(body, "words:0", words, was=b["text"], at=b["at"], stem=self.STEM))
+        self.path.write_text(blocks.edit(body, "words:0", words, cfg=self.cfg, was=b["text"], at=b["at"], stem=self.STEM))
 
     def fill(self):
         return entries.fill_audio_block(self.path, f"{self.STEM}.ogg", "the transcript",
@@ -213,7 +214,7 @@ class FillAudioTest(unittest.TestCase):
         self.edit_first(mine)
         self.assertTrue(self.fill())
         self.assertEqual(self.his_blocks(), [mine, "the transcript"])
-        self.assertIn("### 20:05 IST · audio file · 0:30\n\n![[", self.path.read_text())
+        self.assertIn("### 20:05 IST · audio file · 0:30\n\n![[", unkeyed(self.path.read_text()))
 
     def by_hand(self, old, new):
         """An edit in his notes app (the web app refuses an embed line of his own, and removing a recording that is
@@ -226,7 +227,7 @@ class FillAudioTest(unittest.TestCase):
         self.by_hand("**Today** was long.", f"listen:\n\n![[{self.STEM}.ogg]]")
         self.assertTrue(self.fill())
         self.assertIn(f"### 20:00 IST · text\n\nlisten:\n\n![[{self.STEM}.ogg]]\n\n### 20:05 IST · audio file · 0:30"
-                      f"\n\n![[{self.STEM}.ogg]]\n\nthe transcript", self.path.read_text())
+                      f"\n\n![[{self.STEM}.ogg]]\n\nthe transcript", unkeyed(self.path.read_text()))
 
     def test_no_recording_block_writes_nothing(self):
         self.by_hand(f"![[{self.STEM}.ogg]]\n\n{audio.TRANSCRIBING}", f"it was ![[{self.STEM}.ogg]]")

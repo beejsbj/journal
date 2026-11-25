@@ -51,7 +51,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from . import audio, capture, entries, images, ledger, sweep
-from .config import Config
+from .config import Config, journal_day
 from .ports import Row
 
 STATE = "conversations.json"
@@ -80,7 +80,7 @@ def journals_all_chat(cfg: Config) -> bool:
     return capture_mode(cfg) == "everything"
 
 
-QUOTE_WORDS = 6  # a quote must be at least this long to count as a reply to one of the journal's own messages
+QUOTE_WORDS = sweep.QUOTE_WORDS  # a quote must be at least this long to count as a reply to one of the journal's own messages
 
 
 def annotate_auto(cfg: Config) -> bool:
@@ -203,16 +203,6 @@ def same_db(t, cursor: dict) -> bool:
     if not a:
         return int(cursor.get("last_id") or 0) <= t.max_id()
     return t.anchor(int(a["id"])) == a
-
-
-def rows(cfg: Config, db: Path, after_id: int, since_ts: float = 0.0, upto_id: int | None = None) -> list[tuple]:
-    """(id, ts, role, content, platform id, display kind, tool calls, uid, copy) for the chat, in stored order,
-    as Hermes stored them (``journal.hermes.transcript.raw_rows``). The engine reads ``cfg.transcript().rows()``;
-    this is the old shape, kept for callers of it."""
-    from .hermes.transcript import raw_rows
-    return [(r["id"], r["ts"], r["role"], r["content"], r["pmid"], r["display_kind"], r["tool_calls"], r["uid"],
-             r["copy"]) for r in raw_rows(db, cfg.chat_id, after_id, since_ts, upto_id, platform=cfg.platform,
-                                         users=cfg.owner_ids)]
 
 
 def _send_times(cfg: Config) -> list[str]:
@@ -427,7 +417,9 @@ def his_block(cfg: Config, at: datetime, text: str, source: str = "text", kept: 
               meta: dict | None = None, entry_date: str | None = None, quote: str | None = None,
               key: str | None = None, pictures: list[str] | None = None) -> str:
     """One of the user's messages, verbatim, as a paragraph with a small time marker (and, with ``key``, the
-    hidden line that keys it)."""
+    hidden line that keys it). Off-the-record words raise ``capture.OffRecord`` (the pass and ``Writer`` drop them
+    first: this is the floor, issue #46)."""
+    capture.refuse_off_record(cfg, text)
     out = entries.block_mark("his", key) + "\n" if key else ""
     if quote:
         q = " ".join(quote.split())
@@ -553,8 +545,10 @@ class _Writer:
 
     def new_note(self, ev: Event) -> str:
         """Start an auto note entry with this message as its words (and, when it replies to a day reflection or week
-        review, that analysis's id on its capture: ``answers``)."""
-        local_date = ev.at.astimezone(self.cfg.tz).date().isoformat()
+        review, that analysis's id on its capture: ``answers``). Off-the-record words raise ``capture.OffRecord``
+        before anything is kept or reserved."""
+        capture.refuse_off_record(self.cfg, ev.text)
+        local_date = journal_day(self.cfg, ev.at).isoformat()   # (as ``capture.new_note_prompt`` dates it)
         if not self.write:
             n, stem = 1, entries.stem_for(local_date, "j")
             taken = {p.get("stem") for p in ledger.snapshot(self.cfg.ledger_path)["prompts"]} | self.reserved
@@ -612,7 +606,7 @@ class _Writer:
         analysis): an annotation reply (the entry it annotates is its home) and a day reflection or week review (no
         home; its ledger record's id)."""
         if self._ours is None:
-            from . import compose, reflect
+            from . import compose
             names, out = self.cfg.names, []
             data = ledger.snapshot(self.cfg.ledger_path)
             for p in data["prompts"]:
@@ -623,16 +617,8 @@ class _Writer:
                     out.append((datetime.fromisoformat(r["sent_at"]),
                                 sweep.words(compose.annotation_html(p.get("kind") or "", text, names)),
                                 in_root(self.cfg, str(path)), None))
-            for r in data.get("reflections") or []:
-                tg, path = r.get("telegram") or {}, Path(in_root(self.cfg, r.get("path")) or "")
-                if tg.get("message_id") and tg.get("sent_at") and path.is_file():
-                    try:
-                        title, _ = reflect._label(self.cfg, r["kind"], date.fromisoformat(r["local_date"]))
-                    except (KeyError, ValueError):
-                        continue
-                    body = reflect.body_of(path.read_text(encoding="utf-8", errors="replace"))
-                    out.append((datetime.fromisoformat(tg["sent_at"]),
-                                sweep.words(compose.reflection_html(title, body, names)), None, r.get("id")))
+            out += [(sent, text, None, rid)
+                    for sent, text, rid in sweep.analysis_sends(self.cfg, data, lambda p: in_root(self.cfg, p))]
             self._ours = out
         return self._ours
 
@@ -688,9 +674,11 @@ class _Writer:
         return "written"
 
     def his(self, ev: Event, path: str, quote: str | None) -> str:
-        """Append one of his messages; returns what ``_append`` did ("written" in a dry run)."""
+        """Append one of his messages; returns what ``_append`` did ("written" in a dry run). Off-the-record words
+        raise ``capture.OffRecord`` before anything is kept."""
         if not self.present(path):
             return "missing"
+        capture.refuse_off_record(self.cfg, ev.text)
         kept, meta = self._keep(ev, path) if (ev.source in ("voice", "audio") or ev.audio_path) else (None, {})
         pics = self._keep_images(ev, path) if ev.source == "photo" else []
         source = ev.source if ev.source != "photo" or pics else "text"  # (a picture that could not be kept is text)
@@ -895,6 +883,8 @@ class _Threads:
     def _prompt_for(self, ev: Event, data: dict) -> dict | None:
         """The prompt his message answers by the sweep's rules (a quote of it, else the one open then), read only."""
         prompt = sweep.by_quote(self.cfg, data, ev.quote, ev.at) if ev.quote else None
+        if prompt is None and sweep.quotes_analysis(self.cfg, data, ev.quote, ev.at):
+            return None  # a reply to her reflection answers no prompt (``capture.match``, ``sweep.reconcile``)
         if prompt is None:  # a typed message answers a prompt once; a direct reply to it, as often as it is sent
             prompt = sweep.visible_at(self.cfg, data, ev.at)
             if prompt is not None and prompt["id"] in self.w.planned:
@@ -1033,6 +1023,24 @@ class _Threads:
             th["home"] = None  # the entry was moved or deleted: this message starts a note of its own
         if th["home"] and self._ordinary_home():
             th["home"] = None  # arm: the chat-started note it joined (before the switch) is not a journal thread
+        try:
+            placed = self._place(ev, th)
+        except capture.OffRecord:
+            # the floor refused his words (the opt-out command in them): off the record, this message alone. Its
+            # copies go, her answer to it stays out, and the batch and the cursor go on past it (review of #78)
+            self.w.drop(ev)
+            th["reply"] = "out"
+            return self._skip("off")
+        if placed is None:
+            return
+        if placed == "missing":
+            th["reply"] = "out"
+            return self._skip("not placed")
+        th.update(reply="in", her_last="", owed=True)
+
+    def _place(self, ev: Event, th: dict) -> str | None:
+        """Write one of his messages into the thread's entry, or start a note with it: "written", "missing", or None
+        when ``_admit`` took it elsewhere or dropped it."""
         placed = "written"
         if not th["home"]:
             verdict, home = self._admit(ev)
@@ -1055,10 +1063,7 @@ class _Threads:
                     return
                 th["home"] = home or self.w.new_note(ev)
                 placed = "written" if th["home"] else "missing"
-        if placed == "missing":
-            th["reply"] = "out"
-            return self._skip("not placed")
-        th.update(reply="in", her_last="", owed=True)
+        return placed
 
 
 def _pseudo(cfg: Config, after: datetime | None, upto: datetime) -> list[Event]:

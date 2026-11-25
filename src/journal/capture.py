@@ -22,7 +22,7 @@ from pathlib import Path
 
 from . import audio as jaudio
 from . import channel, entries, ledger, library
-from .config import Config
+from .config import Config, journal_day
 
 
 def _aware(ts: str) -> datetime:
@@ -56,7 +56,7 @@ def open_phase(prompt: dict, at: datetime | None = None) -> bool:
 
 def sent_by(prompt: dict, at: datetime | None = None) -> datetime:
     """When the prompt was last sent by ``at`` (now, without it): a prompt sent again has its earlier sends in
-    ``earlier_sent_at`` (``tick.send_prompt``), and each kept taking replies until the next."""
+    ``earlier_sent_at`` (``chat.send.send_prompt``), and each kept taking replies until the next."""
     sends = [_aware(t) for t in [*(prompt.get("earlier_sent_at") or []), prompt["sent_at"]]]
     return max((t for t in sends if at is None or t <= at), default=min(sends))
 
@@ -99,6 +99,11 @@ def match(data: dict, cfg: Config, chat_id: str, reply_to: str | None, now: date
         p = ledger.by_message_id(data, chat_id, reply_to, cfg.platform)
         if p:
             return p, "direct-reply"
+        if ledger.analysis_by_message_id(data, reply_to):
+            # a reply to her day reflection or week review answers no prompt, even one open now (the reflection
+            # lands at the end of the journal day, before the morning prompt): the conversation writer files it as a
+            # reply to that analysis (``conversations.analysis_answered``)
+            return None, ""
     # (an open program phase keeps taking his typed messages beneath an interrupt: it is open on purpose and takes
     # every message, which an interrupt, answered only by replying to it, does not change; a prompt sent in another
     # chat, before the channel moved, takes nothing typed here)
@@ -165,13 +170,14 @@ def record(cfg: Config, prompt: dict, rule: str, text: str, now: datetime,
     ``text``); ``describe`` asks the tick for the companion's one-line description of each (``images.describe``).
     ``times``: when each paragraph was begun, already checked (``actions.paragraph_times``): words from a face only.
     """
+    refuse_off_record(cfg, text)  # (before anything changes: the record, the entry, the ledger)
     local_now = now.astimezone(cfg.tz)
     prompt["stem"] = entry_stem(cfg, prompt, data)
     # the practice titles a new entry and gives it its bank; for_prompt never raises, so a broken definition can
     # cost the bank in the file, never the capture
     practice = None if prompt["kind"] in entries.FREEFORM_IDS else library.for_prompt(cfg, prompt)
-    path = entries.record_reply(cfg.root, prompt, text, local_now, source, audio, cfg.names, meta, practice,
-                                images or (), times)
+    written: dict = {}
+    path = write_words(cfg, prompt, text, local_now, source, audio, meta, practice, images or (), written, times)
     prompt.setdefault("captures", []).append({
         "at": now.isoformat(),
         "rule": rule,
@@ -184,10 +190,47 @@ def record(cfg: Config, prompt: dict, rule: str, text: str, now: datetime,
         **({"via": via} if via else {}),
         **({"client_id": client_id} if client_id else {}),
         **({"transcript": transcript} if transcript else {}),
+        # the block's own key (MARGIN-FORMAT): what a later step maps this message to, for a note on its block
+        **({"block_key": written["block_key"]} if written.get("block_key") else {}),
     })
     prompt["entry_path"] = str(path)
     prompt["needs_edit"] = True
     return {"prompt": dict(prompt), "path": str(path), "rule": rule}
+
+
+def write_words(cfg: Config, prompt: dict, text: str, at: datetime, source: str, audio: str | None = None,
+                meta: dict | None = None, practice=None, images: Sequence[str] = (),
+                written: dict | None = None, times: Sequence[str] = ()) -> Path:
+    """The one caller of ``entries.record_reply``, the function that writes his words into an entry
+    (``test_off_record_floor`` holds that): ``refuse_off_record`` first, so the floor holds for ``record`` and for
+    ``add_web_block``'s block into an entry with no ledger prompt alike. ``at`` is local time; ``written`` is filled
+    with the new block's key (``entries.record_reply``); ``times``, already checked (``actions.paragraph_times``), go
+    on the line under that key in the same write."""
+    refuse_off_record(cfg, text)
+    return entries.record_reply(cfg.root, prompt, text, at, source, audio, cfg.names, meta, practice, images,
+                                written, times)
+
+
+def write_meta(cfg: Config, path: Path, changes: dict[str, str | None]) -> None:
+    """The one caller of ``entries.set_meta``, which writes his front-matter fields (``mood``, ``people``: labels he
+    types on a face; ``starred``) and takes no config: ``refuse_off_record`` first, on each value and on each item of
+    a ``[a, b]`` list (an item holds no comma: ``writes.MOOD_ITEM``), so a label that starts with the opt-out command
+    is never written (review of #78)."""
+    import json
+    for value in changes.values():
+        if value is None:
+            continue
+        refuse_off_record(cfg, value)
+        if value.startswith("[") and value.endswith("]"):
+            for item in value[1:-1].split(","):
+                item = item.strip()
+                if item.startswith('"'):
+                    try:
+                        item = json.loads(item)
+                    except ValueError:
+                        pass
+                refuse_off_record(cfg, str(item))
+    entries.set_meta(path, changes)
 
 
 def capture(cfg: Config, chat_id: str, reply_to: str | None, text: str, now: datetime,
@@ -378,12 +421,13 @@ def add_web_block(cfg: Config, stem: str, text: str, now: datetime, *, media: st
             return _web_record(cfg, data, prompt, via, text, now, client_id, media, ext, meta, key_of, via=via,
                                times=times)
         path = entries.entry_path(cfg.root, stem)
+        refuse_off_record(cfg, text)  # (before the recording is kept)
         kept = jaudio.keep(cfg, media, str(path), ext) if media else None
         # no ledger prompt, so no capture for the tick to find: an audio file here is kept but not transcribed
         words = text.strip() or (jaudio.NOT_TRANSCRIBED if kept else "")
         try:
-            entries.record_reply(cfg.root, {"stem": stem}, words, now.astimezone(cfg.tz), "audio" if kept else via,
-                                 kept, cfg.names, meta, times=() if kept else times)
+            write_words(cfg, {"stem": stem}, words, now.astimezone(cfg.tz), "audio" if kept else via, kept, meta,
+                        times=() if kept else times)
         except BaseException:
             if kept:
                 Path(cfg.root, kept).unlink(missing_ok=True)
@@ -423,8 +467,9 @@ def strip_command(text: str) -> str | None:
 
 
 def new_note_prompt(data: dict, cfg: Config, now: datetime) -> dict:
-    """A fresh record for one /j note: each note is its own entry file (…-j.md, …-j-2.md)."""
-    local_date = now.astimezone(cfg.tz).date().isoformat()
+    """A fresh record for one /j note: each note is its own entry file (…-j.md, …-j-2.md), dated by the journal day
+    (``config.journal_day``: a note put down at 00:30 is last night's, as a prompt answered then is; issue #82)."""
+    local_date = journal_day(cfg, now).isoformat()
     taken = {p.get("stem") for p in data["prompts"]}
     n, stem = 1, entries.stem_for(local_date, "j")
     while stem in taken or entries.entry_path(cfg.root, stem).exists():
@@ -477,11 +522,23 @@ def note_context(cfg: Config, info: dict) -> str:
 
 def opt_out(cfg: Config, text: str) -> str | None:
     """The text after the opt-out command (``conversations.opt_out_prefix``, default ``/x``), "" for the bare
-    command, or None when the message doesn't start with it."""
+    command, or None when the message doesn't start with it. Any ``/j`` in front of it changes nothing (one or several): ``/j /x …`` is
+    off the record as ``/x …`` is, and a bare ``/j /x`` is a bare ``/x`` (review of #78: read after ``/j`` was
+    stripped, the command was kept as the words of a note). Every reader asks this, so they all agree: the hook, the
+    privacy pass, the conversation writer, the sweep, the faces and the floor (``refuse_off_record``)."""
     from .config import opt_out_prefix
-    prefix = opt_out_prefix(cfg)
-    m = re.match(rf"^\s*{re.escape(prefix)}(?:@\w+)?(?:\s+|$)", text or "", re.I)
-    return (text or "")[m.end():] if m else None
+    command = re.compile(rf"^\s*{re.escape(opt_out_prefix(cfg))}(?:@\w+)?(?:\s+|$)", re.I)
+    text = text or ""
+    m = command.match(text)
+    if m:
+        return text[m.end():]
+    after_j = strip_command(text)
+    while after_j is not None:  # every leading /j (``/j /j /x …``): the floor strips as deep as this does
+        m = command.match(after_j)
+        if m:
+            return after_j[m.end():]
+        after_j = strip_command(after_j)
+    return None
 
 
 def opt_out_inside(cfg: Config, text: str) -> bool:
@@ -493,6 +550,21 @@ def opt_out_inside(cfg: Config, text: str) -> bool:
     if opt_out(cfg, text) is not None:
         return False
     return any(opt_out(cfg, line) is not None for line in (text or "").splitlines()[1:])
+
+
+class OffRecord(ValueError):
+    """Off-the-record words reached a function that writes his words; nothing was written. Every caller refuses
+    them first and decides what to answer (``actions.refuse`` on the faces, ``inbound`` and the privacy pass in the
+    chat); this is the floor under them, so a caller that forgot cannot write them (issue #46)."""
+
+
+def refuse_off_record(cfg: Config, text: str | None) -> None:
+    """Raise ``OffRecord`` when ``text`` starts with the opt-out command or has a line that does (``opt_out``,
+    ``opt_out_inside``). Only the command in the text itself: whether a message falls in a ``/x`` window is the
+    privacy pass's (``privacy.py``), decided by the callers."""
+    if opt_out(cfg, text or "") is not None or opt_out_inside(cfg, text or ""):
+        raise OffRecord("these words start with the off-the-record command, or have a line that does: "
+                        "nothing was written")
 
 
 OFF_RECORD_END = "it stays out of the journal.]"
@@ -552,7 +624,8 @@ def add_companion_note(cfg: Config, text: str, now: datetime, local_date: str | 
     if not text or not text.strip():
         raise ValueError("note text is empty")
     local_now = now.astimezone(cfg.tz)
-    local_date = local_date or local_now.date().isoformat()
+    # (no date given: the journal day, as his notes are filed: her note at 00:30 joins last night's, issue #82)
+    local_date = local_date or journal_day(cfg, now).isoformat()
     datetime.strptime(local_date, "%Y-%m-%d")  # validate
     kind = kind.strip().lower() if kind else None
     ids = tuple(dict.fromkeys((*(known_ids() if known_ids else entries.known_ids()), *entries.FREEFORM_IDS)))

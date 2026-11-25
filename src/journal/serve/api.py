@@ -23,15 +23,15 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable
 
-from .. import actions, audio, capture, entries, images, ledger, library, location, reflect, slots, status, today, version
+from .. import actions, audio, capture, daylog, document, entries, images, ledger, library, location, reflect, slots, status, today, version
 from .. import settings as settings_
 from ..config import Config, effective_today, profile_from_home
-from . import auth, document
+from . import auth
 
 log = logging.getLogger(__name__)
 
 JSON_LIMIT = 1024 * 1024  # bytes of a JSON body
-LIST_LIMIT = 200          # most items one page of /entries may carry
+LIST_LIMIT = document.LIST_LIMIT   # most items one page of /entries may carry
 DAYS_LIMIT = 400          # widest /days or /insights range
 
 
@@ -130,8 +130,7 @@ def _int(req: Request, name: str, default: int, lo: int, hi: int) -> int:
 
 
 def _range(req: Request, default_days: int) -> tuple[date, date]:
-    today_local = req.now.astimezone(req.cfg.tz).date()
-    to = _date(req, "to", today_local)
+    to = _date(req, "to", slots.journal_day(req.cfg, req.now))  # (by default up to the journal day, as Today)
     start = _date(req, "from", to - timedelta(days=default_days - 1))
     if start > to:
         raise HTTPError(400, "bad-request", "from is after to")
@@ -197,8 +196,8 @@ def week_strip(cfg: Config, now: datetime, days_: int = 7) -> list[dict]:
     """The Today view's week strip: the last ``days_`` local days, oldest first, each with how many prompts were
     answered and missed (from the ledger, which keeps recent weeks only) and one ``state``: ``answered`` (all of the
     day's prompts, none waiting), ``partial`` (some answered, some missed or still waiting), ``missed`` (none answered)
-    or ``none`` (nothing sent, or only open prompts)."""
-    end = now.astimezone(cfg.tz).date()
+    or ``none`` (nothing sent, or only open prompts). It ends on the journal day, as Today does."""
+    end = slots.journal_day(cfg, now)
     found = _outcomes(cfg, now, end - timedelta(days=days_ - 1), end)
     out = []
     for back in range(days_ - 1, -1, -1):
@@ -242,12 +241,6 @@ def today_(req: Request):
             "location_source": location.place_source(req.cfg)}
 
 
-def _order(item: tuple[Path, tuple]) -> tuple:
-    path, _key = item
-    info = document.parsed(path) or {}
-    return (path.stem[:10], info.get("time") or "", path.stem)
-
-
 def _filtered(req: Request, start: date | None, end: date | None) -> list[tuple[Path, tuple]]:
     q = (req.query.get("q") or "").strip()
     if len(q) > 200:
@@ -256,28 +249,7 @@ def _filtered(req: Request, start: date | None, end: date | None) -> list[tuple[
                           program=req.query.get("program") or None, q=q, audio_only=req.query.get("audio") == "1")
 
 
-def filter_entries(cfg: Config, start: date | None = None, end: date | None = None, *, kind: str | None = None,
-                   program: str | None = None, q: str = "", audio_only: bool = False) -> list[tuple[Path, tuple]]:
-    """The engine entries that pass the filters, newest first: what ``/entries`` and ``/days`` page through, and
-    what ``journal mcp``'s ``journal_entries`` lists. ``q`` is a substring of **his words only**
-    (``document.matches``)."""
-    out = []
-    for path, key in document.all_entries(cfg):
-        day = path.stem[:10]
-        if (start and day < start.isoformat()) or (end and day > end.isoformat()):
-            continue
-        if kind and key[0] != kind:
-            continue
-        if program:
-            fm = (document.parsed(path) or {}).get("fm") or {}
-            if fm.get("program") != program and not (key[0] == program and key[1] is not None):
-                continue
-        if q and not document.matches(path, q):
-            continue
-        if audio_only and not (document.parsed(path) or {}).get("flags", {}).get("audio"):
-            continue
-        out.append((path, key))
-    return sorted(out, key=_order, reverse=True)
+filter_entries = document.filter_entries   # (moved to the core: issue #47)
 
 
 def entries_list(req: Request):
@@ -318,6 +290,18 @@ def days(req: Request):
             out.append({"date": day, "entries": by_day.get(day, []), "reflection": ref})
         d -= timedelta(days=1)
     return out
+
+
+def day_log(req: Request):
+    """One journal day as a log (issue #82): every line of every entry filed under it, his and hers, in time order,
+    each naming its entry and block (``daylog.day``). Read-only, over the entry files and the ledger only."""
+    raw = req.params["date"]
+    try:
+        date.fromisoformat(raw)
+    except ValueError:
+        raise HTTPError(400, "bad-request", f"not a date like 2026-10-14 (got {raw!r})") from None
+    return {**daylog.day(req.cfg, raw, req.lib()),
+            "voices": {"his": req.cfg.names.user or "You", "hers": req.cfg.names.companion}}
 
 
 def entry_doc(req: Request):
@@ -811,6 +795,7 @@ ROUTES: list[tuple[str, str, Callable, str]] = [
     ("GET", r"/api/v1/entries", entries_list, TOKEN),
     ("GET", r"/api/v1/entries/(?P<stem>[^/]+)", entry_doc, TOKEN),
     ("GET", r"/api/v1/days", days, TOKEN),
+    ("GET", r"/api/v1/days/(?P<date>\d{4}-\d{2}-\d{2})", day_log, TOKEN),
     ("GET", r"/api/v1/media/(?P<name>[^/]+)", media, TOKEN),
     ("GET", r"/api/v1/reflections", reflections, TOKEN),
     ("GET", r"/api/v1/insights/weeks", insights_weeks, TOKEN),

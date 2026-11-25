@@ -38,7 +38,7 @@ import json
 import os
 import re
 import tempfile
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from . import audio, capture, channel, compose, entries, images, ledger, library
@@ -52,6 +52,9 @@ PHASE_STATUSES = ("answered ✓", "open — reply anytime", "sent again below") 
 
 
 # ── reading rows ─────────────────────────────────────────────────────────────
+
+QUOTE_WORDS = 6  # a quote must be at least this long to count as a reply to one of the journal's own messages
+
 
 def words(text: str) -> str:
     """Comparison form: markup, punctuation, emoji and spacing gone, lower case."""
@@ -152,32 +155,6 @@ def _drop(cfg: Config, names: list[str]) -> None:
             os.unlink(os.path.join(str(cfg.root), name))
 
 
-def parse(content: str, platform_message_id: str | None) -> dict | None:
-    """One stored user message → {message_id, quote, text, source, audio_path} (None: not a candidate). The old
-    entry point, over the Hermes adapter's reading (``journal.hermes.transcript.read``)."""
-    from .hermes.transcript import read
-    msg = read(content, platform_message_id)
-    if msg["kind"] != "his":
-        return None
-    return {k: msg[k] for k in ("message_id", "quote", "text", "source", "audio_path")}
-
-
-def rows(cfg: Config, db: Path, after_id: int, since: float) -> list[tuple]:
-    """(id, ts, platform id, content, display kind) of his rows after ``after_id`` and newer than ``since``, as
-    stored (the old shape, kept for callers of it; the sweep reads ``cfg.transcript()``)."""
-    from .hermes.transcript import raw_rows
-    return [(r["id"], r["ts"], r["pmid"], r["content"], r["display_kind"])
-            for r in raw_rows(db, cfg.chat_id, after_id, since, platform=cfg.platform, users=cfg.owner_ids)
-            if r["role"] == "user" and (r["ts"] is None or float(r["ts"]) > since)]  # (no time: kept, as stored)
-
-
-def __getattr__(name: str):
-    if name == "read":  # the row reading moved to the transcript adapter with the rest of Hermes' row semantics
-        from .hermes.transcript import read
-        return read
-    raise AttributeError(name)
-
-
 # ── matching (the hook's rules, at the message's own time) ───────────────────
 
 def prompt_texts(cfg: Config, p: dict) -> list[str]:
@@ -195,7 +172,7 @@ def prompt_texts(cfg: Config, p: dict) -> list[str]:
     for key in ("plain_text", "html", "sent_plain_text", "sent_html"):  # (sent_*: a delivery onto a face's record)
         if p.get(key):
             out.append(words(p[key]))
-    if p.get("program"):  # a phase folds to its own header line (tick.fold, programs): quoting that is a reply to it
+    if p.get("program"):  # a phase folds to its own header line (chat.fold, programs): quoting that is a reply to it
         out += [words(compose.folded_phase_html(p, s, cfg.names)) for s in PHASE_STATUSES]
     return [t for t in out if t]
 
@@ -216,6 +193,37 @@ def by_quote(cfg: Config, data: dict, quote: str, at: datetime) -> dict | None:
         if any(q in t for t in texts) or (texts and q.startswith(texts[0])):
             found.append(p)
     return max(found, key=lambda p: p["sent_at"]) if found else None
+
+
+def analysis_sends(cfg: Config, data: dict, resolve=None) -> list[tuple[datetime, str, str | None]]:
+    """Her day reflections and week reviews as sent to the chat: (sent, its words in comparison form, record id).
+    ``resolve`` maps the recorded path to the file to read (the conversation writer's ``in_root``)."""
+    from . import reflect
+    out = []
+    for r in data.get("reflections") or []:
+        tg = ledger.send_of(r)
+        raw = resolve(r.get("path")) if resolve else r.get("path")
+        path = Path(raw or "")
+        if not (tg.get("message_id") and tg.get("sent_at") and raw and path.is_file()):
+            continue
+        try:
+            title, _ = reflect._label(cfg, r["kind"], date.fromisoformat(r["local_date"]))
+            sent = datetime.fromisoformat(tg["sent_at"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        body = reflect.body_of(path.read_text(encoding="utf-8", errors="replace"))
+        out.append((sent, words(compose.reflection_html(title, body, cfg.names)), r.get("id")))
+    return out
+
+
+def quotes_analysis(cfg: Config, data: dict, quote: str | None, at: datetime) -> bool:
+    """Whether a message quoting ``quote`` replies to her day reflection or week review (sent before ``at``): such a
+    reply answers no prompt, even one open then (``capture.match`` says the same by message id), and the conversation
+    writer files it as a reply to that analysis. A short quote (under ``QUOTE_WORDS`` words) says nothing."""
+    q = words(quote or "")
+    if len(q.split()) < QUOTE_WORDS:
+        return False
+    return any(sent <= at and q in text for sent, text, _ in analysis_sends(cfg, data))
 
 
 def visible_at(cfg: Config, data: dict, at: datetime) -> dict | None:
@@ -314,6 +322,8 @@ def reconcile(cfg: Config, msg: dict, at: datetime, log: list[str] | None = None
             return info
         prompt = by_quote(cfg, data, msg["quote"], at) if msg["quote"] else None
         rule = "direct-reply"
+        if prompt is None and quotes_analysis(cfg, data, msg["quote"], at):
+            return None  # a reply to her reflection: the conversation writer's (as ``capture.match`` leaves it)
         if prompt is None:
             prompt, rule = visible_at(cfg, data, at), "next-message"
         if prompt is None:
@@ -425,7 +435,12 @@ def run(cfg: Config, now: datetime, log: list[str], db: Path | None = None) -> i
                 if conversations.row_is_off(cfg, pv, row, off) or (at != row.at and pv.at(at)):
                     last = max(last, row.id)
                     continue  # off the record (/x), also by when it arrived: never captured
-                info = reconcile(cfg, msg, at, log, caches)
+                try:
+                    info = reconcile(cfg, msg, at, log, caches)
+                except capture.OffRecord:  # the floor refused his words: off the record, this message alone
+                    log.append(f"sweep: message {msg['message_id']} is off the record (the opt-out command in its "
+                               "words): not captured")
+                    info = None
                 if info:
                     captured += 1
                     log.append(f"swept message {msg['message_id']} into {Path(info['path']).name} ({info['rule']})")

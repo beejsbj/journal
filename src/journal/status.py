@@ -80,8 +80,9 @@ def _ops(cfg: Config) -> dict | None:
 
 def status(cfg: Config, now: datetime | None = None, *, web: bool = False) -> dict:
     """What the journal is doing. ``web``: for ``journal serve``, leave out everything read from the chat side
-    (the privacy pass, ``conversations.json``, the mirror queue, the notebook, the hook's records), which no web
-    route may read (API.md Decision 2)."""
+    (the privacy pass, ``conversations.json``, the mirror queue, the notebook, the hook's records, the sweep's
+    watermark), which no web route may read (API.md Decision 2). So the web status has no ``sweep`` and its ``today``
+    no injection count: neither ``sweep.json`` nor ``hook-state.json`` is opened for it (ROUTE-OPENS)."""
     now = now or datetime.now(timezone.utc)
     now_local = now.astimezone(cfg.tz)
     data = ledger.snapshot(cfg.ledger_path)
@@ -139,7 +140,7 @@ def status(cfg: Config, now: datetime | None = None, *, web: bool = False) -> di
         "ops": _ops(cfg),
         "undelivered": failed,
         "reflections": _reflections(cfg, data),
-        "sweep": _read_json(cfg.state_dir / "sweep.json"),
+        "sweep": None if web else _read_json(cfg.state_dir / "sweep.json"),
         "capture_mode": jconfig.capture_mode(cfg),
         "conversations": None if web else _conversation_status(cfg),
         "mirror_queued": None if web else len(_read_json(cfg.state_dir / "mirror-queue.json") or []),
@@ -148,13 +149,14 @@ def status(cfg: Config, now: datetime | None = None, *, web: bool = False) -> di
                           for r in reversed(data.get("recovery") or [])), None),
         "notebook_open": None if web else len(notebook.open_items(cfg)),
         "hook_state": None if web else _hook_state(cfg),
-        "today": _today_status(cfg, now),
+        "today": _today_status(cfg, now, web=web),
         "programs": _program_runs(cfg, now),
         "recent_errors": errors,
         "warnings": cfg.warnings,
     }
     if web:
-        for key in ("conversations", "mirror_queued", "notebook_open", "hook_state"):
+        # sweep.json holds the sessions database's path and a row id (the chat side): the web gets none of it
+        for key in ("conversations", "mirror_queued", "notebook_open", "hook_state", "sweep"):
             out.pop(key)
     return out
 
@@ -180,8 +182,9 @@ def _program_runs(cfg: Config, now: datetime) -> list[dict]:
         return []
 
 
-def _today_status(cfg: Config, now: datetime) -> dict | None:
-    """The today block's switch, injections today and the age of the tick's cache; None if it can't be read."""
+def _today_status(cfg: Config, now: datetime, web: bool = False) -> dict | None:
+    """The today block's switch, injections today and the age of the tick's cache; None if it can't be read.
+    ``web``: no injection count, which lives in the hook's state (``hook-state.json``)."""
     from . import today
     try:
         cache = today.read_cache(cfg)
@@ -189,7 +192,8 @@ def _today_status(cfg: Config, now: datetime) -> dict | None:
             age = round((now - datetime.fromisoformat(cache["at"])).total_seconds() / 60)
         except (KeyError, TypeError, ValueError):
             age = None
-        return {"enabled": today.enabled(cfg), **today.injections(cfg, now), "cache_age_minutes": age}
+        return {"enabled": today.enabled(cfg), **({} if web else today.injections(cfg, now)),
+                "cache_age_minutes": age}
     except Exception:  # noqa: BLE001 - status only
         return None
 
@@ -205,7 +209,7 @@ def _reflections(cfg: Config, data: dict) -> dict:
     recs = sorted(data.get("reflections") or [], key=lambda r: r.get("local_date") or "")[-4:]
     rows = []
     for r in recs:
-        tg = r.get("telegram") or {}
+        tg = ledger.send_of(r)
         rows.append({"id": r.get("id"), "written": bool(r.get("written_at")), "trigger": r.get("trigger"),
                      "attempts": r.get("attempts", 0), "error": r.get("error"),
                      "sent": bool(tg.get("message_id")), "send_error": tg.get("skipped") or tg.get("error")})
@@ -449,7 +453,8 @@ def doctor(cfg: Config, deep: bool = False, token: bool = True, web: bool = Fals
         except Exception:  # noqa: BLE001 - the library row says why
             ends = None
         fall = f"fallback {when} the next day" if which == "day" else f"fallback {when} the day after the week"
-        timing = (f"after the {ends.id} entry is annotated, {fall}" if ends else
+        over = "once the day has ended, " if which == "day" else "once its last day has ended, "
+        timing = (f"{over}after the {ends.id} entry is annotated, {fall}" if ends else
                   f"no practice says closes: {which}, so only at the {fall}")
         rows.append((f"{which} {'reflection' if which == 'day' else 'review'}", "ok" if agent_on else "warn",
                      timing if agent_on else "on, but model steps are disabled: none will be written"))

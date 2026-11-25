@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
-from helpers import CHAT, CleanEnv, add_prompt, write_config
+from helpers import CHAT, CleanEnv, add_prompt, unkeyed, write_config
 
 from journal import audio, entries, hookstate, ledger
 from journal.config import load
@@ -52,7 +52,7 @@ class AudioCaptureTest(CleanEnv):
         self.assertTrue((self.cfg.root / "2026-10-14-evening.ogg").exists())
         hooks.on_llm_call(user_message='"long day, good swim"\n\n' + out["text"], platform="telegram")
         body = self.entry()
-        self.assertIn("· voice transcript\n\n![[2026-10-14-evening.ogg]]\n\nlong day, good swim", body)
+        self.assertIn("· voice transcript\n\n![[2026-10-14-evening.ogg]]\n\nlong day, good swim", unkeyed(body))
 
     def test_audio_file_recorded_at_once_with_its_original_extension(self):
         raw = SimpleNamespace(audio=SimpleNamespace(file_name="Recording 12.M4A"), document=None, voice=None)
@@ -62,7 +62,7 @@ class AudioCaptureTest(CleanEnv):
         saved = self.cfg.root / "2026-10-14-evening.m4a"
         self.assertEqual(saved.read_bytes(), b"m4a-bytes")  # bytes kept exactly as they arrived
         body = self.entry()
-        self.assertIn('· audio file "Recording 12.M4A"\n\n![[2026-10-14-evening.m4a]]\n\nfrom the walk', body)
+        self.assertIn('· audio file "Recording 12.M4A"\n\n![[2026-10-14-evening.m4a]]\n\nfrom the walk', unkeyed(body))
         cap = ledger.find(ledger.snapshot(self.cfg.ledger_path), "2026-10-14-evening")["captures"][0]
         self.assertEqual((cap["source"], cap["platform_message_id"], cap["audio"]), ("audio", "9", "2026-10-14-evening.m4a"))
         self.assertEqual(hookstate.snapshot(self.cfg)["voice"], {})  # nothing waits for a transcript
@@ -204,7 +204,7 @@ class AudioFileTranscriptionTest(CleanEnv):
         from journal import tick
         self.send()
         self.assertIn('· audio file "walk.m4a" · 12:04\n\n![[2026-10-14-evening.m4a]]\n\n'
-                      + audio.TRANSCRIBING, self.entry())
+                      + audio.TRANSCRIBING, unkeyed(self.entry()))
         self.assertEqual(self.capture()["transcript"], "pending")
         log = []
         self.cfg.annotate_after_minutes = 0
@@ -212,7 +212,7 @@ class AudioFileTranscriptionTest(CleanEnv):
         tick.process_audio(self.cfg, datetime.now(timezone.utc), log)
         body = self.entry()
         self.assertIn('· audio file "walk.m4a" · 12:04 · recorded 14 Oct 21:10\n\n![[2026-10-14-evening.m4a]]\n\n'
-                      'walked by the lake\n\n## Iris', body)
+                      'walked by the lake\n\n## Iris', unkeyed(body))
         self.assertNotIn("pending", body)
         c = self.capture()
         self.assertEqual((c["transcript"], c["meta"]["duration"]), ("done", 724))  # Telegram's duration wins
@@ -360,7 +360,7 @@ class AudioFileTranscriptionTest(CleanEnv):
         out = self.send(raw=raw, kind="VOICE")
         hooks.on_llm_call(user_message='"a forwarded thought"\n\n' + out["text"], platform="telegram")
         self.assertIn("· voice transcript · 2:31 · forwarded from 14 Oct 21:10\n\n![[2026-10-14-evening.m4a]]\n\n"
-                      "a forwarded thought", self.entry())
+                      "a forwarded thought", unkeyed(self.entry()))
 
 
 class LabelTest(unittest.TestCase):

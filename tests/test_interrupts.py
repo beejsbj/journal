@@ -16,7 +16,7 @@ from helpers import CHAT, add_prompt, make_cfg
 
 from journal import agent, audio, validate, capture, entries, ledger, library, outage, programdefs, programs, schedule, sweep, telegram
 from journal import tick
-from journal.serve import document
+from journal import document
 import test_programs as tp
 import test_programs_review as rv
 
@@ -510,6 +510,17 @@ class SendTest(Base):
             self.tick_at(self.local("2026-11-02T10:00"))  # the window closed, inside the grace period
         self.assertEqual(len(self.sent_interrupts()), 1)
         self.assertIn("Interrupt 1/8", self.sent_interrupts()[0]["text"])
+
+    def test_an_interrupt_is_held_by_a_x_that_began_after_the_ticks_now(self):
+        # the tick yields tick.lock to a waiter and goes on with its start time: a /x begun meanwhile is after
+        # ``now``, and only the clock sees it (``privacy`` says a window that began after ``now`` is not open at it)
+        began = self.local("2026-11-02T09:10")
+        with mock.patch.object(programs, "_off_the_record", side_effect=lambda cfg, at: at >= began):
+            self.now = self.local("2026-11-02T09:30")  # the clock, with the window begun (the test's clock is ``self.now``)
+            programs.send_interrupts(self.cfg, self.local("2026-11-02T09:00"), self.log)  # the tick's stale ``now``
+        self.assertEqual(self.sent_interrupts(), [])
+        self.assertEqual(self.the_run()["scheduled"][0]["status"], "pending")
+        self.assertTrue(any("off the record" in l for l in self.log))
 
     def test_an_interrupt_held_back_past_the_grace_window_is_missed(self):
         with mock.patch.object(programs, "_off_the_record", return_value=True):

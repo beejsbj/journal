@@ -59,7 +59,7 @@ review rounds; where this document disagrees with a candidate, this document win
 
 | Coupling | Modules and functions | Future home |
 | --- | --- | --- |
-| Reading `state.db` with Hermes row semantics (`display_kind`, `tool_calls`, `[Replying to: "…"]`, `Gateway message origin`, `[OUT-OF-BAND USER MESSAGE]`, `failed_turn` notices, compaction frames, `[Cron delivery:`, audio placeholders, `[Journal: ` mirrors) | `conversations.rows/classify/_ro/anchor/max_id`, `sweep.rows/read/_ro`, `recovery._rows/_his_text`, `context._his_messages/make_verifier/companion_reply_after`, `privacy.view` (via `conversations.rows`), `mirror.live_session/turn_running/busy` | `hermes/transcript.py` → `ports.Row` |
+| Reading `state.db` with Hermes row semantics (`display_kind`, `tool_calls`, `[Replying to: "…"]`, `Gateway message origin`, `[OUT-OF-BAND USER MESSAGE]`, `failed_turn` notices, compaction frames, `[Cron delivery:`, audio placeholders, `[Journal: ` mirrors) | Now behind `cfg.transcript()` (the `Transcript` port: `rows/anchor/max_id/busy`), read by `privacy.compute/view`, `conversations.classify`, `sweep.run`, `recovery.scan`, `context._his_messages/make_verifier/companion_reply_after`; `mirror.turn_running` (the thin tuple readers `conversations.rows` and `sweep.rows/read` moved to `tests/legacy_readers.py`; `live_session/busy` live in `hermes/transcript.py`) | `hermes/transcript.py` → `ports.Row` |
 | Asking the companion | `agent.argv` (`hermes chat --oneshot`), `agent.is_failure_text/is_failed_turn`, `cfg.hermes_env/profile_args` | `hermes/companion.py` (`HermesCompanion`), `agent.py` keeps `ask()` and `CommandCompanion` |
 | Hook glue that also orchestrates capture | `hermes/hooks.py` (`on_dispatch`, `_on_audio`, `_off_record`, `_remember_pack`, `on_llm_call`, `_take_pack`, `_capture_voice`, `_note_off_turn`, `off_record_block`) | engine side: `inbound.py`, `turncontext.py`; adapter keeps event↔dict translation |
 | Writing into her session | `mirror._mirror_to_session` (imports `gateway.mirror`) | `Transcript.mirror()` on the Hermes adapter; `NullTranscript.mirror()` returns `False` |
@@ -106,6 +106,12 @@ src/journal/
   agent.py            ask() facade + CommandCompanion (argv template); raises AgentUnavailable
   telegram.py         the Bot API; `TelegramChannel`, the `Channel` adapter for Telegram (+ reply_markup on send_html)
   ledger.py, notebook.py, outage.py, guard.py, status.py, tick.py, cli.py, migrate.py, location.py, audio.py, sources.py
+  chat/               the chat face (issue #43): deliver.py (`deliver`: send one message, the caller records it, the
+                      mirror; every engine send: prompts, annotation replies, reflections, the catch-up letter, program
+                      summaries), send.py (`send_prompt`: one prompt record to the chat, its ledger
+                      account, `sent.jsonl`, re-sends), fold.py (`fold`: a sent prompt's message edited once
+                      answered or expired), replies.py (`reply_annotations`); the tick runs them as its steps and still
+                      exports their names; alert.py (`Alert`, raised by both) sits beside it in the core
   library/            built-in definitions (package data)
     practices/morning.md evening.md midweek.md weekly.md
     programs/fix-life/program.md  programs/fix-life/sessions/01-anti-vision.md … 10-one-day-reset.md
@@ -302,7 +308,7 @@ New keys (all names generic; a deployment's overlay supplies its values):
 | `serve.tailscale_users` | `[]` | Logins signed in by `Tailscale-User-Login` on the socket only, from tailscaled (root peer) only, for a client that is not this host and not marked cross-site (TSAUTH). |
 | `adapter` | `auto` | `hermes` / `none` / `plainchat`; auto = hermes when `hermes_home` is set. |
 | `channel.platform`, `channel.chat_id`, `channel.user_ids` | `telegram`, `telegram.chat_id`, `[]` | The journal's chat (CHANNELS): any Hermes gateway platform, the chat as Hermes names it, and his ids there (empty: the chat is his, as a DM is). `channel.platform: none` is a journal with no chat (OPEN-PROMPTS rule 6, `Config.has_channel`): prompts, annotation replies, reflections, program summaries and notes are not sent, attempted, counted or alerted; slots go upcoming → due → missed by derivation. Program phases and interrupts are opened with no delivery and answered on a face (OPEN-PROGRAMS). An empty chat id on any other platform still fails and alerts. |
-| `windows.day_ends_at` | `04:00` | The journal day (`slots.journal_day`): words written before it belong to the day before, so an evening answered at 00:30 takes last night's slot; a deliberate send before it takes today's calendar date (`/start morning` at 03:30 delivers today's morning) unless the practice's nearest scheduled slot is last night's (`/start evening` at 00:30). An unusable value is 04:00, and doctor names it. |
+| `windows.day_ends_at` | `04:00` | The journal day (`config.journal_day`, which `slots.journal_day` is): words written before it belong to the day before, so an evening answered at 00:30 takes last night's slot and a note put down then is filed under last night's date; Today and the today block show the journal day; a deliberate send before it takes today's calendar date (`/start morning` at 03:30 delivers today's morning) unless the practice's nearest scheduled slot is last night's (`/start evening` at 00:30). An unusable value is 04:00, and doctor names it. |
 
 Storage, by owner:
 
@@ -314,7 +320,7 @@ Storage, by owner:
 | `state_dir/hook-state.json` | engine | pending voice, pending packs, off-record turns, thread stamps (`last_his`, `last_send`, `today_injected_at`) |
 | `state_dir/today-cache.json` | tick | tasks/weather lines and `heard` (the time of his newest public chat message, read through the privacy pass; never its text), refreshed every `today.cache_minutes` |
 | `state_dir/practices/` or `practices_dir` | user, PWA | user definitions and his edits of the built-ins (`.library`: the defaults they began from) |
-| `state_dir/packs/`, `audio-stash/`, `mirror-queue.json`, `conversations.json`, `sweep.json`, `send-times.json`, `sent.jsonl`, `notebook.json` | engine | as today; **unservable** by the API |
+| `state_dir/packs/`, `audio-stash/`, `mirror-queue.json`, `conversations.json`, `sweep.json`, `send-times.json`, `sent.jsonl`, `notebook.json` | engine | as today; **unservable** by the API (`/status` shows the last sweep's time, read from `sweep.json`, and nothing else of it) |
 
 ## 4. Process model
 
@@ -323,8 +329,8 @@ Four processes may touch the journal; locks and order are fixed:
 | Process | Runs | Locks it takes |
 | --- | --- | --- |
 | Gateway (Hermes) with the plugin loaded | hooks, tools, slash commands | `ledger.locked`, `ledger.locked_state(hook-state.json / conversations.json)`; never `tick.lock` |
-| Tick (`journal tick`, every 5 min, fresh process) | send → privacy → sweep → conversations → programs → fold → audio → annotate → reply → reflect → recover → mirror → cache → prune → notebook | `tick.lock` (non-blocking: skips the round if held), then `ledger.locked` per write |
-| Spawned one-shots (`journal send <id>`, `journal program <action> <run>`) | one send or one program transition | `tick.lock` blocking, then `ledger.locked` |
+| Tick (`journal tick`, every 5 min, fresh process) | send → privacy → sweep → conversations → programs → fold → audio → annotate → reply → reflect → recover → mirror → cache → prune → notebook | `tick-run.lock` and `tick.lock` (non-blocking: skips the round if either is held), then `ledger.locked` per write; yields `tick.lock` to a waiter at its safe points (`ticklock.pause`) |
+| Spawned one-shots (`journal send <id>`, `journal program <action> <run>`) | one send or one program transition | `tick.lock` blocking (`ticklock.waited`: holding `tick-wait.lock` shared while it waits, so a running tick yields), then `ledger.locked` |
 | `journal serve` (long-running, user unit) | reads; small locked writes; spawns for anything that sends; a Web Push thread (a pass a minute) | `ledger.locked` / `locked_state` for writes (the push thread: `locked_state` on `serve-push.json` and `push-sent.json` only); **never** `tick.lock` |
 
 His words from a face (`actions.answer`, `actions.note`, `actions.add`: serve's `POST /entries`, `journal write`, MCP's
@@ -334,6 +340,12 @@ nothing. The tick's scheduled
 send re-reads its record under `ledger.locked` just before `chat.send` (OPEN-PROMPTS rule 2), so a face answer made
 during the opener's model call stops the send; one made between that check and the send attaches the delivery to the
 face's record (rule 3) instead of overwriting it.
+
+A tick yields `tick.lock` between steps when someone waits for it (`ticklock.py`, DECISIONS.md TICK-LOCK-YIELD): a
+send or transition waits for the rest of one step, or one model call inside a step, not for the whole tick; every
+send is still made under `tick.lock`, so the ledger's order of sends is the chat's. `tick-run.lock` (the tick's, for
+its whole run) and `tick-wait.lock` (the waiters' flag) come first: `tick-run.lock` → `tick-wait.lock` → `tick.lock`
+(a yielding tick lets go of `tick.lock` before it waits on the flag).
 
 Lock order is always `tick.lock` → `ledger.lock` → `<state>.lock`; no process takes them in another order
 (`tests/test_locks.py` runs a hook write, a tick and a serve write concurrently in-process and asserts no
@@ -345,7 +357,7 @@ lost (gateway restart mid-spawn) is advanced here, at most five minutes late. A 
 `phase_open`; the run's `opened_at`), with or without a chat; `send_due` then means "owed a delivery" (only with a
 chat), and `programs.phase_opened` is the one reader of the two. An interrupt opens at its time
 (`programs._open_interrupts`). Opening writes nothing to `sent.jsonl`, `send-times.json` or the thread stamps, so it
-is never a chat boundary; a `/x` window holds the delivery only. Deliveries reuse `tick.send_prompt(cfg, record,
+is never a chat boundary; a `/x` window holds the delivery only. Deliveries reuse `chat.send.send_prompt(cfg, record,
 log)`, extracted from `send_due`, so prompts, phases and one-off interrupts share retries, `sent.jsonl`, mirroring
 and folding.
 

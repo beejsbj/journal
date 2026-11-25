@@ -33,7 +33,8 @@ the transcript placeholder live there, `actions.refuse`), which takes its slot f
    `slots.resolve` says which slot words, or a deliberate send (`/start`, `journal send`), go to.
 2. **Opener.** `context.build` makes a dated, sourced pack (`standing.py`, `sources.py`); `agent.ask` asks the
    companion; `validate.check` rejects uncited claims and quotes not in the record. Any failure gives the plain opener.
-3. **Send.** `compose.py` → `cfg.channel()` (the `Channel` port: the Bot API on Telegram, Hermes' senders elsewhere); the record goes into the ledger (`ledger.py`) and `sent.jsonl`; `mirror.py`
+3. **Send.** `compose.py` → `chat.deliver` (`journal/chat/`: the one send for every message the engine sends on its
+   own) → `cfg.channel()` (the `Channel` port: the Bot API on Telegram, Hermes' senders elsewhere); the record goes into the ledger (`ledger.py`) and `sent.jsonl`; `mirror.py`
    copies it into the companion's chat session. Just before a scheduled send the tick reads the record again under the
    ledger lock: answered on a face meanwhile, nothing goes (the pack is saved only after that check). A send that
    loses the race attaches to the face's record (`sent_opener`, `sent_html`, `sent_plain_text`, `needs_edit`) and
@@ -47,7 +48,7 @@ the transcript placeholder live there, `actions.refuse`), which takes its slot f
 5. **After.** Later ticks move program runs (`programs.py`: a phase is opened, its ledger record written with no
    `message_id`, then delivered when there is a chat; only the delivery waits for a `/x` window), fold the sent message where the platform allows edits
    (header, the opener as sent when it fits and parses, a status line; elsewhere the prompt is closed as sent), transcribe audio and describe pictures (`tick.process_audio`, `tick.process_images`),
-   annotate and reply (`tick.annotate`, `tick.reply_annotations`), write reflections (`reflect.py`), and catch up
+   annotate and reply (`tick.annotate`, `chat.replies.reply_annotations`), write reflections (`reflect.py`), and catch up
    after an outage (`recovery.py`, `outage.py`).
 
 `tick.py`'s docstring is the order of steps; README *Architecture* walks every module and step in full;
@@ -56,7 +57,7 @@ the transcript placeholder live there, `actions.refuse`), which takes its slot f
 ## Where state lives
 
 - **Entries**: `root`, one Markdown file per entry, kept audio and pictures beside it. Format in README *Entry file*;
-  parsed by `entries.py` and `serve/document.py`. The `%% journal … %%` lines are the writer's keys against double
+  parsed by `entries.py` and `document.py`. The `%% journal … %%` lines are the writer's keys against double
   writes; splice through those modules.
 - **State**: `state_dir` (default under Hermes `<HERMES_HOME>/plugin-data/journal`; `$JOURNAL_STATE_DIR` or the
   `state_dir` setting moves it), among others: `ledger.json`,
@@ -101,13 +102,19 @@ Read `docs/DECISIONS.md` before changing anything, and your package's section of
 - **`privacy.py` is the single privacy pass, and it fails closed.** Every reader of the chat asks it, a new reader
   included; when the pass cannot run, everything counts as private. Every path that writes his words refuses `/x`
   through `capture.opt_out` / `capture.opt_out_inside`, as `serve/writes.py` and `mcp/handlers.py` do; a new route or
-  tool does the same.
+  tool does the same. Under the callers, the writers of his words refuse it too (`capture.refuse_off_record`: in
+  `capture.record`, `capture.write_words`, the one caller of `entries.record_reply`, `conversations.his_block` and
+  `serve/blocks.edit`, `capture.write_meta`; `tests/test_off_record_floor.py`), so a caller that forgot writes nothing.
 - **Fences hold the shape.** `tests/test_purity.py`: Hermes is imported only under `hermes/` (and by `audio.py` for
   Hermes' speech-to-text, the one entry in `HERMES_ALLOWED`), and `sqlite3.connect` is called only by the transcript
   adapter and `sources.py`. `tests/test_serve_fence.py` and `tests/test_mcp_fence.py`:
-  serve and mcp import nothing that reads the chat, its privacy results, packs, the mirror or the notebook (mcp no
-  model either). `tests/test_serve_privacy.py` runs every route with `sqlite3.connect` failing; a new route gets a
-  sample there.
+  no module of serve or mcp imports, itself, anything that reads the chat, its privacy results, packs, the mirror or
+  the notebook (mcp no model either). The fence is direct, not transitive: loading serve still loads some of those
+  modules through the engine (`tests/test_route_opens.py` pins which), so what holds is behaviour:
+  `tests/test_route_opens.py` walks every route and tool recording every file opened, and fails on one under
+  `state_dir` outside its allowlist or on the chat transcript. `tests/test_serve_privacy.py` runs every route with
+  `sqlite3.connect` failing and every way to a model fenced (`helpers.no_model`; `test_mcp.py` does the same for every
+  tool); a new route gets a sample there.
 - **The engine owns sending and capture.** Serve, MCP and the companion spawn `journal send` / `journal program`; an
   HTTP worker never holds `tick.lock`.
 - **The core is stdlib.** `dependencies = []`; PyYAML (`journal[hermes]`), the MCP SDK (`journal[mcp]`) and

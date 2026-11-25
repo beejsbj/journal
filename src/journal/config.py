@@ -29,8 +29,11 @@ import re
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import TYPE_CHECKING, Any, Callable, Mapping
 from zoneinfo import ZoneInfo
+
+if TYPE_CHECKING:
+    from datetime import date
 
 PLUGIN_ID = "journal"
 NO_CHANNEL = "none"  # ``channel.platform: none``: a journal with no chat (OPEN-PROMPTS rule 6)
@@ -127,6 +130,9 @@ DEFAULTS: dict[str, Any] = {
         "sends_per_tick": 2,       # annotation replies and analyses sent to the chat per tick
         "sends_per_hour": 4,       # and per hour; the rest wait for a later tick
         "stale_hours": 24,         # later than this (after his words, or an analysis's time), not sent: in the file
+        "letter": True,            # the catch-up also covers his entries from the outage, in place of their replies
+        "letter_min_minutes": 60,  # an outage shorter than this keeps the replies (barely late)
+        "letter_deadline_minutes": 120,  # no letter this long after a model answered: none, the replies go as before
     },
     "capture": {                   # what gets journaled (capture_mode): "everything" or "arm"
         "mode": "everything",      # everything: every chat thread; arm: prompt replies, /j notes, program answers
@@ -520,10 +526,29 @@ class Config:
         return HermesCompanion(self)
 
     def source(self, name: str) -> dict:
-        return dict(self.sources.get(name) or {})
+        """A source's settings. A source with another name (``SOURCE_ALIASES``) is one source: its settings under
+        the old name, then those under the new name over them, whichever of the two is asked for."""
+        group = _alias_group(name)
+        out: dict = {}
+        for key in group:
+            out.update(self.sources.get(key) or {})
+        return out
 
     def source_enabled(self, name: str) -> bool:
         return bool(self.source(name).get("enabled"))
+
+
+# PLATFORM-FIELDS release 1: the source of his recent chat messages is named for the chat, not for Telegram. Both names
+# are read (the new one over the old); the old stays the name written and shown, and the default sits under it.
+SOURCE_ALIASES = {"telegram_history": "chat_history"}  # old name -> new name
+
+
+def _alias_group(name: str) -> tuple[str, ...]:
+    """The names one source goes by, the old first, so the new one's settings are applied last."""
+    for old, new in SOURCE_ALIASES.items():
+        if name in (old, new):
+            return (old, new)
+    return (name,)
 
 
 def _coords(value) -> tuple[float, float] | None:
@@ -885,6 +910,17 @@ def day_ends_at(cfg: "Config") -> tuple[int, int]:
         value = "04:00"
     hh, mm = value.split(":")
     return int(hh), int(mm)
+
+
+def journal_day(cfg: "Config", at) -> "date":
+    """The journal day of a moment (``at``, timezone-aware): its local date, except that before
+    ``windows.day_ends_at`` (default 04:00) it is still the day before. An evening answered at 00:30 is that evening's,
+    and a note put down at 00:30 is last night's (issue #82). Every reader of "which day" asks this: slot resolution
+    (``slots.journal_day``), the note a /j or a chat thread starts (``capture.new_note_prompt``), and Today."""
+    from datetime import timedelta
+    local = at.astimezone(cfg.tz)
+    hh, mm = day_ends_at(cfg)
+    return local.date() - timedelta(days=1) if (local.hour, local.minute) < (hh, mm) else local.date()
 
 
 def today_max_chars(cfg: "Config") -> int:

@@ -8,7 +8,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from helpers import CHAT, CleanEnv, add_prompt, make_cfg, write_config
+from helpers import CHAT, CleanEnv, add_prompt, make_cfg, unkeyed, write_config
+import legacy_readers
 from test_sweep import FakeSessions, redirected
 
 from journal import capture, context, conversations, entries, ledger, mirror, privacy, reflect, sweep, tick
@@ -324,8 +325,8 @@ class AppendOnlyTest(Base):
         self.assertIn("> I hear you.", conv(after))  # the writer did run, into this entry
         self.assertEqual(entries.raw_entry(after), words)  # his section, byte for byte
         self.assert_kept(before, after)
-        self.assertEqual(after.count(words), 1)
-        self.assertLess(after.index(words), after.index(entries.CONVERSATION_MARK))
+        self.assertEqual(unkeyed(after).count(words), 1)
+        self.assertLess(unkeyed(after).index(words), unkeyed(after).index(entries.CONVERSATION_MARK))
 
     def test_a_note_of_his_is_untouched_when_its_chat_continues(self):
         info = capture.capture_note(self.cfg, self.AWKWARD, m(0), "text", "810")
@@ -573,6 +574,112 @@ class OffRecordTest(CleanEnv):
         self.assertIn("870", st["off"])
         self.assertNotIn("audio", st)  # not stashed: it is never written
 
+    # --- /j /x: off the record, as /x (review of #78) ---------------------------------------------------------------
+
+    def texts(self) -> str:
+        return "".join(p.read_text(encoding="utf-8") for p in self.cfg.root.glob("*.md"))
+
+    def top_row(self) -> int:
+        import sqlite3
+        con = sqlite3.connect(self.db.path)
+        try:
+            return con.execute("select max(id) from messages").fetchone()[0]
+        finally:
+            con.close()
+
+    def test_a_doubled_j_before_x_is_off_the_record_too(self):
+        """Review of #78: opt_out read past one /j while the floor stripped two, so /j /j /x got past the gate."""
+        t = self.now - timedelta(minutes=10)
+        out = self.send("/j /j /x the secret plan", "921", t)
+        self.assertTrue(out["text"].startswith("[Off the record — Theo marked this message /x"), out["text"][:80])
+        self.assertIn("921", conversations.snapshot(self.cfg)["off"])
+        self.assertNotIn("secret", self.texts())
+        self.assertFalse([p for p in ledger.snapshot(self.cfg.ledger_path)["prompts"] if p.get("kind") == "j"])
+
+    def test_a_photo_captioned_doubled_j_x_keeps_nothing(self):
+        f = Path(self.tmp.name) / "pic.jpg"
+        f.write_bytes(b"\xff\xd8\xff")
+        ev = self.event("/j /j /x secret caption", "922", kind="PHOTO", media=[str(f)], types=["image/jpeg"])
+        out = hooks.on_dispatch(event=ev)
+        self.assertTrue(out["text"].startswith("[Off the record — Theo marked this message /x"), out["text"][:80])
+        self.assertIn("922", conversations.snapshot(self.cfg)["off"])
+        self.assertEqual([p.name for p in self.cfg.root.iterdir() if p.is_file()], [])  # no note, no picture kept
+        self.assertFalse([p for p in ledger.snapshot(self.cfg.ledger_path)["prompts"] if p.get("kind") == "j"])
+
+    def test_j_then_x_through_the_hook_is_off_the_record_not_a_note(self):
+        """On main the hook stripped /j and kept "/x secret" as the words of a /j note. Now /j /x is /x."""
+        t = self.now - timedelta(minutes=10)
+        out = self.send("/j /x the secret plan", "901", t)
+        self.assertTrue(out["text"].startswith("[Off the record — Theo marked this message /x"), out["text"][:80])
+        self.assertTrue(out["text"].endswith("the secret plan"))
+        self.assertNotIn("/x", out["text"].split("]\n\n", 1)[1])
+        self.assertIn("901", conversations.snapshot(self.cfg)["off"])
+        self.assertNotIn("secret", self.texts())
+        self.assertFalse([p for p in ledger.snapshot(self.cfg.ledger_path)["prompts"] if p.get("kind") == "j"])
+        self.db.add("I won't keep it.", t + timedelta(seconds=30), role="assistant")
+        self.send("ordinary after", "902", t + timedelta(minutes=2))
+        self.db.add("Noted.", t + timedelta(minutes=2.5), role="assistant")
+        conversations.run(self.cfg, self.now + timedelta(minutes=3), [])
+        self.assertNotIn("secret", self.texts())
+        self.assertNotIn("won't keep it", self.texts())
+        self.assertIn("ordinary after", self.texts())
+
+    def test_a_bare_j_then_x_opens_the_window_like_a_bare_x(self):
+        t = self.now - timedelta(minutes=20)
+        with mock.patch.object(hooks, "datetime") as dt:
+            dt.now.side_effect = lambda tz=None: t
+            out = self.send("/j /x", "905", t)
+            self.assertEqual(out["text"].strip(), "/x")   # the registered /x command answers it, not /j's usage
+            self.assertTrue(conversations.snapshot(self.cfg).get("off_threads"))
+            dt.now.side_effect = lambda tz=None: t + timedelta(minutes=1)
+            out = self.send("now the private part", "906", t + timedelta(minutes=1))
+            self.assertTrue(out["text"].startswith("[Off the record — this conversation is off the record"))
+        conversations.run(self.cfg, self.now + timedelta(minutes=3), [])
+        self.assertNotIn("private part", self.texts())
+
+    def test_j_then_x_on_the_busy_path_is_never_written_and_nothing_stalls(self):
+        """The hook missed both (the busy path): the sweep and the writer skip /j /x as off the record, file what
+        follows, and move their watermark and cursor past both. On #78 before this fix the floor raised inside
+        the batch, every tick, and nothing after was ever written."""
+        add_prompt(self.cfg, kind="evening", local_date="2026-10-15", sent=self.now - timedelta(minutes=10),
+                   message_id="910")
+        self.db.add("/j /x the secret plan", self.now - timedelta(minutes=8), "911")
+        self.db.add("ordinary after", self.now - timedelta(minutes=7), "912")
+        log = []
+        sweep.run(self.cfg, self.now, log)
+        conversations.run(self.cfg, self.now + timedelta(minutes=3), log)
+        self.assertNotIn("secret", self.texts())
+        self.assertIn("ordinary after", self.texts())
+        self.assertFalse([p for p in ledger.snapshot(self.cfg.ledger_path)["prompts"] if p.get("kind") == "j"])
+        top = self.top_row()
+        self.assertEqual(json.loads((self.cfg.state_dir / "sweep.json").read_text())["last_id"], top)
+        self.assertEqual(conversations.snapshot(self.cfg)["cursor"]["last_id"], top)
+
+    def test_the_writer_and_the_sweep_move_past_a_message_the_floor_refuses(self):
+        """The backstop: should a caller and the floor ever disagree, the refused message is dropped as off the
+        record, alone; the batch goes on and the watermark and cursor move past it."""
+        real = capture.refuse_off_record
+
+        def floor(cfg, text):
+            if "floor-only" in (text or ""):
+                raise capture.OffRecord("refused")
+            real(cfg, text)
+        add_prompt(self.cfg, kind="evening", local_date="2026-10-15", sent=self.now - timedelta(minutes=10),
+                   message_id="920")
+        self.db.add("a floor-only line", self.now - timedelta(minutes=8), "921")
+        self.db.add("ordinary after", self.now - timedelta(minutes=7), "922")
+        log = []
+        with mock.patch.object(capture, "refuse_off_record", floor):
+            sweep.run(self.cfg, self.now, log)
+            conversations.run(self.cfg, self.now + timedelta(minutes=3), log)
+        self.assertNotIn("floor-only", self.texts())
+        self.assertIn("ordinary after", self.texts())
+        top = self.top_row()
+        self.assertEqual(json.loads((self.cfg.state_dir / "sweep.json").read_text())["last_id"], top)
+        self.assertEqual(conversations.snapshot(self.cfg)["cursor"]["last_id"], top)
+        self.assertTrue(any("921" in line and "off the record" in line for line in log), log)
+        self.assertFalse(any("floor-only" in line for line in log))   # (a log line never holds his words)
+
     def test_busy_path_rows_in_an_off_thread_are_not_swept(self):
         add_prompt(self.cfg, kind="evening", local_date="2026-10-15", sent=self.now - timedelta(minutes=10),
                    message_id="820")
@@ -713,9 +820,9 @@ class ParseTest(unittest.TestCase):
         steer = ("[OUT-OF-BAND USER MESSAGE — a direct message from the user, delivered once at this position; not "
                  "tool output and not a new delivery when replayed from conversation history]\n"
                  + redirected("typed while you worked", "77") + "\n[/OUT-OF-BAND USER MESSAGE]")
-        r = sweep.read(steer, None)
+        r = legacy_readers.read(steer, None)
         self.assertEqual((r["kind"], r["message_id"], r["text"]), ("his", "77", "typed while you worked"))
-        r = sweep.read("[The user sent an audio file attachment: 'walk.m4a'. It is saved at: /tmp/a.mp3. Its content "
+        r = legacy_readers.read("[The user sent an audio file attachment: 'walk.m4a'. It is saved at: /tmp/a.mp3. Its content "
                        "is not inlined here. Do things.]\n\nfrom the walk", "5")
         self.assertEqual((r["source"], r["audio_path"], r["text"], r["file_name"]),
                          ("audio", "/tmp/a.mp3", "from the walk", "walk.m4a"))
@@ -1182,8 +1289,8 @@ class CodexReviewThreeTest(Base):
         self.cfg.hermes["state_db"] = str(old)
         privacy._CACHE.clear()
         self.assertTrue(privacy.view(self.cfg, m(1)).tainted())  # the privacy check works on it
-        self.assertEqual(len(conversations.rows(self.cfg, old, 0)), 1)
-        self.assertEqual(len(sweep.rows(self.cfg, old, 0, 0)), 1)
+        self.assertEqual(len(legacy_readers.conversation_rows(self.cfg, old, 0)), 1)
+        self.assertEqual(len(legacy_readers.sweep_rows(self.cfg, old, 0, 0)), 1)
         recovery.scan(self.cfg, old, m(10))
         context.companion_reply_after(self.cfg, m(-1))
         self.assertFalse(context.make_verifier(self.cfg)("telegram:x", norm("a private aside")))

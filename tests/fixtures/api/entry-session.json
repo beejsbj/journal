@@ -127,7 +127,8 @@
       "source": "text",
       "text": "The life I do not want.",
       "audio": null,
-      "phase": 1
+      "phase": 1,
+      "anchor": null
     },
     {
       "kind": "his",
@@ -136,13 +137,15 @@
       "source": "text",
       "text": "The life I want.",
       "audio": null,
-      "phase": 2
+      "phase": 2,
+      "anchor": null
     }
   ],
   "summary": "Two phases done.",
   "analysis": {
     "annotations": null,
     "notes": [],
+    "margin": [],
     "reflection": null
   },
   "flags": {

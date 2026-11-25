@@ -20,6 +20,7 @@ from journal import (agent, capture, cli, compose, config, context, entries, led
 from journal import commands as jcommands
 from journal.config import Names, load
 from journal.hermes import commands, hooks, runtime
+from journal.chat import send as chat_send  # (send_prompt's clock, moved from tick: issue #43)
 
 IST = ZoneInfo("Asia/Kolkata")
 NAMES = Names(user="Sam", companion="Ada", emoji="🌿", pronouns="he/him/his", frontmatter_source="journal")
@@ -90,7 +91,7 @@ class Base(CleanEnv):
             self.asked.append(query)
             raise agent.AgentUnavailable("no model in this test")
         for p in (mock.patch.object(telegram, "_call", self.bot), mock.patch.object(telegram, "token", lambda c: "T"),
-                  mock.patch.object(agent, "ask", unreachable), mock.patch.object(tick, "datetime", Clock),
+                  mock.patch.object(agent, "ask", unreachable), mock.patch.object(tick, "datetime", Clock), mock.patch.object(chat_send, "datetime", Clock),
                   mock.patch.object(context, "build", lambda c, n, *a: "PACK")):
             p.start()
             self.addCleanup(p.stop)
@@ -590,10 +591,10 @@ class ClosesTest(Base):
                    .replace("title: Daily gratitude", "title: Night pages\ncloses: day"))
         self.assertEqual(library.closer(self.cfg, "day").id, "pages")
         self.answered("2026-10-14-pages", "rain all day, walked anyway", at(23, 40))
-        due = reflect.due(self.cfg, ledger.snapshot(self.cfg.ledger_path), at(23, 45))
-        self.assertIn(("reflection", WED.date(), "annotated"), due)
+        due = reflect.due(self.cfg, ledger.snapshot(self.cfg.ledger_path), at(4, 45, WED + timedelta(days=1)))
+        self.assertIn(("reflection", WED.date(), "annotated"), due)  # (once the day has ended)
         rows = {n: d for n, s, d in status.doctor(self.cfg, token=False)}
-        self.assertEqual(rows["day reflection"], "after the pages entry is annotated, fallback 04:00 the next day")
+        self.assertEqual(rows["day reflection"], "once the day has ended, after the pages entry is annotated, fallback 04:00 the next day")
 
     def test_with_nothing_closing_the_day_only_the_fallback_writes_it(self):
         fork = library.fork(self.cfg, "evening")
