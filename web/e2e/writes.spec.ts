@@ -97,6 +97,20 @@ test("/x is refused by the server and stays in the box", async ({ page }) => {
   await expect(page.locator(".composer textarea")).toHaveValue("/x not for the journal");
 });
 
+test("a line put down on Today is a note, as /j makes one; /x is refused there too", async ({ page }) => {
+  await page.goto("/");
+  const box = page.getByLabel("A line for today, saved as a note");
+  await box.fill("/x not for the journal");
+  await box.press("Enter");
+  await expect(page.locator(".quick-line .error-line")).toContainText("not saved");
+  await expect(box).toHaveValue("/x not for the journal");
+  await box.fill("The kettle, the rain.");
+  await box.press("Enter");
+  await expect(page.locator(".quick-line-said")).toContainText("Saved as a note.");
+  await expect(box).toHaveValue("");
+  await expect(page.locator(".written-list")).toContainText("The kettle, the rain.");
+});
+
 test("mood and a star on an entry", async ({ page }) => {
   await page.goto("/entries/2026-10-14-evening");
   await page.getByRole("button", { name: "Mood, people, star" }).click();

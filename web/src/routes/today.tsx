@@ -3,6 +3,7 @@ import { useLocation } from "preact-iso";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { api } from "../api";
 import { PromptLetter } from "../components/Prompt";
+import { QuickLine } from "../components/QuickLine";
 import { HeldRunCard, RunCard, holdsQuestions } from "../components/RunCard";
 import { OSM, OsmCredit } from "../components/OsmCredit";
 import { WeekStrip } from "../components/WeekStrip";
@@ -295,6 +296,7 @@ export function TodayRoute() {
                   </div>
                 </header>
                 <WeekStrip week={today.week} today={today.date} />
+                <QuickLine onDone={reload} />
                 {nothing && <Empty>Nothing scheduled today.</Empty>}
                 {waiting.length > 0 && (
                   <Sec id="waiting-h" title="Waiting for you" i={i++} class="waiting"

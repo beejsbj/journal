@@ -16,6 +16,20 @@ How an install is put together, and what an update touches. Newest section first
 
 The gateway restarts in **windows**, at least an hour from a ritual (the built-ins' default times: 06:00, Wed 12:00, Sun 20:00, 23:00): A (WP0 to WP3), B (WP4 to WP8), C (WP13, the last). A deploy section says which it rides. Rollback is always `hermes -p <profile> plugins install beejsbj/journal --force --ref <previous sha>` (and the CLI at the previous sha), plus a gateway restart when the section says the hook side changed. Receipts: the vault checksum (`sha256sum $JOURNAL_ROOT/*.md | sha256sum`) before and after any check that sends or stores a message.
 
+## TODAY-QUICK-J — a line put down from Today (2026-11-25; serve side only; **no gateway restart**; no config or state change)
+
+**What changes.** Today has a one-line box under the week strip: Enter (or *Put down*) saves the line as a note,
+exactly as `/j` does in the chat (`POST /entries` with no practice: `actions.note`). The write room is unchanged and
+stays for longer pieces. `/x` is refused by the server as on every face, and the words stay in the box (issue #82,
+part 3). DECISIONS.md, TODAY-QUICK-J.
+**Side and restart.** The web app only (`web/`, built into `serve/static/`); no Python changes. `uv tool install
+--force` at the merge sha and `systemctl --user restart journal-serve`; the PWA then offers "Update available".
+**First checks.**
+- On Today, a line typed and Enter: "Saved as a note.", the box empties, and *Written today* lists it.
+- `/x something` typed there: refused with the server's reason, nothing saved (no new file under the configured
+  `root`), the words still in the box.
+**Rollback.** `uv tool install --force` at the previous sha and the serve restart. Notes made stay, as any note does.
+
 ## TICK-LOCK-YIELD — the tick lets a waiting `/next` or send go first (2026-11-24; tick side; **no gateway restart needed**; no config or state change)
 
 **What changes.** Issue #45. A `/next`, a phase step, `/start` or the web app's Send (each a spawned `journal program …`
