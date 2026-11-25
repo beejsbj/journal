@@ -634,6 +634,7 @@ class PacedAnalysesTest(ReflectBase):
         # The 14th's reflection was deferred by an outage when its day ended (15 Oct 04:00); now the 15th has ended
         # too. (Since a reflection waits for its journal day to end, two come due together only after an outage.)
         with ledger.locked(self.cfg.ledger_path) as data:
+            data["reflections_since"] = "2026-10-14"  # (an install that ran then: not a first run)
             data.setdefault("reflections", []).append(
                 {"id": "2026-10-14-reflection", "kind": "reflection", "local_date": "2026-10-14",
                  "deferred_since": datetime(2026, 10, 15, 4, 0, tzinfo=IST).isoformat()})
